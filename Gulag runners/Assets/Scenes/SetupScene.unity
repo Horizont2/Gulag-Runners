@@ -475,6 +475,7 @@ MonoBehaviour:
   hatchWidth: 1.8
   alternateLadderSides: 1
   buildTestFeatures: 1
+  scaleFeaturesToPlayer: 1
   floorGapWidth: 2
   buildCages: 1
   solidMaterial: {fileID: 2100000, guid: f91235ee31c97d01b3d247937749332f, type: 2}
@@ -3368,13 +3369,13 @@ MonoBehaviour:
   shakeFrequency: 22
   traumaDecay: 1.8
   applyViewportRect: 1
-  deviceAspect: 2.1666667
   viewportRect:
     serializedVersion: 2
     x: 0
     y: 0.5
     width: 1
     height: 0.5
+  deviceAspect: 2.1666667
   drawZones: 1
 --- !u!4 &1900000136
 Transform:
@@ -3541,13 +3542,13 @@ MonoBehaviour:
   shakeFrequency: 22
   traumaDecay: 1.8
   applyViewportRect: 1
-  deviceAspect: 2.1666667
   viewportRect:
     serializedVersion: 2
     x: 0
     y: 0
     width: 1
     height: 0.5
+  deviceAspect: 2.1666667
   drawZones: 1
 --- !u!1 &1900000140
 GameObject:
@@ -3628,6 +3629,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4528812574583756579, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: b99d0e450514eff4e99fb7351f800836, type: 2}
     - target: {fileID: 6378207671594616785, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_Controller
       value: 
@@ -3741,6 +3746,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4528812574583756579, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: fbfcb1e50d948b5428a5bb7ad5e5588d, type: 2}
     - target: {fileID: 6378207671594616785, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_Controller
       value: 
