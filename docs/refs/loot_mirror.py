@@ -7,16 +7,37 @@ from sim_motor_mirror import M, C, ACTION, ONE, mul
 BARE_GAIN = 1000
 
 # ---------------------------------------------------------------- items (docs/03, M0 cut)
-NONE, FISTS, CLUB, SPEAR, CHAINMAIL, BANDAGE = 0, 1, 2, 3, 4, 5
+NONE, FISTS, CLUB, SPEAR = 0, 1, 2, 3
+DAGGER, SWORD, AXE, FLAIL, GREATAXE = 4, 5, 6, 7, 8
+LEATHER, CHAINMAIL, PLATE = 20, 21, 22
+BANDAGE = 30
 WEAPON, ARMOUR, UTILITY = 1, 2, 3
 
+
+def _w(name, tier, dmg, frames, reach, dur, pry, pierce=0):
+    return dict(kind=WEAPON, tier=tier, dmg=dmg, frames=frames, reach=M(reach),
+                pry=M(pry), dur=dur, pierce=pierce, name=name)
+
+
+def _a(name, tier, reduction):
+    return dict(kind=ARMOUR, tier=tier, dmg=0, frames=0, reach=0, pry=0, dur=0,
+                pierce=0, reduction=reduction, name=name)
+
+
 ITEMS = {
-    NONE:      dict(kind=0, tier=0, pry=0,    dur=0,  name="-"),
-    FISTS:     dict(kind=WEAPON,  tier=0, pry=M(1000), dur=0,  name="fists"),
-    CLUB:      dict(kind=WEAPON,  tier=1, pry=M(2000), dur=14, name="club"),
-    SPEAR:     dict(kind=WEAPON,  tier=2, pry=M(1600), dur=9,  name="spear"),
-    CHAINMAIL: dict(kind=ARMOUR,  tier=2, pry=0,       dur=0,  name="chainmail"),
-    BANDAGE:   dict(kind=UTILITY, tier=1, pry=0,       dur=0,  name="bandage"),
+    NONE:      dict(kind=0, tier=0, pry=0, dur=0, name="-"),
+    FISTS:     _w("fists", 0, 3, 12, 600, 0, 1000),
+    CLUB:      _w("club", 1, 8, 15, 950, 14, 2000),
+    SPEAR:     _w("spear", 2, 13, 27, 1700, 9, 1600),
+    DAGGER:    _w("dagger", 1, 4, 9, 500, 18, 1200),
+    SWORD:     _w("sword", 2, 10, 19, 1150, 12, 1500),
+    AXE:       _w("axe", 2, 12, 23, 1050, 10, 2400),
+    FLAIL:     _w("flail", 3, 12, 21, 1300, 9, 1400, pierce=700),
+    GREATAXE:  _w("greataxe", 3, 21, 34, 1500, 6, 2600),
+    LEATHER:   _a("leather vest", 1, 150),
+    CHAINMAIL: _a("chainmail", 2, 300),
+    PLATE:     _a("plate", 3, 450),
+    BANDAGE:   dict(kind=UTILITY, tier=1, pry=0, dur=0, heal=30, name="bandage"),
 }
 
 def pry_milli(weapon):

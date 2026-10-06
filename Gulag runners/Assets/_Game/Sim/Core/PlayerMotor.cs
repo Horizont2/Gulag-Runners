@@ -131,10 +131,24 @@ namespace GulagRunners.Sim
             }
 
             Fix targetSpeed = (s.Crouching ? cfg.CrouchSpeed : cfg.RunSpeed) * wishX;
-            Fix accel = wishX != 0
-                ? (grounded ? cfg.GroundAccel : cfg.AirAccel)
-                : (grounded ? cfg.GroundDecel : cfg.AirDecel);
-            s.Velocity.X = Fix.MoveTowards(s.Velocity.X, targetSpeed, accel * Dt);
+            if (s.SpeedPermille > 0)
+                targetSpeed = new Fix((int)(((long)targetSpeed.Raw * s.SpeedPermille) / 1000));
+
+            // Knocked back: the body keeps what the blow gave it. Running the normal ground
+            // deceleration over a hit would wipe the knockback in a tenth of a second, and a hit
+            // that does not move anybody is a hit nobody can read.
+            if (s.HitstunTimer > 0 || s.StaggerTimer > 0)
+            {
+                Fix drag = cfg.GroundDecel / 6;
+                s.Velocity.X = Fix.MoveTowards(s.Velocity.X, Fix.Zero, drag * Dt);
+            }
+            else
+            {
+                Fix accel = wishX != 0
+                    ? (grounded ? cfg.GroundAccel : cfg.AirAccel)
+                    : (grounded ? cfg.GroundDecel : cfg.AirDecel);
+                s.Velocity.X = Fix.MoveTowards(s.Velocity.X, targetSpeed, accel * Dt);
+            }
 
             // Jump. Coyote time and the input buffer together are the "ledge assist" of docs/02:
             // a jump pressed just before landing, or just after stepping off, still fires.
@@ -149,8 +163,10 @@ namespace GulagRunners.Sim
                 s.Noise = NoiseLevel.Quiet;
             }
 
-            // Variable jump height: releasing the button early cuts the rise short.
-            if (!s.JumpHeld && s.Velocity.Y > Fix.Zero)
+            // A jump is one height. Releasing the button early used to cut the rise short, which
+            // reads well on a pad and badly on glass: the same tap gives a different height every
+            // time, so no gap in the arena has a reliable answer.
+            if (cfg.VariableJumpHeight && !s.JumpHeld && s.Velocity.Y > Fix.Zero)
                 s.Velocity.Y = s.Velocity.Y * cfg.JumpCutMul;
 
             if (!grounded)
@@ -210,9 +226,11 @@ namespace GulagRunners.Sim
         {
             if (!input.Has(InputFlags.Dodge)) return false;
             if (s.DodgeRecoverTimer > 0) return false;
-            if (s.StaminaCharges <= 0) return false;
 
-            s.StaminaCharges--;
+            int cost = cfg.DodgeStaminaCost > 0 ? cfg.DodgeStaminaCost : 1;
+            if (s.StaminaCharges < cost) return false;
+
+            s.StaminaCharges -= cost;
             s.Mode = MoveMode.Dodging;
             s.DodgeTimer = cfg.DodgeFrames;
             s.Crouching = false;

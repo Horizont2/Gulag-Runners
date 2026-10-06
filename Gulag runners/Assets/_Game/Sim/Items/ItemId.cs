@@ -25,11 +25,30 @@ namespace GulagRunners.Sim
         /// <summary>T2 weapon. Slow, long, hits hard, breaks sooner. The opposite plan to the club.</summary>
         Spear = 3,
 
+        /// <summary>T1. Quickest in the game and shortest: it has to be earned by closing in.</summary>
+        Dagger = 4,
+
+        /// <summary>T2. The middle of the table — the one the others are read against.</summary>
+        Sword = 5,
+
+        /// <summary>T2. Slower and heavier than the sword, and the best lever in the game.</summary>
+        Axe = 6,
+
+        /// <summary>T3. Slow, enormous, and it goes through a guard. The answer to turtling.</summary>
+        Flail = 7,
+
+        /// <summary>T3. If it lands, the fight is decided.</summary>
+        Greataxe = 8,
+
+        /// <summary>T1 armour.</summary>
+        LeatherVest = 20,
         /// <summary>T2 armour. Visible on the character, which is information for the opponent.</summary>
-        Chainmail = 4,
+        Chainmail = 21,
+        /// <summary>T3 armour.</summary>
+        Plate = 22,
 
         /// <summary>T1 utility.</summary>
-        Bandage = 5
+        Bandage = 30
     }
 
     public enum ItemKind : byte

@@ -27,6 +27,13 @@ namespace GulagRunners.Sim
         public Fix Gravity;
         public Fix MaxFallSpeed;
         public Fix JumpSpeed;
+
+        /// <summary>
+        /// Let go of the button early and the rise is cut short by this. Off by default: a jump
+        /// whose height depends on how long a thumb stayed on glass is a jump a player cannot
+        /// aim, and every ledge in the arena is then a different distance depending on the tap.
+        /// </summary>
+        public bool VariableJumpHeight;
         public Fix JumpCutMul;
         public int CoyoteFrames;
         public int JumpBufferFrames;
@@ -72,7 +79,14 @@ namespace GulagRunners.Sim
         public Fix DodgeSpeed;
         public int DodgeFrames;
         public int DodgeRecoverFrames;
+        /// <summary>Charges one dodge costs. More than one is what makes dodges rare.</summary>
+        public int DodgeStaminaCost;
 
+        /// <summary>
+        /// Stamina is a pool of small charges rather than a count of dodges, because docs/02
+        /// spends it on two things at once — the dodge and holding a guard — and those two cannot
+        /// share a resource sensibly unless one of them can cost more than the other.
+        /// </summary>
         public int StaminaMax;
         public int StaminaRecoverFrames;
 
@@ -106,6 +120,7 @@ namespace GulagRunners.Sim
             c.Gravity          = Fix.FromMilli(28000);
             c.MaxFallSpeed     = Fix.FromMilli(18000);
             c.JumpSpeed        = Fix.FromMilli(9500);
+            c.VariableJumpHeight = false;
             c.JumpCutMul       = Fix.FromMilli(450);
             c.CoyoteFrames     = 6;   // 0.10 s
             c.JumpBufferFrames = 7;   // 0.12 s
@@ -121,12 +136,13 @@ namespace GulagRunners.Sim
             c.ScriptMaxFrames = 30;       // 0.50 s
             c.LadderRegrabFrames = 12;    // 0.20 s
 
-            c.DodgeSpeed         = Fix.FromMilli(7000);
-            c.DodgeFrames        = 21;  // 0.35 s
+            c.DodgeSpeed         = Fix.FromMilli(4800);   // 1.68 m, down from 2.45
+            c.DodgeFrames        = 21;  // 0.35 s of invulnerability, straight from docs/02
             c.DodgeRecoverFrames = 9;
+            c.DodgeStaminaCost   = 3;
 
-            c.StaminaMax            = 3;
-            c.StaminaRecoverFrames  = 72; // 1.2 s
+            c.StaminaMax            = 6;   // two dodges, or six blocked hits
+            c.StaminaRecoverFrames  = 33;  // 0.55 s a charge, so a spent dodge is back in 1.65 s
 
             c.BodyWidth   = Fix.FromMilli(600);
             c.BodyHeight  = Fix.FromMilli(1800);

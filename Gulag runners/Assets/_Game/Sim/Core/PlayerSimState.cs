@@ -12,6 +12,18 @@ namespace GulagRunners.Sim
         Mounting = 5
     }
 
+    /// <summary>Where a swing is in its life. docs/02: wind-up, the hit, and the price of missing.</summary>
+    public enum AttackPhase : byte
+    {
+        None = 0,
+        /// <summary>Committed, nothing has happened yet. This is the window the opponent reads.</summary>
+        Windup = 1,
+        /// <summary>The hitbox is live.</summary>
+        Active = 2,
+        /// <summary>What a miss costs.</summary>
+        Recovery = 3
+    }
+
     /// <summary>
     /// Everything the simulation knows about one player's movement.
     /// Deliberately a plain struct of value types: docs/06 requires the whole round state to
@@ -68,6 +80,52 @@ namespace GulagRunners.Sim
 
         /// <summary>Was the action button down last tick. Swapping wants a press, not a hold.</summary>
         public bool ActionHeld;
+
+        // ---------------------------------------------------------------- the fight (docs/02)
+
+        public short Health;
+
+        public AttackPhase Attack;
+        /// <summary>Frames left in the current phase.</summary>
+        public int AttackTimer;
+        /// <summary>How long the whole current phase lasts, for presentation to scrub a clip by.</summary>
+        public int AttackPhaseFrames;
+        /// <summary>0, 1, 2. The third is the heavy one that ends the string.</summary>
+        public byte ComboIndex;
+        /// <summary>Frames left to continue the combo with another press.</summary>
+        public int ComboTimer;
+        /// <summary>This swing has already connected; one swing hits once.</summary>
+        public bool SwingSpent;
+
+        public bool Blocking;
+        /// <summary>Frames the guard has been up. Under ParryFrames it parries instead of blocks.</summary>
+        public int GuardTimer;
+        /// <summary>Guard broken: frames until it can be raised again.</summary>
+        public int GuardBreakTimer;
+
+        /// <summary>Hit and unable to act. Knockback is carried by velocity, not by this.</summary>
+        public int HitstunTimer;
+        /// <summary>Parried. Longer than hitstun, and entirely the attacker's own fault.</summary>
+        public int StaggerTimer;
+
+        public bool Dead;
+        public int DeathTimer;
+        public bool GuardHeld;
+
+        /// <summary>
+        /// Ground speed cap as a fraction of the run speed, in thousandths. Zero means no cap —
+        /// the combat layer sets it so that a raised guard slows the body without the movement
+        /// motor needing to know what a guard is.
+        /// </summary>
+        public short SpeedPermille;
+
+        // ---- outputs of the last tick, for presentation and audio
+        public short DamageTaken;
+        public bool WasHit;
+        public bool WasBlocked;
+        public bool WasParried;
+        public bool SwingStarted;
+        public bool JustDied;
         /// <summary>Counts down after letting go of a ladder; no new ladder is grabbed until it
         /// reaches zero.</summary>
         public int LadderCooldownTimer;
@@ -90,6 +148,9 @@ namespace GulagRunners.Sim
         public NoiseLevel Noise;
 
         public bool Invulnerable => DodgeTimer > 0;
+        /// <summary>Unable to act: hit, parried, or dead.</summary>
+        public bool Reeling => HitstunTimer > 0 || StaggerTimer > 0 || Dead;
+        public bool Swinging => Attack != AttackPhase.None;
         public bool OnGround => Mode == MoveMode.Grounded;
 
         public static PlayerSimState Spawn(FixVec2 position, sbyte facing, in MoveConfig config)
@@ -106,6 +167,8 @@ namespace GulagRunners.Sim
             s.PickedUp = ItemId.None;
             s.Dropped = ItemId.None;
             s.StaminaCharges = config.StaminaMax;
+            s.Health = 100;
+            s.Attack = AttackPhase.None;
             s.Noise = NoiseLevel.Silent;
             return s;
         }

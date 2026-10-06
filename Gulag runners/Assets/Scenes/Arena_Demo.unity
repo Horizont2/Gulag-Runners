@@ -662,6 +662,7 @@ MonoBehaviour:
     gravity: 28
     maxFallSpeed: 18
     jumpSpeed: 9.5
+    variableJumpHeight: 0
     jumpCutMultiplier: 0.2
     coyoteFrames: 6
     jumpBufferFrames: 7
@@ -675,11 +676,12 @@ MonoBehaviour:
     scriptMinFrames: 10
     scriptMaxFrames: 30
     ladderRegrabFrames: 12
-    dodgeSpeed: 7
+    dodgeSpeed: 4.8
     dodgeFrames: 21
     dodgeRecoverFrames: 9
-    staminaMax: 3
-    staminaRecoverFrames: 72
+    dodgeStaminaCost: 3
+    staminaMax: 6
+    staminaRecoverFrames: 33
     bodyWidth: 0.3
     bodyHeight: 0.91
     crouchHeight: 1.1
@@ -871,6 +873,7 @@ MonoBehaviour:
     gravity: 28
     maxFallSpeed: 18
     jumpSpeed: 9.5
+    variableJumpHeight: 0
     jumpCutMultiplier: 0.2
     coyoteFrames: 6
     jumpBufferFrames: 7
@@ -884,11 +887,12 @@ MonoBehaviour:
     scriptMinFrames: 10
     scriptMaxFrames: 30
     ladderRegrabFrames: 12
-    dodgeSpeed: 7
+    dodgeSpeed: 4.8
     dodgeFrames: 21
     dodgeRecoverFrames: 9
-    staminaMax: 3
-    staminaRecoverFrames: 72
+    dodgeStaminaCost: 3
+    staminaMax: 6
+    staminaRecoverFrames: 33
     bodyWidth: 0.3
     bodyHeight: 0.91
     crouchHeight: 1.1
@@ -1565,6 +1569,41 @@ MonoBehaviour:
       toolWear: 3
     decayMultiplier: 2
     noiseInterval: 0.33
+  drops:
+    popSpeedX: 1.4
+    popSpeedY: 3.6
+    dropSpeedX: 1.1
+    dropSpeedY: 2.2
+    gravity: 22
+    maxFallSpeed: 14
+    bounce: 0.15
+    pickupRadius: 0.22
+    popLock: 0.23
+    dropLock: 0.5
+  groundItemCapacity: 6
+  combat:
+    maxHealth: 100
+    activeTime: 0.05
+    recoveryShare: 0.7
+    comboWindow: 0.33
+    maxCombo: 3
+    heavyDamageMultiplier: 1.7
+    heavyTimingMultiplier: 1.5
+    hitstunPerDamage: 1
+    maxHitstun: 0.43
+    knockbackSpeed: 3.2
+    heavyKnockbackSpeed: 6
+    knockbackLift: 1.6
+    chip: 0.15
+    blockStaminaCost: 2
+    guardBreakTime: 0.7
+    blockSpeed: 0.42
+    parryWindow: 0.12
+    staggerTime: 0.6
+    deathTime: 1.5
+  fighters:
+  - {fileID: 1900000122}
+  - {fileID: 1900000130}
   logOpenings: 1
 --- !u!1001 &1900000600
 PrefabInstance:
@@ -1630,7 +1669,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1491755031287024, guid: 6d24153a60e1f22d90e8a8d1ff2cb34a, type: 3}
       propertyPath: contents
-      value: 4
+      value: 21
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1706,7 +1745,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1541552742287974, guid: 8198c47ba65c7ce4e3a4557f1166056b, type: 3}
       propertyPath: contents
-      value: 5
+      value: 30
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

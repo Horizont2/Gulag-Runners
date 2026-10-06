@@ -13,11 +13,11 @@ GROUND_STICK = M(200)
 
 C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          AACC=M(22000), ADEC=M(10000), GRAV=M(28000), MAXFALL=M(18000),
-         JUMP=M(9500), CUT=M(200), COYOTE=6, BUF=7,
-         CUP=M(2000), CDN=M(2600), DODGE=M(7000), DF=21, DR=9,
+         JUMP=M(9500), VARJUMP=False, CUT=M(200), COYOTE=6, BUF=7,
+         CUP=M(2000), CDN=M(2600), DODGE=M(4800), DF=21, DR=9, DCOST=3,
          LDIS=M(1500), LSNAP=M(2000), LTOP=M(60), MREACH=M(1600),
          SSPD=M(2400), SMINF=10, SMAXF=30, LREGRAB=12,
-         SMAX=3, SREC=72, W=M(300), H=M(910), CH=M(682),
+         SMAX=6, SREC=33, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CORNER=M(250), FALLTHRU=18,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
@@ -36,6 +36,12 @@ class S:
         # loot (LootMotor): three slots, the chest claim, and the per-tick outputs
         s.inv = None; s.opening = -1; s.picked = 0; s.opened_chest = -1
         s.dropped = 0; s.standing_on = -1; s.action_held = False
+        # combat (CombatMotor)
+        s.health = 100; s.attack = 0; s.attack_t = 0; s.combo = 0; s.combo_t = 0
+        s.swing_spent = False; s.blocking = False; s.guard_t = 0; s.guard_break = 0
+        s.stun = 0; s.stagger = 0; s.dead = False; s.guard_held = False
+        s.speed_permille = 0; s.damage_taken = 0
+        s.was_hit = s.was_blocked = s.was_parried = s.swing_started = s.just_died = False
 
 def boxes(scene_pieces, kind):
     return [b for b in scene_pieces if b[4] == kind]
@@ -158,8 +164,8 @@ def step(s, inp, w):
             s.dodge_rec = C["DR"]; s.vx //= 2
             s.mode = "ground" if grounded(s, w) else "air"
         return
-    if (inp & DOD) and s.dodge_rec == 0 and s.stam > 0:
-        s.stam -= 1; s.mode = "dodge"; s.dodge = C["DF"]; s.crouch = False; s.ladder = -1
+    if (inp & DOD) and s.dodge_rec == 0 and s.stam >= C["DCOST"]:
+        s.stam -= C["DCOST"]; s.mode = "dodge"; s.dodge = C["DF"]; s.crouch = False; s.ladder = -1
         d = wx or s.facing; s.facing = d; s.vx = C["DODGE"] * d; s.vy = 0; s.noise = 2
         move_x(s, mul(s.vx, DT), w); s.dodge -= 1
         return
@@ -181,13 +187,18 @@ def step(s, inp, w):
         s.buf = 0; s.fallthru = C["FALLTHRU"]; s.mode = "air"; g = False
 
     tgt = (C["CROUCH"] if s.crouch else C["RUN"]) * wx
-    acc = (C["GACC"] if g else C["AACC"]) if wx else (C["GDEC"] if g else C["ADEC"])
-    s.vx = move_towards(s.vx, tgt, mul(acc, DT))
+    if s.speed_permille > 0:
+        tgt = (tgt * s.speed_permille) // 1000
+    if s.stun > 0 or s.stagger > 0:
+        s.vx = move_towards(s.vx, 0, mul(C["GDEC"] // 6, DT))
+    else:
+        acc = (C["GACC"] if g else C["AACC"]) if wx else (C["GDEC"] if g else C["ADEC"])
+        s.vx = move_towards(s.vx, tgt, mul(acc, DT))
 
     if s.buf > 0 and (g or s.coyote > 0):
         s.buf = 0; s.coyote = 0; s.crouch = False
         s.vy = C["JUMP"]; s.mode = "air"; g = False; s.noise = 1
-    if not s.jump_held and s.vy > 0: s.vy = mul(s.vy, C["CUT"])
+    if C["VARJUMP"] and not s.jump_held and s.vy > 0: s.vy = mul(s.vy, C["CUT"])
 
     if not g:
         s.vy -= mul(C["GRAV"], DT)

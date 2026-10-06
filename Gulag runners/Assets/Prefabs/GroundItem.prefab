@@ -445,9 +445,9 @@ MonoBehaviour:
     root: {fileID: 6380059922749513}
   - item: 3
     root: {fileID: 6380059922749523}
-  - item: 4
+  - item: 21
     root: {fileID: 6380059922749533}
-  - item: 5
+  - item: 30
     root: {fileID: 6380059922749543}
   spinRoot: {fileID: 6380059922749505}
   tintTarget: {fileID: 0}

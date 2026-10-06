@@ -33,6 +33,13 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix PrySpeed;
 
+        /// <summary>
+        /// How much of the damage goes through a raised guard, in thousandths, when that is more
+        /// than the ordinary chip. docs/03 asks that every item have a counter-item; this is the
+        /// flail's, and the thing it counters is a player who never lowers their shield.
+        /// </summary>
+        public int BlockPierce;
+
         // ---- armour
         /// <summary>Fraction of incoming damage removed. docs/02: T1/T2/T3 = 15/30/45%.</summary>
         public Fix DamageReduction;

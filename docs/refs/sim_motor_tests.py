@@ -1,5 +1,5 @@
 import sim_motor_mirror as T
-from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD
+from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, JMP, DOD
 
 # ---- the exact arena baked into SetupScene -------------------------------------
 floors, rooms = 3, 3
@@ -96,7 +96,8 @@ s = S(0, 0.0); run(s, 0, 10)
 x0 = F(s.x); stam0 = s.stam
 for _ in range(21): step(s, DOD | R, W)
 ok &= check("dodge travels", abs(F(s.x)-x0) > 1.5, f"d={F(s.x)-x0:.2f} m")
-ok &= check("dodge costs stamina", s.stam == stam0-1, f"stam={s.stam}")
+ok &= check("dodge costs stamina", s.stam == C["SMAX"] - C["DCOST"],
+      f"{C['SMAX']} -> {s.stam}, a dodge costs {C['DCOST']}")
 
 print("\n8. crouch under a lintel")
 wallx = left + 2*room_w
@@ -117,6 +118,44 @@ s = S(0,0.0); run(s,0,10)
 noises=set()
 for _ in range(120): step(s, R|DN, W); noises.add(s.noise)
 ok &= check("crouch-walking is silent", noises == {0}, f"levels={sorted(noises)}")
+
+print("\n11a. the jump is one height, not a thumb measurement")
+peaks = []
+for hold in (3, 8, 20, 200):
+    s2 = S(-3.0, 0.9)
+    for _ in range(120):
+        step(s2, 0, W)
+        if s2.mode == "ground": break
+    top = F(s2.y)
+    for t in range(90):
+        step(s2, JMP if t < hold else 0, W)
+        top = max(top, F(s2.y))
+    peaks.append(round(top, 3))
+check("every tap gives the same jump", len(set(peaks)) == 1, f"apex {peaks} m for 3/8/20/200 frames held")
+
+print("\n11b. the dodge is rare and short")
+s2 = S(-3.0, 0.9)
+for _ in range(120):
+    step(s2, 0, W)
+    if s2.mode == "ground": break
+# back to back: a dodge is 21 frames plus 9 of recovery, so 30 is as fast as it can be asked for
+dodges = 0
+for t in range(95):
+    was = s2.mode
+    step(s2, DOD if t % 30 == 0 else 0, W)
+    if s2.mode == "dodge" and was != "dodge": dodges += 1
+check("the pool pays for two in a row and then makes you wait", dodges == 2,
+      f"{dodges} dodges in 1.6 s, stamina {s2.stam}/6")
+
+s2 = S(-3.0, 0.9)
+for _ in range(120):
+    step(s2, 0, W)
+    if s2.mode == "ground": break
+start = F(s2.x)
+for _ in range(23):
+    step(s2, DOD, W)
+travel = abs(F(s2.x) - start)
+check("and it is a step out of reach, not a teleport", 1.4 < travel < 2.0, f"{travel:.2f} m")
 
 print("\n11. facing")
 s = S(0, 0.0); run(s, 0, 10)

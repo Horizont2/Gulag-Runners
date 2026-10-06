@@ -32,6 +32,11 @@ namespace GulagRunners.Game
         [Tooltip("Apex = jumpSpeed^2 / (2*gravity). Keep it BELOW the 2.5 m floor height: " +
                  "if a jump cleared a floor, ladders would be pointless (docs/05).")]
         public float jumpSpeed = 9.5f;
+
+        [Tooltip("Let go early and the jump is cut short. OFF by default: a jump whose height " +
+                 "depends on how long a thumb stayed on glass is a jump nobody can aim, and " +
+                 "every ledge then needs a different tap.")]
+        public bool variableJumpHeight;
         [Range(0f, 1f)] public float jumpCutMultiplier = 0.45f;
         public int coyoteFrames = 6;
         public int jumpBufferFrames = 7;
@@ -67,15 +72,23 @@ namespace GulagRunners.Game
         public int ladderRegrabFrames = 12;
 
         [Header("Dodge")]
-        public float dodgeSpeed = 7f;
-        [Tooltip("0.35 s of invulnerability, from docs/02.")]
+        [Tooltip("Travel is speed x duration: 4.8 m/s over 0.35 s is 1.68 m — about two body " +
+                 "widths, which is a step out of reach rather than a teleport across the room.")]
+        public float dodgeSpeed = 4.8f;
+        [Tooltip("0.35 s of invulnerability, from docs/02. This is the window, not the distance.")]
         public int dodgeFrames = 21;
         public int dodgeRecoverFrames = 9;
+        [Tooltip("Charges one dodge costs. Raising this against the pool below is what makes " +
+                 "dodges rare: three of six means two in a row and no more.")]
+        public int dodgeStaminaCost = 3;
 
         [Header("Stamina")]
-        public int staminaMax = 3;
-        [Tooltip("1.2 s per charge, from docs/02.")]
-        public int staminaRecoverFrames = 72;
+        [Tooltip("A pool of small charges, not a count of dodges: docs/02 spends stamina on the " +
+                 "dodge AND on holding a guard, and those two cannot share a resource unless one " +
+                 "of them can cost more.")]
+        public int staminaMax = 6;
+        [Tooltip("Seconds per charge. At 0.55 s a spent dodge is back in 1.65 s.")]
+        public int staminaRecoverFrames = 33;
 
         [Header("Body")]
         [Tooltip("Collision width. Match it to the character's silhouette, not to its T-pose " +
@@ -113,6 +126,7 @@ namespace GulagRunners.Game
             c.Gravity = M(gravity);
             c.MaxFallSpeed = M(maxFallSpeed);
             c.JumpSpeed = M(jumpSpeed);
+            c.VariableJumpHeight = variableJumpHeight;
             c.JumpCutMul = M(jumpCutMultiplier);
             c.CoyoteFrames = coyoteFrames;
             c.JumpBufferFrames = jumpBufferFrames;
@@ -129,6 +143,7 @@ namespace GulagRunners.Game
             c.DodgeSpeed = M(dodgeSpeed);
             c.DodgeFrames = dodgeFrames;
             c.DodgeRecoverFrames = dodgeRecoverFrames;
+            c.DodgeStaminaCost = Mathf.Max(1, dodgeStaminaCost);
             c.StaminaMax = staminaMax;
             c.StaminaRecoverFrames = staminaRecoverFrames;
             c.BodyWidth = M(bodyWidth);

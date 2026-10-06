@@ -113,6 +113,12 @@ namespace GulagRunners.Game
         /// <summary>Raised on the tick something is pushed out of a slot to make room.</summary>
         public event Action<ItemId> Dropped;
 
+        /// <summary>Raised on the tick this player is hurt, with the damage that got through.</summary>
+        public event Action<int> Hurt;
+
+        /// <summary>Raised on the tick this player dies.</summary>
+        public event Action Died;
+
         /// <summary>Feet height of the last ground stood on. The camera anchors to this.</summary>
         public float GroundedY { get; private set; }
 
@@ -254,7 +260,16 @@ namespace GulagRunners.Game
             bool wasAirborne = _state.Mode == MoveMode.Airborne;
             float fallSpeed = -_state.Velocity.Y.Raw / (float)Fix.RawOne;
 
-            PlayerMotor.Step(ref _state, input, _world, in _config);
+            // The fight decides what the body is allowed to do before it moves: a swing is a
+            // commitment to where you are standing, and that is what makes reach matter.
+            InputFlags moveInput = input;
+            if (matchState != null)
+                moveInput = CombatMotor.Step(ref _state, input, matchState.Combat, in _config);
+
+            PlayerMotor.Step(ref _state, moveInput, _world, in _config);
+
+            if (_state.WasHit) Hurt?.Invoke(_state.DamageTaken);
+            if (_state.JustDied) Died?.Invoke();
 
             // Loot after movement: where the body ended up this tick decides which chest it is
             // standing at. Movement never depends on the inventory, so the order is not a choice
@@ -327,6 +342,19 @@ namespace GulagRunners.Game
 
         /// <summary>Re-reads the inspector tuning. Handy while tuning in play mode.</summary>
         public void ApplyTuning() => _config = tuning.ToConfig();
+
+        /// <summary>
+        /// Replaces this player's whole simulation state.
+        ///
+        /// Only <see cref="MatchState"/> calls it, and only to write back the result of resolving
+        /// hits for the match. It exists because the players still own their own state while two
+        /// of them tick independently; the match ticker that rollback needs (docs/06) takes that
+        /// ownership away, and this method goes with it.
+        /// </summary>
+        public void OverwriteState(in PlayerSimState state) => _state = state;
+
+        /// <summary>Back on their feet at the spawn point, whole. One call is a new round.</summary>
+        public void Respawn() => SpawnAt(_spawnPoint, spawnFacing);
 
         /// <summary>
         /// Yaw correction for a model that does not look along +Z. Everything else is expressed

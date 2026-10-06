@@ -78,10 +78,14 @@ s = S(left+16.2, 0.9); until(s, 0, lambda s: s.mode == "ground", 120)
 check("stands on the low one-way", abs(F(s.y)-0.9) < 0.06, f"y={F(s.y):.2f}")
 check("jumps up to the high one-way",
       until(s, R | JMP, lambda s: F(s.y) > 1.6, 300), f"y={F(s.y):.2f}")
+# hold down, then ONE press of jump: with a fixed jump height, alternating the button every
+# tick is a string of full jumps rather than a drop.
 dropped = False
-for _ in range(600):
+for _ in range(60):
     step(s, DN, W)
-    step(s, DN | JMP, W)
+step(s, DN | JMP, W)
+for _ in range(240):
+    step(s, DN, W)
     if F(s.y) < 0.2:
         dropped = True
         break

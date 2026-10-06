@@ -37,6 +37,15 @@ namespace GulagRunners.Game
                  "A drop with the pool full recycles the stalest item on the floor.")]
         [Range(1, 32)] public int groundItemCapacity = 6;
 
+        [Header("The fight (docs/02)")]
+        public CombatTuning combat = new CombatTuning();
+
+        [Tooltip("The fighters, in a fixed order. Hits are resolved once for the whole match " +
+                 "rather than once per player: a hit is a fact about two bodies, and two players " +
+                 "each deciding their own would disagree about it.")]
+        public System.Collections.Generic.List<PlayerController> fighters =
+            new System.Collections.Generic.List<PlayerController>();
+
         [Header("Debug")]
         [Tooltip("Log each chest as it is opened, with who opened it and what was inside.")]
         public bool logOpenings = true;
@@ -45,6 +54,9 @@ namespace GulagRunners.Game
         public GroundItem[] GroundItems { get; private set; } = System.Array.Empty<GroundItem>();
         public ChestConfig Config { get; private set; }
         public DropConfig Drops { get; private set; }
+        public CombatConfig Combat { get; private set; }
+
+        PlayerSimState[] _scratch = System.Array.Empty<PlayerSimState>();
 
         PlayerController _tickOwner;
 
@@ -78,6 +90,7 @@ namespace GulagRunners.Game
         {
             Config = chests.ToConfig();
             Drops = drops.ToConfig();
+            Combat = combat.ToConfig();
 
             if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
             SimWorld world = worldBaker != null ? worldBaker.World : null;
@@ -104,6 +117,36 @@ namespace GulagRunners.Game
             if (_tickOwner != caller) return;
 
             LootMotor.StepGround(GroundItems, world, Drops);
+            ResolveHits();
+        }
+
+        /// <summary>
+        /// Who hit whom, once per tick. The states are copied out, resolved together and copied
+        /// back, so the decision lives in the deterministic layer rather than here — and when the
+        /// match ticker arrives this becomes the loop that owns them outright.
+        /// </summary>
+        void ResolveHits()
+        {
+            if (fighters.Count < 2) return;
+            if (_scratch.Length != fighters.Count) _scratch = new PlayerSimState[fighters.Count];
+
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                if (fighters[i] == null) return;
+                _scratch[i] = fighters[i].State;
+            }
+
+            CombatMotor.Resolve(_scratch, Combat, fighters[0].Config);
+
+            for (int i = 0; i < fighters.Count; i++) fighters[i].OverwriteState(in _scratch[i]);
+        }
+
+        /// <summary>Puts every fighter back on their feet at full health. One call is a new round.</summary>
+        [ContextMenu("Reset fighters")]
+        public void ResetFighters()
+        {
+            foreach (PlayerController p in fighters)
+                if (p != null) p.Respawn();
         }
 
         /// <summary>Re-reads the inspector tuning. Handy while balancing in play mode.</summary>
@@ -111,6 +154,7 @@ namespace GulagRunners.Game
         {
             Config = chests.ToConfig();
             Drops = drops.ToConfig();
+            Combat = combat.ToConfig();
         }
 
         public void ReportOpened(int playerIndex, int chestIndex)
