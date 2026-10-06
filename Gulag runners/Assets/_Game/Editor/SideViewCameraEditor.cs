@@ -19,21 +19,43 @@ namespace GulagRunners.GameEditor
 
             EditorGUILayout.Space();
 
-            // Measured against the full screen, which is what the docs/02 rule is about: in a
-            // half-height split view the fighter fills twice as much of its own viewport.
             float height = cam.EffectiveViewHeight;
-            float viewportShare = cam.applyViewportRect ? Mathf.Clamp01(cam.viewportRect.height) : 1f;
-            float fighterShare = height > 0f ? 1.8f / height * viewportShare : 0f;
-            string verdict = fighterShare >= 0.17f && fighterShare <= 0.20f
-                ? "within the 17-20% docs/02 asks for"
-                : "OUTSIDE the 17-20% docs/02 asks for";
+            float body = cam.FramingBodyHeight;
+            float share = height > 0f ? body / height : 0f;
+            bool readable = share >= 0.17f && share <= 0.20f;
+
+            // Width is where a split-screen test goes wrong, not height: half of a 16:9 window
+            // is 32:9, and at a readable character size that shows most of the arena at once.
+            Vector2 view = Handles.GetMainGameViewSize();
+            Rect rect = cam.applyViewportRect
+                ? cam.FittedViewportRect(view) : new Rect(0f, 0f, 1f, 1f);
+            float px = Mathf.Max(1f, view.x * rect.width);
+            float py = Mathf.Max(1f, view.y * rect.height);
+            float aspect = px / py;
+            float width = height * aspect;
+
+            float arenaW = cam.bordersMax.x - cam.bordersMin.x;
+            float arenaH = cam.bordersMax.y - cam.bordersMin.y;
+            bool pinnedX = cam.useBorders && width >= arenaW;
+            bool pinnedY = cam.useBorders && height >= arenaH;
 
             EditorGUILayout.HelpBox(
-                $"A 1.8 m fighter fills {fighterShare * 100f:0.#}% of screen height — {verdict}.\n" +
-                $"View: {height:0.#} m tall. Arena borders: " +
-                $"{cam.bordersMax.x - cam.bordersMin.x:0.#} x " +
-                $"{cam.bordersMax.y - cam.bordersMin.y:0.#} m.",
-                fighterShare >= 0.17f && fighterShare <= 0.20f ? MessageType.Info : MessageType.Warning);
+                $"A {body:0.##} m fighter fills {share * 100f:0.#}% of the view height — " +
+                (readable ? "within" : "OUTSIDE") + " the 17-20% docs/02 asks for.\n" +
+                $"View: {width:0.#} x {height:0.#} m at {aspect:0.00}:1. " +
+                $"Arena borders: {arenaW:0.#} x {arenaH:0.#} m.",
+                readable ? MessageType.Info : MessageType.Warning);
+
+            if (pinnedX || pinnedY)
+            {
+                EditorGUILayout.HelpBox(
+                    "The view is as large as the arena " +
+                    (pinnedX && pinnedY ? "in both directions" : pinnedX ? "horizontally" : "vertically") +
+                    ", so the borders hold the camera still and none of the follow rules below " +
+                    "can do anything. Either frame the fighter larger, or give this viewport a " +
+                    "device aspect so it stops being a letterbox.",
+                    MessageType.Warning);
+            }
 
             if (GUILayout.Button("Fit borders to arena", GUILayout.Height(24)))
             {
