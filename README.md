@@ -28,6 +28,7 @@
 | [docs/11-player-movement.md](docs/11-player-movement.md) | Рух гравця: архітектура, числа, налаштування сцени в інспекторі |
 | [docs/12-git-setup.md](docs/12-git-setup.md) | Git для Unity: що має бути в репозиторії, діагностика «немає файлів» |
 | [docs/13-chests-and-loot.md](docs/13-chests-and-loot.md) | Скрині й лут: M0-набір предметів, числа скринь, як поставити в сцені |
+| [docs/14-audio-and-noise.md](docs/14-audio-and-noise.md) | Звук як інформаційний канал: модель чутності, індикатор, готовність до FMOD |
 
 ## Чотири речення, які тримають весь дизайн
 
