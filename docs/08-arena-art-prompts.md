@@ -201,6 +201,62 @@ house, cabin, building facade, dollhouse, apartment cross-section, interior room
 furniture, rows of windows, roof shingles
 ```
 
+#### Промт-візія лісу («як це має виглядати»)
+
+Той самий біом, але кадр не схема, а **настрій**: з бійцями для масштабу, зі світлом і
+туманом. Використовуй для презентацій, муд-борду й як орієнтир художнику — на відміну від
+промта-лейауту вище, тут дозволено драматизувати.
+
+```
+Stylized low poly 3D game key art, side view of a forest arena for a mobile 1v1 game,
+modeled in Blender, flat-shaded faceted geometry. An outdoor taiga hillside sliced open in
+cross-section, not a building.
+
+THE PLACE: an abandoned logging camp swallowed by northern pine forest at cold foggy dawn.
+The hillside is cut open so three stacked levels read at a glance — dugout tunnels in the
+dark earth below, a forest floor of clearings between giant pine trunks and mossy boulders
+in the middle, and timber platforms high in the canopy joined by rope bridges above. Wooden
+ladders and plank ramps link the levels and square hatches drop into the tunnels. Everything
+is hand-built from rough timber, rope and salvaged iron: sawn stumps, stacked logs, a
+leaning sawmill shelter, a rusted iron cage standing open at the far end of the tunnel.
+
+THE MOOD: cold, damp, abandoned, quiet just before violence. Thin ground fog drifts between
+the trunks behind the hillside. Pale dawn light falls from the upper left; a single warm
+orange lantern burns down in the tunnels, the only warm thing in the picture.
+
+THE FIGHTERS: two small low poly escapees in torn clothing, barehanded, 1.8 meters tall,
+standing in different clearings and unaware of each other — one lit with a cool cyan rim
+light, the other with a warm orange rim light. They are small in frame and give the arena
+its scale.
+
+THE LOOT: three glowing cyan wooden crates and one glowing gold safe, each sitting flat on
+solid ground, clearly readable against the dark timber.
+
+RULES OF THE IMAGE: every walkable surface is flat and horizontal, every platform rests on
+visible posts, branches or rock, nothing floats in mid-air, and the left and right ends
+differ in shape. Flat saturated color fills, hard edges between facets, no texture detail.
+Distant forest very pale and low contrast, the gameplay levels dark and high contrast, fog
+only behind the hillside and never in front of it.
+
+CAMERA: strict side elevation, near-orthographic, perpendicular to the slice, 12 degree
+downward tilt, the whole hillside in frame.
+
+--ar 21:9 --style raw --stylize 250
+```
+
+**Крупний план** — для матеріалів і палітри, коли треба показати художнику фактуру:
+
+```
+Stylized low poly 3D game environment, side view close-up of a single forest clearing from
+a taiga logging camp arena, modeled in Blender, flat-shaded faceted geometry. Two enormous
+pine trunks frame a flat patch of mossy ground; a wall of tangled roots and boulders closes
+the right side; a plank ramp leads up to a timber platform on a thick branch; a square hatch
+in the ground opens onto a ladder going down into a dark dugout. One glowing cyan wooden
+crate sits flat on the moss. A 1.8 meter human silhouette stands beside it for scale. Cold
+foggy dawn light, flat saturated colors, hard faceted edges, no texture detail, pale fog
+behind the trunks only. --ar 16:9 --style raw --stylize 250
+```
+
 ### 2. Шахта / вапнякова печера 🕳️ — обидва режими
 ```
 SUBJECT: a limestone cave system cut open in cross-section, crossed by an abandoned mine.
