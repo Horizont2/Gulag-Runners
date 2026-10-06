@@ -46,6 +46,12 @@ namespace GulagRunners.Game
         [Tooltip("Above this it plays the sprint clip, in m/s.")]
         public float sprintThreshold = 3.4f;
 
+        [Header("Jump")]
+        [Tooltip("Drive the jump clip as a pose instead of looping it: rising shows its early " +
+                 "frames, the apex its middle, falling its end. One clip then reads as a whole " +
+                 "jump arc, which is what the pack otherwise lacks.")]
+        public bool poseJumpByVelocity = true;
+
         [Header("Playback speed")]
         [Tooltip("The ground speed the walk and run clips were authored at. Playback is scaled " +
                  "by the real speed against this, so the feet do not skate.")]
@@ -97,13 +103,14 @@ namespace GulagRunners.Game
             PlayerSimState s = player.State;
             float speed = Mathf.Abs(s.Velocity.X.Raw / (float)Fix.RawOne);
 
-            string state = PickState(in s, speed, out float playback);
-            Play(state, playback);
+            string state = PickState(in s, speed, out float playback, out float scrub);
+            Play(state, playback, scrub);
         }
 
-        string PickState(in PlayerSimState s, float speed, out float playback)
+        string PickState(in PlayerSimState s, float speed, out float playback, out float scrub)
         {
             playback = 1f;
+            scrub = -1f;
 
             switch (s.Mode)
             {
@@ -120,6 +127,14 @@ namespace GulagRunners.Game
                     return sprintState;
 
                 case MoveMode.Airborne:
+                    if (poseJumpByVelocity)
+                    {
+                        float vy = s.Velocity.Y.Raw / (float)Fix.RawOne;
+                        float top = Mathf.Max(0.1f, player.tuning.jumpSpeed);
+                        float bottom = -Mathf.Max(0.1f, player.tuning.maxFallSpeed);
+                        scrub = Mathf.Clamp01(Mathf.InverseLerp(top, bottom, vy));
+                        playback = 0f;
+                    }
                     return airState;
 
                 default:
@@ -152,7 +167,7 @@ namespace GulagRunners.Game
         float Scale(float speed, float reference) =>
             reference <= 0.01f ? 1f : Mathf.Clamp(speed / reference, minPlaybackSpeed, maxPlaybackSpeed);
 
-        void Play(string stateName, float playback)
+        void Play(string stateName, float playback, float scrub)
         {
             if (string.IsNullOrEmpty(stateName)) return;
 
@@ -171,6 +186,15 @@ namespace GulagRunners.Game
             }
 
             animator.speed = playback;
+
+            // A posed state is re-driven every frame, so it never blends — correct for a jump,
+            // which is an instant action and should not ease in.
+            if (scrub >= 0f)
+            {
+                _currentHash = hash;
+                animator.Play(hash, 0, scrub);
+                return;
+            }
 
             if (hash == _currentHash) return;
             _currentHash = hash;

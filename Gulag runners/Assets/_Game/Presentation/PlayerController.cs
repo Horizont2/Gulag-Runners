@@ -4,6 +4,16 @@ using GulagRunners.Sim;
 
 namespace GulagRunners.Game
 {
+    /// <summary>Which way the character model looks in its own local space.</summary>
+    public enum ModelForward
+    {
+        /// <summary>Unity's humanoid rigs face +Z; this is almost always the right answer.</summary>
+        PlusZ = 0,
+        MinusZ = 1,
+        PlusX = 2,
+        MinusX = 3
+    }
+
     /// <summary>
     /// Drives one player: samples input, steps the deterministic simulation at a fixed 60 Hz,
     /// and renders the result.
@@ -40,8 +50,23 @@ namespace GulagRunners.Game
                  "tracks the feet. For the scaled capsule this is 0.9, half the body height.")]
         public float visualYOffset = 0.9f;
 
-        [Tooltip("Squash the visual when crouching.")]
+        [Tooltip("Squash the visual when crouching. Leave off for a rigged character — the " +
+                 "crouch clip conveys it, and squashing a skeleton reads as a bug.")]
         public bool squashOnCrouch = true;
+
+        [Header("Facing")]
+        [Tooltip("Which way the model looks in its own space. A Unity humanoid rig must face +Z " +
+                 "for its avatar to be valid, so that is the default. Get this wrong and the " +
+                 "character turns towards and away from the camera instead of left and right.")]
+        public ModelForward modelForward = ModelForward.PlusZ;
+
+        [Tooltip("Seconds to turn around. 0 snaps. A short turn reads as a character changing " +
+                 "direction; an instant flip reads as a sprite.")]
+        [Range(0f, 0.4f)] public float turnSmoothTime = 0.07f;
+
+        [Tooltip("Which way this player looks when the round starts. Set player two to -1 so the " +
+                 "two of them face each other.")]
+        public int spawnFacing = 1;
 
         [Header("Safety")]
         [Tooltip("At spawn, seat the player on the first floor below instead of dropping them " +
@@ -80,6 +105,8 @@ namespace GulagRunners.Game
         Vector3 _baseVisualScale = Vector3.one;
         Vector2 _spawnPoint;
         bool _warnedEmptyWorld;
+        float _yaw;
+        float _yawVelocity;
 
         const float TickSeconds = 1f / PlayerMotor.TicksPerSecond;
         const int MaxTicksPerFrame = 8;   // never let a hitch turn into a spiral of death
@@ -117,7 +144,7 @@ namespace GulagRunners.Game
 
             Vector3 p = transform.position;
             _spawnPoint = new Vector2(p.x, p.y - visualYOffset);
-            SpawnAt(_spawnPoint, 1);
+            SpawnAt(_spawnPoint, spawnFacing);
         }
 
         void SpawnAt(Vector2 feet, int facing)
@@ -134,6 +161,11 @@ namespace GulagRunners.Game
             _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
             _previous = _state;
             _accumulator = 0f;
+
+            // Start already facing the right way: a spin on spawn looks like a glitch.
+            _yaw = TargetYaw(_state.Facing);
+            _yawVelocity = 0f;
+
             Render(1f);
         }
 
@@ -209,7 +241,13 @@ namespace GulagRunners.Game
             // The visual root keeps whatever local offset it was authored with: a capsule sits
             // centred on this object, while a character model hangs from it by its feet.
             Transform v = visualRoot != null ? visualRoot : transform;
-            v.localRotation = Quaternion.Euler(0f, _state.Facing >= 0 ? 0f : 180f, 0f);
+
+            float target = TargetYaw(_state.Facing);
+            _yaw = turnSmoothTime <= 0.001f
+                ? target
+                : Mathf.SmoothDampAngle(_yaw, target, ref _yawVelocity, turnSmoothTime,
+                                        Mathf.Infinity, Time.deltaTime);
+            v.localRotation = Quaternion.Euler(0f, _yaw, 0f);
 
             if (squashOnCrouch)
             {
@@ -229,6 +267,23 @@ namespace GulagRunners.Game
 
         /// <summary>Re-reads the inspector tuning. Handy while tuning in play mode.</summary>
         public void ApplyTuning() => _config = tuning.ToConfig();
+
+        /// <summary>
+        /// Yaw that points the model along +X or -X, the only two directions that exist on the
+        /// gameplay plane. Rotating a +Z-facing model by 0 or 180 degrees — the obvious-looking
+        /// thing — turns it towards and away from the camera instead, which is no turn at all.
+        /// </summary>
+        float TargetYaw(int facing)
+        {
+            float faceRight = modelForward switch
+            {
+                ModelForward.PlusZ => 90f,
+                ModelForward.MinusZ => -90f,
+                ModelForward.PlusX => 0f,
+                _ => 180f
+            };
+            return facing >= 0 ? faceRight : faceRight + 180f;
+        }
 
         static Fix ToFix(float metres) => Fix.FromMilli(Mathf.RoundToInt(metres * 1000f));
 

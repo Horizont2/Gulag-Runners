@@ -3007,7 +3007,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inputSourceBehaviour: {fileID: 1900000123}
   worldBaker: {fileID: 1900000117}
-  visualRoot: {fileID: 0}
+  visualRoot: {fileID: 2000000002}
   tuning:
     runSpeed: 3.6
     crouchSpeed: 1.6
@@ -3041,6 +3041,9 @@ MonoBehaviour:
   planeZ: 0
   visualYOffset: 0.9
   squashOnCrouch: 0
+  modelForward: 0
+  turnSmoothTime: 0.07
+  spawnFacing: 1
   snapToGroundOnSpawn: 1
   snapSearchDistance: 6
   killY: -25
@@ -3201,7 +3204,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inputSourceBehaviour: {fileID: 1900000131}
   worldBaker: {fileID: 1900000117}
-  visualRoot: {fileID: 0}
+  visualRoot: {fileID: 2000000005}
   tuning:
     runSpeed: 3.6
     crouchSpeed: 1.6
@@ -3235,6 +3238,9 @@ MonoBehaviour:
   planeZ: 0
   visualYOffset: 0.9
   squashOnCrouch: 0
+  modelForward: 0
+  turnSmoothTime: 0.07
+  spawnFacing: -1
   snapToGroundOnSpawn: 1
   snapSearchDistance: 6
   killY: -25
@@ -3544,6 +3550,7 @@ MonoBehaviour:
   climbState: Swimming
   crouchIdleState: Sitting
   crouchMoveState: Walk
+  poseJumpByVelocity: 1
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4
@@ -3637,6 +3644,7 @@ MonoBehaviour:
   climbState: Swimming
   crouchIdleState: Sitting
   crouchMoveState: Walk
+  poseJumpByVelocity: 1
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4

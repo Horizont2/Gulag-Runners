@@ -118,4 +118,16 @@ noises=set()
 for _ in range(120): step(s, R|DN, W); noises.add(s.noise)
 ok &= check("crouch-walking is silent", noises == {0}, f"levels={sorted(noises)}")
 
+print("\n11. facing")
+s = S(0, 0.0); run(s, 0, 10)
+run(s, R, 30)
+ok &= check("faces right when running right", s.facing == 1, f"facing={s.facing}")
+run(s, L, 30)
+ok &= check("faces left when running left", s.facing == -1, f"facing={s.facing}")
+run(s, 0, 60)
+ok &= check("keeps facing after stopping", s.facing == -1, f"facing={s.facing}")
+f0 = s.facing
+for _ in range(21): step(s, DOD, W)
+ok &= check("dodge keeps the current facing", s.facing == f0, f"facing={s.facing}")
+
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))
