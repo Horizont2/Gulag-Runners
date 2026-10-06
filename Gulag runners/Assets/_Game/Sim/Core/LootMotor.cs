@@ -19,16 +19,25 @@ namespace GulagRunners.Sim
         const int BareGain = 1000;
 
         public static void Step(ref PlayerSimState s, int playerIndex, InputFlags input,
-                                SimWorld world, ChestSimState[] chests,
-                                in ChestConfig cfg, in MoveConfig move)
+                                SimWorld world, ChestSimState[] chests, GroundItem[] ground,
+                                in ChestConfig cfg, in DropConfig drop, in MoveConfig move)
         {
             s.PickedUp = ItemId.None;
+            s.Dropped = ItemId.None;
             s.OpenedChest = -1;
+            s.StandingOn = -1;
+
+            // The swap wants a press, not a hold: holding the button is how a chest is opened,
+            // and the two must not fight over the same frame.
+            bool actionHeld = input.Has(InputFlags.Action);
+            bool actionPressed = actionHeld && !s.ActionHeld;
+            s.ActionHeld = actionHeld;
 
             if (world == null || chests == null ||
                 world.Chests.Length == 0 || chests.Length != world.Chests.Length)
             {
                 s.OpeningChest = -1;
+                TakeFromGround(ref s, actionPressed, ground, in drop, in move, false);
                 return;
             }
 
@@ -42,7 +51,17 @@ namespace GulagRunners.Sim
             if (s.OpeningChest >= 0 && s.OpeningChest != target)
                 Drain(ref s, playerIndex, chests, in cfg);
 
-            if (target < 0) return;
+            if (target < 0)
+            {
+                // Nothing to open here, so the action button is the loot button.
+                TakeFromGround(ref s, actionPressed, ground, in drop, in move, false);
+                return;
+            }
+
+            // A chest under the hands wins the button: holding it to pry would otherwise swap
+            // your weapon for whatever happens to be lying at your feet. Walking over something
+            // with a free slot still picks it up, because that costs no button at all.
+            TakeFromGround(ref s, actionPressed, ground, in drop, in move, true);
 
             ref ChestSimState state = ref chests[target];
             ChestDef def = world.Chests[target];
@@ -77,10 +96,262 @@ namespace GulagRunners.Sim
             // breaks even when that chest held its replacement.
             if (tool) s.Inventory.SpendWeapon(kind.ToolWear);
 
-            s.Inventory.Equip(def.Contents);
-            s.PickedUp = def.Contents;
+            // The loot comes OUT; it does not appear in a slot. Seeing it land is the payoff for
+            // the time and the noise just spent, and it is what makes a full slot a decision
+            // rather than something that happened to you (docs/03).
+            // Thrown TOWARDS whoever opened it, not along their facing: at a chest you are
+            // facing into it, and loot that lands on the far side is loot you have to walk round
+            // the thing you just opened to reach.
+            FixVec2 centre = Centre(in def.Box);
+            Pop(ground, def.Contents, centre, ThrowDirection(in s, in def.Box), in drop);
+
             s.OpenedChest = target;
             s.Noise = NoiseLevel.Loud;             // a chest coming open is heard across the floor
+        }
+
+        // ---------------------------------------------------------------- loot on the floor
+
+        static FixVec2 Centre(in Aabb box) =>
+            new FixVec2(box.MinX + (box.MaxX - box.MinX) / 2,
+                        box.MinY + (box.MaxY - box.MinY) / 2);
+
+        /// <summary>
+        /// Which way loot should leave a chest: towards the player who opened it, so they do not
+        /// have to walk round the thing they just opened to pick it up.
+        ///
+        /// Standing squarely on the chest there is no "towards", so it goes back the way they
+        /// came — the opposite of the way they are facing, since walking up to a chest leaves you
+        /// facing into it.
+        /// </summary>
+        static int ThrowDirection(in PlayerSimState s, in Aabb box)
+        {
+            Fix centreX = box.MinX + (box.MaxX - box.MinX) / 2;
+            Fix offset = s.Position.X - centreX;
+            Fix meaningful = (box.MaxX - box.MinX) / 4;
+
+            if (offset > meaningful) return 1;
+            if (offset < -meaningful) return -1;
+            return s.Facing >= 0 ? -1 : 1;
+        }
+
+        /// <summary>Throws an item out of a chest.</summary>
+        public static int Pop(GroundItem[] ground, ItemId item, FixVec2 from, int dir,
+                              in DropConfig cfg)
+        {
+            return Launch(ground, item, from, new FixVec2(cfg.PopSpeedX * Sign(dir), cfg.PopSpeedY),
+                          cfg.PopLockFrames);
+        }
+
+        /// <summary>Drops an item out of a hand, away from the way the body is facing.</summary>
+        public static int DropItem(GroundItem[] ground, ItemId item, FixVec2 from, int dir,
+                                   in DropConfig cfg)
+        {
+            return Launch(ground, item, from, new FixVec2(cfg.DropSpeedX * -Sign(dir), cfg.DropSpeedY),
+                          cfg.DropLockFrames);
+        }
+
+        static int Sign(int dir) => dir >= 0 ? 1 : -1;
+
+        static int Launch(GroundItem[] ground, ItemId item, FixVec2 from, FixVec2 velocity, int lockFrames)
+        {
+            if (ground == null || ground.Length == 0 || item == ItemId.None) return -1;
+
+            int slot = FreeSlot(ground);
+            if (slot < 0) return -1;
+
+            ground[slot] = new GroundItem
+            {
+                Item = item,
+                State = GroundItemState.Flying,
+                Position = from,
+                Velocity = velocity,
+                PickupLock = lockFrames,
+                Age = 0
+            };
+            return slot;
+        }
+
+        /// <summary>
+        /// An empty slot, or the oldest item already resting on the floor. A full pool means the
+        /// floor is littered, and losing the stalest thing on it is better than a drop that
+        /// silently does not happen.
+        /// </summary>
+        static int FreeSlot(GroundItem[] ground)
+        {
+            int oldest = -1, oldestAge = -1;
+            for (int i = 0; i < ground.Length; i++)
+            {
+                if (!ground[i].Live) return i;
+                if (ground[i].State == GroundItemState.Resting && ground[i].Age > oldestAge)
+                {
+                    oldestAge = ground[i].Age;
+                    oldest = i;
+                }
+            }
+            return oldest;
+        }
+
+        /// <summary>
+        /// Moves every item in the air and lands it. Called once per tick for the whole match,
+        /// not once per player: an item belongs to nobody until somebody takes it.
+        /// </summary>
+        public static void StepGround(GroundItem[] ground, SimWorld world, in DropConfig cfg)
+        {
+            if (ground == null || world == null) return;
+
+            for (int i = 0; i < ground.Length; i++)
+            {
+                ref GroundItem item = ref ground[i];
+                if (!item.Live) continue;
+
+                item.Age++;
+                if (item.PickupLock > 0) item.PickupLock--;
+                if (item.State != GroundItemState.Flying) continue;
+
+                item.Velocity.Y = item.Velocity.Y - cfg.Gravity * PlayerMotor.Dt;
+                if (item.Velocity.Y < -cfg.MaxFallSpeed) item.Velocity.Y = -cfg.MaxFallSpeed;
+
+                FixVec2 next = new FixVec2(item.Position.X + item.Velocity.X * PlayerMotor.Dt,
+                                           item.Position.Y + item.Velocity.Y * PlayerMotor.Dt);
+
+                // A wall stops it dead. Without this an item thrown at a wall sails through it
+                // and lands in the next room, or inside the geometry, where nobody can reach it.
+                if (item.Velocity.X != Fix.Zero && Blocked(next.X, item.Position.Y, world, cfg))
+                {
+                    next.X = item.Position.X;
+                    item.Velocity.X = Fix.Zero;
+                }
+
+                if (item.Velocity.Y <= Fix.Zero &&
+                    TryFloorUnder(next.X, item.Position.Y, world, cfg.PickupRadius, out Fix floorY))
+                {
+                    Fix rest = floorY + cfg.PickupRadius;
+                    if (next.Y <= rest)
+                    {
+                        // One soft bounce, then dead. An item that rolls is an item that ends up
+                        // somewhere neither player can predict.
+                        Fix up = -item.Velocity.Y * cfg.Bounce;
+                        item.Position = new FixVec2(next.X, rest);
+
+                        if (up > Fix.FromMilli(400))
+                        {
+                            item.Velocity = new FixVec2(item.Velocity.X / 2, up);
+                        }
+                        else
+                        {
+                            item.Velocity = FixVec2.Zero;
+                            item.State = GroundItemState.Resting;
+                        }
+                        continue;
+                    }
+                }
+
+                item.Position = next;
+
+                // Fell out of the world: give it back rather than leaving a ghost in the pool.
+                if (item.Position.Y < Fix.FromInt(-40)) item = default;
+            }
+        }
+
+        /// <summary>Is there solid where the item is about to be.</summary>
+        static bool Blocked(Fix x, Fix y, SimWorld world, in DropConfig cfg)
+        {
+            Aabb box = new Aabb(x - cfg.PickupRadius, y - cfg.PickupRadius,
+                                x + cfg.PickupRadius, y + cfg.PickupRadius);
+            for (int i = 0; i < world.Solids.Length; i++)
+                if (box.Overlaps(in world.Solids[i])) return true;
+            return false;
+        }
+
+        /// <summary>Top of the nearest solid under a point, searching a short way down.</summary>
+        static bool TryFloorUnder(Fix x, Fix fromY, SimWorld world, Fix radius, out Fix floorY)
+        {
+            floorY = Fix.Zero;
+            bool found = false;
+            Fix lowest = fromY - Fix.FromInt(2);
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (solid.MaxX <= x - radius || solid.MinX >= x + radius) continue;
+                if (solid.MaxY > fromY + radius) continue;
+                if (solid.MaxY < lowest) continue;
+                if (!found || solid.MaxY > floorY) { floorY = solid.MaxY; found = true; }
+            }
+
+            return found;
+        }
+
+        /// <summary>
+        /// Picking things up. Two rules, both from docs/02:
+        ///
+        ///   walking over something with the slot free takes it, with no button at all;
+        ///   with the slot full it is a deliberate press, and what was in the slot drops.
+        ///
+        /// The free-slot rule never costs the player anything, so it runs even while they are
+        /// busy prying a chest. The swap does not: that button is already spoken for.
+        /// </summary>
+        static void TakeFromGround(ref PlayerSimState s, bool actionPressed, GroundItem[] ground,
+                                   in DropConfig cfg, in MoveConfig move, bool buttonTaken)
+        {
+            if (ground == null || ground.Length == 0) return;
+            if (s.Mode != MoveMode.Grounded && s.Mode != MoveMode.Airborne) return;
+
+            Aabb body = s.Body(in move);
+            int free = -1, swap = -1;
+
+            for (int i = 0; i < ground.Length; i++)
+            {
+                GroundItem item = ground[i];
+                if (!item.Takeable) continue;
+
+                Aabb box = new Aabb(item.Position.X - cfg.PickupRadius, item.Position.Y - cfg.PickupRadius,
+                                    item.Position.X + cfg.PickupRadius, item.Position.Y + cfg.PickupRadius);
+                if (!body.Overlaps(in box)) continue;
+
+                if (s.Inventory.SlotContents(ItemTable.KindOf(item.Item)) == ItemId.None)
+                {
+                    if (free < 0) free = i;
+                }
+                else if (swap < 0)
+                {
+                    swap = i;
+                }
+            }
+
+            // Tell presentation what the action button would do if it were pressed now, so the
+            // button can say so before it is pressed rather than after.
+            s.StandingOn = free >= 0 ? free : swap;
+
+            if (free >= 0)
+            {
+                Take(ref s, ground, free, in cfg, false);
+                return;
+            }
+
+            if (swap < 0 || buttonTaken || !actionPressed) return;
+            if (s.Mode != MoveMode.Grounded) return;
+
+            Take(ref s, ground, swap, in cfg, true);
+        }
+
+        static void Take(ref PlayerSimState s, GroundItem[] ground, int index,
+                         in DropConfig cfg, bool swapping)
+        {
+            ItemId taken = ground[index].Item;
+            FixVec2 at = ground[index].Position;
+            ground[index] = default;
+
+            ItemId displaced = s.Inventory.Equip(taken);
+            s.PickedUp = taken;
+
+            if (swapping && displaced != ItemId.None)
+            {
+                DropItem(ground, displaced, at, s.Facing, in cfg);
+                s.Dropped = displaced;
+            }
+
+            s.Noise = NoiseLevel.Quiet;            // picking something up is still a sound
         }
 
         /// <summary>

@@ -35,6 +35,7 @@ class S:
         s.stam = C["SMAX"]; s.stam_t = 0; s.ladder = -1; s.noise = 0
         # loot (LootMotor): three slots, the chest claim, and the per-tick outputs
         s.inv = None; s.opening = -1; s.picked = 0; s.opened_chest = -1
+        s.dropped = 0; s.standing_on = -1; s.action_held = False
 
 def boxes(scene_pieces, kind):
     return [b for b in scene_pieces if b[4] == kind]

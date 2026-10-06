@@ -2,7 +2,7 @@
 
 Same integer arithmetic as the C#: progress counts in thousandths of a bare-handed frame, so a
 weapon used as a lever advances it faster without any of it becoming a float."""
-from sim_motor_mirror import M, C, ACTION
+from sim_motor_mirror import M, C, ACTION, ONE, mul
 
 BARE_GAIN = 1000
 
@@ -33,6 +33,122 @@ CHEST_CFG = {
 }
 DECAY_MUL = 2
 NOISE_FRAMES = 20
+
+# ---------------------------------------------------------------- loot on the floor (DropConfig)
+D = dict(POP_X=M(1400), POP_Y=M(3600), DROP_X=M(1100), DROP_Y=M(2200),
+         GRAV=M(22000), MAXFALL=M(14000), BOUNCE=M(150), RADIUS=M(220),
+         POP_LOCK=14, DROP_LOCK=30)
+DT = ONE // 60
+
+NOTHING, FLYING, RESTING = 0, 1, 2
+
+
+class Ground:
+    def __init__(s):
+        s.item, s.state = NONE, NOTHING
+        s.x = s.y = s.vx = s.vy = 0
+        s.lock, s.age = 0, 0
+
+    @property
+    def live(s):
+        return s.state != NOTHING
+
+    @property
+    def takeable(s):
+        return s.state == RESTING and s.lock <= 0
+
+    def clear(s):
+        s.__init__()
+
+
+def pool(n):
+    return [Ground() for _ in range(n)]
+
+
+def free_slot(ground):
+    oldest, oldest_age = -1, -1
+    for i, g in enumerate(ground):
+        if not g.live:
+            return i
+        if g.state == RESTING and g.age > oldest_age:
+            oldest, oldest_age = i, g.age
+    return oldest
+
+
+def launch(ground, item, x, y, vx, vy, lock):
+    if not ground or item == NONE:
+        return -1
+    i = free_slot(ground)
+    if i < 0:
+        return -1
+    g = ground[i]
+    g.item, g.state = item, FLYING
+    g.x, g.y, g.vx, g.vy = x, y, vx, vy
+    g.lock, g.age = lock, 0
+    return i
+
+
+def pop(ground, item, x, y, facing):
+    return launch(ground, item, x, y, D["POP_X"] * (1 if facing >= 0 else -1),
+                  D["POP_Y"], D["POP_LOCK"])
+
+
+def drop_item(ground, item, x, y, facing):
+    return launch(ground, item, x, y, D["DROP_X"] * (-1 if facing >= 0 else 1),
+                  D["DROP_Y"], D["DROP_LOCK"])
+
+
+def blocked(x, y, w):
+    box = (x - D["RADIUS"], y - D["RADIUS"], x + D["RADIUS"], y + D["RADIUS"])
+    return any(overlaps(box, sol) for sol in w["solid"])
+
+
+def floor_under(x, from_y, w):
+    best = None
+    lowest = from_y - 2 * ONE
+    for sol in w["solid"]:
+        if sol[2] <= x - D["RADIUS"] or sol[0] >= x + D["RADIUS"]:
+            continue
+        if sol[3] > from_y + D["RADIUS"] or sol[3] < lowest:
+            continue
+        if best is None or sol[3] > best:
+            best = sol[3]
+    return best
+
+
+def step_ground(ground, w):
+    for g in ground:
+        if not g.live:
+            continue
+        g.age += 1
+        if g.lock > 0:
+            g.lock -= 1
+        if g.state != FLYING:
+            continue
+
+        g.vy -= mul(D["GRAV"], DT)
+        if g.vy < -D["MAXFALL"]:
+            g.vy = -D["MAXFALL"]
+        nx, ny = g.x + mul(g.vx, DT), g.y + mul(g.vy, DT)
+        if g.vx != 0 and blocked(nx, g.y, w):
+            nx, g.vx = g.x, 0
+
+        if g.vy <= 0:
+            floor = floor_under(nx, g.y, w)
+            if floor is not None:
+                rest = floor + D["RADIUS"]
+                if ny <= rest:
+                    up = mul(-g.vy, D["BOUNCE"])
+                    g.x, g.y = nx, rest
+                    if up > M(400):
+                        g.vx, g.vy = g.vx // 2, up
+                    else:
+                        g.vx = g.vy = 0
+                        g.state = RESTING
+                    continue
+        g.x, g.y = nx, ny
+        if g.y < -40 * ONE:
+            g.clear()
 
 
 class Chest:
@@ -118,12 +234,65 @@ def drain(s, player, chests):
     held.progress, held.opener, s.opening = 0, -1, -1
 
 
-def loot_step(s, player, inp, chests):
+def take_from_ground(s, pressed, ground, button_taken):
+    if not ground:
+        return
+    if s.mode not in ("ground", "air"):
+        return
+
+    b = body(s)
+    free = swap = -1
+    for i, g in enumerate(ground):
+        if not g.takeable:
+            continue
+        box = (g.x - D["RADIUS"], g.y - D["RADIUS"], g.x + D["RADIUS"], g.y + D["RADIUS"])
+        if not overlaps(b, box):
+            continue
+        slot = {WEAPON: s.inv.weapon, ARMOUR: s.inv.armour, UTILITY: s.inv.utility}.get(
+            ITEMS[g.item]["kind"], NONE)
+        if slot == NONE:
+            if free < 0:
+                free = i
+        elif swap < 0:
+            swap = i
+
+    s.standing_on = free if free >= 0 else swap
+
+    if free >= 0:
+        take(s, ground, free, False)
+        return
+    if swap < 0 or button_taken or not pressed or s.mode != "ground":
+        return
+    take(s, ground, swap, True)
+
+
+def take(s, ground, i, swapping):
+    g = ground[i]
+    taken, at_x, at_y = g.item, g.x, g.y
+    g.clear()
+    displaced = s.inv.equip(taken)
+    s.picked = taken
+    if swapping and displaced != NONE:
+        drop_item(ground, displaced, at_x, at_y, s.facing)
+        s.dropped = displaced
+    s.noise = 1
+
+
+def loot_step(s, player, inp, chests, ground=None):
     """One tick of LootMotor, run after the movement step."""
+    ground = ground if ground is not None else []
     s.picked = NONE
+    s.dropped = NONE
     s.opened_chest = -1
+    s.standing_on = -1
+
+    held = bool(inp & ACTION)
+    pressed = held and not s.action_held
+    s.action_held = held
+
     if not chests:
         s.opening = -1
+        take_from_ground(s, pressed, ground, False)
         return
 
     working = bool(inp & ACTION) and s.mode == "ground"
@@ -133,7 +302,10 @@ def loot_step(s, player, inp, chests):
         drain(s, player, chests)
 
     if target < 0:
+        take_from_ground(s, pressed, ground, False)
         return
+
+    take_from_ground(s, pressed, ground, True)
 
     chest = chests[target]
     cfg = CHEST_CFG[chest.kind]
@@ -155,8 +327,12 @@ def loot_step(s, player, inp, chests):
     s.opening = -1
     if tool:
         s.inv.spend(cfg["wear"])
-    s.inv.equip(chest.contents)
-    s.picked = chest.contents
+    cx = chest.box[0] + (chest.box[2] - chest.box[0]) // 2
+    cy = chest.box[1] + (chest.box[3] - chest.box[1]) // 2
+    offset = s.x - cx
+    meaningful = (chest.box[2] - chest.box[0]) // 4
+    away = 1 if offset > meaningful else (-1 if offset < -meaningful else (-1 if s.facing >= 0 else 1))
+    pop(ground, chest.contents, cx, cy, away)
     s.opened_chest = target
     s.noise = 3
 

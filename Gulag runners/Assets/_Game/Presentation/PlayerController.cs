@@ -107,8 +107,11 @@ namespace GulagRunners.Game
         /// <summary>Raised on the tick a fall ends, with the impact speed in m/s.</summary>
         public event Action<float> Landed;
 
-        /// <summary>Raised on the tick a chest hands something over.</summary>
+        /// <summary>Raised on the tick something is taken off the floor.</summary>
         public event Action<ItemId> PickedUp;
+
+        /// <summary>Raised on the tick something is pushed out of a slot to make room.</summary>
+        public event Action<ItemId> Dropped;
 
         /// <summary>Feet height of the last ground stood on. The camera anchors to this.</summary>
         public float GroundedY { get; private set; }
@@ -258,14 +261,17 @@ namespace GulagRunners.Game
             // that can be got wrong later.
             if (matchState != null)
             {
-                LootMotor.Step(ref _state, playerIndex, input, _world, matchState.ChestStates,
-                               matchState.Config, in _config);
+                // Loot in the air belongs to nobody, so it steps once for the whole match rather
+                // than once per player. Whoever asks first drives it, from inside this same loop.
+                matchState.AdvanceShared(this, _world);
 
-                if (_state.PickedUp != ItemId.None)
-                {
-                    matchState.ReportOpened(playerIndex, _state.OpenedChest);
-                    PickedUp?.Invoke(_state.PickedUp);
-                }
+                LootMotor.Step(ref _state, playerIndex, input, _world, matchState.ChestStates,
+                               matchState.GroundItems, matchState.Config, matchState.Drops,
+                               in _config);
+
+                if (_state.OpenedChest >= 0) matchState.ReportOpened(playerIndex, _state.OpenedChest);
+                if (_state.PickedUp != ItemId.None) PickedUp?.Invoke(_state.PickedUp);
+                if (_state.Dropped != ItemId.None) Dropped?.Invoke(_state.Dropped);
             }
 
             if (_state.Mode == MoveMode.Grounded)

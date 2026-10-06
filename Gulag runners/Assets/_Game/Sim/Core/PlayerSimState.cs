@@ -55,6 +55,19 @@ namespace GulagRunners.Sim
 
         /// <summary>Output of the last tick: which chest that was, or -1.</summary>
         public int OpenedChest;
+
+        /// <summary>Output of the last tick: what was pushed out of a slot to make room.</summary>
+        public ItemId Dropped;
+
+        /// <summary>
+        /// Output of the last tick: the ground item the body is standing over, or -1. Presentation
+        /// reads it to say what the action button would do BEFORE it is pressed, which is the
+        /// difference between a contextual button and a guess.
+        /// </summary>
+        public int StandingOn;
+
+        /// <summary>Was the action button down last tick. Swapping wants a press, not a hold.</summary>
+        public bool ActionHeld;
         /// <summary>Counts down after letting go of a ladder; no new ladder is grabbed until it
         /// reaches zero.</summary>
         public int LadderCooldownTimer;
@@ -89,7 +102,9 @@ namespace GulagRunners.Sim
             s.LadderIndex = -1;
             s.OpeningChest = -1;
             s.OpenedChest = -1;
+            s.StandingOn = -1;
             s.PickedUp = ItemId.None;
+            s.Dropped = ItemId.None;
             s.StaminaCharges = config.StaminaMax;
             s.Noise = NoiseLevel.Silent;
             return s;

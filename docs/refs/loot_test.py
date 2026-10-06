@@ -6,9 +6,9 @@ import sim_motor_mirror as M
 import loot_mirror as T
 from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, ACTION
 from arena_geometry import floor_h, ladder_x, world
-from loot_mirror import (Chest, Inv, loot_step, frames_to_open, fresh,
-                         CRATE, LOCKER, SAFE, NONE, FISTS, CLUB, SPEAR, CHAINMAIL, BANDAGE,
-                         ITEMS, CHEST_CFG)
+from loot_mirror import (Chest, Inv, loot_step, frames_to_open, fresh, pool, step_ground,
+                         drop_item, CRATE, LOCKER, SAFE, NONE, FISTS, CLUB, SPEAR, CHAINMAIL,
+                         BANDAGE, ITEMS, CHEST_CFG, D, RESTING, FLYING)
 
 W = world()
 
@@ -38,6 +38,14 @@ def check(n, c, d=""):
     print(f"  {'PASS' if c else 'FAIL'}  {n}{('  ' + d) if d else ''}")
 
 
+GROUND = pool(6)
+
+
+def reset_ground():
+    for g in GROUND:
+        g.clear()
+
+
 def spawn(x, y, weapon=NONE):
     s = S(x, y)
     s.inv = Inv()
@@ -50,9 +58,13 @@ def spawn(x, y, weapon=NONE):
     return s
 
 
-def tick(s, inp, chests=None, player=0):
+def tick(s, inp, chests=None, player=0, shared=True):
+    # Loot in the air belongs to nobody, so it steps once per tick for the whole match. With two
+    # players in a test, only one of them passes shared=True, exactly as the tick owner does.
+    if shared:
+        step_ground(GROUND, W)
     step(s, inp, W)
-    loot_step(s, player, inp, chests or [])
+    loot_step(s, player, inp, chests or [], GROUND)
 
 
 def walk_to(s, x, chests, player=0, limit=900):
@@ -66,12 +78,42 @@ def walk_to(s, x, chests, player=0, limit=900):
 
 
 def hold_open(s, chests, player=0, limit=900):
-    """Holds ACTION until something comes out. Returns (ticks, item)."""
+    """Holds ACTION until a chest gives up its loot. Returns (ticks, item on the floor)."""
     for t in range(limit):
         tick(s, ACTION, chests, player)
+        if s.opened_chest >= 0:
+            return t + 1, chests[s.opened_chest].contents
+    return limit, NONE
+
+
+def loose(s):
+    """The nearest piece of loot lying on the floor, or None."""
+    live = [g for g in GROUND if g.live and g.state == RESTING]
+    return min(live, key=lambda g: abs(g.x - s.x)) if live else None
+
+
+def collect(s, chests, player=0, limit=300, swap=False):
+    """Walks to the nearest loose item and takes it. With swap, taps action over a full slot."""
+    for t in range(limit):
+        g = loose(s)
+        inp = 0
+        if g is not None:
+            if F(s.x) < F(g.x) - 0.05:
+                inp = R
+            elif F(s.x) > F(g.x) + 0.05:
+                inp = L
+            elif swap and t % 2 == 0:
+                inp = ACTION
+        tick(s, inp, chests, player)
         if s.picked != NONE:
             return t + 1, s.picked
     return limit, NONE
+
+
+def open_and_take(s, chests, player=0):
+    a, item = hold_open(s, chests, player)
+    b, taken = collect(s, chests, player)
+    return a + b, taken
 
 
 print("1. the table of docs/03 is the table the code produces")
@@ -92,8 +134,12 @@ s = spawn(-8.3, 0.9)
 walked = walk_to(s, -5.5, chests)
 check("reaches the first crate", abs(F(s.x) + 5.5) < 0.1, f"{walked/60:.2f} s of walking")
 took, item = hold_open(s, chests)
-check("the crate opens", chests[0].opened and item == CLUB,
-      f"{took/60:.2f} s bare-handed -> {ITEMS[item]['name']}")
+check("the crate opens and the club comes OUT of it", chests[0].opened and item == CLUB,
+      f"{took/60:.2f} s bare-handed -> {ITEMS[item]['name']} on the floor")
+check("it is not in the slot yet", s.inv.bare, "a chest reveals, it does not hand over")
+took2, taken = collect(s, chests)
+check("walking over it picks it up, with no button", taken == CLUB,
+      f"{took2/60:.2f} s later")
 check("and the club is in hand", s.inv.weapon == CLUB and s.inv.durability == 14,
       f"durability {s.inv.durability}")
 
@@ -104,7 +150,8 @@ check("the club opens the locker in half the time", abs(took / 60 - 2.5) < 0.1,
       f"{took/60:.2f} s")
 check("and it cost two of its fourteen uses", s2.inv.durability == 12,
       f"durability {s2.inv.durability}")
-check("the chainmail is on", s2.inv.armour == CHAINMAIL)
+collect(s2, chests)
+check("the chainmail goes on by itself: the armour slot was free", s2.inv.armour == CHAINMAIL)
 
 spear = spawn(-2.0, floor_h + 0.9, SPEAR)
 safes = 0
@@ -188,6 +235,7 @@ check("it resumes the moment the feet are down",
       s.mode == "ground" and chests[0].progress > 0, f"mode={s.mode}")
 
 print("\n8. the time economy of docs/03, walked rather than assumed")
+reset_ground()
 # docs/03: "22 seconds is about 2 crates + 1 locker + 1 safe with running in between".
 # This is that exact shopping list, on this arena, with the real motor doing the running.
 chests = build()
@@ -199,9 +247,11 @@ def leg(label, ticks):
     return ticks
 
 spent += leg("walk to the crate", walk_to(s, -5.5, chests))
-t, item = hold_open(s, chests); spent += leg("crate, bare-handed", t); got.append(ITEMS[item]['name'])
+t, _ = hold_open(s, chests); spent += leg("crate, bare-handed", t)
+t, item = collect(s, chests); spent += leg("step over and take it", t); got.append(ITEMS[item]['name'])
 spent += leg("walk to the locker", walk_to(s, -2.5, chests))
-t, item = hold_open(s, chests); spent += leg("locker, with the club", t); got.append(ITEMS[item]['name'])
+t, _ = hold_open(s, chests); spent += leg("locker, with the club", t)
+t, item = collect(s, chests); spent += leg("take it", t); got.append(ITEMS[item]['name'])
 spent += leg("back to the ladder", walk_to(s, ladder_x(0), chests))
 
 climb = 0
@@ -213,30 +263,119 @@ for _ in range(600):
 spent += leg("climb a floor", climb)
 
 spent += leg("walk to the safe", walk_to(s, -2.0, chests))
-t, item = hold_open(s, chests); spent += leg("safe, forced", t); got.append(ITEMS[item]['name'])
+t, _ = hold_open(s, chests); spent += leg("safe, forced", t)
+t, item = collect(s, chests, swap=True)
+spent += leg("swap the club for the spear", t); got.append(ITEMS[item]['name'])
 spent += leg("walk to the far crate", walk_to(s, 4.5, chests))
-t, item = hold_open(s, chests); spent += leg("crate", t); got.append(ITEMS[item]['name'])
+t, _ = hold_open(s, chests); spent += leg("crate", t)
+t, item = collect(s, chests); spent += leg("take it", t); got.append(ITEMS[item]['name'])
 
 for label, ticks in legs:
     print(f"        {ticks/60:5.2f} s  {label}")
 
 opened = sum(1 for c in chests if c.opened)
+carrying = [ITEMS[i]["name"] for i in (s.inv.weapon, s.inv.armour, s.inv.utility) if i != NONE]
 check("two crates, a locker and a safe, with the running, fit the phase",
       spent <= budget and opened == 4,
-      f"{spent/60:.1f} s of {budget/60:.0f}, {opened} chests, carrying {', '.join(got)}")
+      f"{spent/60:.1f} s of {budget/60:.0f}, {opened} chests opened, "
+      f"picked up {', '.join(got)}, carrying {', '.join(carrying)}")
 check("and the phase is not over before it starts", spent >= budget * 0.6,
       f"{spent/budget*100:.0f}% of the phase spent")
 check("you cannot have everything: two chests are still shut",
       opened < len(chests), f"{len(chests)-opened} left")
 
-print("\n9. the same inputs give the same frames")
+print("\n9. loot comes out and lands where it can be reached")
+reset_ground()
+chests = build()
+s = spawn(-6.4, 0.9)                                   # standing LEFT of the crate at -5.5
+walk_to(s, -5.5, chests)
+hold_open(s, chests)
+g = next(x for x in GROUND if x.live)
+check("it leaves the chest in the air", g.state == FLYING, f"state {g.state}")
+for _ in range(90):
+    tick(s, 0, chests)
+    if g.state == RESTING:
+        break
+check("and settles on the floor", g.state == RESTING and abs(F(g.y) - 0.22) < 0.02,
+      f"y={F(g.y):.2f}")
+check("thrown back towards whoever opened it, not past it",
+      F(g.x) < -5.5, f"chest at -5.50, loot at {F(g.x):.2f}, opener came from the left")
+check("within one step", abs(F(g.x) + 5.5) < 1.0, f"{abs(F(g.x)+5.5):.2f} m away")
+check("not inside the floor", not T.blocked(g.x, g.y, W))
+
+print("\n10. a wall stops it, it does not sail through")
+reset_ground()
+# fired hard at the left outer wall, which stands at x = -10.8
+T.launch(GROUND, CLUB, X(-10.0), X(1.0), -T.M(9000), 0, 0)
+for _ in range(120):
+    step_ground(GROUND, W)
+g = GROUND[0]
+check("stopped on this side of the wall", F(g.x) > -10.8, f"x={F(g.x):.2f}, wall at -10.80")
+check("and on the floor", g.state == RESTING, f"state {g.state}")
+
+print("\n11. a free slot takes it, a full slot is a decision")
+reset_ground()
+s = spawn(-5.5, 0.9)
+T.launch(GROUND, CHAINMAIL, X(-5.5), X(0.3), 0, 0, 0)
+for _ in range(30):
+    tick(s, 0, chests)
+check("armour slot empty: walking over it is enough", s.inv.armour == CHAINMAIL)
+
+reset_ground()
+s = spawn(-5.5, 0.9, CLUB)
+T.launch(GROUND, SPEAR, X(-5.5), X(0.3), 0, 0, 0)
+for _ in range(60):
+    tick(s, 0, chests)
+check("weapon slot full: walking over it does nothing", s.inv.weapon == CLUB,
+      f"still holding {ITEMS[s.inv.weapon]['name']}")
+check("but the button knows what it would do", s.standing_on >= 0, f"index {s.standing_on}")
+for t in range(30):
+    tick(s, ACTION if t % 2 == 0 else 0, chests)
+    if s.picked != NONE:
+        break
+check("a press swaps it", s.inv.weapon == SPEAR, f"now holding {ITEMS[s.inv.weapon]['name']}")
+check("and the club is on the floor", any(g.live and g.item == CLUB for g in GROUND))
+
+print("\n12. what you drop is not instantly yours again")
+club = next(g for g in GROUND if g.live and g.item == CLUB)
+check("it comes out locked", club.lock > 0, f"{club.lock} frames")
+held = s.inv.weapon
+for _ in range(20):
+    tick(s, 0, chests)
+check("still the spear while the lock runs", s.inv.weapon == held)
+
+print("\n13. a full floor recycles the stalest thing on it")
+reset_ground()
+for i in range(len(GROUND)):
+    T.launch(GROUND, BANDAGE, X(-5 + i * 0.3), X(0.3), 0, 0, 0)
+for _ in range(10):
+    step_ground(GROUND, W)
+GROUND[0].age = 9999                                   # the stalest
+slot = T.launch(GROUND, SPEAR, X(0.0), X(0.3), 0, 0, 0)
+check("the drop still happens", slot >= 0, f"slot {slot}")
+check("and it took the oldest one's place", GROUND[slot].item == SPEAR and slot == 0,
+      f"slot {slot}")
+
+print("\n14. loot popped over a hatch falls to the floor below")
+reset_ground()
+T.launch(GROUND, CLUB, X(ladder_x(0)), X(floor_h + 0.5), 0, 0, 0)
+for _ in range(240):
+    step_ground(GROUND, W)
+g = GROUND[0]
+check("it fell through the hole rather than resting in mid-air",
+      g.state == RESTING and F(g.y) < 1.0, f"y={F(g.y):.2f}, dropped from {floor_h + 0.5}")
+
+print("\n15. the same inputs give the same frames")
 r = []
 for _ in range(2):
+    reset_ground()
     c = build()
     p = spawn(-8.3, 0.9)
     walk_to(p, -5.5, c)
     hold_open(p, c)
-    r.append((p.x, p.y, p.inv.weapon, p.inv.durability, c[0].progress))
+    collect(p, c)
+    r.append((p.x, p.y, p.inv.weapon, p.inv.durability, c[0].progress,
+              [(g.item, g.x, g.y, g.state) for g in GROUND]))
 check("bit-identical replay", r[0] == r[1], f"{r[0]}")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

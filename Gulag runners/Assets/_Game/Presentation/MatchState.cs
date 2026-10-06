@@ -29,12 +29,24 @@ namespace GulagRunners.Game
         [Header("Chest tuning (docs/03)")]
         public ChestTuning chests = new ChestTuning();
 
+        [Header("Loot on the floor (docs/02, docs/03)")]
+        public DropTuning drops = new DropTuning();
+
+        [Tooltip("How many items can lie on the floor at once. Loot does not appear from nowhere: " +
+                 "this is a pool, sized here and shown by exactly this many views in the scene. " +
+                 "A drop with the pool full recycles the stalest item on the floor.")]
+        [Range(1, 32)] public int groundItemCapacity = 6;
+
         [Header("Debug")]
         [Tooltip("Log each chest as it is opened, with who opened it and what was inside.")]
         public bool logOpenings = true;
 
         public ChestSimState[] ChestStates { get; private set; } = System.Array.Empty<ChestSimState>();
+        public GroundItem[] GroundItems { get; private set; } = System.Array.Empty<GroundItem>();
         public ChestConfig Config { get; private set; }
+        public DropConfig Drops { get; private set; }
+
+        PlayerController _tickOwner;
 
         void Awake()
         {
@@ -65,16 +77,41 @@ namespace GulagRunners.Game
         public void ResetRound()
         {
             Config = chests.ToConfig();
+            Drops = drops.ToConfig();
 
             if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
             SimWorld world = worldBaker != null ? worldBaker.World : null;
 
             int count = world != null ? world.Chests.Length : 0;
             ChestStates = ChestSimState.FreshSet(count);
+            GroundItems = GroundItem.Pool(groundItemCapacity);
+            _tickOwner = null;
+        }
+
+        /// <summary>
+        /// Advances everything that belongs to nobody in particular — loot in the air — exactly
+        /// once per tick.
+        ///
+        /// The first player to ask becomes the one who drives it, because the players own the only
+        /// tick loop there is. That is the seam the match ticker replaces when rollback arrives
+        /// (docs/06); until then this keeps the shared state stepping once, from inside the same
+        /// loop the players step in, rather than from a second clock that would drift from it.
+        /// </summary>
+        public void AdvanceShared(PlayerController caller, SimWorld world)
+        {
+            if (caller == null) return;
+            if (_tickOwner == null || !_tickOwner.isActiveAndEnabled) _tickOwner = caller;
+            if (_tickOwner != caller) return;
+
+            LootMotor.StepGround(GroundItems, world, Drops);
         }
 
         /// <summary>Re-reads the inspector tuning. Handy while balancing in play mode.</summary>
-        public void ApplyTuning() => Config = chests.ToConfig();
+        public void ApplyTuning()
+        {
+            Config = chests.ToConfig();
+            Drops = drops.ToConfig();
+        }
 
         public void ReportOpened(int playerIndex, int chestIndex)
         {
