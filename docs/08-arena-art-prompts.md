@@ -258,15 +258,96 @@ behind the trunks only. --ar 16:9 --style raw --stylize 250
 ```
 
 ### 2. Шахта / вапнякова печера 🕳️ — обидва режими
+
+**Природний біом** — форма `ant farm cross-section`, не `dollhouse`.
+Фішка біому — **справжня темрява**: світло це ресурс, а не освітлення сцени. Тому в промті
+темрява прописана як окремий предмет уваги, інакше модель рівномірно освітлює всю печеру.
+
 ```
-SUBJECT: a limestone cave system cut open in cross-section, crossed by an abandoned mine.
-Bottom floor: a flooded tunnel with still black water and a mine cart on rails. Middle
-floor: three rock chambers with timber supports, linked by short tunnels, the middle one a
-tall cathedral cavern. Top floor: three narrow stone ledges with an ore bucket on a cable.
-PROPS: three glowing cyan crates on flat rock shelves, one glowing gold safe in the central
-cavern. Hanging lanterns on posts.
-ПАЛІТРА: near-black rock, wet grey limestone, glowing turquoise mineral veins, small warm
-amber pools of lantern light, large areas of pure unlit darkness between them
+Stylized low poly 3D game environment render, a cutaway slice through a limestone hillside
+revealing a cave system, for a side-scrolling game level, modeled in Blender, flat-shaded
+faceted geometry. This is a natural cave and an abandoned mine, not a building.
+
+SUBJECT: a flooded limestone cave system that an abandoned mine has been dug through, sliced
+open like an ant farm so all three levels of chambers are visible at once.
+
+LEVELS: exactly three stacked levels of terrain.
+Bottom level, flooded sump: still black water between rock walls, a derelict mine cart tipped
+on rails, one rusted iron holding cage at the far left end and one at the far right, their
+doors raised open.
+Middle level, mine workings: three separate rock chambers carved out of the stone and
+separated by thick walls of raw limestone, each propped with rough timber frames and joined
+by short tunnels; the central chamber is a tall cathedral cavern with a flat stone floor.
+Top level, upper galleries: three narrow flat rock ledges along the cave roof, hung with
+stalactites, with an ore bucket on a steel cable spanning the central cavern.
+
+CONNECTIONS: wooden ladders, plank catwalks and rail tracks clearly join the three levels,
+and square timber-framed shafts drop between them.
+
+SCALE: a small dark 1.8 meter tall human silhouette stands on a middle chamber floor for
+scale. Each chamber is about five times his height wide.
+
+RULES: every walkable surface is perfectly flat and horizontal, no tilted or diagonal walking
+surfaces. Every platform rests on visible timber posts or rock ledges. Nothing floats in
+mid-air. The left and right ends have the same number of spaces but different shapes, not a
+mirror image. Keep the object count low and every object physically supported.
+
+PROPS: three glowing cyan wooden crates and one glowing gold safe, each sitting flat on a rock
+floor. A few oil lanterns hanging on timber posts.
+
+LIGHT AND COLOR: flat saturated color fills, hard edges between facets, no texture detail.
+Near-black rock, wet grey limestone, glowing turquoise mineral veins in the walls, small warm
+amber pools of lantern light. Large areas between the lit pools are solid unlit black, not
+grey haze — the darkness is the subject. Strong value separation: the lit gameplay surfaces
+read bright against pure black surroundings.
+
+CAMERA: strict side elevation, near-orthographic, camera perpendicular to the slice, 12 degree
+downward tilt, the whole cave system fits in frame with clear margins.
+
+--ar 21:9 --style raw --stylize 150
+```
+
+Негатив — базовий v2 **плюс**:
+```
+house, cabin, building facade, dollhouse, interior rooms, furniture, windows,
+evenly lit, flat ambient lighting, fully illuminated, daylight, grey fog filling the darkness
+```
+
+#### Промт-візія печери («як це має виглядати»)
+
+```
+Stylized low poly 3D game key art, side view of a cave arena for a mobile 1v1 game, modeled
+in Blender, flat-shaded faceted geometry. A natural limestone cave sliced open in
+cross-section, not a building.
+
+THE PLACE: a flooded limestone cave that an abandoned mine was dug straight through, cut open
+so three levels read at a glance — black standing water and a tipped mine cart below, three
+rock chambers propped with rough timber in the middle, narrow stalactite ledges and an ore
+bucket on a cable above. Ladders, plank catwalks and rail tracks link the levels. A rusted
+iron cage stands open at the far end of the flooded tunnel.
+
+THE MOOD: cold, black, dripping, oppressive. Most of the frame is pure unlit darkness; light
+exists only where someone hung a lantern or where turquoise mineral veins glow in the rock. A
+single shaft of pale daylight falls from a collapsed ceiling into the central cavern — the
+only clean light in the picture, and the only place both fighters will be able to see.
+
+THE FIGHTERS: two small low poly escapees in torn clothing, barehanded, 1.8 meters tall, in
+different chambers and unaware of each other — one lit with a cool cyan rim light, the other
+with a warm orange rim light, each a lone silhouette inside a small pool of lantern light
+surrounded by black.
+
+THE LOOT: three glowing cyan wooden crates and one glowing gold safe, each sitting flat on a
+rock floor; in this darkness their glow is the brightest thing after the lanterns.
+
+RULES OF THE IMAGE: every walkable surface is flat and horizontal, every platform rests on
+visible timber posts or rock ledges, nothing floats in mid-air, and the left and right ends
+differ in shape. Flat saturated color fills, hard faceted edges, no texture detail. The
+darkness between the lit pools is solid black, never grey haze.
+
+CAMERA: strict side elevation, near-orthographic, perpendicular to the slice, 12 degree
+downward tilt, the whole cave system in frame.
+
+--ar 21:9 --style raw --stylize 250
 ```
 
 ### 3. Руїни фортеці 🏰 — середньовічний
