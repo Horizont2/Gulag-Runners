@@ -24,6 +24,7 @@
 | [docs/07-roadmap-and-risks.md](docs/07-roadmap-and-risks.md) | M0–M3 з пакетами Asset Store, ризики, мітигації |
 | [docs/08-arena-art-prompts.md](docs/08-arena-art-prompts.md) | Промти для генерації арен (low poly, розріз із кімнатами) |
 | [docs/09-economy-and-ranking.md](docs/09-economy-and-ranking.md) | Золото, скіни, ліги, захист новачків, матчмейкінг |
+| [docs/10-free-assets.md](docs/10-free-assets.md) | Безкоштовні асет-паки під кожен біом, ліцензії, що качати під M0 |
 
 ## Чотири речення, які тримають весь дизайн
 

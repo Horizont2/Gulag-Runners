@@ -104,3 +104,11 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Сторонні паки з Unity Asset Store: використовувати в грі можна,
+# перепоширювати (у т.ч. комітити в публічний репозиторій) — ні.
+# CC0-паки можна тримати в репозиторії: клади їх у Assets/_ThirdParty/CC0/.
+/[Aa]ssets/_ThirdParty/**
+!/[Aa]ssets/_ThirdParty/CC0/
+!/[Aa]ssets/_ThirdParty/CC0/**
+!/[Aa]ssets/_ThirdParty/**/*.meta
