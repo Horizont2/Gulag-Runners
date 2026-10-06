@@ -108,9 +108,24 @@ namespace GulagRunners.Game
                  "so a jump to a high ledge is never blind.")]
         public float airRiseSlack = 2.2f;
 
-        [Tooltip("Falling this far below the anchor pulls the camera down immediately. A fall " +
-                 "the player cannot see is the one unforgivable camera failure.")]
+        [Tooltip("Falling this far below the anchor pulls the camera down. A fall the player " +
+                 "cannot see is the one unforgivable camera failure.")]
         public float airFallSlack = 1.6f;
+
+        [Tooltip("Descending faster than this, the camera stops trailing behind the anchor and " +
+                 "tracks the player directly.\n\n" +
+                 "Trailing is what made falls stutter: the anchor was dragged along at a fixed " +
+                 "distance, the easing lagged behind that, and the hard edge then snapped the " +
+                 "camera forward every few frames. Committing to the fall removes the snap.")]
+        public float fallFollowSpeed = 3f;
+
+        [Tooltip("Catch-up time while falling fast. Short on purpose — the hard edge must never " +
+                 "be the thing that moves the camera.")]
+        public float fallSmoothTime = 0.07f;
+
+        [Tooltip("Metres the camera leads BELOW the player at terminal velocity, so the ground " +
+                 "comes into frame before the landing rather than after it.")]
+        public float fallLookAhead = 1.4f;
 
         [Header("Two-target framing")]
         [Tooltip("Extra metres kept around both fighters when framing them together.")]
@@ -155,6 +170,7 @@ namespace GulagRunners.Game
         float _lookAheadVelocity;
         float _zoom = 1f;
         float _zoomVelocity;
+        bool _fastFall;
         float _trauma;
         float _shakeSeed;
         PlayerController _subscribed;
@@ -276,9 +292,10 @@ namespace GulagRunners.Game
             float wantX = SoftTarget(_focus.x, aim.x, dead.x);
             float wantY = SoftTarget(_focus.y, aim.y, dead.y);
 
-            float vSmooth = player != null && player.State.Mode == Sim.MoveMode.Climbing
-                ? climbSmoothTime
-                : verticalSmoothTime;
+            float vSmooth = verticalSmoothTime;
+            if (_fastFall) vSmooth = fallSmoothTime;
+            else if (player != null && player.State.Mode == Sim.MoveMode.Climbing)
+                vSmooth = climbSmoothTime;
 
             _focus.x = Mathf.SmoothDamp(_focus.x, wantX, ref _focusVelocity.x,
                                         horizontalSmoothTime, Mathf.Infinity, dt);
@@ -353,17 +370,35 @@ namespace GulagRunners.Game
             switch (player.State.Mode)
             {
                 case Sim.MoveMode.Grounded:
+                    _fastFall = false;
                     _anchorY = player.GroundedY + feetToOrigin;
                     return _anchorY;
 
                 case Sim.MoveMode.Climbing:
+                    _fastFall = false;
                     _anchorY = targetY;             // a ladder is deliberate vertical travel
                     return _anchorY;
 
                 default:
+                {
+                    float vy = player.State.Velocity.Y.Raw / (float)Sim.Fix.RawOne;
+
+                    // A committed fall is tracked directly, and led slightly below, so the
+                    // ground arrives in frame before the player does.
+                    if (vy < -fallFollowSpeed)
+                    {
+                        float range = Mathf.Max(0.1f, player.tuning.maxFallSpeed - fallFollowSpeed);
+                        float lead = Mathf.Clamp01((-vy - fallFollowSpeed) / range) * fallLookAhead;
+                        _anchorY = targetY - lead;
+                        _fastFall = true;
+                        return _anchorY;
+                    }
+
+                    _fastFall = false;
                     if (targetY > _anchorY + airRiseSlack) _anchorY = targetY - airRiseSlack;
                     else if (targetY < _anchorY - airFallSlack) _anchorY = targetY + airFallSlack;
                     return _anchorY;
+                }
             }
         }
 
@@ -431,6 +466,7 @@ namespace GulagRunners.Game
             _lookAheadVelocity = 0f;
             _focusVelocity = Vector2.zero;
             _trauma = 0f;
+            _fastFall = false;
             _anchorY = target.position.y;
 
             Vector2 aim = AimPoint(1f, out float z);

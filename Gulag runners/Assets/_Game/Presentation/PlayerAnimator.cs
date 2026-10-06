@@ -28,8 +28,9 @@ namespace GulagRunners.Game
         [Tooltip("Running.")]                              public string runState = "Run";
         [Tooltip("Top speed, and the dodge dash.")]        public string sprintState = "Run Fast";
         [Tooltip("In the air, rising or falling.")]        public string airState = "Jumping Up";
-        [Tooltip("On a ladder. Swimming is the closest thing the free pack has to climbing.")]
-        public string climbState = "Swimming";
+        [Tooltip("Climbing up a ladder.")]      public string climbUpState = "Ladder Up";
+        [Tooltip("Climbing down a ladder.")]    public string climbDownState = "Ladder Down";
+        [Tooltip("Holding still on a ladder.")] public string climbIdleState = "Ladder Idle";
         [Tooltip("Crouching and still.")]                  public string crouchIdleState = "Sitting";
         [Tooltip("Crouch-walking.")]                       public string crouchMoveState = "Walk";
 
@@ -116,10 +117,12 @@ namespace GulagRunners.Game
             {
                 case MoveMode.Climbing:
                 {
-                    float climb = Mathf.Abs(s.Velocity.Y.Raw / (float)Fix.RawOne);
-                    // Standing still on a ladder freezes the clip rather than looping it.
-                    playback = climb <= 0.05f ? 0f : Scale(climb, referenceClimbSpeed);
-                    return climbState;
+                    float vy = s.Velocity.Y.Raw / (float)Fix.RawOne;
+                    // A real hold pose beats freezing a climb clip mid-reach.
+                    if (Mathf.Abs(vy) <= 0.05f) return climbIdleState;
+
+                    playback = Scale(Mathf.Abs(vy), referenceClimbSpeed);
+                    return vy > 0f ? climbUpState : climbDownState;
                 }
 
                 case MoveMode.Dodging:

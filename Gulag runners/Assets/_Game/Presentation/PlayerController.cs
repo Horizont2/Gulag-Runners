@@ -315,9 +315,30 @@ namespace GulagRunners.Game
                 ? new Vector3(FeetPosition.x, FeetPosition.y, planeZ)
                 : new Vector3(transform.position.x, transform.position.y - visualYOffset, planeZ);
 
+            // The simulated body: this box, and nothing about the mesh, is what collides.
             Gizmos.color = new Color(1f, 0.4f, 0.2f, 0.9f);
             Gizmos.DrawWireCube(feet + new Vector3(0f, h * 0.5f, 0f),
                                 new Vector3(tuning.bodyWidth, h, 0.05f));
+
+            // Where the model actually starts and ends, so a mismatch is visible rather than
+            // guessed at. Only the height is drawn: a T-pose's width spans both arms and would
+            // say nothing useful about how wide the character is.
+            if (visualRoot != null && visualRoot != transform)
+            {
+                Renderer[] renderers = visualRoot.GetComponentsInChildren<Renderer>();
+                if (renderers.Length > 0)
+                {
+                    Bounds b = renderers[0].bounds;
+                    for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
+
+                    Gizmos.color = new Color(0.8f, 0.8f, 0.8f, 0.6f);
+                    float w = tuning.bodyWidth * 0.8f;
+                    Gizmos.DrawLine(new Vector3(feet.x - w, b.min.y, planeZ),
+                                    new Vector3(feet.x + w, b.min.y, planeZ));
+                    Gizmos.DrawLine(new Vector3(feet.x - w, b.max.y, planeZ),
+                                    new Vector3(feet.x + w, b.max.y, planeZ));
+                }
+            }
 
             // Jump apex, so the "a jump must not clear a floor" rule is visible while authoring.
             Gizmos.color = new Color(0.3f, 0.8f, 1f, 0.5f);

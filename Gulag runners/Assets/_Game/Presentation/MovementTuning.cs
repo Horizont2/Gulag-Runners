@@ -54,7 +54,9 @@ namespace GulagRunners.Game
         public int staminaRecoverFrames = 72;
 
         [Header("Body")]
-        public float bodyWidth = 0.6f;
+        [Tooltip("Collision width. Match it to the character's silhouette, not to its T-pose " +
+                 "bounds: those span both outstretched arms and are useless as a body width.")]
+        public float bodyWidth = 0.45f;
         public float bodyHeight = 1.8f;
         public float crouchHeight = 1.1f;
 
