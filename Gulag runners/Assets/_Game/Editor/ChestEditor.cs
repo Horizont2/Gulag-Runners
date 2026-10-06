@@ -52,6 +52,47 @@ namespace GulagRunners.GameEditor
                     "This chest is empty. Opening it will cost the player the time and the noise " +
                     "and give nothing back.", MessageType.Warning);
 
+            // The model is a separate asset and only Unity knows how big it really is, so the
+            // interaction box is measured here rather than guessed when the chest is placed.
+            Renderer[] model = chest.GetComponentsInChildren<Renderer>();
+            BoxCollider box = chest.GetComponent<BoxCollider>();
+            if (model.Length > 0)
+            {
+                Bounds b = model[0].bounds;
+                for (int i = 1; i < model.Length; i++) b.Encapsulate(model[i].bounds);
+                Rect r = chest.ToRect();
+
+                EditorGUILayout.HelpBox(
+                    $"Model is {b.size.x:0.00} x {b.size.y:0.00} m, " +
+                    $"reach box is {r.width:0.00} x {r.height:0.00} m.\n" +
+                    "The box is what the player has to stand in, not what they can see: a little " +
+                    "wider than the model is right, much wider is a chest you open from across " +
+                    "the room.",
+                    MessageType.None);
+
+                using (new EditorGUI.DisabledScope(box == null))
+                {
+                    if (GUILayout.Button("Fit reach box to the model", GUILayout.Height(22)))
+                    {
+                        Undo.RecordObject(box, "Fit reach box to the model");
+                        Vector3 scale = chest.transform.lossyScale;
+                        Vector3 size = new Vector3(
+                            Mathf.Max(0.4f, b.size.x + 0.2f) / Mathf.Max(0.0001f, scale.x),
+                            Mathf.Max(0.3f, b.size.y) / Mathf.Max(0.0001f, scale.y),
+                            Mathf.Max(0.4f, b.size.z + 0.2f) / Mathf.Max(0.0001f, scale.z));
+                        box.size = size;
+                        box.center = new Vector3(0f, size.y * 0.5f, 0f);
+                        EditorUtility.SetDirty(box);
+                    }
+                }
+
+                if (box == null)
+                    EditorGUILayout.HelpBox(
+                        "No BoxCollider on this chest, so the reach box comes from the transform " +
+                        "scale — which also scales the model. Add one (it is never baked into a " +
+                        "wall) to size the two independently.", MessageType.Warning);
+            }
+
             if (chest.kind == ChestKind.Safe && !chest.hasPuzzle)
                 EditorGUILayout.HelpBox(
                     "A safe with no puzzle can only be forced. That is the slow, loud way in — " +

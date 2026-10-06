@@ -59,6 +59,12 @@ namespace GulagRunners.Game
         public bool logBakeReport = true;
 
         public SimWorld World { get; private set; }
+
+        /// <summary>
+        /// The Chest components behind World.Chests, in the same order. Presentation uses it to
+        /// find which baked chest it is drawing, which is a lookup rather than a guess.
+        /// </summary>
+        public Chest[] ChestSources { get; private set; } = System.Array.Empty<Chest>();
         public string LastReport { get; private set; } = "not baked yet";
 
         readonly List<Rect> _gizmoSolid = new List<Rect>();
@@ -67,6 +73,7 @@ namespace GulagRunners.Game
         readonly List<SimCollider> _markedBuffer = new List<SimCollider>();
         readonly List<Collider> _colliderBuffer = new List<Collider>();
         readonly List<Chest> _chestBuffer = new List<Chest>();
+        readonly List<Chest> _chestSources = new List<Chest>();
         readonly List<Rect> _gizmoChest = new List<Rect>();
 
         void Awake()
@@ -109,11 +116,12 @@ namespace GulagRunners.Game
             _gizmoOneWay.Clear();
             _gizmoLadder.Clear();
             _gizmoChest.Clear();
+            _chestSources.Clear();
 
             int roots = 0, markedSeen = 0, markedSkipped = 0, chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
             int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
-                skippedAlreadyMarked = 0, skippedInactive = 0;
+                skippedAlreadyMarked = 0, skippedInactive = 0, skippedChest = 0;
 
             HashSet<int> handled = new HashSet<int>();
 
@@ -143,6 +151,7 @@ namespace GulagRunners.Game
                     if (!chest.isActiveAndEnabled) { chestsSkipped++; continue; }
                     handled.Add(chest.gameObject.GetInstanceID());
                     chests.Add(chest.ToDef());
+                    _chestSources.Add(chest);
                     _gizmoChest.Add(chest.ToRect());
                 }
 
@@ -162,6 +171,12 @@ namespace GulagRunners.Game
                     // Never bake a player's own body: it would become a wall it stands inside.
                     if (col.GetComponentInParent<PlayerController>() != null)
                     { skippedPlayer++; continue; }
+
+                    // Nor anything belonging to a chest, including whatever colliders came with
+                    // its model. You walk into a chest to open it; a chest you bump against is
+                    // one you can never reach.
+                    if (col.GetComponentInParent<Chest>() != null)
+                    { skippedChest++; continue; }
 
                     int layerBit = 1 << col.gameObject.layer;
                     SimColliderKind kind;
@@ -183,11 +198,13 @@ namespace GulagRunners.Game
                 Ladders = ladders.ToArray(),
                 Chests = chests.ToArray()
             };
+            ChestSources = _chestSources.ToArray();
 
             LastReport =
                 $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider ({markedSkipped} inactive), " +
                 $"{collidersSeen} Unity collider (skipped: {skippedAlreadyMarked} already marked, " +
-                $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedLayer} wrong layer, " +
+                $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedChest} on a chest, " +
+                $"{skippedLayer} wrong layer, " +
                 $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid, " +
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
