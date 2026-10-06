@@ -15,7 +15,8 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          AACC=M(22000), ADEC=M(10000), GRAV=M(28000), MAXFALL=M(18000),
          JUMP=M(9500), CUT=M(200), COYOTE=6, BUF=7,
          CUP=M(2000), CDN=M(2600), DODGE=M(7000), DF=21, DR=9,
-         LDIS=M(1500), LSNAP=M(6000), LTOP=M(60), MREACH=M(1600), MFRAMES=14,
+         LDIS=M(1500), LSNAP=M(2000), LTOP=M(60), MREACH=M(1600),
+         SSPD=M(2400), SMINF=10, SMAXF=30, LREGRAB=12,
          SMAX=3, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CORNER=M(250), FALLTHRU=18,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
@@ -28,7 +29,9 @@ class S:
         s.vx = s.vy = 0
         s.mode = "air"; s.facing = 1; s.crouch = False; s.jump_held = False
         s.coyote = s.buf = s.dodge = s.dodge_rec = s.fallthru = s.stepn = 0
-        s.mantle_t = 0; s.mantle_from = (0,0); s.mantle_to = (0,0)
+        s.ladder_cd = 0
+        s.script_t = 0; s.script_frames = 0; s.script_dir = 1
+        s.script_from = (0,0); s.script_to = (0,0)
         s.stam = C["SMAX"]; s.stam_t = 0; s.ladder = -1; s.noise = 0
 
 def boxes(scene_pieces, kind):
@@ -47,15 +50,23 @@ def body(s, at_x=None, at_y=None):
 def any_solid(w, box):
     return any(overlaps(box, s) for s in w["solid"])
 
-def grounded(s, w):
+def support_under(x, y, fallthru, w):
     half = C["W"] // 2
-    feet = (s.x - half + SKIN, s.y - GROUND_PROBE, s.x + half - SKIN, s.y)
+    feet = (x - half + SKIN, y - GROUND_PROBE, x + half - SKIN, y)
     if any_solid(w, feet): return True
-    if s.fallthru == 0:
+    if fallthru == 0:
         for p in w["oneway"]:
-            if s.y + SKIN < p[3]: continue
+            if y + SKIN < p[3]: continue
             if overlaps(feet, p): return True
     return False
+
+def grounded(s, w):
+    return support_under(s.x, s.y, s.fallthru, w)
+
+def sweep_free(from_x, to_x, y, w):
+    half = C["W"] // 2
+    swept = (min(from_x, to_x) - half, y + SKIN, max(from_x, to_x) + half, y + C["H"])
+    return not any_solid(w, swept)
 
 def on_oneway_only(s, w):
     half = C["W"] // 2
@@ -121,7 +132,7 @@ def move_towards(cur, tgt, md):
 
 def step(s, inp, w):
     s.noise = 0
-    for a in ("coyote", "buf", "dodge_rec", "fallthru", "stepn"):
+    for a in ("coyote", "buf", "dodge_rec", "fallthru", "stepn", "ladder_cd"):
         if getattr(s, a) > 0: setattr(s, a, getattr(s, a) - 1)
     if s.stam < C["SMAX"]:
         s.stam_t += 1
@@ -135,20 +146,8 @@ def step(s, inp, w):
     s.jump_held = jh
     if wx: s.facing = wx
 
-    if s.mode == "mantle":
-        s.mantle_t -= 1
-        if s.mantle_t <= 0:
-            s.x, s.y = s.mantle_to; s.vx = s.vy = 0
-            s.mode = "ground" if grounded(s, w) else "air"
-            return
-        done = C["MFRAMES"] - s.mantle_t
-        t = (ONE*done)//C["MFRAMES"]
-        def ss(v):
-            v = max(0, min(ONE, v)); return mul(mul(v,v), 3*ONE - 2*v)
-        yT = ss(t*3//2); xT = ss((t - M(300))*10//7)
-        s.x = s.mantle_from[0] + mul(s.mantle_to[0]-s.mantle_from[0], xT)
-        s.y = s.mantle_from[1] + mul(s.mantle_to[1]-s.mantle_from[1], yT)
-        return
+    if s.mode in ("mantle", "mount"):
+        return step_scripted(s, w)
 
     if s.mode == "dodge":
         move_x(s, mul(s.vx, DT), w); s.dodge -= 1
@@ -162,7 +161,10 @@ def step(s, inp, w):
         move_x(s, mul(s.vx, DT), w); s.dodge -= 1
         return
 
-    if s.mode == "ladder" or (wy and ladder_at(s, w) >= 0 and can_mount(s, w, wy)):
+    if s.mode == "ladder":
+        return climb(s, wx, wy, w)
+    if try_mount(s, wy, w):
+        if s.mode == "mount": return step_scripted(s, w)
         return climb(s, wx, wy, w)
 
     g = s.mode == "ground"
@@ -217,11 +219,66 @@ def ladder_at(s, w):
         if overlaps(b, l): return i
     return -1
 
-def can_mount(s, w, wy):
+def frames_for(dist):
+    if dist <= M(20): return 0
+    if C["SSPD"] <= 0: return C["SMAXF"]
+    f = (((dist << 16) // C["SSPD"]) * 60 >> 16) + 1
+    return max(C["SMINF"], min(C["SMAXF"], f))
+
+def try_mount(s, wy, w):
+    if not wy: return False
+    if s.ladder_cd > 0: return False
+    if s.crouch and any_solid(w, (s.x - C["W"]//2, s.y, s.x + C["W"]//2, s.y + C["H"])):
+        return False
     i = ladder_at(s, w)
     if i < 0: return False
-    if wy < 0 and s.mode == "ground" and w["ladder"][i][1] >= s.y: return False
+    box = w["ladder"][i]
+    centre = box[0] + (box[2]-box[0])//2
+
+    if wy > 0:
+        if s.y >= box[3] - C["LTOP"] - C["H"]//4: return False
+    else:
+        if s.mode == "ground" and box[1] >= s.y: return False
+        if support_under(centre, s.y, s.fallthru, w): return False
+
+    target = centre if sweep_free(s.x, centre, s.y, w) else s.x
+    frames = frames_for(abs(target - s.x))
+
+    s.ladder = i; s.crouch = False; s.vx = s.vy = 0
+    s.script_dir = 1 if wy > 0 else -1
+    if frames <= 0:
+        s.x = target; s.mode = "ladder"
+        return True
+    s.script_from = (s.x, s.y); s.script_to = (target, s.y)
+    s.script_frames = frames; s.script_t = frames
+    s.mode = "mount"; s.noise = 1
     return True
+
+def step_scripted(s, w):
+    if s.mode == "mount" and s.buf > 0:
+        s.buf = 0; s.script_t = 0; s.ladder = -1; s.ladder_cd = C["LREGRAB"]
+        s.mode = "air"; s.vx = 0; s.vy = C["JUMP"]; s.noise = 1
+        return
+    s.script_t -= 1
+    if s.script_t <= 0:
+        s.x, s.y = s.script_to; s.vx = s.vy = 0
+        if s.mode == "mount":
+            s.mode = "ladder"
+        else:
+            s.mode = "ground" if grounded(s, w) else "air"
+            s.ladder_cd = C["LREGRAB"]
+        return
+    total = s.script_frames if s.script_frames > 0 else 1
+    done = total - s.script_t
+    t = (ONE*done)//total
+    def ss(v):
+        v = max(0, min(ONE, v)); return mul(mul(v,v), 3*ONE - 2*v)
+    if s.mode == "mount":
+        xT = ss(t); yT = xT
+    else:
+        yT = ss(t*3//2); xT = ss((t - M(300))*10//7)
+    s.x = s.script_from[0] + mul(s.script_to[0]-s.script_from[0], xT)
+    s.y = s.script_from[1] + mul(s.script_to[1]-s.script_from[1], yT)
 
 def supported(x, g, w):
     half=C["W"]//2
@@ -259,8 +316,12 @@ def try_mantle(s, prefer, w):
     elif l is None: side=1
     elif r is None: side=-1
     else: side = 1 if floor_run(r,1,w) >= floor_run(l,-1,w) else -1
-    s.mantle_from=(s.x,s.y); s.mantle_to = r if side>0 else l
-    s.mantle_t=C["MFRAMES"]; s.mode="mantle"; s.ladder=-1
+    s.script_from=(s.x,s.y); s.script_to = r if side>0 else l
+    span_x = abs(s.script_to[0]-s.x)*10//7
+    span_y = abs(s.script_to[1]-s.y)*3//2
+    frames = frames_for(max(span_x, span_y)) or C["SMINF"]
+    s.script_frames=frames; s.script_t=frames; s.script_dir=side
+    s.mode="mantle"; s.ladder=-1
     s.vx=s.vy=0; s.facing=side
     return True
 
@@ -275,18 +336,16 @@ def ground_below(x, y, maxd, w):
     return best
 
 def climb(s, wx, wy, w):
-    if s.mode != "ladder":
-        i = ladder_at(s, w)
-        s.mode = "ladder"; s.ladder = i; s.crouch = False; s.vx = s.vy = 0
     if s.buf > 0:
-        s.buf = 0; s.mode = "air"; s.ladder = -1
+        s.buf = 0; s.mode = "air"; s.ladder = -1; s.ladder_cd = C["LREGRAB"]
         s.vx = C["RUN"]*wx; s.vy = C["JUMP"]; s.noise = 1; return
     if not (0 <= s.ladder < len(w["ladder"])):
         s.mode = "ground" if grounded(s, w) else "air"; return
     l = w["ladder"][s.ladder]
     centre = l[0] + (l[2]-l[0])//2
     if not wx:
-        s.x = move_towards(s.x, centre, mul(C["LSNAP"], DT))
+        want = move_towards(s.x, centre, mul(C["LSNAP"], DT))
+        if sweep_free(s.x, want, s.y, w): s.x = want
     s.vx = 0
     s.vy = C["CUP"] if wy > 0 else (-C["CDN"] if wy < 0 else 0)
     move_y(s, mul(s.vy, DT), w)
@@ -297,6 +356,10 @@ def climb(s, wx, wy, w):
         if s.vy > 0: s.vy = 0
     if at_top and wy > 0 and try_mantle(s, wx, w):
         return
+    if wy < 0 and grounded(s, w):
+        s.ladder = -1; s.ladder_cd = C["LREGRAB"]
+        s.mode = "ground"; s.vx = s.vy = 0; s.noise = 1
+        return
     if wx: move_x(s, mul(C["LDIS"]*wx, DT), w)
     if wy and s.stepn == 0: s.noise = 1; s.stepn = C["STEPN"]
     b = body(s)
@@ -305,4 +368,5 @@ def climb(s, wx, wy, w):
         s.mode = "ground" if grounded(s, w) else "air"
         return
     if wx and grounded(s, w):
-        s.ladder = -1; s.mode = "ground"; s.vx = s.vy = 0
+        s.ladder = -1; s.ladder_cd = C["LREGRAB"]
+        s.mode = "ground"; s.vx = s.vy = 0

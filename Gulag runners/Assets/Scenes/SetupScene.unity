@@ -3001,10 +3001,13 @@ MonoBehaviour:
     climbUpSpeed: 2
     climbDownSpeed: 2.6
     ladderDismountSpeed: 1.5
-    ladderSnapSpeed: 6
+    ladderSnapSpeed: 2
     ladderTopMargin: 0.06
     mantleReach: 1.6
-    mantleFrames: 14
+    scriptSpeed: 2.4
+    scriptMinFrames: 10
+    scriptMaxFrames: 30
+    ladderRegrabFrames: 12
     dodgeSpeed: 7
     dodgeFrames: 21
     dodgeRecoverFrames: 9
@@ -3203,17 +3206,20 @@ MonoBehaviour:
     climbUpSpeed: 2
     climbDownSpeed: 2.6
     ladderDismountSpeed: 1.5
-    ladderSnapSpeed: 6
+    ladderSnapSpeed: 2
     ladderTopMargin: 0.06
     mantleReach: 1.6
-    mantleFrames: 14
+    scriptSpeed: 2.4
+    scriptMinFrames: 10
+    scriptMaxFrames: 30
+    ladderRegrabFrames: 12
     dodgeSpeed: 7
     dodgeFrames: 21
     dodgeRecoverFrames: 9
     staminaMax: 3
     staminaRecoverFrames: 72
     bodyWidth: 0.3
-    bodyHeight: 0.92
+    bodyHeight: 0.91
     crouchHeight: 1.1
     stepUpHeight: 0.3
     cornerCorrect: 0.25
@@ -3657,12 +3663,17 @@ MonoBehaviour:
   climbDownState: Ladder Down
   climbIdleState: Ladder Idle
   mantleState: Ladder Out
+  mountUpState: Ladder Up Start
+  mountDownState: Ladder Down Start
+  ladderExitState: Ladder Down End
   crouchIdleState: Sitting
   crouchMoveState: Walk
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4
   poseJumpByVelocity: 1
+  ladderActionPlayback: 2
+  ladderExitHold: 0.22
   referenceWalkSpeed: 1.6
   referenceRunSpeed: 3.6
   referenceClimbSpeed: 2
@@ -3765,12 +3776,17 @@ MonoBehaviour:
   climbDownState: Ladder Down
   climbIdleState: Ladder Idle
   mantleState: Ladder Out
+  mountUpState: Ladder Up Start
+  mountDownState: Ladder Down Start
+  ladderExitState: Ladder Down End
   crouchIdleState: Sitting
   crouchMoveState: Walk
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4
   poseJumpByVelocity: 1
+  ladderActionPlayback: 2
+  ladderExitHold: 0.22
   referenceWalkSpeed: 1.6
   referenceRunSpeed: 3.6
   referenceClimbSpeed: 2

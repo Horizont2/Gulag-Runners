@@ -33,6 +33,12 @@ namespace GulagRunners.Game
         [Tooltip("Climbing down a ladder.")]    public string climbDownState = "Ladder Down";
         [Tooltip("Holding still on a ladder.")] public string climbIdleState = "Ladder Idle";
         [Tooltip("Climbing out at the top of a ladder.")] public string mantleState = "Ladder Out";
+        [Tooltip("Reaching for a ladder from below, to climb up it.")]
+        public string mountUpState = "Ladder Up Start";
+        [Tooltip("Stepping backwards onto a ladder from above, to climb down it.")]
+        public string mountDownState = "Ladder Down Start";
+        [Tooltip("Stepping off the foot of a ladder onto the floor.")]
+        public string ladderExitState = "Ladder Down End";
         [Tooltip("Crouching and still.")]                  public string crouchIdleState = "Sitting";
         [Tooltip("Crouch-walking.")]                       public string crouchMoveState = "Walk";
 
@@ -52,6 +58,18 @@ namespace GulagRunners.Game
                  "jump arc, which is what the pack otherwise lacks.")]
         public bool poseJumpByVelocity = true;
 
+        [Header("Ladder transitions")]
+        [Tooltip("The ladder start and end clips are long one-shots — one of them runs two and a " +
+                 "half seconds. The grab and the climb-out they illustrate take a quarter of a " +
+                 "second, so they are played faster than authored or only their opening frames " +
+                 "would ever be seen.")]
+        [Range(0.5f, 4f)] public float ladderActionPlayback = 2f;
+
+        [Tooltip("How long the step-off clip is held after letting go of the foot of a ladder, " +
+                 "in seconds. Presentation only: the simulation has already handed control back, " +
+                 "so moving at any point cuts it short.")]
+        [Range(0f, 0.6f)] public float ladderExitHold = 0.22f;
+
         [Header("Playback speed")]
         [Tooltip("The ground speed the walk and run clips were authored at. Playback is scaled " +
                  "by the real speed against this, so the feet do not skate.")]
@@ -63,6 +81,8 @@ namespace GulagRunners.Game
 
         int _currentHash;
         bool _warned;
+        MoveMode _lastMode = MoveMode.Grounded;
+        float _exitHold;
 
         void Reset()
         {
@@ -103,14 +123,36 @@ namespace GulagRunners.Game
             PlayerSimState s = player.State;
             float speed = Mathf.Abs(s.Velocity.X.Raw / (float)Fix.RawOne);
 
-            string state = PickState(in s, speed, out float playback, out float scrub);
-            Play(state, playback, scrub);
+            TrackLadderExit(in s, Time.deltaTime);
+
+            string state = PickState(in s, speed, out float playback, out float scrub,
+                                     out float fade);
+            Play(state, playback, scrub, fade);
         }
 
-        string PickState(in PlayerSimState s, float speed, out float playback, out float scrub)
+        /// <summary>
+        /// Notices the moment the simulation lets go of the foot of a ladder and keeps the
+        /// step-off clip on screen for a beat afterwards. The climb-out at the top needs none of
+        /// this — it is a state of its own and lasts exactly as long as its clip is shown.
+        /// </summary>
+        void TrackLadderExit(in PlayerSimState s, float dt)
+        {
+            if (s.Mode == MoveMode.Grounded && _lastMode == MoveMode.Climbing)
+                _exitHold = ladderExitHold;
+            else if (s.Mode != MoveMode.Grounded)
+                _exitHold = 0f;
+            else if (_exitHold > 0f)
+                _exitHold -= dt;
+
+            _lastMode = s.Mode;
+        }
+
+        string PickState(in PlayerSimState s, float speed, out float playback, out float scrub,
+                         out float fade)
         {
             playback = 1f;
             scrub = -1f;
+            fade = crossFade;
 
             switch (s.Mode)
             {
@@ -129,7 +171,14 @@ namespace GulagRunners.Game
                     return dodgeState;
 
                 case MoveMode.Mantling:
+                    playback = ladderActionPlayback;
+                    fade = ScriptedFade(in s);
                     return mantleState;
+
+                case MoveMode.Mounting:
+                    playback = ladderActionPlayback;
+                    fade = ScriptedFade(in s);
+                    return s.ScriptDir >= 0 ? mountUpState : mountDownState;
 
                 case MoveMode.Airborne:
                     if (poseJumpByVelocity)
@@ -143,6 +192,14 @@ namespace GulagRunners.Game
                     return airState;
 
                 default:
+                    // Just stepped off the bottom of a ladder and not moving yet: finish the
+                    // dismount instead of popping straight into Idle.
+                    if (_exitHold > 0f && speed <= idleThreshold && !s.Crouching)
+                    {
+                        playback = ladderActionPlayback;
+                        return ladderExitState;
+                    }
+
                     if (s.Crouching)
                     {
                         if (speed <= idleThreshold) return crouchIdleState;
@@ -166,7 +223,17 @@ namespace GulagRunners.Game
         float Scale(float speed, float reference) =>
             reference <= 0.01f ? 1f : Mathf.Clamp(speed / reference, minPlaybackSpeed, maxPlaybackSpeed);
 
-        void Play(string stateName, float playback, float scrub)
+        /// <summary>
+        /// A cross-fade short enough that a scripted move actually reaches its own clip. Fading for
+        /// 0.12 s into a state that only lasts 0.10 s shows the fade and never the clip.
+        /// </summary>
+        float ScriptedFade(in PlayerSimState s)
+        {
+            float seconds = Mathf.Max(1, s.ScriptFrames) / (float)PlayerMotor.TicksPerSecond;
+            return Mathf.Min(crossFade, seconds * 0.4f);
+        }
+
+        void Play(string stateName, float playback, float scrub, float fade)
         {
             if (string.IsNullOrEmpty(stateName)) return;
 
@@ -198,8 +265,8 @@ namespace GulagRunners.Game
             if (hash == _currentHash) return;
             _currentHash = hash;
 
-            if (crossFade <= 0f) animator.Play(hash, 0, 0f);
-            else animator.CrossFadeInFixedTime(hash, crossFade, 0);
+            if (fade <= 0f) animator.Play(hash, 0, 0f);
+            else animator.CrossFadeInFixedTime(hash, fade, 0);
         }
     }
 }

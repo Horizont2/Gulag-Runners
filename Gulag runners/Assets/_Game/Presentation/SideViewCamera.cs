@@ -294,7 +294,8 @@ namespace GulagRunners.Game
 
             float vSmooth = verticalSmoothTime;
             if (_fastFall) vSmooth = fallSmoothTime;
-            else if (player != null && player.State.Mode == Sim.MoveMode.Climbing)
+            else if (player != null && (player.State.Mode == Sim.MoveMode.Climbing ||
+                                        player.State.Mode == Sim.MoveMode.Mounting))
                 vSmooth = climbSmoothTime;
 
             _focus.x = Mathf.SmoothDamp(_focus.x, wantX, ref _focusVelocity.x,
@@ -375,6 +376,7 @@ namespace GulagRunners.Game
                     return _anchorY;
 
                 case Sim.MoveMode.Climbing:
+                case Sim.MoveMode.Mounting:
                     _fastFall = false;
                     _anchorY = targetY;             // a ladder is deliberate vertical travel
                     return _anchorY;

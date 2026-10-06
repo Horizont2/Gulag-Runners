@@ -179,7 +179,7 @@ namespace GulagRunners.Game
             _accumulator = 0f;
 
             // Start already facing the right way: a spin on spawn looks like a glitch.
-            _yaw = TargetYaw(_state.Facing, _state.Mode == MoveMode.Climbing);
+            _yaw = TargetYaw(_state.Facing, FacingLadder(_state.Mode));
             _yawVelocity = 0f;
             GroundedY = position.Y.Raw / (float)Fix.RawOne;
 
@@ -268,7 +268,7 @@ namespace GulagRunners.Game
             // centred on this object, while a character model hangs from it by its feet.
             Transform v = visualRoot != null ? visualRoot : transform;
 
-            float target = TargetYaw(_state.Facing, _state.Mode == MoveMode.Climbing);
+            float target = TargetYaw(_state.Facing, FacingLadder(_state.Mode));
             _yaw = turnSmoothTime <= 0.001f
                 ? target
                 : Mathf.SmoothDampAngle(_yaw, target, ref _yawVelocity, turnSmoothTime,
@@ -306,6 +306,15 @@ namespace GulagRunners.Game
             ModelForward.PlusX => -90f,
             _ => 90f
         };
+
+        /// <summary>
+        /// Whether the character should be turned towards the rungs. The grab counts: starting the
+        /// turn with the reach means the character is already facing the ladder by the time it is
+        /// on it, instead of swinging round afterwards. The climb-out does not — it steps off
+        /// sideways, and that is the direction it should be looking.
+        /// </summary>
+        static bool FacingLadder(MoveMode mode) =>
+            mode == MoveMode.Climbing || mode == MoveMode.Mounting;
 
         /// <summary>
         /// Yaw that points the model where it should look.

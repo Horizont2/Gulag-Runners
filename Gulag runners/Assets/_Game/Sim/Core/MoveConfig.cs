@@ -36,7 +36,11 @@ namespace GulagRunners.Sim
         /// <summary>How fast you edge sideways off a ladder.</summary>
         public Fix LadderDismountSpeed;
 
-        /// <summary>How fast the body slides onto the ladder's centre line when grabbing it.</summary>
+        /// <summary>
+        /// How fast the body is drawn back to the ladder's centre line after drifting off it. The
+        /// grab itself no longer uses this — it eases on over several frames — so all this has left
+        /// to undo is a sideways nudge, and it does it at climbing speed so it cannot be seen.
+        /// </summary>
         public Fix LadderSnapSpeed;
 
         /// <summary>Clearance kept below the top of a ladder box, so climbing never leaves it.</summary>
@@ -45,8 +49,25 @@ namespace GulagRunners.Sim
         /// <summary>How far to either side the climb-out looks for floor to step onto.</summary>
         public Fix MantleReach;
 
-        /// <summary>Frames the climb-out takes.</summary>
-        public int MantleFrames;
+        /// <summary>
+        /// Average speed of a scripted ladder move — the grab at the bottom of a ladder and the
+        /// climb-out at the top. Both last as long as their own distance at this speed, so neither
+        /// is ever a snap: the eased peak is one and a half times this, which at the default is
+        /// exactly a run. A fixed duration cannot do that, because the distance is not fixed.
+        /// </summary>
+        public Fix ScriptSpeed;
+        /// <summary>Floor and ceiling on a scripted move's length, in frames. The ceiling is what
+        /// stops a long climb-out from taking a whole second; it is high enough that the peak stays
+        /// below a dodge even at full reach.</summary>
+        public int ScriptMinFrames;
+        public int ScriptMaxFrames;
+
+        /// <summary>
+        /// Frames after letting go of a ladder during which it cannot be grabbed again. Without it,
+        /// jumping off a ladder while still holding the stick up re-grabs it on the very next tick,
+        /// which is the ladder trap wearing a different hat.
+        /// </summary>
+        public int LadderRegrabFrames;
 
         public Fix DodgeSpeed;
         public int DodgeFrames;
@@ -92,10 +113,13 @@ namespace GulagRunners.Sim
             c.ClimbUpSpeed   = Fix.FromMilli(2000);
             c.ClimbDownSpeed = Fix.FromMilli(2600);
             c.LadderDismountSpeed = Fix.FromMilli(1500);
-            c.LadderSnapSpeed = Fix.FromMilli(6000);
+            c.LadderSnapSpeed = Fix.FromMilli(2000);
             c.LadderTopMargin = Fix.FromMilli(60);
             c.MantleReach = Fix.FromMilli(1600);
-            c.MantleFrames = 14;          // 0.23 s
+            c.ScriptSpeed = Fix.FromMilli(2400);
+            c.ScriptMinFrames = 10;       // 0.17 s
+            c.ScriptMaxFrames = 30;       // 0.50 s
+            c.LadderRegrabFrames = 12;    // 0.20 s
 
             c.DodgeSpeed         = Fix.FromMilli(7000);
             c.DodgeFrames        = 21;  // 0.35 s

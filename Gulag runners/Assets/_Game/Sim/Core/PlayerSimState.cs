@@ -7,7 +7,9 @@ namespace GulagRunners.Sim
         Climbing = 2,
         Dodging  = 3,
         /// <summary>Climbing out at the top of a ladder onto the floor beside it.</summary>
-        Mantling = 4
+        Mantling = 4,
+        /// <summary>Reaching for a ladder: the short move that puts the body onto the rungs.</summary>
+        Mounting = 5
     }
 
     /// <summary>
@@ -38,11 +40,23 @@ namespace GulagRunners.Sim
         public int StaminaTimer;
 
         public int LadderIndex;
+        /// <summary>Counts down after letting go of a ladder; no new ladder is grabbed until it
+        /// reaches zero.</summary>
+        public int LadderCooldownTimer;
 
-        /// <summary>Where the climb-out started, and where it ends. Only valid while Mantling.</summary>
-        public FixVec2 MantleFrom;
-        public FixVec2 MantleTo;
-        public int MantleTimer;
+        /// <summary>
+        /// A short scripted move: where it started, where it ends, how many frames it lasts in
+        /// total and how many are left. Only valid while Mantling or Mounting — the two places
+        /// where the simulation walks the body along a path instead of integrating velocity,
+        /// because both are transitions between two states rather than states of their own.
+        /// </summary>
+        public FixVec2 ScriptFrom;
+        public FixVec2 ScriptTo;
+        public int ScriptTimer;
+        public int ScriptFrames;
+        /// <summary>Which way the scripted move goes: climb direction for a mount, step side for
+        /// a climb-out. Presentation reads it to pick the matching clip.</summary>
+        public sbyte ScriptDir;
 
         /// <summary>Output of the last tick. Read by presentation, and later by the audio-info system.</summary>
         public NoiseLevel Noise;

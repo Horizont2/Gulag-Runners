@@ -42,9 +42,12 @@ namespace GulagRunners.Sim
 
             if (wishX != 0) s.Facing = (sbyte)wishX;
 
-            if (s.Mode == MoveMode.Mantling)
+            // Both scripted moves — the grab at the bottom of a ladder and the climb-out at the
+            // top — run before anything else, because while one is playing the body is being
+            // walked along a path and nothing else may touch it.
+            if (s.Mode == MoveMode.Mantling || s.Mode == MoveMode.Mounting)
             {
-                StepMantle(ref s, world, cfg);
+                StepScripted(ref s, world, cfg);
                 return;
             }
 
@@ -68,7 +71,11 @@ namespace GulagRunners.Sim
 
             if (TryMountLadder(ref s, wishY, world, cfg))
             {
-                StepClimb(ref s, wishX, wishY, world, cfg);
+                // A grab that has distance to cover plays its reach first; one that starts
+                // already on the centre line goes straight to climbing, so standing at a ladder
+                // and pressing up never costs a frame it does not need to.
+                if (s.Mode == MoveMode.Mounting) StepScripted(ref s, world, cfg);
+                else StepClimb(ref s, wishX, wishY, world, cfg);
                 return;
             }
 
@@ -83,6 +90,7 @@ namespace GulagRunners.Sim
             if (s.JumpBufferTimer > 0) s.JumpBufferTimer--;
             if (s.DodgeRecoverTimer > 0) s.DodgeRecoverTimer--;
             if (s.FallThroughTimer > 0) s.FallThroughTimer--;
+            if (s.LadderCooldownTimer > 0) s.LadderCooldownTimer--;
             if (s.StepNoiseTimer > 0) s.StepNoiseTimer--;
 
             if (s.StaminaCharges < cfg.StaminaMax)
@@ -233,24 +241,98 @@ namespace GulagRunners.Sim
 
         // ---------------------------------------------------------------- ladders
 
+        /// <summary>
+        /// Grabbing a ladder. Succeeds into either Mounting — a short eased reach onto the centre
+        /// line — or straight into Climbing when the body is already on it.
+        ///
+        /// Everything refused here is refused because accepting it would flicker: a grab that is
+        /// undone by the next tick's automatic release is a character twitching on the spot, which
+        /// is exactly how the old instant snap read.
+        /// </summary>
         static bool TryMountLadder(ref PlayerSimState s, int wishY, SimWorld world, in MoveConfig cfg)
         {
             if (wishY == 0) return false;
+            if (s.LadderCooldownTimer > 0) return false;
+
+            // Nobody climbs a ladder crouched, and the grab clears the crouch — so there has to be
+            // room to stand up first, or the grab would push the head into the ceiling it was
+            // ducking under.
+            if (s.Crouching && !HasHeadroom(ref s, world, cfg)) return false;
 
             Aabb body = s.Body(in cfg);
             int ladder = world.FindLadder(in body);
             if (ladder < 0) return false;
 
-            // Pressing down on the floor means crouch, not climb, unless the ladder goes below.
-            if (wishY < 0 && s.Mode == MoveMode.Grounded && world.Ladders[ladder].MinY >= s.Position.Y)
-                return false;
+            Aabb box = world.Ladders[ladder];
+            Fix centreX = world.LadderCentreX(ladder);
 
-            s.Mode = MoveMode.Climbing;
+            if (wishY > 0)
+            {
+                // Nothing worth climbing: the body is already at the top of this ladder. Without
+                // this, pressing up while standing beside a hatch grabs the ladder you just left
+                // and the climb-out immediately puts you back where you were.
+                if (s.Position.Y >= box.MaxY - cfg.LadderTopMargin - cfg.BodyHeight / 4)
+                    return false;
+            }
+            else
+            {
+                // Pressing down on the floor means crouch, not climb, unless the ladder goes below.
+                if (s.Mode == MoveMode.Grounded && box.MinY >= s.Position.Y) return false;
+
+                // And there has to be a way down on the centre line — a hatch, or the lip of a
+                // ledge. At the foot of a ladder there is floor instead, and grabbing it there
+                // would be undone by the release at the bottom on the very next tick.
+                if (SupportUnder(centreX, s.Position.Y, s.FallThroughTimer, world, in cfg))
+                    return false;
+            }
+
+            // The reach is a straight slide sideways, so it must not pass through anything. If it
+            // would, grab the ladder where the body already stands instead of refusing: being on
+            // the rungs slightly off centre is harmless, being pushed into a wall is not.
+            Fix targetX = SweepFree(s.Position.X, centreX, s.Position.Y, world, in cfg)
+                ? centreX : s.Position.X;
+
+            int frames = FramesFor(Fix.Abs(targetX - s.Position.X), in cfg);
+
             s.LadderIndex = ladder;
             s.Crouching = false;
             s.Velocity = FixVec2.Zero;
-            s.Position.X = world.LadderCentreX(ladder);
+            s.ScriptDir = (sbyte)(wishY > 0 ? 1 : -1);
+
+            if (frames <= 0)
+            {
+                s.Position.X = targetX;
+                s.Mode = MoveMode.Climbing;
+                return true;
+            }
+
+            s.ScriptFrom = s.Position;
+            s.ScriptTo = new FixVec2(targetX, s.Position.Y);
+            s.ScriptFrames = frames;
+            s.ScriptTimer = frames;
+            s.Mode = MoveMode.Mounting;
+            s.Noise = NoiseLevel.Quiet;
             return true;
+        }
+
+        /// <summary>
+        /// How long a scripted move takes: its distance at the scripted-move speed, within the
+        /// configured floor and ceiling. Zero means there is nothing to show.
+        ///
+        /// Deriving it from the distance is the whole point. A fixed frame count has to be short
+        /// enough not to feel like a pause on a short move, which makes it a lurch on a long one —
+        /// the climb-out used to cover a metre and a half in fourteen frames, ten metres a second,
+        /// faster than a dodge.
+        /// </summary>
+        static int FramesFor(Fix distance, in MoveConfig cfg)
+        {
+            if (distance <= Fix.FromMilli(20)) return 0;
+            if (cfg.ScriptSpeed <= Fix.Zero) return cfg.ScriptMaxFrames;
+
+            int frames = (distance / cfg.ScriptSpeed * TicksPerSecond).ToInt() + 1;
+            if (frames < cfg.ScriptMinFrames) frames = cfg.ScriptMinFrames;
+            if (frames > cfg.ScriptMaxFrames) frames = cfg.ScriptMaxFrames;
+            return frames;
         }
 
         static void StepClimb(ref PlayerSimState s, int wishX, int wishY, SimWorld world, in MoveConfig cfg)
@@ -261,6 +343,7 @@ namespace GulagRunners.Sim
                 s.JumpBufferTimer = 0;
                 s.Mode = MoveMode.Airborne;
                 s.LadderIndex = -1;
+                s.LadderCooldownTimer = cfg.LadderRegrabFrames;
                 s.Velocity = new FixVec2(cfg.RunSpeed * wishX, cfg.JumpSpeed);
                 s.Noise = NoiseLevel.Quiet;
                 return;
@@ -274,16 +357,22 @@ namespace GulagRunners.Sim
 
             Aabb ladder = world.Ladders[s.LadderIndex];
 
-            // Slide onto the ladder's centre line instead of teleporting there. Snapping X in a
-            // single tick is a visible jump sideways, and it was half of what made ladders feel
-            // broken.
+            // Keep the body on the ladder's centre line. The grab already put it there, so this
+            // only has to undo a sideways nudge, and it does so at climbing speed: at the 6 m/s it
+            // used to run at, letting go of the stick after edging along the rungs snapped the body
+            // back twice as fast as a run.
             //
-            // Only while the player is not pushing sideways: the pull towards the centre is four
-            // times faster than the sideways step off, so left running it would make stepping off
-            // a ladder impossible.
+            // Only while the player is not pushing sideways, or it would fight the step off.
             if (wishX == 0)
-                s.Position.X = Fix.MoveTowards(s.Position.X, world.LadderCentreX(s.LadderIndex),
-                                               cfg.LadderSnapSpeed * Dt);
+            {
+                Fix want = Fix.MoveTowards(s.Position.X, world.LadderCentreX(s.LadderIndex),
+                                           cfg.LadderSnapSpeed * Dt);
+
+                // The pull writes X directly, so it has to check its own way: a ladder mounted
+                // from an awkward angle must not drag the body into the wall beside it.
+                if (SweepFree(s.Position.X, want, s.Position.Y, world, in cfg))
+                    s.Position.X = want;
+            }
 
             s.Velocity.X = Fix.Zero;
             s.Velocity.Y = wishY > 0 ? cfg.ClimbUpSpeed
@@ -311,6 +400,20 @@ namespace GulagRunners.Sim
             if (atTop && wishY > 0 && TryStartMantle(ref s, wishX, world, cfg))
                 return;
 
+            // The same courtesy at the other end: keep holding down at the foot of a ladder and
+            // you step off it onto the floor. Before this, the bottom was the trap the top used
+            // to be — the body stopped on the ground still bolted to the rungs, in a climb-idle
+            // pose, until the player thought to nudge sideways.
+            if (wishY < 0 && Grounded(ref s, world, cfg))
+            {
+                s.LadderIndex = -1;
+                s.LadderCooldownTimer = cfg.LadderRegrabFrames;
+                s.Mode = MoveMode.Grounded;
+                s.Velocity = FixVec2.Zero;
+                s.Noise = NoiseLevel.Quiet;
+                return;
+            }
+
             // Pushing sideways edges off the ladder.
             if (wishX != 0)
                 MoveX(ref s, cfg.LadderDismountSpeed * wishX * Dt, world, cfg);
@@ -333,6 +436,7 @@ namespace GulagRunners.Sim
             if (wishX != 0 && Grounded(ref s, world, cfg))
             {
                 s.LadderIndex = -1;
+                s.LadderCooldownTimer = cfg.LadderRegrabFrames;
                 s.Mode = MoveMode.Grounded;
                 s.Velocity = FixVec2.Zero;
             }
@@ -365,9 +469,20 @@ namespace GulagRunners.Sim
                     ? 1 : -1;
             }
 
-            s.MantleFrom = s.Position;
-            s.MantleTo = side > 0 ? landRight : landLeft;
-            s.MantleTimer = cfg.MantleFrames;
+            s.ScriptFrom = s.Position;
+            s.ScriptTo = side > 0 ? landRight : landLeft;
+
+            // Each axis is charged for the part of the window it actually gets — Y the first two
+            // thirds, X the last seven tenths — so neither has to hurry to fit a window the other
+            // one sized.
+            Fix spanX = Fix.Abs(s.ScriptTo.X - s.ScriptFrom.X) * 10 / 7;
+            Fix spanY = Fix.Abs(s.ScriptTo.Y - s.ScriptFrom.Y) * 3 / 2;
+            int frames = FramesFor(Fix.Max(spanX, spanY), in cfg);
+            if (frames <= 0) frames = cfg.ScriptMinFrames;
+
+            s.ScriptFrames = frames;
+            s.ScriptTimer = frames;
+            s.ScriptDir = (sbyte)side;
             s.Mode = MoveMode.Mantling;
             s.LadderIndex = -1;
             s.Velocity = FixVec2.Zero;
@@ -446,32 +561,78 @@ namespace GulagRunners.Sim
         }
 
         /// <summary>
-        /// The climb-out itself: a short scripted move with no gravity and no collision, because
-        /// the destination was checked to be free before it started. Height leads and the step
-        /// across follows, which is the shape of a real mantle rather than a diagonal slide.
+        /// The two scripted ladder moves: the grab at the bottom and the climb-out at the top.
+        ///
+        /// Both walk the body from one checked position to another with no gravity and no
+        /// collision, because the destination was proved free before the move started. They exist
+        /// for the same reason: the frame where the body changes between standing and climbing is
+        /// the frame that used to jump, and a jump cannot be smoothed away afterwards by
+        /// presentation. It has to not happen in the simulation.
         /// </summary>
-        static void StepMantle(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        static void StepScripted(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
         {
-            s.MantleTimer--;
-
-            if (s.MantleTimer <= 0)
+            // Never trap the player on a ladder — not even during the quarter second it takes to
+            // reach for one. The climb-out is deliberately not cancellable: it is already
+            // committed to a landing, and breaking it off leaves the body over the hole it was
+            // leaving.
+            if (s.Mode == MoveMode.Mounting && s.JumpBufferTimer > 0)
             {
-                s.Position = s.MantleTo;
-                s.Velocity = FixVec2.Zero;
-                s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
+                s.JumpBufferTimer = 0;
+                s.ScriptTimer = 0;
+                s.LadderIndex = -1;
+                s.LadderCooldownTimer = cfg.LadderRegrabFrames;
+                s.Mode = MoveMode.Airborne;
+                s.Velocity = new FixVec2(Fix.Zero, cfg.JumpSpeed);
                 s.Noise = NoiseLevel.Quiet;
                 return;
             }
 
-            int done = cfg.MantleFrames - s.MantleTimer;
-            Fix t = new Fix((int)(((long)Fix.RawOne * done) / cfg.MantleFrames));
+            s.ScriptTimer--;
 
-            Fix yT = SmoothStep(Clamp01(t * 3 / 2));
-            Fix xT = SmoothStep(Clamp01((t - Fix.FromMilli(300)) * 10 / 7));
+            if (s.ScriptTimer <= 0)
+            {
+                s.Position = s.ScriptTo;
+                s.Velocity = FixVec2.Zero;
+
+                if (s.Mode == MoveMode.Mounting)
+                {
+                    // On the rungs, holding still. The climb itself starts on the next tick, from
+                    // the input of that tick, so letting go of the stick during the grab does not
+                    // smuggle a frame of climbing in behind it.
+                    s.Mode = MoveMode.Climbing;
+                }
+                else
+                {
+                    s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
+                    s.LadderCooldownTimer = cfg.LadderRegrabFrames;
+                    s.Noise = NoiseLevel.Quiet;
+                }
+                return;
+            }
+
+            int total = s.ScriptFrames > 0 ? s.ScriptFrames : 1;
+            int done = total - s.ScriptTimer;
+            Fix t = new Fix((int)(((long)Fix.RawOne * done) / total));
+
+            Fix xT, yT;
+            if (s.Mode == MoveMode.Mounting)
+            {
+                // One eased step sideways onto the centre line. Reaching for a ladder is a step,
+                // not a hop: nothing about it is vertical, and the Y ends where it began.
+                xT = SmoothStep(t);
+                yT = xT;
+            }
+            else
+            {
+                // Height leads and the step across follows, which is the shape of a real mantle
+                // rather than a diagonal slide.
+                yT = SmoothStep(Clamp01(t * 3 / 2));
+                xT = SmoothStep(Clamp01((t - Fix.FromMilli(300)) * 10 / 7));
+            }
 
             s.Position = new FixVec2(
-                s.MantleFrom.X + (s.MantleTo.X - s.MantleFrom.X) * xT,
-                s.MantleFrom.Y + (s.MantleTo.Y - s.MantleFrom.Y) * yT);
+                s.ScriptFrom.X + (s.ScriptTo.X - s.ScriptFrom.X) * xT,
+                s.ScriptFrom.Y + (s.ScriptTo.Y - s.ScriptFrom.Y) * yT);
         }
 
         static Fix Clamp01(Fix v) => Fix.Clamp(v, Fix.Zero, Fix.One);
@@ -597,25 +758,46 @@ namespace GulagRunners.Sim
             return false;
         }
 
-        static bool Grounded(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        static bool Grounded(ref PlayerSimState s, SimWorld world, in MoveConfig cfg) =>
+            SupportUnder(s.Position.X, s.Position.Y, s.FallThroughTimer, world, in cfg);
+
+        /// <summary>
+        /// Whether a footprint placed at this x, with its feet at this y, has something to stand
+        /// on. Grounded is this question asked about where the body actually is; the ladder grab
+        /// asks it about where the body is about to be, which is why it is a free function.
+        /// </summary>
+        static bool SupportUnder(Fix x, Fix y, int fallThroughTimer, SimWorld world,
+                                 in MoveConfig cfg)
         {
             Fix half = cfg.BodyWidth / 2;
-            Aabb feet = new Aabb(s.Position.X - half + Skin, s.Position.Y - GroundProbe,
-                                 s.Position.X + half - Skin, s.Position.Y);
+            Aabb feet = new Aabb(x - half + Skin, y - GroundProbe, x + half - Skin, y);
 
             if (AnySolidOverlap(world, in feet)) return true;
 
-            if (s.FallThroughTimer == 0)
+            if (fallThroughTimer == 0)
             {
                 for (int i = 0; i < world.OneWay.Length; i++)
                 {
                     Aabb plat = world.OneWay[i];
-                    if (s.Position.Y + Skin < plat.MaxY) continue;
+                    if (y + Skin < plat.MaxY) continue;
                     if (feet.Overlaps(in plat)) return true;
                 }
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Whether the body can slide along the ground from one x to another without passing
+        /// through anything. One box covering both ends is enough: the world is axis-aligned, so
+        /// anything in the way of a straight sideways slide is inside that box.
+        /// </summary>
+        static bool SweepFree(Fix fromX, Fix toX, Fix y, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Aabb swept = new Aabb(Fix.Min(fromX, toX) - half, y + Skin,
+                                  Fix.Max(fromX, toX) + half, y + cfg.BodyHeight);
+            return !AnySolidOverlap(world, in swept);
         }
 
         static bool StandingOnOneWayOnly(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)

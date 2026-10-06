@@ -42,9 +42,10 @@ namespace GulagRunners.Game
         [Tooltip("How fast you edge sideways off a ladder onto a landing.")]
         public float ladderDismountSpeed = 1.5f;
 
-        [Tooltip("How fast the body slides onto a ladder's centre line when grabbing it. " +
-                 "Snapping instantly is a visible teleport.")]
-        public float ladderSnapSpeed = 6f;
+        [Tooltip("How fast the body is pulled back to a ladder's centre line after drifting off " +
+                 "it. The grab eases on by itself, so this only has a sideways nudge to undo: at " +
+                 "climbing speed it is invisible, and at four times that it is a yank.")]
+        public float ladderSnapSpeed = 2f;
 
         [Tooltip("Clearance kept below the top of a ladder. Climbing past the top is what made " +
                  "the character pop off the ladder and fall straight back onto it.")]
@@ -53,8 +54,17 @@ namespace GulagRunners.Game
         [Tooltip("How far to either side the climb-out looks for floor to step onto.")]
         public float mantleReach = 1.6f;
 
-        [Tooltip("Frames the climb-out takes.")]
-        public int mantleFrames = 14;
+        [Tooltip("Average speed of the two scripted ladder moves: the grab at the bottom and the " +
+                 "climb-out at the top. Each lasts as long as its own distance at this speed, so " +
+                 "neither can be a snap. Raise it for brisker ladders, lower it for heavier ones.")]
+        public float scriptSpeed = 2.4f;
+        [Tooltip("Shortest and longest a scripted ladder move may take, in frames.")]
+        public int scriptMinFrames = 10;
+        public int scriptMaxFrames = 30;
+
+        [Tooltip("Frames after letting go of a ladder during which it cannot be grabbed again. " +
+                 "Without it, jumping off while still holding up re-grabs the ladder at once.")]
+        public int ladderRegrabFrames = 12;
 
         [Header("Dodge")]
         public float dodgeSpeed = 7f;
@@ -112,7 +122,10 @@ namespace GulagRunners.Game
             c.LadderSnapSpeed = M(ladderSnapSpeed);
             c.LadderTopMargin = M(ladderTopMargin);
             c.MantleReach = M(mantleReach);
-            c.MantleFrames = mantleFrames;
+            c.ScriptSpeed = M(scriptSpeed);
+            c.ScriptMinFrames = scriptMinFrames;
+            c.ScriptMaxFrames = Mathf.Max(scriptMinFrames, scriptMaxFrames);
+            c.LadderRegrabFrames = ladderRegrabFrames;
             c.DodgeSpeed = M(dodgeSpeed);
             c.DodgeFrames = dodgeFrames;
             c.DodgeRecoverFrames = dodgeRecoverFrames;
