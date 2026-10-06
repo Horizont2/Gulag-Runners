@@ -3007,7 +3007,7 @@ MonoBehaviour:
     staminaMax: 3
     staminaRecoverFrames: 72
     bodyWidth: 0.3
-    bodyHeight: 0.9
+    bodyHeight: 0.91
     crouchHeight: 1.1
     stepUpHeight: 0.3
     cornerCorrect: 0.25
@@ -3016,7 +3016,7 @@ MonoBehaviour:
     stepNoiseFrames: 18
     hardLandSpeed: 8
   planeZ: 0
-  visualYOffset: 0.45
+  visualYOffset: 0.865
   squashOnCrouch: 0
   modelForward: 0
   turnSmoothTime: 0.07
