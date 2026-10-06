@@ -2906,8 +2906,8 @@ Transform:
   m_GameObject: {fileID: 1900000126}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.588, y: 1.206, z: -0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: -8.588, y: 0.98, z: -0}
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2000000002}
@@ -2986,7 +2986,7 @@ MonoBehaviour:
   worldBaker: {fileID: 1900000117}
   visualRoot: {fileID: 2000000002}
   tuning:
-    runSpeed: 3.6
+    runSpeed: 3
     crouchSpeed: 1.6
     groundAccel: 40
     groundDecel: 50
@@ -3006,8 +3006,8 @@ MonoBehaviour:
     dodgeRecoverFrames: 9
     staminaMax: 3
     staminaRecoverFrames: 72
-    bodyWidth: 0.45
-    bodyHeight: 1.8
+    bodyWidth: 0.3
+    bodyHeight: 0.9
     crouchHeight: 1.1
     stepUpHeight: 0.3
     cornerCorrect: 0.25
@@ -3016,7 +3016,7 @@ MonoBehaviour:
     stepNoiseFrames: 18
     hardLandSpeed: 8
   planeZ: 0
-  visualYOffset: 0.9
+  visualYOffset: 0.45
   squashOnCrouch: 0
   modelForward: 0
   turnSmoothTime: 0.07
@@ -3102,8 +3102,8 @@ Transform:
   m_GameObject: {fileID: 1900000134}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 8.3, y: 0.4939, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 8.2515, y: 0.7, z: 0}
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2000000005}
@@ -3182,7 +3182,7 @@ MonoBehaviour:
   worldBaker: {fileID: 1900000117}
   visualRoot: {fileID: 2000000005}
   tuning:
-    runSpeed: 3.6
+    runSpeed: 3
     crouchSpeed: 1.6
     groundAccel: 40
     groundDecel: 50
@@ -3202,8 +3202,8 @@ MonoBehaviour:
     dodgeRecoverFrames: 9
     staminaMax: 3
     staminaRecoverFrames: 72
-    bodyWidth: 0.45
-    bodyHeight: 1.8
+    bodyWidth: 0.3
+    bodyHeight: 0.92
     crouchHeight: 1.1
     stepUpHeight: 0.3
     cornerCorrect: 0.25
@@ -3212,7 +3212,7 @@ MonoBehaviour:
     stepNoiseFrames: 18
     hardLandSpeed: 8
   planeZ: 0
-  visualYOffset: 0.9
+  visualYOffset: 0.6
   squashOnCrouch: 0
   modelForward: 0
   turnSmoothTime: 0.07
@@ -3546,15 +3546,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2222615538149900119, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.7
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2222615538149900119, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.7
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2222615538149900119, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.7
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2222615538149900119, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_LocalPosition.x
@@ -3562,7 +3562,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2222615538149900119, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.9
+      value: -1.72
       objectReference: {fileID: 0}
     - target: {fileID: 2222615538149900119, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_LocalPosition.z
@@ -3596,21 +3596,21 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 7190392360658972332, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
-      propertyPath: m_Name
-      value: Visual
-      objectReference: {fileID: 0}
     - target: {fileID: 6378207671594616785, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 19487246b655e12fd02931c8cebbb100, type: 2}
     - target: {fileID: 6378207671594616785, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
-      propertyPath: m_ApplyRootMotion
+      propertyPath: m_CullingMode
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6378207671594616785, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
-      propertyPath: m_CullingMode
+      propertyPath: m_ApplyRootMotion
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7190392360658972332, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
+      propertyPath: m_Name
+      value: Visual
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3670,7 +3670,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2222615538149900119, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.9
+      value: -1.18
       objectReference: {fileID: 0}
     - target: {fileID: 2222615538149900119, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_LocalPosition.z
@@ -3704,21 +3704,21 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 7190392360658972332, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
-      propertyPath: m_Name
-      value: Visual
-      objectReference: {fileID: 0}
     - target: {fileID: 6378207671594616785, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 19487246b655e12fd02931c8cebbb100, type: 2}
     - target: {fileID: 6378207671594616785, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
-      propertyPath: m_ApplyRootMotion
+      propertyPath: m_CullingMode
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6378207671594616785, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
-      propertyPath: m_CullingMode
+      propertyPath: m_ApplyRootMotion
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7190392360658972332, guid: 8fba94173e2a97041a18861de4fdcc9c, type: 3}
+      propertyPath: m_Name
+      value: Visual
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
