@@ -24,6 +24,42 @@
 | Усе сіре, **нема контрасту** між фоном і грою | `desaturated background` + туман застосувались до всього | явні значення + `fog only behind the structure, never in front of it` |
 | **Незрозумілий масштаб** — чи можна стрибнути на цю колоду? | нема референсу розміру | `a 1.8 meter tall human silhouette standing on the bottom floor for scale` |
 | Центральна світна сітка | лишилась із промта v1 | у поточному концепті її нема — старт у **клітках** |
+| *(у рендері v2)* замість лісу — **будинок** | `dollhouse` + `structure` + `log cabin rooms` | для природних біомів — `cross-section slice of a hillside`, `sliced open like a terrarium`, `This is an outdoor environment, not a building` |
+
+## Що показав рендер v2
+
+![тестовий рендер v2](refs/test-forest-v2.png)
+
+**Структурні блоки спрацювали:** три рівні, стіни між кімнатами, видимі драбини й люки,
+ящики стоять на підлозі, силуети людей дають масштаб, фон блідий — геймплей темний.
+Нічого не висить. Половини різні. Це вже придатна геометрія.
+
+**Зламався словник біому:** замість лісу вийшов **розріз житлового будинку**. Причина —
+три слова в промті v1 шаблона, які разом означають саме будинок:
+
+| Слово в промті | Що модель почула |
+|---|---|
+| `cutaway of a three-story structure` | будівля в три поверхи |
+| `like a dollhouse` | **ляльковий дім** — найсильніший сигнал |
+| `log cabin rooms with plank walls` | дерев'яний зруб із кімнатами |
+
+### Два словники: природні біоми vs забудовані
+
+Шаблон мусить мати **дві форми**, інакше природні біоми перетворюються на будинки:
+
+| | **Забудовані** (фортеця, барак, завод, станція, бункер, болотне село) | **Природні** (ліс, печера, кар'єр) |
+|---|---|---|
+| Форма | `side-view cutaway of a three-story structure`, `cut open like a dollhouse` | `a cross-section slice of a hillside`, `sliced open like a terrarium`, `like an ant farm cross-section` |
+| Рівні | `floors` розділені `solid vertical walls` | `levels of terrain` розділені `earth walls, rock outcrops, root masses, boulders` |
+| Низ | підвал, тунель | **дугаут у ґрунті**, видимий зріз землі з корінням і шарами породи |
+| Середина | кімнати | **галявини** між стовбурами й валунами |
+| Верх | дахи | **крона**: платформи на товстих гілках, мотузкові мости |
+| Обов'язковий рядок | — | `This is an outdoor environment, not a building.` |
+| У негатив | — | `house, cabin, building facade, dollhouse, apartment cross-section, rows of windows` |
+
+> **Правило:** слово `dollhouse` вживай **тільки** для забудованих біомів. Для природних —
+> `terrarium` або `ant farm cross-section`: вони дають той самий розріз, але через землю,
+> а не через стіни.
 
 > ### ⚠️ Головне, чого промт не полагодить
 > Генератори зображень дають **настрій, палітру й матеріали**. Вони **не дають придатного
@@ -39,8 +75,14 @@
 Складай промт із блоків **у цьому порядку**. Міняється тільки `SUBJECT` і `PROPS`.
 
 ```
-Stylized low poly 3D game environment render, side-view cutaway of a three-story
-structure, modeled in Blender, flat-shaded faceted geometry.
+Stylized low poly 3D game environment render, <<FORM>>, modeled in Blender,
+flat-shaded faceted geometry.
+
+   FORM для забудованих біомів:
+     side-view cutaway of a three-story structure, cut open like a dollhouse
+   FORM для природних біомів (ліс, печера, кар'єр):
+     a cross-section slice of a hillside for a side-scrolling game level.
+     This is an outdoor environment, not a building.
 
 SUBJECT: <<блок біому>>
 
@@ -82,6 +124,12 @@ isometric, top-down, three-quarter view, perspective distortion, realistic textu
 photorealism, high polygon detail
 ```
 
+Для **природних** біомів додай у негатив:
+```
+house, cabin, building facade, dollhouse, apartment cross-section, interior rooms,
+furniture, rows of windows, roof shingles
+```
+
 ### Чому саме ці формулювання
 
 - **`modeled in Blender` / `render`** — найсильніший важіль проти «намальованого концепт-арту».
@@ -100,16 +148,57 @@ photorealism, high polygon detail
 Підставляй у `SUBJECT`, `PROPS` і `палітра` шаблона вище.
 
 ### 1. Тайговий лісоповал 🌲 ⭐ MVP — середньовічний
+
+**Природний біом** — використовує форму `terrarium`, не `dollhouse`. Повний готовий промт:
+
 ```
-SUBJECT: an abandoned taiga logging camp built into a hillside and cut open like a
-dollhouse. Bottom floor: a dirt dugout tunnel with timber support frames. Middle floor:
-three log cabin rooms with plank walls and narrow doorways, the middle one a sawmill hall
-with a tall ceiling. Top floor: three flat shingled rooftops with low railings, under an
-open sky. A few dark conifers stand behind the structure, not in front of it.
-PROPS: three glowing cyan wooden crates and one glowing gold safe, each sitting flat on a
-floor. One wooden ladder per floor junction.
-ПАЛІТРА: cool blue-green palette, dark wet timber, pale grey-green sky, one warm orange
-lantern accent
+Stylized low poly 3D game environment render, a cross-section slice of a forested hillside
+for a side-scrolling game level, modeled in Blender, flat-shaded faceted geometry.
+This is an outdoor forest environment, not a building.
+
+SUBJECT: an abandoned taiga logging camp spread across a hillside that has been sliced open
+like a terrarium, so the tunnels dug into the earth are visible in cross-section.
+
+LEVELS: exactly three stacked levels of terrain.
+Bottom level, underground: dugout tunnels carved into dark soil and held up by rough timber
+frames, the cut face of the earth showing tree roots and rock strata; one iron holding cage
+at the far left end of the tunnel and one at the far right, their doors raised open.
+Middle level, forest floor: open ground between enormous standing pine trunks and mossy
+boulders, divided into three separate clearings by walls of rock, tangled roots and stacked
+timber; the central clearing holds a small open-sided sawmill shelter with a flat plank floor.
+Top level, canopy: three flat timber platforms built on thick horizontal branches, joined by
+rope bridges, pale open sky above.
+
+CONNECTIONS: wooden ladders and plank ramps clearly join the three levels, and square hatches
+lead down into the tunnels.
+
+SCALE: a small dark 1.8 meter tall human silhouette stands on the forest floor for scale.
+Each clearing is about six times his height wide.
+
+RULES: every walkable surface is perfectly flat and horizontal, no tilted or diagonal walking
+surfaces. Every platform rests on visible posts, branches or rock ledges. Nothing floats in
+mid-air. The left and right ends have the same number of spaces but different shapes, not a
+mirror image. Keep the object count low and every object physically supported.
+
+PROPS: three glowing cyan wooden crates and one glowing gold safe, each sitting flat on the
+ground or on a platform.
+
+LIGHT AND COLOR: flat saturated color fills, hard edges between facets, no texture detail.
+Cool blue-green palette, dark wet timber, pale grey-green sky, one warm orange lantern accent
+underground. Strong value separation — distant background trees very pale and low contrast,
+the three gameplay levels dark and high contrast. Fog only behind the hillside, never in
+front of it.
+
+CAMERA: strict side elevation, near-orthographic, camera perpendicular to the slice,
+12 degree downward tilt, the whole hillside fits in frame with clear margins.
+
+--ar 21:9 --style raw --stylize 150
+```
+
+Негатив — базовий v2 **плюс**:
+```
+house, cabin, building facade, dollhouse, apartment cross-section, interior rooms,
+furniture, rows of windows, roof shingles
 ```
 
 ### 2. Шахта / вапнякова печера 🕳️ — обидва режими
@@ -295,6 +384,7 @@ near the horizon, soft color banding. Equirectangular panorama --ar 2:1
 - [ ] Туман **тільки за** конструкцією, не поверх неї?
 - [ ] Скрині видно одразу, вони стоять на підлозі й світяться за тіром?
 - [ ] Це **фасетний low poly**, а не намальована ілюстрація?
+- [ ] Це справді **той біом**, який просили, а не розріз будинку?
 - [ ] Силуети читаються, якщо зменшити до 300 px?
 - [ ] Нема реальної історичної символіки?
 
