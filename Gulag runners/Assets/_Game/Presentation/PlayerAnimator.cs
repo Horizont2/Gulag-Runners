@@ -26,11 +26,13 @@ namespace GulagRunners.Game
         [Tooltip("Standing still.")]                       public string idleState = "Idle";
         [Tooltip("Moving slowly on the ground.")]          public string walkState = "Walk";
         [Tooltip("Running.")]                              public string runState = "Run";
-        [Tooltip("Top speed, and the dodge dash.")]        public string sprintState = "Run Fast";
+        [Tooltip("The dodge dash. There is no sprint: the game has one ground speed.")]
+        public string dodgeState = "Run Fast";
         [Tooltip("In the air, rising or falling.")]        public string airState = "Jumping Up";
         [Tooltip("Climbing up a ladder.")]      public string climbUpState = "Ladder Up";
         [Tooltip("Climbing down a ladder.")]    public string climbDownState = "Ladder Down";
         [Tooltip("Holding still on a ladder.")] public string climbIdleState = "Ladder Idle";
+        [Tooltip("Climbing out at the top of a ladder.")] public string mantleState = "Ladder Out";
         [Tooltip("Crouching and still.")]                  public string crouchIdleState = "Sitting";
         [Tooltip("Crouch-walking.")]                       public string crouchMoveState = "Walk";
 
@@ -43,9 +45,6 @@ namespace GulagRunners.Game
 
         [Tooltip("Above this speed it plays Run instead of Walk, in m/s.")]
         public float runThreshold = 2.4f;
-
-        [Tooltip("Above this it plays the sprint clip, in m/s.")]
-        public float sprintThreshold = 3.4f;
 
         [Header("Jump")]
         [Tooltip("Drive the jump clip as a pose instead of looping it: rising shows its early " +
@@ -127,7 +126,10 @@ namespace GulagRunners.Game
 
                 case MoveMode.Dodging:
                     playback = maxPlaybackSpeed;
-                    return sprintState;
+                    return dodgeState;
+
+                case MoveMode.Mantling:
+                    return mantleState;
 
                 case MoveMode.Airborne:
                     if (poseJumpByVelocity)
@@ -149,12 +151,6 @@ namespace GulagRunners.Game
                     }
 
                     if (speed <= idleThreshold) return idleState;
-
-                    if (speed >= sprintThreshold)
-                    {
-                        playback = Scale(speed, referenceRunSpeed);
-                        return sprintState;
-                    }
 
                     if (speed >= runThreshold)
                     {

@@ -5,7 +5,7 @@ from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD
 
 rooms, floors = 3, 3
 room_w, floor_h, slab, wall, door_h = 7.2, 3.0, 0.3, 0.4, 2.2
-hatch_w, ladder_w, gap_w = 1.8, 0.9, 2.0
+hatch_w, ladder_w, gap_w = 1.8, 0.9, 0.728
 total_w, total_h = rooms*room_w, floors*floor_h
 left, right = -total_w/2, total_w/2
 lintel, clear = floor_h-door_h, floor_h-slab
@@ -33,8 +33,8 @@ box((left-wall/2, total_h/2), (wall, total_h))
 box((right+wall/2, total_h/2), (wall, total_h))
 for f in range(floors-1):
     box((ladder_x(f), f*floor_h+floor_h/2), (ladder_w, floor_h+slab), 2)
-box((left+9.6, 0.15), (1.6, 0.3))
-box((left+12.6, 1.3+(clear-1.3)/2), (1.6, clear-1.3))
+box((left+9.6, 0.0774), (1.6, 0.1547))
+box((left+12.6, 1.748), (1.6, 1.904))
 box((left+16.2, 0.8), (3.0, 0.2), 1)
 box((left+18.0, 1.6), (2.4, 0.2), 1)
 box((left+1.2, 1.1), (0.1, 2.2))
@@ -68,19 +68,21 @@ check("walks to ladder 0", until(s, L if ladder_x(0) < F(s.x) else R,
       lambda s: abs(F(s.x)-ladder_x(0)) < 0.4), f"x={F(s.x):.2f}")
 check("climbs to floor 1", until(s, UP, lambda s: F(s.y) >= floor_h-0.05),
       f"y={F(s.y):.2f}")
-check("steps off the ladder onto floor 1", until(s, R, lambda s: s.mode == "ground", 240),
-      f"mode={s.mode} y={F(s.y):.2f}")
+check("climbs out onto floor 1 by itself", until(s, UP, lambda s: s.mode == "ground", 300),
+      f"mode={s.mode} y={F(s.y):.2f} x={F(s.x):.2f}")
+check("ends up standing on the floor, not in the hatch",
+      abs(F(s.y) - floor_h) < 0.05, f"y={F(s.y):.2f}")
 
 check("crosses floor 1 to ladder 1", until(s, R, lambda s: abs(F(s.x)-ladder_x(1)) < 0.5, 900),
       f"x={F(s.x):.2f} y={F(s.y):.2f}")
 check("climbs to floor 2", until(s, UP, lambda s: F(s.y) >= 2*floor_h-0.05),
       f"y={F(s.y):.2f}")
-check("steps off onto floor 2", until(s, L, lambda s: s.mode == "ground", 240),
+check("climbs out onto floor 2 by itself", until(s, UP, lambda s: s.mode == "ground", 300),
       f"mode={s.mode} y={F(s.y):.2f}")
 
 # the gap is on the top floor, where there is sky overhead and a jump carries its full length
 right_edge = gap_w / 2          # approaching from the right, this is the brink
-half = 0.3
+half = 0.15
 until(s, L, lambda s: F(s.x) - half < right_edge + 0.45, 900)
 before = F(s.x)
 jumped = False
@@ -95,8 +97,13 @@ check("jumps the gap in the top floor", jumped,
 print("\nObstacles do what they are for")
 s = S(left+8.0, 0.9); until(s, 0, lambda s: s.mode == "ground", 120)
 y0 = F(s.y)
-until(s, R, lambda s: F(s.x) > left+10.6, 300)
-check("step ledge is walked up without jumping", F(s.y) > y0+0.25, f"y={F(s.y):.2f}")
+peak = y0
+for _ in range(600):
+    step(s, R, W)
+    peak = max(peak, F(s.y))
+    if F(s.x) > left + 10.4: break
+check("step ledge is walked up without jumping", peak > y0 + 0.12,
+      f"rose to {peak:.3f} m, ledge top 0.155, never left the ground")
 
 s = S(left+11.2, 0.9); until(s, 0, lambda s: s.mode == "ground", 120)
 blocked = not until(s, R, lambda s: F(s.x) > left+13.6, 300)
@@ -108,8 +115,14 @@ s = S(left+16.2, 0.9); until(s, 0, lambda s: s.mode == "ground", 120)
 check("stands on the low one-way", abs(F(s.y)-0.9) < 0.06, f"y={F(s.y):.2f}")
 check("jumps up to the high one-way",
       until(s, R | JMP, lambda s: F(s.y) > 1.6, 300), f"y={F(s.y):.2f}")
-check("drops back through with down+jump",
-      until(s, DN | JMP, lambda s: F(s.y) < 0.2, 300), f"y={F(s.y):.2f}")
+dropped = False
+for _ in range(600):
+    step(s, DN, W)
+    step(s, DN | JMP, W)
+    if F(s.y) < 0.2:
+        dropped = True
+        break
+check("drops back through with down+jump", dropped, f"y={F(s.y):.2f}")
 
 print("\nPlayer 2 can reach the same places from the other end")
 s = S(right-2.5, 0.9); until(s, 0, lambda s: s.mode == "ground", 120)

@@ -36,6 +36,18 @@ namespace GulagRunners.Sim
         /// <summary>How fast you edge sideways off a ladder.</summary>
         public Fix LadderDismountSpeed;
 
+        /// <summary>How fast the body slides onto the ladder's centre line when grabbing it.</summary>
+        public Fix LadderSnapSpeed;
+
+        /// <summary>Clearance kept below the top of a ladder box, so climbing never leaves it.</summary>
+        public Fix LadderTopMargin;
+
+        /// <summary>How far to either side the climb-out looks for floor to step onto.</summary>
+        public Fix MantleReach;
+
+        /// <summary>Frames the climb-out takes.</summary>
+        public int MantleFrames;
+
         public Fix DodgeSpeed;
         public int DodgeFrames;
         public int DodgeRecoverFrames;
@@ -80,6 +92,10 @@ namespace GulagRunners.Sim
             c.ClimbUpSpeed   = Fix.FromMilli(2000);
             c.ClimbDownSpeed = Fix.FromMilli(2600);
             c.LadderDismountSpeed = Fix.FromMilli(1500);
+            c.LadderSnapSpeed = Fix.FromMilli(6000);
+            c.LadderTopMargin = Fix.FromMilli(60);
+            c.MantleReach = Fix.FromMilli(1600);
+            c.MantleFrames = 14;          // 0.23 s
 
             c.DodgeSpeed         = Fix.FromMilli(7000);
             c.DodgeFrames        = 21;  // 0.35 s

@@ -53,10 +53,16 @@ namespace GulagRunners.Game
                  "and a gap in the first floor you have to jump.")]
         public bool buildTestFeatures = true;
 
-        [Tooltip("Width of the hole in the TOP floor, which is the only one open to the sky. " +
-                 "Indoors the ceiling cuts a jump short — it carries barely 1 m — so a gap to " +
-                 "jump only makes sense up here, where a running jump covers about 2.4 m.")]
-        public float floorGapWidth = 2.0f;
+        [Tooltip("Size the obstacles from the player's own body instead of these fixed numbers. " +
+                 "A gap, a step and a beam only mean anything relative to how tall the character " +
+                 "is — change the character's height and fixed numbers quietly stop working: " +
+                 "a beam stops forcing a crouch, a gap stops being jumpable.")]
+        public bool scaleFeaturesToPlayer = true;
+
+        [Tooltip("Width of the hole in the TOP floor, the only one open to the sky. Indoors the " +
+                 "ceiling cuts a jump short, so a gap to jump only makes sense up here. Ignored " +
+                 "when Scale Features To Player is on.")]
+        public float floorGapWidth = 1.4f;
 
         public bool buildCages = true;
 

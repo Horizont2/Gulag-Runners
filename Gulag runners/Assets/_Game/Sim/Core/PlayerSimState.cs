@@ -5,7 +5,9 @@ namespace GulagRunners.Sim
         Airborne = 0,
         Grounded = 1,
         Climbing = 2,
-        Dodging  = 3
+        Dodging  = 3,
+        /// <summary>Climbing out at the top of a ladder onto the floor beside it.</summary>
+        Mantling = 4
     }
 
     /// <summary>
@@ -36,6 +38,11 @@ namespace GulagRunners.Sim
         public int StaminaTimer;
 
         public int LadderIndex;
+
+        /// <summary>Where the climb-out started, and where it ends. Only valid while Mantling.</summary>
+        public FixVec2 MantleFrom;
+        public FixVec2 MantleTo;
+        public int MantleTimer;
 
         /// <summary>Output of the last tick. Read by presentation, and later by the audio-info system.</summary>
         public NoiseLevel Noise;

@@ -62,7 +62,7 @@ base = F(s.y); apex = base
 for i in range(120):
     step(s, JMP, W); apex = max(apex, F(s.y))
 ok &= check("apex below a floor", apex-base < floor_h, f"apex={apex-base:.3f} floor={floor_h}")
-ok &= check("apex is usable indoors", apex-base > 0.7, f"apex={apex-base:.3f} headroom={floor_h-slab-1.8:.2f}")
+ok &= check("apex is usable indoors", apex-base > 0.7, f"apex={apex-base:.3f}")
 
 print("\n4. ladder to the floor above")
 s = S(ladder_x, 0.0); run(s, 0, 10)

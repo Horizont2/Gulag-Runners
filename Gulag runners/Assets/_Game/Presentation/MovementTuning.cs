@@ -42,6 +42,20 @@ namespace GulagRunners.Game
         [Tooltip("How fast you edge sideways off a ladder onto a landing.")]
         public float ladderDismountSpeed = 1.5f;
 
+        [Tooltip("How fast the body slides onto a ladder's centre line when grabbing it. " +
+                 "Snapping instantly is a visible teleport.")]
+        public float ladderSnapSpeed = 6f;
+
+        [Tooltip("Clearance kept below the top of a ladder. Climbing past the top is what made " +
+                 "the character pop off the ladder and fall straight back onto it.")]
+        public float ladderTopMargin = 0.06f;
+
+        [Tooltip("How far to either side the climb-out looks for floor to step onto.")]
+        public float mantleReach = 1.6f;
+
+        [Tooltip("Frames the climb-out takes.")]
+        public int mantleFrames = 14;
+
         [Header("Dodge")]
         public float dodgeSpeed = 7f;
         [Tooltip("0.35 s of invulnerability, from docs/02.")]
@@ -58,6 +72,9 @@ namespace GulagRunners.Game
                  "bounds: those span both outstretched arms and are useless as a body width.")]
         public float bodyWidth = 0.45f;
         public float bodyHeight = 1.8f;
+        [Tooltip("Height while crouching. Clamped to 75% of the body height on conversion: a " +
+                 "crouch taller than the character makes the hitbox GROW when you duck, which " +
+                 "inverts every ceiling check that depends on it.")]
         public float crouchHeight = 1.1f;
 
         [Header("Ledge assist")]
@@ -92,6 +109,10 @@ namespace GulagRunners.Game
             c.ClimbUpSpeed = M(climbUpSpeed);
             c.ClimbDownSpeed = M(climbDownSpeed);
             c.LadderDismountSpeed = M(ladderDismountSpeed);
+            c.LadderSnapSpeed = M(ladderSnapSpeed);
+            c.LadderTopMargin = M(ladderTopMargin);
+            c.MantleReach = M(mantleReach);
+            c.MantleFrames = mantleFrames;
             c.DodgeSpeed = M(dodgeSpeed);
             c.DodgeFrames = dodgeFrames;
             c.DodgeRecoverFrames = dodgeRecoverFrames;
@@ -99,7 +120,7 @@ namespace GulagRunners.Game
             c.StaminaRecoverFrames = staminaRecoverFrames;
             c.BodyWidth = M(bodyWidth);
             c.BodyHeight = M(bodyHeight);
-            c.CrouchHeight = M(crouchHeight);
+            c.CrouchHeight = M(Mathf.Min(crouchHeight, bodyHeight * 0.75f));
             c.StepUpHeight = M(stepUpHeight);
             c.CornerCorrect = M(cornerCorrect);
             c.FallThroughFrames = fallThroughFrames;

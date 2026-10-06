@@ -1358,8 +1358,8 @@ Transform:
   m_GameObject: {fileID: 1900000045}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -5.9, y: 5.85, z: 0}
-  m_LocalScale: {x: 9.8, y: 0.3, z: 1}
+  m_LocalPosition: {x: -5.582, y: 5.85, z: 0}
+  m_LocalScale: {x: 10.436, y: 0.3, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1900000003}
@@ -1462,8 +1462,8 @@ Transform:
   m_GameObject: {fileID: 1900000050}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3.65, y: 5.85, z: 0}
-  m_LocalScale: {x: 5.3, y: 0.3, z: 1}
+  m_LocalPosition: {x: 3.332, y: 5.85, z: 0}
+  m_LocalScale: {x: 5.936, y: 0.3, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1900000003}
@@ -2294,8 +2294,8 @@ Transform:
   m_GameObject: {fileID: 1900000090}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1.2, y: 0.15, z: 0}
-  m_LocalScale: {x: 1.6, y: 0.3, z: 1}
+  m_LocalPosition: {x: -1.2, y: 0.0774, z: 0}
+  m_LocalScale: {x: 1.6, y: 0.1547, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1900000003}
@@ -2398,8 +2398,8 @@ Transform:
   m_GameObject: {fileID: 1900000095}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.8, y: 2, z: 0}
-  m_LocalScale: {x: 1.6, y: 1.4, z: 1}
+  m_LocalPosition: {x: 1.8, y: 1.7481, z: 0}
+  m_LocalScale: {x: 1.6, y: 1.9038, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1900000003}
@@ -3001,6 +3001,10 @@ MonoBehaviour:
     climbUpSpeed: 2
     climbDownSpeed: 2.6
     ladderDismountSpeed: 1.5
+    ladderSnapSpeed: 6
+    ladderTopMargin: 0.06
+    mantleReach: 1.6
+    mantleFrames: 14
     dodgeSpeed: 7
     dodgeFrames: 21
     dodgeRecoverFrames: 9
@@ -3199,6 +3203,10 @@ MonoBehaviour:
     climbUpSpeed: 2
     climbDownSpeed: 2.6
     ladderDismountSpeed: 1.5
+    ladderSnapSpeed: 6
+    ladderTopMargin: 0.06
+    mantleReach: 1.6
+    mantleFrames: 14
     dodgeSpeed: 7
     dodgeFrames: 21
     dodgeRecoverFrames: 9
@@ -3643,17 +3651,17 @@ MonoBehaviour:
   idleState: Idle
   walkState: Walk
   runState: Run
-  sprintState: Run Fast
+  dodgeState: Run Fast
   airState: Jumping Up
   climbUpState: Ladder Up
   climbDownState: Ladder Down
   climbIdleState: Ladder Idle
+  mantleState: Ladder Out
   crouchIdleState: Sitting
   crouchMoveState: Walk
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4
-  sprintThreshold: 3.4
   poseJumpByVelocity: 1
   referenceWalkSpeed: 1.6
   referenceRunSpeed: 3.6
@@ -3751,17 +3759,17 @@ MonoBehaviour:
   idleState: Idle
   walkState: Walk
   runState: Run
-  sprintState: Run Fast
+  dodgeState: Run Fast
   airState: Jumping Up
   climbUpState: Ladder Up
   climbDownState: Ladder Down
   climbIdleState: Ladder Idle
+  mantleState: Ladder Out
   crouchIdleState: Sitting
   crouchMoveState: Walk
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4
-  sprintThreshold: 3.4
   poseJumpByVelocity: 1
   referenceWalkSpeed: 1.6
   referenceRunSpeed: 3.6

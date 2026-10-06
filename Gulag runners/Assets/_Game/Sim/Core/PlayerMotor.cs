@@ -42,6 +42,12 @@ namespace GulagRunners.Sim
 
             if (wishX != 0) s.Facing = (sbyte)wishX;
 
+            if (s.Mode == MoveMode.Mantling)
+            {
+                StepMantle(ref s, world, cfg);
+                return;
+            }
+
             if (s.Mode == MoveMode.Dodging)
             {
                 StepDodge(ref s, world, cfg);
@@ -260,6 +266,25 @@ namespace GulagRunners.Sim
                 return;
             }
 
+            if (s.LadderIndex < 0 || s.LadderIndex >= world.Ladders.Length)
+            {
+                s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
+                return;
+            }
+
+            Aabb ladder = world.Ladders[s.LadderIndex];
+
+            // Slide onto the ladder's centre line instead of teleporting there. Snapping X in a
+            // single tick is a visible jump sideways, and it was half of what made ladders feel
+            // broken.
+            //
+            // Only while the player is not pushing sideways: the pull towards the centre is four
+            // times faster than the sideways step off, so left running it would make stepping off
+            // a ladder impossible.
+            if (wishX == 0)
+                s.Position.X = Fix.MoveTowards(s.Position.X, world.LadderCentreX(s.LadderIndex),
+                                               cfg.LadderSnapSpeed * Dt);
+
             s.Velocity.X = Fix.Zero;
             s.Velocity.Y = wishY > 0 ? cfg.ClimbUpSpeed
                          : wishY < 0 ? -cfg.ClimbDownSpeed
@@ -267,9 +292,26 @@ namespace GulagRunners.Sim
 
             MoveY(ref s, s.Velocity.Y * Dt, world, cfg);
 
-            // Pushing sideways edges off the ladder. At the top of a ladder the feet are over
-            // the hatch, with no floor underneath, so without this the player hangs there with
-            // no way off but jumping.
+            // Never climb past the top of the ladder box. Doing so dropped the body out of the
+            // ladder with nothing underneath — the hatch is a hole — so it fell, touched the
+            // ladder again, re-grabbed, and climbed back out. That loop was the juddering.
+            Fix ceiling = ladder.MaxY - cfg.LadderTopMargin;
+            bool atTop = s.Position.Y >= ceiling;
+            if (atTop)
+            {
+                s.Position.Y = ceiling;
+                if (s.Velocity.Y > Fix.Zero) s.Velocity.Y = Fix.Zero;
+            }
+
+            // At the top, climbing out onto the floor beside the hatch is automatic. Asking the
+            // player to nudge sideways while hanging over a hole is not a mechanic, it is a trap.
+            // Hold a direction and you climb out that way; hold nothing and the climb-out picks
+            // the side with more floor on it, rather than depositing you in whatever pocket
+            // happens to be nearest.
+            if (atTop && wishY > 0 && TryStartMantle(ref s, wishX, world, cfg))
+                return;
+
+            // Pushing sideways edges off the ladder.
             if (wishX != 0)
                 MoveX(ref s, cfg.LadderDismountSpeed * wishX * Dt, world, cfg);
 
@@ -280,11 +322,7 @@ namespace GulagRunners.Sim
             }
 
             Aabb body = s.Body(in cfg);
-            bool stillOnLadder = s.LadderIndex >= 0
-                                 && s.LadderIndex < world.Ladders.Length
-                                 && body.Overlaps(in world.Ladders[s.LadderIndex]);
-
-            if (!stillOnLadder)
+            if (!body.Overlaps(in ladder))
             {
                 s.LadderIndex = -1;
                 s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
@@ -299,6 +337,146 @@ namespace GulagRunners.Sim
                 s.Velocity = FixVec2.Zero;
             }
         }
+
+        /// <summary>
+        /// Looks for floor beside the ladder to climb out onto, nearest first and preferring the
+        /// side asked for. Returns false when there is nothing to step onto, in which case the
+        /// player simply stays on the ladder rather than being dropped into a hole.
+        /// </summary>
+        static bool TryStartMantle(ref PlayerSimState s, int preferSide, SimWorld world,
+                                   in MoveConfig cfg)
+        {
+            bool right = TryFindLanding(ref s, 1, world, in cfg, out FixVec2 landRight);
+            bool left = TryFindLanding(ref s, -1, world, in cfg, out FixVec2 landLeft);
+
+            if (!right && !left) return false;
+
+            int side;
+            if (preferSide > 0 && right) side = 1;
+            else if (preferSide < 0 && left) side = -1;
+            else if (!left) side = 1;
+            else if (!right) side = -1;
+            else
+            {
+                // No direction asked for, and both sides work: take the one with more floor
+                // beyond it. Climbing out of a hatch into the narrow side means the first step
+                // back is into the hole you just left.
+                side = FloorRun(landRight, 1, world, in cfg) >= FloorRun(landLeft, -1, world, in cfg)
+                    ? 1 : -1;
+            }
+
+            s.MantleFrom = s.Position;
+            s.MantleTo = side > 0 ? landRight : landLeft;
+            s.MantleTimer = cfg.MantleFrames;
+            s.Mode = MoveMode.Mantling;
+            s.LadderIndex = -1;
+            s.Velocity = FixVec2.Zero;
+            s.Facing = (sbyte)side;
+            s.Noise = NoiseLevel.Quiet;
+            return true;
+        }
+
+        /// <summary>Nearest spot on one side where the whole body can stand, within reach.</summary>
+        static bool TryFindLanding(ref PlayerSimState s, int side, SimWorld world,
+                                   in MoveConfig cfg, out FixVec2 landing)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Fix step = Fix.FromMilli(100);
+            int steps = cfg.MantleReach.Raw / step.Raw;
+
+            for (int i = 1; i <= steps; i++)
+            {
+                Fix x = s.Position.X + step * (i * side);
+
+                FixVec2 probe = new FixVec2(x, s.Position.Y + cfg.BodyHeight);
+                if (!TryFindGroundBelow(probe, world, in cfg, cfg.BodyHeight * 2, out Fix groundY))
+                    continue;
+
+                // Only ever climb UP and out, never down into something.
+                if (groundY < s.Position.Y - cfg.LadderTopMargin * 4) continue;
+
+                Aabb standing = new Aabb(x - half, groundY + Skin,
+                                         x + half, groundY + cfg.BodyHeight);
+                if (AnySolidOverlap(world, in standing)) continue;
+
+                // The whole footprint must be supported, not just its middle. Without this the
+                // climb-out happily picks the lip of a slab, leaving the body half over the hole
+                // it just climbed out of, and the next step walks straight back in.
+                if (!FullySupported(x, groundY, world, in cfg)) continue;
+
+                landing = new FixVec2(x, groundY + Skin);
+                return true;
+            }
+
+            landing = default;
+            return false;
+        }
+
+        /// <summary>How far unbroken floor continues beyond a landing point.</summary>
+        static Fix FloorRun(FixVec2 from, int dir, SimWorld world, in MoveConfig cfg)
+        {
+            Fix step = Fix.FromMilli(200);
+            Fix reached = Fix.Zero;
+
+            for (int i = 1; i <= 25; i++)                     // 5 m is plenty to decide on
+            {
+                Fix x = from.X + step * (i * dir);
+                FixVec2 probe = new FixVec2(x, from.Y + cfg.BodyHeight);
+                if (!TryFindGroundBelow(probe, world, in cfg, cfg.BodyHeight * 2, out Fix groundY))
+                    break;
+                if (!FullySupported(x, groundY, world, in cfg)) break;
+                reached = step * i;
+            }
+
+            return reached;
+        }
+
+        /// <summary>Solid under the left edge, the middle and the right edge of the footprint.</summary>
+        static bool FullySupported(Fix x, Fix groundY, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            for (int i = -1; i <= 1; i++)
+            {
+                Fix px = x + half * i;
+                Aabb probe = new Aabb(px - Skin * 4, groundY - GroundProbe,
+                                      px + Skin * 4, groundY - Skin);
+                if (!AnySolidOverlap(world, in probe)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// The climb-out itself: a short scripted move with no gravity and no collision, because
+        /// the destination was checked to be free before it started. Height leads and the step
+        /// across follows, which is the shape of a real mantle rather than a diagonal slide.
+        /// </summary>
+        static void StepMantle(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            s.MantleTimer--;
+
+            if (s.MantleTimer <= 0)
+            {
+                s.Position = s.MantleTo;
+                s.Velocity = FixVec2.Zero;
+                s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
+                s.Noise = NoiseLevel.Quiet;
+                return;
+            }
+
+            int done = cfg.MantleFrames - s.MantleTimer;
+            Fix t = new Fix((int)(((long)Fix.RawOne * done) / cfg.MantleFrames));
+
+            Fix yT = SmoothStep(Clamp01(t * 3 / 2));
+            Fix xT = SmoothStep(Clamp01((t - Fix.FromMilli(300)) * 10 / 7));
+
+            s.Position = new FixVec2(
+                s.MantleFrom.X + (s.MantleTo.X - s.MantleFrom.X) * xT,
+                s.MantleFrom.Y + (s.MantleTo.Y - s.MantleFrom.Y) * yT);
+        }
+
+        static Fix Clamp01(Fix v) => Fix.Clamp(v, Fix.Zero, Fix.One);
+
+        static Fix SmoothStep(Fix t) => t * t * (Fix.FromInt(3) - t * 2);
 
         // ---------------------------------------------------------------- collision
 
