@@ -54,8 +54,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.9, y: 0.55, z: 0.9}
-  m_Center: {x: 0, y: 0.275, z: 0}
+  m_Size: {x: 0.7, y: 0.5, z: 0.7}
+  m_Center: {x: 0, y: 0.25, z: 0}
 --- !u!114 &1541552742287974
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -135,15 +135,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2785472371509426277, guid: 511198219d384134c8311337315ae660, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.55
+      value: 0.11
       objectReference: {fileID: 0}
     - target: {fileID: 2785472371509426277, guid: 511198219d384134c8311337315ae660, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.55
+      value: 0.11
       objectReference: {fileID: 0}
     - target: {fileID: 2785472371509426277, guid: 511198219d384134c8311337315ae660, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.55
+      value: 0.11
       objectReference: {fileID: 0}
     - target: {fileID: 2785472371509426277, guid: 511198219d384134c8311337315ae660, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x

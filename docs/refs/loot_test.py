@@ -13,13 +13,14 @@ from loot_mirror import (Chest, Inv, loot_step, frames_to_open, fresh, pool, ste
 W = world()
 
 # The six chests of SetupScene: (name, kind, contents, centre x, floor y, width, height)
+# Reach boxes as the three chest prefabs define them.
 LAYOUT = [
-    ("Chest_F0_Crate_L",  CRATE,  CLUB,      -5.5, 0.0, 0.9, 0.55),
-    ("Chest_F0_Locker_L", LOCKER, CHAINMAIL, -2.5, 0.0, 0.9, 0.70),
-    ("Chest_F1_Safe_L",   SAFE,   SPEAR,     -2.0, 3.0, 1.0, 0.80),
-    ("Chest_F1_Crate_R",  CRATE,  BANDAGE,    4.5, 3.0, 0.9, 0.55),
-    ("Chest_F2_Safe_L",   SAFE,   SPEAR,     -4.0, 6.0, 1.0, 0.80),
-    ("Chest_F2_Crate_R",  CRATE,  CLUB,       3.0, 6.0, 0.9, 0.55),
+    ("Chest_F0_Crate_L",  CRATE,  CLUB,      -5.5, 0.0, 0.7, 0.50),
+    ("Chest_F0_Locker_L", LOCKER, CHAINMAIL, -2.5, 0.0, 0.7, 0.60),
+    ("Chest_F1_Safe_L",   SAFE,   SPEAR,     -2.0, 3.0, 0.8, 0.70),
+    ("Chest_F1_Crate_R",  CRATE,  BANDAGE,    4.5, 3.0, 0.7, 0.50),
+    ("Chest_F2_Safe_L",   SAFE,   SPEAR,     -4.0, 6.0, 0.8, 0.70),
+    ("Chest_F2_Crate_R",  CRATE,  CLUB,       3.0, 6.0, 0.7, 0.50),
 ]
 
 
