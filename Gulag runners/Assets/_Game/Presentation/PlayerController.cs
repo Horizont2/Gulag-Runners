@@ -86,6 +86,12 @@ namespace GulagRunners.Game
         /// <summary>Raised on any tick that made a noise. Loudness is simulation state (docs/01).</summary>
         public event Action<NoiseLevel, Vector2> Noise;
 
+        /// <summary>Raised on the tick a fall ends, with the impact speed in m/s.</summary>
+        public event Action<float> Landed;
+
+        /// <summary>Feet height of the last ground stood on. The camera anchors to this.</summary>
+        public float GroundedY { get; private set; }
+
         public PlayerSimState State => _state;
         public MoveConfig Config => _config;
         public SimWorld World => _world;
@@ -165,6 +171,7 @@ namespace GulagRunners.Game
             // Start already facing the right way: a spin on spawn looks like a glitch.
             _yaw = TargetYaw(_state.Facing);
             _yawVelocity = 0f;
+            GroundedY = position.Y.Raw / (float)Fix.RawOne;
 
             Render(1f);
         }
@@ -218,7 +225,16 @@ namespace GulagRunners.Game
                 }
             }
 
+            bool wasAirborne = _state.Mode == MoveMode.Airborne;
+            float fallSpeed = -_state.Velocity.Y.Raw / (float)Fix.RawOne;
+
             PlayerMotor.Step(ref _state, input, _world, in _config);
+
+            if (_state.Mode == MoveMode.Grounded)
+            {
+                GroundedY = _state.Position.Y.Raw / (float)Fix.RawOne;
+                if (wasAirborne) Landed?.Invoke(Mathf.Max(0f, fallSpeed));
+            }
 
             if (_state.Noise != NoiseLevel.Silent)
                 Noise?.Invoke(_state.Noise, FeetPosition);
