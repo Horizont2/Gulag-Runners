@@ -2995,7 +2995,7 @@ MonoBehaviour:
     gravity: 28
     maxFallSpeed: 18
     jumpSpeed: 9.5
-    jumpCutMultiplier: 0.45
+    jumpCutMultiplier: 0.2
     coyoteFrames: 6
     jumpBufferFrames: 7
     climbUpSpeed: 2
@@ -3191,7 +3191,7 @@ MonoBehaviour:
     gravity: 28
     maxFallSpeed: 18
     jumpSpeed: 9.5
-    jumpCutMultiplier: 0.45
+    jumpCutMultiplier: 0.2
     coyoteFrames: 6
     jumpBufferFrames: 7
     climbUpSpeed: 2
