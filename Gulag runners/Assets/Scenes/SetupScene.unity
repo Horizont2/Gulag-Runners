@@ -3309,14 +3309,21 @@ MonoBehaviour:
   fieldOfView: 30
   pitchDegrees: 12
   planeZ: 0
-  verticalBias: 0.9
-  lookAhead: 1.5
-  lookAheadSmoothTime: 0.35
-  horizontalSmoothTime: 0.14
+  scaleFramingToViewport: 1
+  aimHeight: 1.1
+  deadZoneX: 0.12
+  deadZoneY: 0.18
+  hardEdgeX: 0.38
+  hardEdgeY: 0.4
+  horizontalSmoothTime: 0.18
   verticalSmoothTime: 0.22
-  verticalDeadZone: 0.8
-  floorChangeDistance: 2
-  floorChangeSpeedUp: 4
+  climbSmoothTime: 0.1
+  lookAhead: 2
+  lookAheadSmoothTime: 0.45
+  lookAheadMinSpeed: 0.4
+  anchorToGround: 1
+  airRiseSlack: 2.2
+  airFallSlack: 1.6
   framingPadding: 3
   minZoom: 0.6
   maxZoom: 1.1
@@ -3325,6 +3332,11 @@ MonoBehaviour:
   bordersMin: {x: -10.8, y: 0}
   bordersMax: {x: 10.8, y: 10}
   centreWhenSmallerThanView: 1
+  landingTrauma: 0.25
+  shakeAmplitude: 0.25
+  shakeRoll: 1.5
+  shakeFrequency: 22
+  traumaDecay: 1.8
   applyViewportRect: 1
   viewportRect:
     serializedVersion: 2
@@ -3332,6 +3344,7 @@ MonoBehaviour:
     y: 0.5
     width: 1
     height: 0.5
+  drawZones: 1
 --- !u!4 &1900000136
 Transform:
   m_ObjectHideFlags: 0
@@ -3462,14 +3475,21 @@ MonoBehaviour:
   fieldOfView: 30
   pitchDegrees: 12
   planeZ: 0
-  verticalBias: 0.9
-  lookAhead: 1.5
-  lookAheadSmoothTime: 0.35
-  horizontalSmoothTime: 0.14
+  scaleFramingToViewport: 1
+  aimHeight: 1.1
+  deadZoneX: 0.12
+  deadZoneY: 0.18
+  hardEdgeX: 0.38
+  hardEdgeY: 0.4
+  horizontalSmoothTime: 0.18
   verticalSmoothTime: 0.22
-  verticalDeadZone: 0.8
-  floorChangeDistance: 2
-  floorChangeSpeedUp: 4
+  climbSmoothTime: 0.1
+  lookAhead: 2
+  lookAheadSmoothTime: 0.45
+  lookAheadMinSpeed: 0.4
+  anchorToGround: 1
+  airRiseSlack: 2.2
+  airFallSlack: 1.6
   framingPadding: 3
   minZoom: 0.6
   maxZoom: 1.1
@@ -3478,6 +3498,11 @@ MonoBehaviour:
   bordersMin: {x: -10.8, y: 0}
   bordersMax: {x: 10.8, y: 10}
   centreWhenSmallerThanView: 1
+  landingTrauma: 0.25
+  shakeAmplitude: 0.25
+  shakeRoll: 1.5
+  shakeFrequency: 22
+  traumaDecay: 1.8
   applyViewportRect: 1
   viewportRect:
     serializedVersion: 2
@@ -3485,6 +3510,7 @@ MonoBehaviour:
     y: 0
     width: 1
     height: 0.5
+  drawZones: 1
 --- !u!1 &1900000140
 GameObject:
   m_ObjectHideFlags: 0

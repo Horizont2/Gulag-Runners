@@ -19,14 +19,19 @@ namespace GulagRunners.GameEditor
 
             EditorGUILayout.Space();
 
-            float fighterShare = cam.visibleWorldHeight > 0f ? 1.8f / cam.visibleWorldHeight : 0f;
+            // Measured against the full screen, which is what the docs/02 rule is about: in a
+            // half-height split view the fighter fills twice as much of its own viewport.
+            float height = cam.EffectiveViewHeight;
+            float viewportShare = cam.applyViewportRect ? Mathf.Clamp01(cam.viewportRect.height) : 1f;
+            float fighterShare = height > 0f ? 1.8f / height * viewportShare : 0f;
             string verdict = fighterShare >= 0.17f && fighterShare <= 0.20f
                 ? "within the 17-20% docs/02 asks for"
                 : "OUTSIDE the 17-20% docs/02 asks for";
 
             EditorGUILayout.HelpBox(
                 $"A 1.8 m fighter fills {fighterShare * 100f:0.#}% of screen height — {verdict}.\n" +
-                $"Arena borders: {cam.bordersMax.x - cam.bordersMin.x:0.#} x " +
+                $"View: {height:0.#} m tall. Arena borders: " +
+                $"{cam.bordersMax.x - cam.bordersMin.x:0.#} x " +
                 $"{cam.bordersMax.y - cam.bordersMin.y:0.#} m.",
                 fighterShare >= 0.17f && fighterShare <= 0.20f ? MessageType.Info : MessageType.Warning);
 
