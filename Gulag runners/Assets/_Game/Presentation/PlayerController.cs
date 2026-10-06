@@ -36,9 +36,9 @@ namespace GulagRunners.Game
         [Tooltip("The single gameplay plane. The arena is 3D; the fight is not (docs/02).")]
         public float planeZ;
 
-        [Tooltip("Lift applied to the visual because the simulation tracks the feet. " +
-                 "For the default 1 m sphere this is 0.5.")]
-        public float visualYOffset = 0.5f;
+        [Tooltip("Distance from this object's origin down to the feet, because the simulation " +
+                 "tracks the feet. For the scaled capsule this is 0.9, half the body height.")]
+        public float visualYOffset = 0.9f;
 
         [Tooltip("Squash the visual when crouching.")]
         public bool squashOnCrouch = true;
@@ -206,9 +206,8 @@ namespace GulagRunners.Game
 
             transform.position = new Vector3(p.x, p.y + visualYOffset, planeZ);
 
-            if (visualRoot != null && visualRoot != transform)
-                visualRoot.localPosition = Vector3.zero;
-
+            // The visual root keeps whatever local offset it was authored with: a capsule sits
+            // centred on this object, while a character model hangs from it by its feet.
             Transform v = visualRoot != null ? visualRoot : transform;
             v.localRotation = Quaternion.Euler(0f, _state.Facing >= 0 ? 0f : 180f, 0f);
 

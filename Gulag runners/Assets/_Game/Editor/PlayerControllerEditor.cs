@@ -33,6 +33,18 @@ namespace GulagRunners.GameEditor
                     : "Correct: a jump cannot clear a floor, so ladders are the only way up."),
                 apex >= FloorHeight ? MessageType.Error : MessageType.Info);
 
+            EditorGUILayout.Space();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Attach character model", GUILayout.Height(24)))
+                {
+                    GameObject prefab = PlayerVisualSetup.FindPrefab();
+                    if (prefab != null) PlayerVisualSetup.Attach(pc, prefab);
+                }
+                if (GUILayout.Button("Remove", GUILayout.Height(24), GUILayout.Width(80)))
+                    PlayerVisualSetup.DetachFromAll();
+            }
+
             if (!Application.isPlaying) return;
 
             PlayerSimState s = pc.State;

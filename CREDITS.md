@@ -31,4 +31,19 @@ See `docs/10-free-assets.md` for the shortlist of packs chosen per biome.
 
 <!-- Add an entry here for every pack you download. -->
 
-_(empty — the project is still at the documentation stage)_
+### Free Pack - Stick Man — PolyOne
+Source:      Unity Asset Store (publisher PolyOne)
+Licence:     Unity Asset Store EULA
+Location:    Assets/PolyOne/Free Stickman
+In repo:     yes — see the note below
+Used for:    player character model, rig and the eight animation clips
+             (Idle, Walk, Run, Run Fast, Jumping Up, Sitting, Swimming, Yelling)
+
+> ⚠️ The Asset Store EULA lets you ship a pack inside your game but does not let you
+> redistribute it, and committing it to a repository is redistribution. It is currently
+> committed. Two ways to settle this: keep it only if this repository stays private and
+> every person with access holds their own Asset Store licence for the pack, or remove it
+> from git (`git rm -r --cached "Gulag runners/Assets/PolyOne"`, add it to `.gitignore`)
+> and leave this entry so everyone installs it themselves. A CC0 character pack —
+> KayKit Adventurers or Quaternius — would avoid the question entirely; see
+> docs/10-free-assets.md.
