@@ -2879,6 +2879,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   includeTriggers: 0
+  restrictToPlane: 1
+  planeZ: 0
+  planeThickness: 1.5
   rebakeEveryFrame: 0
   drawBakedBoxes: 1
   logBakeReport: 1

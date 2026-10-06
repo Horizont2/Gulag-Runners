@@ -46,6 +46,21 @@ namespace GulagRunners.Game
         [Tooltip("Trigger colliders are skipped by default: they are usually zones, not geometry.")]
         public bool includeTriggers;
 
+        [Header("The gameplay plane")]
+        [Tooltip("Only bake colliders that reach the gameplay plane. docs/02: the arena is 3D, " +
+                 "the fight is not — depth is presentation. Without this, scenery standing five " +
+                 "metres behind the plane is flattened onto it and becomes a wall the player " +
+                 "walks into for no visible reason.")]
+        public bool restrictToPlane = true;
+
+        [Tooltip("Z of the gameplay plane. Match it to the players' Plane Z.")]
+        public float planeZ;
+
+        [Tooltip("How far either side of the plane still counts as being on it, in metres. " +
+                 "Wide enough for geometry authored a little off-centre, narrow enough to leave " +
+                 "the backdrop alone.")]
+        public float planeThickness = 1.5f;
+
         [Header("Options")]
         [Tooltip("Rebake every frame. Editor convenience while dragging platforms about; " +
                  "turn it off in a build.")]
@@ -121,7 +136,7 @@ namespace GulagRunners.Game
             int roots = 0, markedSeen = 0, markedSkipped = 0, chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
             int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
-                skippedAlreadyMarked = 0, skippedInactive = 0, skippedChest = 0;
+                skippedAlreadyMarked = 0, skippedInactive = 0, skippedChest = 0, skippedDepth = 0;
 
             HashSet<int> handled = new HashSet<int>();
 
@@ -178,6 +193,9 @@ namespace GulagRunners.Game
                     if (col.GetComponentInParent<Chest>() != null)
                     { skippedChest++; continue; }
 
+                    Bounds cb = col.bounds;
+                    if (restrictToPlane && !ReachesPlane(cb)) { skippedDepth++; continue; }
+
                     int layerBit = 1 << col.gameObject.layer;
                     SimColliderKind kind;
                     if ((ladderLayers.value & layerBit) != 0) kind = SimColliderKind.Ladder;
@@ -185,8 +203,7 @@ namespace GulagRunners.Game
                     else if ((solidLayers.value & layerBit) != 0) kind = SimColliderKind.Solid;
                     else { skippedLayer++; continue; }
 
-                    Bounds b = col.bounds;
-                    Add(kind, new Rect(b.min.x, b.min.y, b.size.x, b.size.y),
+                    Add(kind, new Rect(cb.min.x, cb.min.y, cb.size.x, cb.size.y),
                         solids, oneWay, ladders);
                 }
             }
@@ -204,7 +221,7 @@ namespace GulagRunners.Game
                 $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider ({markedSkipped} inactive), " +
                 $"{collidersSeen} Unity collider (skipped: {skippedAlreadyMarked} already marked, " +
                 $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedChest} on a chest, " +
-                $"{skippedLayer} wrong layer, " +
+                $"{skippedDepth} off the plane, {skippedLayer} wrong layer, " +
                 $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid, " +
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
@@ -223,6 +240,13 @@ namespace GulagRunners.Game
 
             return World;
         }
+
+        /// <summary>
+        /// Does this collider reach the gameplay plane. A level built in 3D has a foreground and
+        /// a background, and only the slab in the middle is the game.
+        /// </summary>
+        bool ReachesPlane(Bounds b) =>
+            b.max.z >= planeZ - planeThickness && b.min.z <= planeZ + planeThickness;
 
         /// <summary>
         /// The scene's roots. Falls back to the active scene if this object's own scene is not
