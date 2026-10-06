@@ -60,6 +60,21 @@ namespace GulagRunners.GameEditor
                 EditorGUILayout.IntField("Stamina", s.StaminaCharges);
                 EditorGUILayout.EnumPopup("Noise this tick", s.Noise);
             }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Carrying (docs/02: three slots, no menu)",
+                                       EditorStyles.boldLabel);
+            using (new EditorGUI.DisabledScope(true))
+            {
+                string weapon = s.Inventory.BareHanded
+                    ? "fists"
+                    : $"{s.Inventory.Weapon} ({s.Inventory.WeaponDurability} left)";
+                EditorGUILayout.TextField("Weapon", weapon);
+                EditorGUILayout.EnumPopup("Armour", s.Inventory.Armour);
+                EditorGUILayout.EnumPopup("Utility", s.Inventory.Utility);
+                EditorGUILayout.IntField("Opening chest", s.OpeningChest);
+            }
+
             Repaint();
         }
     }

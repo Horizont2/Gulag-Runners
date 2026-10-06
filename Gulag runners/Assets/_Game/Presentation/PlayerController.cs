@@ -36,6 +36,14 @@ namespace GulagRunners.Game
         [Tooltip("The SimWorldBaker in the scene.")]
         public SimWorldBaker worldBaker;
 
+        [Tooltip("The shared round state: which chests are open. Leave empty to use the one in " +
+                 "the scene. Without it this player simply cannot open anything.")]
+        public MatchState matchState;
+
+        [Tooltip("0 for player one, 1 for player two. A chest records which player is opening " +
+                 "it, so the two of them must not share an index.")]
+        public int playerIndex;
+
         [Tooltip("Transform that carries the mesh. Leave empty to move this object directly.")]
         public Transform visualRoot;
 
@@ -99,6 +107,9 @@ namespace GulagRunners.Game
         /// <summary>Raised on the tick a fall ends, with the impact speed in m/s.</summary>
         public event Action<float> Landed;
 
+        /// <summary>Raised on the tick a chest hands something over.</summary>
+        public event Action<ItemId> PickedUp;
+
         /// <summary>Feet height of the last ground stood on. The camera anchors to this.</summary>
         public float GroundedY { get; private set; }
 
@@ -154,6 +165,8 @@ namespace GulagRunners.Game
                                    "fall forever.", this);
             }
             _world = worldBaker != null ? (worldBaker.World ?? worldBaker.Bake()) : new SimWorld();
+
+            if (matchState == null) matchState = MatchState.Instance;
 
             if (visualRoot == null) visualRoot = transform;
             _baseVisualScale = visualRoot.localScale;
@@ -239,6 +252,21 @@ namespace GulagRunners.Game
             float fallSpeed = -_state.Velocity.Y.Raw / (float)Fix.RawOne;
 
             PlayerMotor.Step(ref _state, input, _world, in _config);
+
+            // Loot after movement: where the body ended up this tick decides which chest it is
+            // standing at. Movement never depends on the inventory, so the order is not a choice
+            // that can be got wrong later.
+            if (matchState != null)
+            {
+                LootMotor.Step(ref _state, playerIndex, input, _world, matchState.ChestStates,
+                               matchState.Config, in _config);
+
+                if (_state.PickedUp != ItemId.None)
+                {
+                    matchState.ReportOpened(playerIndex, _state.OpenedChest);
+                    PickedUp?.Invoke(_state.PickedUp);
+                }
+            }
 
             if (_state.Mode == MoveMode.Grounded)
             {
