@@ -237,6 +237,29 @@ class Scene:
             return [wc[i] - ext[i] for i in range(3)], [wc[i] + ext[i] for i in range(3)]
         return None
 
+    def renders(self, go):
+        """Does this object actually draw anything. An invisible collider cannot occlude."""
+        return any(self.docs.get(c, (0, ''))[0] in (23, 137)       # Mesh/SkinnedMeshRenderer
+                   for c in self.gos[go]['comps'])
+
+    def occluders(self, plane_z):
+        """Everything drawn between the camera and the gameplay plane, nearest first.
+
+        SideViewCamera stands at planeZ - distance and looks along +Z, so anything with a
+        smaller Z than the plane is between it and the fight. In a level modelled in 3D that
+        set is the whole answer to "why can I not see my own fighter".
+        """
+        out = []
+        for fid in self.gos:
+            if fid not in self.tr_of_go or not self.renders(fid):
+                continue
+            b = self.bounds(fid)
+            if b is None or b[0][2] >= plane_z:
+                continue
+            out.append((self.gos[fid]['name'], b[0], b[1]))
+        out.sort(key=lambda r: r[1][2])
+        return out
+
     def trigger(self, go):
         for c in self.gos[go]['comps']:
             cls, body = self.docs.get(c, (0, ''))
@@ -379,6 +402,48 @@ def bake(scene=None, report=False):
 def world(report=False):
     b = bake(report=report)
     return {k: b[k] for k in ("solid", "oneway", "ladder")}
+
+
+CAMERA_GUID = "b921a9be9303a1887f282de341a5ae31"
+
+
+def cameras(scene=None):
+    """Every SideViewCamera in the scene, as the numbers that decide what it frames."""
+    sc = scene or Scene()
+    out = []
+    for fid, (cls, body) in sorted(sc.docs.items()):
+        if cls != 114 or f'guid: {CAMERA_GUID}' not in body:
+            continue
+        lo = _vec(body, 'bordersMin', {'x': 0, 'y': 0})
+        hi = _vec(body, 'bordersMax', {'x': 0, 'y': 0})
+        out.append(dict(
+            planeZ=_field(body, 'planeZ', float, 0.0),
+            fov=_field(body, 'fieldOfView', float, 30.0),
+            pitch=_field(body, 'pitchDegrees', float, 12.0),
+            fraction=_field(body, 'bodyScreenFraction', float, 0.18),
+            aspect=_field(body, 'deviceAspect', float, 19.5 / 9),
+            min=(lo['x'], lo['y']), max=(hi['x'], hi['y'])))
+    return out
+
+
+def camera(scene=None):
+    """Where the first camera ends up, worked out the way SideViewCamera.Place does."""
+    sc = scene or Scene()
+    cam = cameras(sc)[0]
+    body_h = 0.91
+    for fid, (cls, b) in sc.docs.items():
+        if cls == 114 and f'guid: {PLAYER_GUID}' in b:
+            m = re.search(r'^    bodyHeight: (\S+)$', b, re.M)
+            if m:
+                body_h = float(m.group(1))
+            break
+    height = body_h / max(0.02, cam['fraction'])
+    pitch = math.radians(cam['pitch'])
+    distance = height * 0.5 * math.cos(pitch) / math.tan(math.radians(cam['fov'] / 2))
+    return dict(height=height, distance=distance, aspect=cam['aspect'],
+                planeZ=cam['planeZ'],
+                z=cam['planeZ'] - distance * math.cos(pitch),
+                rise=distance * math.sin(pitch))
 
 
 def spawns(scene=None):

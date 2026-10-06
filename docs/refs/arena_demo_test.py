@@ -264,6 +264,55 @@ for idx, (toward, label) in enumerate(((-1, "left"), (1, "right"))):
     check(f"a fighter cannot walk off the {label} end of the arena", not out,
           f"ended at ({F(s.x):.2f}, {F(s.y):.2f})")
 
+# ---------------------------------------------------------------- what the camera sees
+print("\nWhat the camera sees")
+# SideViewCamera stands at planeZ - distance and looks along +Z. A level modelled in 3D has a
+# side it is meant to be seen from, and if the camera is on the other one the fight happens
+# behind the scenery. This measures it instead of trusting the scene view.
+CAM = G.camera()
+print(f"   view {CAM['height']:.2f} m tall, camera {CAM['distance']:.2f} m out at "
+      f"z {CAM['z']:.2f}, plane at z {CAM['planeZ']:.2f}")
+OCC = G.Scene().occluders(CAM['planeZ'])
+
+
+def hidden(feet, x):
+    """Fraction of the frame covered by scenery in front of a fighter standing here."""
+    focus = feet + 0.55
+    cam_y = focus + CAM['rise']
+    lo_y, hi_y = focus - CAM['height'] / 2, focus + CAM['height'] / 2
+    half_w = CAM['height'] * CAM['aspect'] / 2
+    worst, by = 0.0, None
+    for name, lo, hi in OCC:
+        d = lo[2] - CAM['z']
+        if d <= 0.2 or hi[0] < x - half_w or lo[0] > x + half_w:
+            continue
+        scale = CAM['distance'] / d
+        top = (hi[1] - cam_y) * scale + cam_y
+        bot = (lo[1] - cam_y) * scale + cam_y
+        tall = max(0.0, min(top, hi_y) - max(bot, lo_y)) / CAM['height']
+        wide = (min(hi[0], x + half_w) - max(lo[0], x - half_w)) / (2 * half_w)
+        if tall * wide > worst:
+            worst, by = tall * wide, name or "(cube)"
+    return worst, by
+
+
+for label, feet, xs in (("ground floor", 0.12, (-12.0, -6.0, -2.0, 3.0, 8.0)),
+                        ("spawn plateaus", 0.97, (SPAWNS[0][0], SPAWNS[1][0])),
+                        ("upper walkway", 3.83, (-11.5, -5.0, 0.0, 7.7))):
+    worst, by = max((hidden(feet, x) for x in xs), key=lambda r: r[0])
+    check(f"the {label} is not shot through the scenery", worst < 0.25,
+          f"worst {worst * 100:.0f}% of the frame, by {by}")
+
+# the arena has to fit the camera's reach, or half of it is never framed
+for cam in G.cameras():
+    check("the camera borders hold the whole arena",
+          cam['min'][0] <= -17.6 and cam['max'][0] >= 13.8
+          and cam['min'][1] <= 0.1 and cam['max'][1] >= 4.8,
+          f"({cam['min'][0]}, {cam['min'][1]})..({cam['max'][0]}, {cam['max'][1]})")
+    travel = (cam['max'][1] - cam['min'][1]) - CAM['height']
+    check("the camera can follow a fighter between the floors", travel > 1.2,
+          f"{travel:.2f} m of vertical travel for a {CAM['height']:.2f} m view")
+
 # ---------------------------------------------------------------- the chests
 print("\nChests")
 for box, kind, contents, name in CHESTS:
