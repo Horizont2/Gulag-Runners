@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using GulagRunners.Game;
@@ -55,65 +56,43 @@ namespace GulagRunners.GameEditor
             Transform root = rootGo.transform;
 
             float left = b.LeftEdge, right = b.RightEdge, z = b.planeZ;
-            float ladderX = b.LadderX;
+            float lintel = Mathf.Max(0.1f, b.floorHeight - b.doorHeight);
 
             for (int f = 0; f < b.floors; f++)
             {
                 float y = f * b.floorHeight;
-                bool hatch = b.buildLadders && f > 0;
+                BuildSlab(b, root, f, y);
 
-                if (hatch)
-                {
-                    float holeMin = ladderX - b.hatchWidth * 0.5f;
-                    float holeMax = ladderX + b.hatchWidth * 0.5f;
-
-                    float lw = holeMin - left;
-                    if (lw > 0.05f)
-                        Box(b, root, $"Floor{f}_L", new Vector3(left + lw * 0.5f, y - b.slabThickness * 0.5f, z),
-                            new Vector3(lw, b.slabThickness, 1f), SimColliderKind.Solid);
-
-                    float rw = right - holeMax;
-                    if (rw > 0.05f)
-                        Box(b, root, $"Floor{f}_R", new Vector3(holeMax + rw * 0.5f, y - b.slabThickness * 0.5f, z),
-                            new Vector3(rw, b.slabThickness, 1f), SimColliderKind.Solid);
-                }
-                else
-                {
-                    Box(b, root, $"Floor{f}", new Vector3(0f, y - b.slabThickness * 0.5f, z),
-                        new Vector3(b.TotalWidth, b.slabThickness, 1f), SimColliderKind.Solid);
-                }
-
-                // Interior walls: these are what make the fog of war of docs/01 real.
+                // Interior walls are lintels above a doorway. A full-height wall would seal a
+                // room off, and docs/05 wants at least two ways out of every room.
                 for (int r = 1; r < b.roomsPerFloor; r++)
                 {
                     float x = left + r * b.roomWidth;
-                    if (b.buildLadders && Mathf.Abs(x - ladderX) < b.roomWidth * 0.5f) continue;
-
-                    // Lintel only: the gap underneath is the doorway. A full-height wall would
-                    // seal the room off completely (docs/05: every room needs two ways out).
-                    float lintel = Mathf.Max(0.1f, b.floorHeight - b.doorHeight);
                     Box(b, root, $"Wall{f}_{r}",
                         new Vector3(x, y + b.doorHeight + lintel * 0.5f, z),
                         new Vector3(b.wallThickness, lintel, 1f), SimColliderKind.Solid);
                 }
             }
 
-            Box(b, root, "WallLeft", new Vector3(left - b.wallThickness * 0.5f, b.TotalHeight * 0.5f, z),
-                new Vector3(b.wallThickness, b.TotalHeight, 1f), SimColliderKind.Solid);
-            Box(b, root, "WallRight", new Vector3(right + b.wallThickness * 0.5f, b.TotalHeight * 0.5f, z),
-                new Vector3(b.wallThickness, b.TotalHeight, 1f), SimColliderKind.Solid);
+            float height = b.TotalHeight;
+            Box(b, root, "WallLeft", new Vector3(left - b.wallThickness * 0.5f, height * 0.5f, z),
+                new Vector3(b.wallThickness, height, 1f), SimColliderKind.Solid);
+            Box(b, root, "WallRight", new Vector3(right + b.wallThickness * 0.5f, height * 0.5f, z),
+                new Vector3(b.wallThickness, height, 1f), SimColliderKind.Solid);
 
             if (b.buildLadders)
+            {
                 for (int f = 0; f < b.floors - 1; f++)
+                {
+                    float x = b.LadderXForFloor(f);
                     Box(b, root, $"Ladder{f}",
-                        new Vector3(ladderX, f * b.floorHeight + b.floorHeight * 0.5f, z),
+                        new Vector3(x, f * b.floorHeight + b.floorHeight * 0.5f, z),
                         new Vector3(b.ladderWidth, b.floorHeight + b.slabThickness, 1f),
                         SimColliderKind.Ladder);
+                }
+            }
 
-            if (b.buildOneWayPlatform)
-                Box(b, root, "OneWayPlatform",
-                    new Vector3(left + b.roomWidth * 2.2f, b.floorHeight * 0.6f, z),
-                    new Vector3(b.roomWidth * 0.5f, 0.2f, 1f), SimColliderKind.OneWay);
+            if (b.buildTestFeatures) BuildTestFeatures(b, root, z);
 
             if (b.buildCages)
             {
@@ -127,8 +106,7 @@ namespace GulagRunners.GameEditor
             {
                 Undo.RecordObject(b.cameraToFit, "Fit camera borders");
                 b.cameraToFit.planeZ = z;
-                b.cameraToFit.SetBorders(new Vector2(left, 0f),
-                                         new Vector2(right, b.TotalHeight + 1f));
+                b.cameraToFit.SetBorders(new Vector2(left, 0f), new Vector2(right, height + 1f));
                 EditorUtility.SetDirty(b.cameraToFit);
             }
 
@@ -136,13 +114,80 @@ namespace GulagRunners.GameEditor
             {
                 Undo.RecordObject(b.playerToPlace, "Place player");
                 PlayerController pc = b.playerToPlace.GetComponent<PlayerController>();
-                float lift = pc != null ? pc.visualYOffset : 0.5f;
+                float lift = pc != null ? pc.visualYOffset : 0.9f;
                 b.playerToPlace.position = new Vector3(left + 2.5f, lift, z);
                 EditorUtility.SetDirty(b.playerToPlace);
             }
 
             Undo.CollapseUndoOperations(group);
             Selection.activeGameObject = rootGo;
+        }
+
+        /// <summary>
+        /// A floor slab, built as segments around its holes: the hatch the ladder below comes
+        /// up through, and on the top floor the gap that has to be jumped.
+        /// </summary>
+        static void BuildSlab(ArenaBuilder b, Transform root, int floor, float y)
+        {
+            float left = b.LeftEdge, right = b.RightEdge, z = b.planeZ;
+            List<(float min, float max)> holes = new List<(float, float)>();
+
+            if (floor > 0 && b.buildLadders)
+            {
+                float hx = b.LadderXForFloor(floor - 1);
+                holes.Add((hx - b.hatchWidth * 0.5f, hx + b.hatchWidth * 0.5f));
+            }
+
+            // The gap goes on the top floor, the only one with open sky above it: indoors the
+            // ceiling clips a jump to about a metre, so a gap down there would be a wall.
+            if (floor == b.floors - 1 && b.buildTestFeatures && b.floorGapWidth > 0.05f)
+                holes.Add((-b.floorGapWidth * 0.5f, b.floorGapWidth * 0.5f));
+
+            holes.Sort((p, q) => p.min.CompareTo(q.min));
+
+            float cursor = left;
+            int part = 0;
+            foreach ((float min, float max) hole in holes)
+            {
+                float w = hole.min - cursor;
+                if (w > 0.05f)
+                    Box(b, root, $"Floor{floor}_{part++}",
+                        new Vector3(cursor + w * 0.5f, y - b.slabThickness * 0.5f, z),
+                        new Vector3(w, b.slabThickness, 1f), SimColliderKind.Solid);
+                cursor = Mathf.Max(cursor, hole.max);
+            }
+
+            float last = right - cursor;
+            if (last > 0.05f)
+                Box(b, root, $"Floor{floor}_{part}",
+                    new Vector3(cursor + last * 0.5f, y - b.slabThickness * 0.5f, z),
+                    new Vector3(last, b.slabThickness, 1f), SimColliderKind.Solid);
+        }
+
+        /// <summary>
+        /// The four obstacles the movement has to be tested against. Each one exists to prove a
+        /// specific rule from docs/02 rather than to look like anything.
+        /// </summary>
+        static void BuildTestFeatures(ArenaBuilder b, Transform root, float z)
+        {
+            float left = b.LeftEdge;
+            float clear = b.floorHeight - b.slabThickness;
+
+            // Ledge assist: a step low enough to be walked up without jumping.
+            Box(b, root, "Test_StepLedge", new Vector3(left + 9.6f, 0.15f, z),
+                new Vector3(1.6f, 0.3f, 1f), SimColliderKind.Solid);
+
+            // Crouch: a beam hanging low enough that you cannot pass standing.
+            float beamBottom = 1.3f;
+            Box(b, root, "Test_LowBeam",
+                new Vector3(left + 12.6f, beamBottom + (clear - beamBottom) * 0.5f, z),
+                new Vector3(1.6f, clear - beamBottom, 1f), SimColliderKind.Solid);
+
+            // One-way platforms, spaced inside one jump of each other.
+            Box(b, root, "Test_OneWayLow", new Vector3(left + 16.2f, 0.8f, z),
+                new Vector3(3.0f, 0.2f, 1f), SimColliderKind.OneWay);
+            Box(b, root, "Test_OneWayHigh", new Vector3(left + 18.0f, 1.6f, z),
+                new Vector3(2.4f, 0.2f, 1f), SimColliderKind.OneWay);
         }
 
         static void Box(ArenaBuilder b, Transform parent, string name, Vector3 centre,

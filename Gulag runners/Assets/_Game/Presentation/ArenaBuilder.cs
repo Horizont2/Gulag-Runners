@@ -40,8 +40,24 @@ namespace GulagRunners.Game
         [Header("Connections")]
         public bool buildLadders = true;
         public float ladderWidth = 0.9f;
-        public float hatchWidth = 1.6f;
-        public bool buildOneWayPlatform = true;
+        public float hatchWidth = 1.8f;
+
+        [Tooltip("Put each floor's ladder at the opposite end from the one below, so reaching " +
+                 "the top floor means crossing the whole arena rather than climbing one " +
+                 "chimney. Routes that differ by side are what docs/05 asks of the two wings.")]
+        public bool alternateLadderSides = true;
+
+        [Header("Movement test features (M0 greybox)")]
+        [Tooltip("Adds the obstacles the movement needs to be tested against: a low step for " +
+                 "ledge assist, a beam you must crouch under, a stack of one-way platforms, " +
+                 "and a gap in the first floor you have to jump.")]
+        public bool buildTestFeatures = true;
+
+        [Tooltip("Width of the hole in the TOP floor, which is the only one open to the sky. " +
+                 "Indoors the ceiling cuts a jump short — it carries barely 1 m — so a gap to " +
+                 "jump only makes sense up here, where a running jump covers about 2.4 m.")]
+        public float floorGapWidth = 2.0f;
+
         public bool buildCages = true;
 
         [Header("Materials (optional)")]
@@ -61,7 +77,12 @@ namespace GulagRunners.Game
         public float TotalHeight => floors * floorHeight;
         public float LeftEdge => -TotalWidth * 0.5f;
         public float RightEdge => TotalWidth * 0.5f;
-        public float LadderX => LeftEdge + roomWidth;
+        /// <summary>X of the ladder that leads up from the given floor.</summary>
+        public float LadderXForFloor(int floor)
+        {
+            bool leftSide = !alternateLadderSides || floor % 2 == 0;
+            return leftSide ? LeftEdge + roomWidth * 0.5f : RightEdge - roomWidth * 0.5f;
+        }
 
         public Transform FindGeneratedRoot()
         {
