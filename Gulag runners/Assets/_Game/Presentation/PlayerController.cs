@@ -68,6 +68,16 @@ namespace GulagRunners.Game
                  "two of them face each other.")]
         public int spawnFacing = 1;
 
+        [Tooltip("Turn to face the ladder while climbing instead of staying side-on. The climb " +
+                 "clips are authored with the character facing the rungs, so played side-on they " +
+                 "read as someone climbing sideways through thin air.")]
+        public bool faceLadderWhenClimbing = true;
+
+        [Tooltip("Degrees turned back towards the camera while on a ladder. Square to the ladder " +
+                 "is a flat back and a dead silhouette; a few degrees of angle keeps the body " +
+                 "readable without losing the sense that the character is facing the rungs.")]
+        [Range(0f, 60f)] public float ladderViewAngle = 25f;
+
         [Header("Safety")]
         [Tooltip("At spawn, seat the player on the first floor below instead of dropping them " +
                  "onto it. A spawn that begins with a fall reads as broken collision.")]
@@ -169,7 +179,7 @@ namespace GulagRunners.Game
             _accumulator = 0f;
 
             // Start already facing the right way: a spin on spawn looks like a glitch.
-            _yaw = TargetYaw(_state.Facing);
+            _yaw = TargetYaw(_state.Facing, _state.Mode == MoveMode.Climbing);
             _yawVelocity = 0f;
             GroundedY = position.Y.Raw / (float)Fix.RawOne;
 
@@ -258,7 +268,7 @@ namespace GulagRunners.Game
             // centred on this object, while a character model hangs from it by its feet.
             Transform v = visualRoot != null ? visualRoot : transform;
 
-            float target = TargetYaw(_state.Facing);
+            float target = TargetYaw(_state.Facing, _state.Mode == MoveMode.Climbing);
             _yaw = turnSmoothTime <= 0.001f
                 ? target
                 : Mathf.SmoothDampAngle(_yaw, target, ref _yawVelocity, turnSmoothTime,
@@ -285,20 +295,40 @@ namespace GulagRunners.Game
         public void ApplyTuning() => _config = tuning.ToConfig();
 
         /// <summary>
-        /// Yaw that points the model along +X or -X, the only two directions that exist on the
-        /// gameplay plane. Rotating a +Z-facing model by 0 or 180 degrees — the obvious-looking
-        /// thing — turns it towards and away from the camera instead, which is no turn at all.
+        /// Yaw correction for a model that does not look along +Z. Everything else is expressed
+        /// as a world direction and then offset by this, so there is one place that knows which
+        /// way a given character faces.
         /// </summary>
-        float TargetYaw(int facing)
+        float ModelYawOffset => modelForward switch
         {
-            float faceRight = modelForward switch
+            ModelForward.PlusZ => 0f,
+            ModelForward.MinusZ => 180f,
+            ModelForward.PlusX => -90f,
+            _ => 90f
+        };
+
+        /// <summary>
+        /// Yaw that points the model where it should look.
+        ///
+        /// Walking, that is +X or -X — the only two directions that exist on the gameplay plane.
+        /// Rotating a +Z-facing model by 0 or 180 degrees, the obvious-looking thing, turns it
+        /// towards and away from the camera instead, which is no turn at all.
+        ///
+        /// Climbing, it is into the screen: the character turns its back to the camera and faces
+        /// the rungs, angled a little so the silhouette still reads as a body.
+        /// </summary>
+        float TargetYaw(int facing, bool climbing)
+        {
+            if (climbing && faceLadderWhenClimbing)
             {
-                ModelForward.PlusZ => 90f,
-                ModelForward.MinusZ => -90f,
-                ModelForward.PlusX => 0f,
-                _ => 180f
-            };
-            return facing >= 0 ? faceRight : faceRight + 180f;
+                // 0 degrees of world yaw points along +Z, away from the camera and into the
+                // ladder. The skew leans back towards whichever side the character came from.
+                float side = facing >= 0 ? 1f : -1f;
+                return ModelYawOffset + ladderViewAngle * side;
+            }
+
+            float walkYaw = facing >= 0 ? 90f : -90f;    // +X or -X in world yaw
+            return ModelYawOffset + walkYaw;
         }
 
         static Fix ToFix(float metres) => Fix.FromMilli(Mathf.RoundToInt(metres * 1000f));

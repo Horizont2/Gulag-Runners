@@ -3021,6 +3021,8 @@ MonoBehaviour:
   modelForward: 0
   turnSmoothTime: 0.07
   spawnFacing: 1
+  faceLadderWhenClimbing: 1
+  ladderViewAngle: 25
   snapToGroundOnSpawn: 1
   snapSearchDistance: 6
   killY: -25
@@ -3217,6 +3219,8 @@ MonoBehaviour:
   modelForward: 0
   turnSmoothTime: 0.07
   spawnFacing: -1
+  faceLadderWhenClimbing: 1
+  ladderViewAngle: 25
   snapToGroundOnSpawn: 1
   snapSearchDistance: 6
   killY: -25
