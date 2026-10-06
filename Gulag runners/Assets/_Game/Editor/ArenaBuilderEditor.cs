@@ -88,8 +88,13 @@ namespace GulagRunners.GameEditor
                 {
                     float x = left + r * b.roomWidth;
                     if (b.buildLadders && Mathf.Abs(x - ladderX) < b.roomWidth * 0.5f) continue;
-                    Box(b, root, $"Wall{f}_{r}", new Vector3(x, y + b.floorHeight * 0.5f, z),
-                        new Vector3(b.wallThickness, b.floorHeight, 1f), SimColliderKind.Solid);
+
+                    // Lintel only: the gap underneath is the doorway. A full-height wall would
+                    // seal the room off completely (docs/05: every room needs two ways out).
+                    float lintel = Mathf.Max(0.1f, b.floorHeight - b.doorHeight);
+                    Box(b, root, $"Wall{f}_{r}",
+                        new Vector3(x, y + b.doorHeight + lintel * 0.5f, z),
+                        new Vector3(b.wallThickness, lintel, 1f), SimColliderKind.Solid);
                 }
             }
 

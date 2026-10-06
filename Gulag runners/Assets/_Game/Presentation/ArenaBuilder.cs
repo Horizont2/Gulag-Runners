@@ -25,6 +25,12 @@ namespace GulagRunners.Game
         public float floorHeight = 2.5f;
         public float slabThickness = 0.4f;
         public float wallThickness = 0.4f;
+
+        [Tooltip("Height of the doorway left in every interior wall. The wall is built as a " +
+                 "lintel above it, so a room is never sealed — docs/05 requires at least two " +
+                 "ways out of every room, because a dead end is lethal in a game where you " +
+                 "cannot see the other player coming.")]
+        public float doorHeight = 2.0f;
         [Tooltip("The single gameplay plane. The arena is 3D; the fight is not (docs/02).")]
         public float planeZ;
 

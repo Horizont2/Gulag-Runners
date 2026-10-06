@@ -12,6 +12,10 @@ GameObject:
   - component: {fileID: 7962743143162566146}
   - component: {fileID: 104037624565055732}
   - component: {fileID: 8311752000723476423}
+  - component: {fileID: 1600000001}
+  - component: {fileID: 1600000002}
+  - component: {fileID: 1600000003}
+  - component: {fileID: 1600000004}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -114,3 +118,93 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &1600000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6797926830135214249}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 882fe3a922af38d6658c85cd54734955, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  inputSourceBehaviour: {fileID: 1600000002}
+  worldBaker: {fileID: 0}
+  visualRoot: {fileID: 0}
+  tuning:
+    runSpeed: 3.6
+    crouchSpeed: 1.6
+    groundAccel: 40
+    groundDecel: 50
+    airAccel: 22
+    airDecel: 10
+    gravity: 28
+    maxFallSpeed: 18
+    jumpSpeed: 9.5
+    jumpCutMultiplier: 0.45
+    coyoteFrames: 6
+    jumpBufferFrames: 7
+    climbUpSpeed: 2
+    climbDownSpeed: 2.6
+    dodgeSpeed: 7
+    dodgeFrames: 21
+    dodgeRecoverFrames: 9
+    staminaMax: 3
+    staminaRecoverFrames: 72
+    bodyWidth: 0.6
+    bodyHeight: 1.8
+    crouchHeight: 1.1
+    stepUpHeight: 0.3
+    cornerCorrect: 0.25
+    fallThroughFrames: 18
+    loudSpeed: 2.5
+    stepNoiseFrames: 18
+    hardLandSpeed: 8
+  planeZ: 0
+  visualYOffset: 0.5
+  squashOnCrouch: 1
+  drawBody: 1
+--- !u!114 &1600000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6797926830135214249}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d38199ce45987337a0a238a9761ca4ad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1600000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6797926830135214249}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0754104aade356a499371fd6becaabcd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1600000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6797926830135214249}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc216feddf11f9a8debc522b34a04fc1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stick: {fileID: 0}
+  attackButton: {fileID: 0}
+  jumpButton: {fileID: 0}
+  dodgeButton: {fileID: 0}
+  actionButton: {fileID: 0}
+  verticalThreshold: 0.5
