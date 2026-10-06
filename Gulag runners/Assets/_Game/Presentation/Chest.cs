@@ -65,23 +65,7 @@ namespace GulagRunners.Game
             }
         }
 
-        public Rect ToRect()
-        {
-            Bounds b;
-            BoxCollider box = GetComponent<BoxCollider>();
-            if (box != null)
-            {
-                Vector3 centre = transform.TransformPoint(box.center);
-                Vector3 size = Vector3.Scale(box.size, transform.lossyScale);
-                b = new Bounds(centre, size);
-            }
-            else
-            {
-                b = new Bounds(transform.position, transform.lossyScale);
-            }
-
-            return new Rect(b.min.x, b.min.y, b.size.x, b.size.y);
-        }
+        public Rect ToRect() => SimCollider.WorldRect(this, GetComponent<Collider>());
 
         public ChestDef ToDef() => new ChestDef
         {

@@ -61,6 +61,26 @@ namespace GulagRunners.Game
                  "the backdrop alone.")]
         public float planeThickness = 1.5f;
 
+        [Header("Ladders")]
+        [Tooltip("Cut a hatch through anything a ladder passes through.\n\n" +
+                 "In a level built in 3D a ladder is BEHIND the floor it serves, and the hole is " +
+                 "in depth. Flattened onto one plane that hole disappears and the ladder runs " +
+                 "into the underside of its own landing — the climb stops a metre short and the " +
+                 "level reads as broken. docs/05 calls ladders and hatches the connections " +
+                 "between floors; this is what makes that true of a hand-built level.")]
+        public bool ladderCutsHatch = true;
+
+        [Tooltip("Extra clearance either side of the hatch, in metres.")]
+        public float hatchMargin = 0.1f;
+
+        [Tooltip("How far a ladder has to reach INTO a solid before that counts as passing " +
+                 "through it, in metres.\n\n" +
+                 "Without this, a ladder whose foot is modelled one centimetre inside the " +
+                 "platform it stands on punches a hole in that platform, and the fighter who " +
+                 "spawns there falls through the floor. A ladder resting on a slab wants the " +
+                 "slab, not a hatch; only one that runs through it wants a hatch.")]
+        public float hatchMinOverlap = 0.05f;
+
         [Header("Options")]
         [Tooltip("Rebake every frame. Editor convenience while dragging platforms about; " +
                  "turn it off in a build.")]
@@ -133,7 +153,8 @@ namespace GulagRunners.Game
             _gizmoChest.Clear();
             _chestSources.Clear();
 
-            int roots = 0, markedSeen = 0, markedSkipped = 0, chestsSeen = 0, chestsSkipped = 0;
+            int roots = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0,
+                chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
             int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
                 skippedAlreadyMarked = 0, skippedInactive = 0, skippedChest = 0, skippedDepth = 0;
@@ -152,6 +173,7 @@ namespace GulagRunners.Game
                     markedSeen++;
                     if (!c.isActiveAndEnabled) { markedSkipped++; continue; }
                     handled.Add(c.gameObject.GetInstanceID());
+                    if (c.kind == SimColliderKind.Ignore) { markedIgnored++; continue; }
                     Add(c.kind, c.ToRect(), solids, oneWay, ladders);
                 }
 
@@ -208,6 +230,8 @@ namespace GulagRunners.Game
                 }
             }
 
+            int hatches = ladderCutsHatch ? CutHatches(solids, ladders) : 0;
+
             World = new SimWorld
             {
                 Solids = solids.ToArray(),
@@ -218,11 +242,13 @@ namespace GulagRunners.Game
             ChestSources = _chestSources.ToArray();
 
             LastReport =
-                $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider ({markedSkipped} inactive), " +
+                $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider " +
+                $"({markedSkipped} inactive, {markedIgnored} ignored), " +
                 $"{collidersSeen} Unity collider (skipped: {skippedAlreadyMarked} already marked, " +
                 $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedChest} on a chest, " +
                 $"{skippedDepth} off the plane, {skippedLayer} wrong layer, " +
-                $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid, " +
+                $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid " +
+                $"({hatches} cut by ladders), " +
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
 
@@ -239,6 +265,61 @@ namespace GulagRunners.Game
             }
 
             return World;
+        }
+
+        /// <summary>
+        /// Opens a hatch through every solid a ladder runs through, and returns how many it cut.
+        ///
+        /// A solid the ladder merely STANDS on is left alone — that is the floor it starts from,
+        /// not something in its way. That distinction is measured, not assumed: the ladder has to
+        /// reach <see cref="hatchMinOverlap"/> into the solid before it counts as running through
+        /// it, because hand-built levels have ladder feet a centimetre inside their own platform
+        /// and a hole there is a fighter falling out of the arena.
+        /// </summary>
+        int CutHatches(List<Aabb> solids, List<Aabb> ladders)
+        {
+            if (ladders.Count == 0 || solids.Count == 0) return 0;
+
+            Fix margin = Fix.FromMilli(Mathf.RoundToInt(Mathf.Max(0f, hatchMargin) * 1000f));
+            Fix minOverlap =
+                Fix.FromMilli(Mathf.RoundToInt(Mathf.Max(0f, hatchMinOverlap) * 1000f));
+            Fix sliver = Fix.FromMilli(50);
+            int cut = 0;
+
+            List<Aabb> working = new List<Aabb>(solids.Count + ladders.Count);
+
+            foreach (Aabb ladder in ladders)
+            {
+                Fix holeMin = ladder.MinX - margin;
+                Fix holeMax = ladder.MaxX + margin;
+
+                working.Clear();
+                foreach (Aabb solid in solids)
+                {
+                    bool crossesX = solid.MinX < holeMax && solid.MaxX > holeMin;
+
+                    // How much of the solid's height the ladder actually occupies. A ladder
+                    // standing ON a slab shares an edge with it and no more; one running
+                    // THROUGH it covers the whole thickness.
+                    Fix overlapY = Fix.Min(solid.MaxY, ladder.MaxY)
+                                 - Fix.Max(solid.MinY, ladder.MinY);
+
+                    if (!crossesX || overlapY <= minOverlap) { working.Add(solid); continue; }
+
+                    cut++;
+
+                    if (holeMin - solid.MinX > sliver)
+                        working.Add(new Aabb(solid.MinX, solid.MinY, holeMin, solid.MaxY));
+
+                    if (solid.MaxX - holeMax > sliver)
+                        working.Add(new Aabb(holeMax, solid.MinY, solid.MaxX, solid.MaxY));
+                }
+
+                solids.Clear();
+                solids.AddRange(working);
+            }
+
+            return cut;
         }
 
         /// <summary>
