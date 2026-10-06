@@ -267,6 +267,12 @@ namespace GulagRunners.Sim
 
             MoveY(ref s, s.Velocity.Y * Dt, world, cfg);
 
+            // Pushing sideways edges off the ladder. At the top of a ladder the feet are over
+            // the hatch, with no floor underneath, so without this the player hangs there with
+            // no way off but jumping.
+            if (wishX != 0)
+                MoveX(ref s, cfg.LadderDismountSpeed * wishX * Dt, world, cfg);
+
             if (wishY != 0 && s.StepNoiseTimer == 0)
             {
                 s.Noise = NoiseLevel.Quiet;              // climbing is quiet, but not silent
@@ -285,11 +291,12 @@ namespace GulagRunners.Sim
                 return;
             }
 
-            // Stepping off sideways at a landing.
+            // Landed on a floor while edging sideways: let go of the ladder.
             if (wishX != 0 && Grounded(ref s, world, cfg))
             {
                 s.LadderIndex = -1;
                 s.Mode = MoveMode.Grounded;
+                s.Velocity = FixVec2.Zero;
             }
         }
 
@@ -344,12 +351,27 @@ namespace GulagRunners.Sim
                 Aabb body = new Aabb(s.Position.X - half, targetY, s.Position.X + half, targetY + height);
                 if (!body.Overlaps(in solid)) continue;
 
-                // Ledge assist: a rising jump that clips a corner is nudged past it instead of
-                // being stopped, which is what makes the arena feel fair on a phone.
-                if (dy > Fix.Zero && TryCornerCorrect(ref s, in solid, targetY, half, height, world, cfg))
-                    continue;
+                // Only resolve against a surface the body is actually moving into. Without
+                // these two guards a body that already overlaps a box — a player spawned with
+                // their head inside the floor above, say — gets snapped to the far side of it
+                // and teleports a whole storey.
+                if (dy > Fix.Zero)
+                {
+                    if (startY + height > solid.MinY + Skin) continue;   // not a ceiling from below
 
-                targetY = dy > Fix.Zero ? solid.MinY - height - Skin : solid.MaxY + Skin;
+                    // Ledge assist: a rising jump that clips a corner is nudged past it rather
+                    // than stopped, which is what makes the arena feel fair on a phone.
+                    if (TryCornerCorrect(ref s, in solid, targetY, half, height, world, cfg))
+                        continue;
+
+                    targetY = solid.MinY - height - Skin;
+                }
+                else
+                {
+                    if (startY + Skin < solid.MaxY) continue;            // not a floor from above
+                    targetY = solid.MaxY + Skin;
+                }
+
                 s.Velocity.Y = Fix.Zero;
             }
 
@@ -430,6 +452,37 @@ namespace GulagRunners.Sim
                 if (feet.Overlaps(in world.OneWay[i])) return true;
 
             return false;
+        }
+
+        /// <summary>
+        /// Finds the top of the first solid under a body, within maxDistance.
+        /// Used to seat a player on the floor at spawn instead of dropping them onto it:
+        /// a spawn that starts with a fall reads as "the collision is broken" even when it
+        /// is not.
+        /// </summary>
+        public static bool TryFindGroundBelow(FixVec2 feet, SimWorld world, in MoveConfig cfg,
+                                              Fix maxDistance, out Fix groundY)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Fix lowest = feet.Y - maxDistance;
+            bool found = false;
+            groundY = feet.Y;
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (solid.MaxX <= feet.X - half || solid.MinX >= feet.X + half) continue;
+                if (solid.MaxY > feet.Y + Skin) continue;      // above the feet
+                if (solid.MaxY < lowest) continue;             // too far down
+
+                if (!found || solid.MaxY > groundY)
+                {
+                    groundY = solid.MaxY;
+                    found = true;
+                }
+            }
+
+            return found;
         }
 
         static bool HasHeadroom(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)

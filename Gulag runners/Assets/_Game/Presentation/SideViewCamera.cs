@@ -20,6 +20,13 @@ namespace GulagRunners.Game
     public sealed class SideViewCamera : MonoBehaviour
     {
         [Header("Target")]
+        [Tooltip("The player this camera belongs to. Each player has their own camera: on a " +
+                 "phone that is the only camera on the device, and in the editor the two share " +
+                 "the screen through Viewport Rect below.")]
+        public PlayerController player;
+
+        [Tooltip("Filled in from Player automatically. Assign directly only for a camera that " +
+                 "follows something other than a player.")]
         public Transform target;
         [Tooltip("Optional. When set, the camera frames both fighters and zooms to fit.")]
         public Transform secondTarget;
@@ -77,6 +84,14 @@ namespace GulagRunners.Game
         [Tooltip("When the arena is narrower than the view, centre on it instead of clamping.")]
         public bool centreWhenSmallerThanView = true;
 
+        [Header("Split screen (editor testing only)")]
+        [Tooltip("Apply the rect below to the camera on Awake. On a real device each player " +
+                 "has the whole screen, so leave this off outside local testing.")]
+        public bool applyViewportRect;
+
+        [Tooltip("Normalised viewport. Top half is (0, 0.5, 1, 0.5), bottom half (0, 0, 1, 0.5).")]
+        public Rect viewportRect = new Rect(0f, 0f, 1f, 1f);
+
         Camera _camera;
         float _lookAheadCurrent;
         float _lookAheadVelocity;
@@ -93,15 +108,33 @@ namespace GulagRunners.Game
         {
             _camera = GetComponent<Camera>();
 
+            if (player != null) target = player.transform;
+
             if (target == null && autoFindPlayer)
             {
-                PlayerController player = FindFirstObjectByType<PlayerController>();
-                if (player != null) target = player.transform;
+                PlayerController found = FindFirstObjectByType<PlayerController>();
+                if (found != null)
+                {
+                    target = found.transform;
+                    player = found;
+                    Debug.LogWarning($"{name}: no target assigned, grabbed the first player in " +
+                                     "the scene. Assign Player in the inspector — with two " +
+                                     "players both cameras would otherwise follow the same one.",
+                                     this);
+                }
+                else
+                {
+                    Debug.LogError($"{name}: no player to follow.", this);
+                }
             }
+
+            if (applyViewportRect && _camera != null) _camera.rect = viewportRect;
 
             ApplyLens();
             SnapToTarget();
         }
+
+        void OnEnable() => SnapToTarget();
 
         void OnValidate()
         {
@@ -134,8 +167,17 @@ namespace GulagRunners.Game
             // Vertical dead zone: ignore small hops, chase hard when the floor changes.
             float dy = desired.y - _focus.y;
             float vSmooth = verticalSmoothTime;
-            if (Mathf.Abs(dy) > floorChangeDistance) vSmooth = verticalSmoothTime / floorChangeSpeedUp;
-            else if (Mathf.Abs(dy) < verticalDeadZone) desired.y = _focus.y;
+            if (Mathf.Abs(dy) > floorChangeDistance)
+            {
+                vSmooth = verticalSmoothTime / floorChangeSpeedUp;
+            }
+            else if (Mathf.Abs(dy) < verticalDeadZone)
+            {
+                // Inside the dead zone the camera holds still. Clearing the stored velocity
+                // matters: without it SmoothDamp keeps drifting after every small hop.
+                desired.y = _focus.y;
+                _focusVelocity.y = 0f;
+            }
 
             float x = Mathf.SmoothDamp(_focus.x, desired.x, ref _focusVelocity.x, horizontalSmoothTime, Mathf.Infinity, dt);
             float y = Mathf.SmoothDamp(_focus.y, desired.y, ref _focusVelocity.y, vSmooth, Mathf.Infinity, dt);
@@ -164,10 +206,8 @@ namespace GulagRunners.Game
                 return new Vector2(mid.x, mid.y + verticalBias);
             }
 
-            float facing = 0f;
-            PlayerController pc = target.GetComponent<PlayerController>();
-            if (pc != null) facing = pc.State.Facing;
-            else facing = Mathf.Sign(target.localScale.x);
+            PlayerController pc = player != null ? player : target.GetComponent<PlayerController>();
+            float facing = pc != null ? pc.State.Facing : 1f;
 
             _lookAheadCurrent = Mathf.SmoothDamp(_lookAheadCurrent, facing * lookAhead,
                                                  ref _lookAheadVelocity, lookAheadSmoothTime,

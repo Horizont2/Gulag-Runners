@@ -25,6 +25,8 @@ namespace GulagRunners.Game
     [DisallowMultipleComponent]
     public sealed class SimCollider : MonoBehaviour
     {
+        [Tooltip("Solid blocks from every side. One-way can be jumped through from below and " +
+                 "dropped from with down + jump. Ladder connects floors.")]
         public SimColliderKind kind = SimColliderKind.Solid;
 
         public Rect ToRect()
@@ -45,15 +47,18 @@ namespace GulagRunners.Game
             return new Rect(b.min.x, b.min.y, b.size.x, b.size.y);
         }
 
-        public Aabb ToAabb()
-        {
-            Rect r = ToRect();
-            return new Aabb(
-                Fix.FromMilli(Mathf.RoundToInt(r.xMin * 1000f)),
-                Fix.FromMilli(Mathf.RoundToInt(r.yMin * 1000f)),
-                Fix.FromMilli(Mathf.RoundToInt(r.xMax * 1000f)),
-                Fix.FromMilli(Mathf.RoundToInt(r.yMax * 1000f)));
-        }
+        public Aabb ToAabb() => RectToAabb(ToRect());
+
+        /// <summary>
+        /// Converts a world-space rect to simulation space. Rounded to millimetres on purpose:
+        /// the simulation is integer-only, and quantising here means two machines reading the
+        /// same scene produce the same world (docs/06).
+        /// </summary>
+        public static Aabb RectToAabb(Rect r) => new Aabb(
+            Fix.FromMilli(Mathf.RoundToInt(r.xMin * 1000f)),
+            Fix.FromMilli(Mathf.RoundToInt(r.yMin * 1000f)),
+            Fix.FromMilli(Mathf.RoundToInt(r.xMax * 1000f)),
+            Fix.FromMilli(Mathf.RoundToInt(r.yMax * 1000f)));
 
         void OnDrawGizmos()
         {

@@ -148,6 +148,7 @@ MonoBehaviour:
     jumpBufferFrames: 7
     climbUpSpeed: 2
     climbDownSpeed: 2.6
+    ladderDismountSpeed: 1.5
     dodgeSpeed: 7
     dodgeFrames: 21
     dodgeRecoverFrames: 9
@@ -165,6 +166,9 @@ MonoBehaviour:
   planeZ: 0
   visualYOffset: 0.5
   squashOnCrouch: 1
+  snapToGroundOnSpawn: 1
+  snapSearchDistance: 6
+  killY: -25
   drawBody: 1
 --- !u!114 &1600000002
 MonoBehaviour:
@@ -190,6 +194,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0754104aade356a499371fd6becaabcd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  scheme: 0
+  gamepadIndex: 0
+  useMouseForAttack: 1
 --- !u!114 &1600000004
 MonoBehaviour:
   m_ObjectHideFlags: 0

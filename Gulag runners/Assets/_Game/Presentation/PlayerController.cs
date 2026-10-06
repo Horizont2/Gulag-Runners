@@ -43,6 +43,18 @@ namespace GulagRunners.Game
         [Tooltip("Squash the visual when crouching.")]
         public bool squashOnCrouch = true;
 
+        [Header("Safety")]
+        [Tooltip("At spawn, seat the player on the first floor below instead of dropping them " +
+                 "onto it. A spawn that begins with a fall reads as broken collision.")]
+        public bool snapToGroundOnSpawn = true;
+
+        [Tooltip("How far down to look for that floor, in metres.")]
+        public float snapSearchDistance = 6f;
+
+        [Tooltip("Fall below this height and the player is returned to the spawn point. " +
+                 "Without it, a missing floor looks like an endless fall with no explanation.")]
+        public float killY = -25f;
+
         [Header("Debug")]
         public bool drawBody = true;
 
@@ -63,8 +75,11 @@ namespace GulagRunners.Game
         PlayerSimState _previous;
 
         float _accumulator;
-        InputFlags _pending;          // OR of everything pressed since the last tick
+        InputFlags _held;             // what is held right now
+        InputFlags _pending;          // held, plus anything tapped since the last tick
         Vector3 _baseVisualScale = Vector3.one;
+        Vector2 _spawnPoint;
+        bool _warnedEmptyWorld;
 
         const float TickSeconds = 1f / PlayerMotor.TicksPerSecond;
         const int MaxTicksPerFrame = 8;   // never let a hitch turn into a spiral of death
@@ -101,16 +116,36 @@ namespace GulagRunners.Game
             _baseVisualScale = visualRoot.localScale;
 
             Vector3 p = transform.position;
-            _state = PlayerSimState.Spawn(
-                new FixVec2(ToFix(p.x), ToFix(p.y - visualYOffset)), 1, in _config);
-            _previous = _state;
+            _spawnPoint = new Vector2(p.x, p.y - visualYOffset);
+            SpawnAt(_spawnPoint, 1);
+        }
 
+        void SpawnAt(Vector2 feet, int facing)
+        {
+            FixVec2 position = new FixVec2(ToFix(feet.x), ToFix(feet.y));
+
+            if (snapToGroundOnSpawn && _world != null &&
+                PlayerMotor.TryFindGroundBelow(position, _world, in _config,
+                                               ToFix(snapSearchDistance), out Fix groundY))
+            {
+                position.Y = groundY;
+            }
+
+            _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
+            _previous = _state;
+            _accumulator = 0f;
             Render(1f);
         }
 
         void Update()
         {
-            if (_input != null) _pending |= _input.Read();
+            // Sample once per frame. _held is what is down now; _pending also carries anything
+            // tapped and released between two ticks, so a fast tap on a phone is never lost.
+            if (_input != null)
+            {
+                _held = _input.Read();
+                _pending |= _held;
+            }
 
             _accumulator += Time.deltaTime;
 
@@ -120,13 +155,12 @@ namespace GulagRunners.Game
                 _accumulator -= TickSeconds;
                 ticks++;
                 Tick(_pending);
-                _pending = InputFlags.None;
-                if (_input != null) _pending |= _input.Read();
+                _pending = _held;          // taps are consumed, held buttons stay held
             }
 
             if (ticks == MaxTicksPerFrame) _accumulator = 0f;
 
-            // Interpolate so the view is smooth above 60 fps without the sim ever varying.
+            // Interpolate so the view is smooth above 60 fps without the simulation varying.
             Render(Mathf.Clamp01(_accumulator / TickSeconds));
         }
 
@@ -135,10 +169,25 @@ namespace GulagRunners.Game
             _previous = _state;
             if (worldBaker != null && worldBaker.World != null) _world = worldBaker.World;
 
+            if (!_warnedEmptyWorld && (_world == null || _world.Solids.Length == 0))
+            {
+                _warnedEmptyWorld = true;
+                Debug.LogError(
+                    $"{name}: the simulated world has no solid boxes, so there is nothing to " +
+                    "stand on. Every platform needs a collider on a layer listed in the " +
+                    "SimWorldBaker's Solid Layers.", this);
+            }
+
             PlayerMotor.Step(ref _state, input, _world, in _config);
 
             if (_state.Noise != NoiseLevel.Silent)
                 Noise?.Invoke(_state.Noise, FeetPosition);
+
+            if (_state.Position.Y.Raw < ToFix(killY).Raw)
+            {
+                Debug.LogWarning($"{name}: fell past killY, returning to the spawn point.", this);
+                SpawnAt(_spawnPoint, _state.Facing);
+            }
         }
 
         void Render(float alpha)
@@ -167,11 +216,8 @@ namespace GulagRunners.Game
         /// <summary>Teleports the simulation. Use this for spawning, not transform.position.</summary>
         public void Teleport(Vector2 feetPosition, int facing = 1)
         {
-            _state = PlayerSimState.Spawn(new FixVec2(ToFix(feetPosition.x), ToFix(feetPosition.y)),
-                                          (sbyte)(facing >= 0 ? 1 : -1), in _config);
-            _previous = _state;
-            _accumulator = 0f;
-            Render(1f);
+            _spawnPoint = feetPosition;
+            SpawnAt(feetPosition, facing);
         }
 
         /// <summary>Re-reads the inspector tuning. Handy while tuning in play mode.</summary>

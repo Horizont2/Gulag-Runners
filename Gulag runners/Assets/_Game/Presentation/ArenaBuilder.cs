@@ -22,15 +22,18 @@ namespace GulagRunners.Game
         [Min(1)] public int floors = 3;
         [Min(1)] public int roomsPerFloor = 3;
         public float roomWidth = 7.2f;
-        public float floorHeight = 2.5f;
-        public float slabThickness = 0.4f;
+        [Tooltip("Floor to floor. Clear headroom is this minus the slab, and a 1.8 m fighter " +
+                 "needs headroom well above their own height or jumping indoors does nothing. " +
+                 "3.0 m leaves 2.7 m clear, which is 0.9 m of usable jump.")]
+        public float floorHeight = 3.0f;
+        public float slabThickness = 0.3f;
         public float wallThickness = 0.4f;
 
         [Tooltip("Height of the doorway left in every interior wall. The wall is built as a " +
                  "lintel above it, so a room is never sealed — docs/05 requires at least two " +
                  "ways out of every room, because a dead end is lethal in a game where you " +
                  "cannot see the other player coming.")]
-        public float doorHeight = 2.0f;
+        public float doorHeight = 2.2f;
         [Tooltip("The single gameplay plane. The arena is 3D; the fight is not (docs/02).")]
         public float planeZ;
 

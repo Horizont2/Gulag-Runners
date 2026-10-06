@@ -33,6 +33,8 @@ namespace GulagRunners.Sim
 
         public Fix ClimbUpSpeed;
         public Fix ClimbDownSpeed;
+        /// <summary>How fast you edge sideways off a ladder.</summary>
+        public Fix LadderDismountSpeed;
 
         public Fix DodgeSpeed;
         public int DodgeFrames;
@@ -77,6 +79,7 @@ namespace GulagRunners.Sim
 
             c.ClimbUpSpeed   = Fix.FromMilli(2000);
             c.ClimbDownSpeed = Fix.FromMilli(2600);
+            c.LadderDismountSpeed = Fix.FromMilli(1500);
 
             c.DodgeSpeed         = Fix.FromMilli(7000);
             c.DodgeFrames        = 21;  // 0.35 s

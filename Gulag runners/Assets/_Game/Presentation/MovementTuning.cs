@@ -39,6 +39,8 @@ namespace GulagRunners.Game
         [Header("Ladders")]
         public float climbUpSpeed = 2.0f;
         public float climbDownSpeed = 2.6f;
+        [Tooltip("How fast you edge sideways off a ladder onto a landing.")]
+        public float ladderDismountSpeed = 1.5f;
 
         [Header("Dodge")]
         public float dodgeSpeed = 7f;
@@ -87,6 +89,7 @@ namespace GulagRunners.Game
             c.JumpBufferFrames = jumpBufferFrames;
             c.ClimbUpSpeed = M(climbUpSpeed);
             c.ClimbDownSpeed = M(climbDownSpeed);
+            c.LadderDismountSpeed = M(ladderDismountSpeed);
             c.DodgeSpeed = M(dodgeSpeed);
             c.DodgeFrames = dodgeFrames;
             c.DodgeRecoverFrames = dodgeRecoverFrames;

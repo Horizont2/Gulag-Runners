@@ -104,3 +104,7 @@ InitTestScene*.unity*
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Python bytecode from the simulation test harness
+__pycache__/
+*.pyc
