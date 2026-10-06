@@ -169,13 +169,21 @@ namespace GulagRunners.Game
             _previous = _state;
             if (worldBaker != null && worldBaker.World != null) _world = worldBaker.World;
 
-            if (!_warnedEmptyWorld && (_world == null || _world.Solids.Length == 0))
+            if (_world == null || _world.Solids.Length == 0)
             {
-                _warnedEmptyWorld = true;
-                Debug.LogError(
-                    $"{name}: the simulated world has no solid boxes, so there is nothing to " +
-                    "stand on. Every platform needs a collider on a layer listed in the " +
-                    "SimWorldBaker's Solid Layers.", this);
+                // Ask for one rebake before giving up: if this player awoke before the arena
+                // was ready, the world is simply stale rather than wrong.
+                if (!_warnedEmptyWorld && worldBaker != null) _world = worldBaker.Bake();
+
+                if (!_warnedEmptyWorld && (_world == null || _world.Solids.Length == 0))
+                {
+                    _warnedEmptyWorld = true;
+                    Debug.LogError(
+                        $"{name}: the simulated world has no solid boxes, so there is nothing to " +
+                        "stand on.\n" +
+                        (worldBaker != null ? worldBaker.LastReport : "no SimWorldBaker assigned"),
+                        this);
+                }
             }
 
             PlayerMotor.Step(ref _state, input, _world, in _config);

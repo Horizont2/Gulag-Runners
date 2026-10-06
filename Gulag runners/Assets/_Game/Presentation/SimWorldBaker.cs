@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using GulagRunners.Sim;
 
 namespace GulagRunners.Game
@@ -7,17 +8,20 @@ namespace GulagRunners.Game
     /// <summary>
     /// Turns the colliders in the scene into one immutable <see cref="SimWorld"/>.
     ///
-    /// The simulation does its own collision and never uses Unity physics, because PhysX is
-    /// not deterministic across devices and rollback needs bit-identical results (docs/06).
-    /// So Unity colliders here are only an authoring surface: their world-space bounds are
-    /// read once and copied into the simulation.
+    /// The simulation does its own collision and never uses Unity physics, because PhysX is not
+    /// deterministic across devices and rollback needs bit-identical results (docs/06). Unity
+    /// colliders are therefore only an authoring surface: their world-space bounds are read once
+    /// and copied into the simulation.
     ///
-    /// Any ordinary BoxCollider works — you do not need a special component. Add a
-    /// <see cref="SimCollider"/> only to mark something as a one-way platform or a ladder,
-    /// or use the layer masks below.
+    /// Any ordinary BoxCollider works — no special component is needed. Add a
+    /// <see cref="SimCollider"/> only to mark something as a one-way platform or a ladder, or use
+    /// the layer masks below.
     ///
-    /// Later this is replaced by the seeded generator of docs/05, which will build the same
-    /// SimWorld from a 64-bit seed instead of from a scene.
+    /// The scan walks the scene's root objects rather than calling FindObjectsByType. It is the
+    /// same result when everything is healthy, but it is explicit about what it looked at, which
+    /// is what makes the report below possible — and a bake that silently finds nothing is the
+    /// single most confusing failure in this project, because it looks exactly like broken
+    /// physics.
     /// </summary>
     [DefaultExecutionOrder(-100)]
     [DisallowMultipleComponent]
@@ -26,19 +30,17 @@ namespace GulagRunners.Game
         public static SimWorldBaker Instance { get; private set; }
 
         [Header("What to bake")]
-        [Tooltip("Bake every ordinary Unity collider in the scene, not just objects carrying a " +
+        [Tooltip("Bake every ordinary Unity collider in the scene, not only objects carrying a " +
                  "SimCollider. Leave this on unless you want to hand-pick every box.")]
         public bool bakeUnityColliders = true;
 
         [Tooltip("Colliders on these layers become solid walls and floors.")]
         public LayerMask solidLayers = ~0;
 
-        [Tooltip("Colliders on these layers become one-way platforms. A SimCollider on the " +
-                 "object overrides this.")]
+        [Tooltip("Colliders on these layers become one-way platforms. A SimCollider overrides it.")]
         public LayerMask oneWayLayers = 0;
 
-        [Tooltip("Colliders on these layers become ladders. A SimCollider on the object " +
-                 "overrides this.")]
+        [Tooltip("Colliders on these layers become ladders. A SimCollider overrides it.")]
         public LayerMask ladderLayers = 0;
 
         [Tooltip("Trigger colliders are skipped by default: they are usually zones, not geometry.")]
@@ -49,18 +51,21 @@ namespace GulagRunners.Game
                  "turn it off in a build.")]
         public bool rebakeEveryFrame;
 
-        [Tooltip("Draw the baked boxes in the scene view, so what the simulation sees is " +
-                 "visible rather than assumed.")]
+        [Tooltip("Draw the baked boxes in the scene view, so what the simulation sees is visible " +
+                 "rather than assumed.")]
         public bool drawBakedBoxes = true;
 
+        [Tooltip("Log a one-line summary of every bake. Worth leaving on until the arena is final.")]
+        public bool logBakeReport = true;
+
         public SimWorld World { get; private set; }
-        public int SolidCount => World?.Solids.Length ?? 0;
-        public int OneWayCount => World?.OneWay.Length ?? 0;
-        public int LadderCount => World?.Ladders.Length ?? 0;
+        public string LastReport { get; private set; } = "not baked yet";
 
         readonly List<Rect> _gizmoSolid = new List<Rect>();
         readonly List<Rect> _gizmoOneWay = new List<Rect>();
         readonly List<Rect> _gizmoLadder = new List<Rect>();
+        readonly List<SimCollider> _markedBuffer = new List<SimCollider>();
+        readonly List<Collider> _colliderBuffer = new List<Collider>();
 
         void Awake()
         {
@@ -73,6 +78,13 @@ namespace GulagRunners.Game
             if (Instance == null) Instance = this;
         }
 
+        void Start()
+        {
+            // Second chance. If anything about load order left the first bake empty, this catches
+            // it before the player has fallen anywhere, and the report says what was seen.
+            if (World == null || World.Solids.Length == 0) Bake();
+        }
+
         void LateUpdate()
         {
             if (rebakeEveryFrame) Bake();
@@ -83,6 +95,7 @@ namespace GulagRunners.Game
             if (Instance == this) Instance = null;
         }
 
+        [ContextMenu("Bake now")]
         public SimWorld Bake()
         {
             List<Aabb> solids = new List<Aabb>();
@@ -93,39 +106,51 @@ namespace GulagRunners.Game
             _gizmoOneWay.Clear();
             _gizmoLadder.Clear();
 
-            // 1. Objects explicitly marked with a SimCollider always win.
-            SimCollider[] marked = FindObjectsByType<SimCollider>(FindObjectsSortMode.None);
-            System.Array.Sort(marked, CompareById);
+            int roots = 0, markedSeen = 0, markedSkipped = 0;
+            List<string> rootNames = new List<string>();
+            int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
+                skippedAlreadyMarked = 0, skippedInactive = 0;
 
             HashSet<int> handled = new HashSet<int>();
-            foreach (SimCollider c in marked)
-            {
-                if (!c.isActiveAndEnabled) continue;
-                handled.Add(c.gameObject.GetInstanceID());
-                Add(c.kind, c.ToRect(), solids, oneWay, ladders);
-            }
 
-            // 2. Then every ordinary collider that was not already handled.
-            if (bakeUnityColliders)
+            foreach (GameObject root in RootObjects())
             {
-                Collider[] colliders = FindObjectsByType<Collider>(FindObjectsSortMode.None);
-                System.Array.Sort(colliders, CompareById);
+                roots++;
+                if (rootNames.Count < 12) rootNames.Add(root.name);
 
-                foreach (Collider col in colliders)
+                // 1. Objects explicitly marked with a SimCollider always win.
+                root.GetComponentsInChildren(true, _markedBuffer);
+                foreach (SimCollider c in _markedBuffer)
                 {
-                    if (col == null || !col.enabled || !col.gameObject.activeInHierarchy) continue;
-                    if (col.isTrigger && !includeTriggers) continue;
-                    if (handled.Contains(col.gameObject.GetInstanceID())) continue;
+                    markedSeen++;
+                    if (!c.isActiveAndEnabled) { markedSkipped++; continue; }
+                    handled.Add(c.gameObject.GetInstanceID());
+                    Add(c.kind, c.ToRect(), solids, oneWay, ladders);
+                }
+
+                if (!bakeUnityColliders) continue;
+
+                // 2. Then every ordinary collider not already handled.
+                root.GetComponentsInChildren(true, _colliderBuffer);
+                foreach (Collider col in _colliderBuffer)
+                {
+                    collidersSeen++;
+                    if (col == null || !col.enabled || !col.gameObject.activeInHierarchy)
+                    { skippedInactive++; continue; }
+                    if (col.isTrigger && !includeTriggers) { skippedTrigger++; continue; }
+                    if (handled.Contains(col.gameObject.GetInstanceID()))
+                    { skippedAlreadyMarked++; continue; }
 
                     // Never bake a player's own body: it would become a wall it stands inside.
-                    if (col.GetComponentInParent<PlayerController>() != null) continue;
+                    if (col.GetComponentInParent<PlayerController>() != null)
+                    { skippedPlayer++; continue; }
 
                     int layerBit = 1 << col.gameObject.layer;
                     SimColliderKind kind;
                     if ((ladderLayers.value & layerBit) != 0) kind = SimColliderKind.Ladder;
                     else if ((oneWayLayers.value & layerBit) != 0) kind = SimColliderKind.OneWay;
                     else if ((solidLayers.value & layerBit) != 0) kind = SimColliderKind.Solid;
-                    else continue;
+                    else { skippedLayer++; continue; }
 
                     Bounds b = col.bounds;
                     Add(kind, new Rect(b.min.x, b.min.y, b.size.x, b.size.y),
@@ -140,21 +165,46 @@ namespace GulagRunners.Game
                 Ladders = ladders.ToArray()
             };
 
-            if (Application.isPlaying && World.Solids.Length == 0)
-                Debug.LogError(
-                    $"{name}: baked 0 solid boxes, so there is no floor and the player will fall " +
-                    "forever. Check that your platforms have a collider, are on a layer included " +
-                    "in Solid Layers, and are not triggers.", this);
+            LastReport =
+                $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider ({markedSkipped} inactive), " +
+                $"{collidersSeen} Unity collider (skipped: {skippedAlreadyMarked} already marked, " +
+                $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedLayer} wrong layer, " +
+                $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid, " +
+                $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder";
+
+            if (Application.isPlaying)
+            {
+                if (World.Solids.Length == 0)
+                    Debug.LogError($"{name}: baked no solid boxes, so there is no floor and the " +
+                                   $"player will fall forever.\n{LastReport}\n" +
+                                   "If SimCollider count is 0, the arena objects are not in this " +
+                                   "scene or are inactive. If they were seen but skipped, the " +
+                                   "reason is in the list above.", this);
+                else if (logBakeReport)
+                    Debug.Log($"{name}: {LastReport}", this);
+            }
 
             return World;
         }
 
-        static int CompareById(Object a, Object b) =>
-            a.GetInstanceID().CompareTo(b.GetInstanceID());
+        /// <summary>
+        /// The scene's roots. Falls back to the active scene if this object's own scene is not
+        /// usable yet, which can happen very early in the load.
+        /// </summary>
+        IEnumerable<GameObject> RootObjects()
+        {
+            Scene scene = gameObject.scene;
+            if (!scene.IsValid() || !scene.isLoaded) scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid()) yield break;
+
+            foreach (GameObject go in scene.GetRootGameObjects()) yield return go;
+        }
 
         void Add(SimColliderKind kind, Rect r,
                  List<Aabb> solids, List<Aabb> oneWay, List<Aabb> ladders)
         {
+            if (r.width <= 0f || r.height <= 0f) return;
+
             Aabb box = SimCollider.RectToAabb(r);
             switch (kind)
             {

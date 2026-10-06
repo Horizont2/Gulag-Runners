@@ -14,22 +14,22 @@ namespace GulagRunners.GameEditor
             SimWorldBaker baker = (SimWorldBaker)target;
 
             EditorGUILayout.Space();
-            if (baker.World != null)
-                EditorGUILayout.HelpBox(
-                    $"Baked: {baker.World.Solids.Length} solid, " +
-                    $"{baker.World.OneWay.Length} one-way, " +
-                    $"{baker.World.Ladders.Length} ladder boxes.",
-                    MessageType.Info);
-            else
-                EditorGUILayout.HelpBox(
-                    "Not baked yet. The world is baked automatically on Awake.",
-                    MessageType.None);
 
-            using (new EditorGUI.DisabledScope(!Application.isPlaying))
+            bool empty = baker.World == null || baker.World.Solids.Length == 0;
+            EditorGUILayout.HelpBox(baker.LastReport,
+                                    empty ? MessageType.Warning : MessageType.Info);
+
+            if (GUILayout.Button("Bake now", GUILayout.Height(24)))
             {
-                if (GUILayout.Button("Re-bake now"))
-                    baker.Bake();
+                baker.Bake();
+                Debug.Log($"{baker.name}: {baker.LastReport}", baker);
             }
+
+            EditorGUILayout.HelpBox(
+                "Press Bake now without entering play mode. If it reports 0 SimCollider and " +
+                "0 Unity collider, the arena is not in this scene. If it reports colliders but " +
+                "0 solid, the skip reasons say why.",
+                MessageType.None);
         }
     }
 }
