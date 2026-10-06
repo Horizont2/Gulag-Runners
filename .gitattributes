@@ -1,20 +1,20 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Gulag Runners — .gitattributes
 #
-# Без цього файлу Unity-проєкт у команді ламається двома способами:
-#   1) Windows і macOS по-різному перетворюють кінці рядків, і YAML-файли сцен
-#      та префабів дають конфлікти на кожному рядку;
-#   2) бінарні ассети git намагається злити як текст і псує їх.
+# Without this file a Unity project breaks for a team in two ways:
+#   1) Windows and macOS normalise line endings differently, so scene and prefab
+#      YAML conflicts on every single line;
+#   2) git tries to merge binary assets as text and corrupts them.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# За замовчуванням git сам визначає текст і нормалізує до LF у репозиторії.
+# By default let git detect text and normalise it to LF inside the repository.
 * text=auto
 
-# ── Unity YAML: текст, але зливати тільки UnityYAMLMerge ────────────────────
-# Щоб merge=unity запрацював, кожен має один раз виконати:
+# ── Unity YAML: text, but only ever merged with UnityYAMLMerge ──────────────
+# For merge=unity to do anything, each person runs this once:
 #   git config merge.unity.name "UnityYAMLMerge"
-#   git config merge.unity.driver "'<шлях до UnityYAMLMerge>' merge -p %O %B %A %A"
-# UnityYAMLMerge лежить у теці редактора: Editor/Data/Tools/UnityYAMLMerge(.exe)
+#   git config merge.unity.driver "'<path to UnityYAMLMerge>' merge -p %O %B %A %A"
+# UnityYAMLMerge ships with the editor: Editor/Data/Tools/UnityYAMLMerge(.exe)
 *.unity      text eol=lf merge=unity
 *.prefab     text eol=lf merge=unity
 *.asset      text eol=lf merge=unity
@@ -38,7 +38,7 @@
 *.spriteatlas   text eol=lf merge=unity
 *.meta       text eol=lf merge=unity
 
-# ── Код і конфіги ───────────────────────────────────────────────────────────
+# ── Code and configuration ──────────────────────────────────────────────────
 *.cs        text eol=lf diff=csharp
 *.shader    text eol=lf
 *.hlsl      text eol=lf
@@ -55,12 +55,12 @@
 *.gitignore    text eol=lf
 *.gitattributes text eol=lf
 
-# ── Скрипти: кінці рядків мають значення для запуску ────────────────────────
+# ── Scripts: line endings decide whether they run at all ────────────────────
 *.sh        text eol=lf
 *.bat       text eol=crlf
 *.cmd       text eol=crlf
 
-# ── Бінарне: ніколи не чіпати ───────────────────────────────────────────────
+# ── Binary: never touch ─────────────────────────────────────────────────────
 *.png  binary
 *.jpg  binary
 *.jpeg binary
@@ -100,12 +100,12 @@
 *.7z   binary
 
 # ── Git LFS ─────────────────────────────────────────────────────────────────
-# НЕ вмикайте, доки git-lfs не встановлений У ВСІХ у команді.
-# Якщо увімкнути LFS, а в когось його нема — він отримає замість текстур і
-# моделей текстові файли-заглушки на кілька рядків. Це рівно той симптом
-# "у мене немає файлів", і полагодити його потім дорожче, ніж домовитись зараз.
+# Do NOT enable until git-lfs is installed by EVERYONE on the team.
+# If LFS is on and someone does not have it, they get a few-line text stub instead
+# of every texture and model. That is exactly the "I have no files" symptom, and it
+# costs more to undo later than it costs to agree on it now.
 #
-# Коли всі поставлять git-lfs (git lfs install), розкоментуйте:
+# Once everyone has run `git lfs install`, uncomment:
 # *.png  filter=lfs diff=lfs merge=lfs -text
 # *.psd  filter=lfs diff=lfs merge=lfs -text
 # *.fbx  filter=lfs diff=lfs merge=lfs -text

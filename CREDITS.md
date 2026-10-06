@@ -1,29 +1,34 @@
-# Credits / Атрибуція сторонніх асетів
+# Credits — third-party asset attribution
 
-Веди цей файл **з першого завантаженого пака**. Потім не згадаєш, що звідки.
+Start filling this in with the very first pack you download. Later on nobody remembers
+where anything came from.
 
-## Формат запису
+## Entry format
 
 ```
-### <Назва пака> — <Автор>
-Джерело: <URL>
-Ліцензія: CC0 / CC BY 4.0 / Unity Asset Store EULA
-Де лежить: Assets/_ThirdParty/<тека>
-У репозиторії: так / ні (чому)
-Що використано: <коротко>
+### <Pack name> — <Author>
+Source:      <URL>
+Licence:     CC0 / CC BY 4.0 / Unity Asset Store EULA
+Location:    Assets/_ThirdParty/<folder>
+In repo:     yes / no (why)
+Used for:    <short description>
 ```
 
-## Правила
+## Rules
 
-- **CC0** — атрибуція не обов'язкова, але записуємо все одно, щоб знати походження.
-  Можна комітити в репозиторій.
-- **CC BY** — атрибуція **обов'язкова**: автор і посилання мусять потрапити в титри гри.
-- **Unity Asset Store (навіть безкоштовні паки)** — використання в грі дозволене,
-  **перепоширення заборонене**. Такі паки **не комітимо** — вони в `.gitignore`,
-  а тут записуємо, що саме треба доставити вручну при розгортанні проєкту.
+- **CC0** — attribution is not required, but record it anyway so the origin is traceable.
+  Safe to commit to the repository.
+- **CC BY** — attribution **is required**: the author and a link must appear in the game
+  credits.
+- **Unity Asset Store (including free packs)** — you may ship the pack inside the game but
+  you may not redistribute it. Those packs are **not committed**: they are covered by
+  `.gitignore`, and this file records what each person has to install by hand when setting
+  the project up.
 
-## Асети
+See `docs/10-free-assets.md` for the shortlist of packs chosen per biome.
 
-<!-- Записи додавати нижче в міру завантаження. -->
+## Assets
 
-_(порожньо — проєкт ще на етапі документації)_
+<!-- Add an entry here for every pack you download. -->
+
+_(empty — the project is still at the documentation stage)_
