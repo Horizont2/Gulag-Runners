@@ -40,6 +40,21 @@ namespace GulagRunners.Sim
         public int StaminaTimer;
 
         public int LadderIndex;
+
+        /// <summary>Three slots, no menu: weapon, armour, utility (docs/02).</summary>
+        public Inventory Inventory;
+
+        /// <summary>
+        /// Chest this player has claimed, or -1. The claim is held until the chest's progress
+        /// drains away, even after walking off, because only the claimant may drain it.
+        /// </summary>
+        public int OpeningChest;
+
+        /// <summary>Output of the last tick: what came out of a chest, for presentation to react to.</summary>
+        public ItemId PickedUp;
+
+        /// <summary>Output of the last tick: which chest that was, or -1.</summary>
+        public int OpenedChest;
         /// <summary>Counts down after letting go of a ladder; no new ladder is grabbed until it
         /// reaches zero.</summary>
         public int LadderCooldownTimer;
@@ -72,6 +87,9 @@ namespace GulagRunners.Sim
             s.Mode = MoveMode.Airborne;
             s.Facing = facing == 0 ? (sbyte)1 : facing;
             s.LadderIndex = -1;
+            s.OpeningChest = -1;
+            s.OpenedChest = -1;
+            s.PickedUp = ItemId.None;
             s.StaminaCharges = config.StaminaMax;
             s.Noise = NoiseLevel.Silent;
             return s;

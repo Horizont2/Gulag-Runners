@@ -17,6 +17,12 @@ namespace GulagRunners.Sim
         /// <summary>Ladders and hatches: the connections between floors (docs/05).</summary>
         public Aabb[] Ladders = System.Array.Empty<Aabb>();
 
+        /// <summary>
+        /// Chests, in the order the scene lists them. The order is part of the world: a round's
+        /// chest states are an array parallel to this one, so both devices must agree on it.
+        /// </summary>
+        public ChestDef[] Chests = System.Array.Empty<ChestDef>();
+
         /// <summary>Index of the ladder the box touches, or -1.</summary>
         public int FindLadder(in Aabb body)
         {

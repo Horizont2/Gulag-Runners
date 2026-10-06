@@ -66,6 +66,8 @@ namespace GulagRunners.Game
         readonly List<Rect> _gizmoLadder = new List<Rect>();
         readonly List<SimCollider> _markedBuffer = new List<SimCollider>();
         readonly List<Collider> _colliderBuffer = new List<Collider>();
+        readonly List<Chest> _chestBuffer = new List<Chest>();
+        readonly List<Rect> _gizmoChest = new List<Rect>();
 
         void Awake()
         {
@@ -101,12 +103,14 @@ namespace GulagRunners.Game
             List<Aabb> solids = new List<Aabb>();
             List<Aabb> oneWay = new List<Aabb>();
             List<Aabb> ladders = new List<Aabb>();
+            List<ChestDef> chests = new List<ChestDef>();
 
             _gizmoSolid.Clear();
             _gizmoOneWay.Clear();
             _gizmoLadder.Clear();
+            _gizmoChest.Clear();
 
-            int roots = 0, markedSeen = 0, markedSkipped = 0;
+            int roots = 0, markedSeen = 0, markedSkipped = 0, chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
             int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
                 skippedAlreadyMarked = 0, skippedInactive = 0;
@@ -128,9 +132,23 @@ namespace GulagRunners.Game
                     Add(c.kind, c.ToRect(), solids, oneWay, ladders);
                 }
 
+                // 2. Chests. Collected before the ordinary colliders so that a chest's own
+                //    collider is never baked into a wall: you walk into a chest, not against it.
+                //    The order they are found in IS the chest order, and the round's chest states
+                //    are an array parallel to it, so it has to be the scene order on both devices.
+                root.GetComponentsInChildren(true, _chestBuffer);
+                foreach (Chest chest in _chestBuffer)
+                {
+                    chestsSeen++;
+                    if (!chest.isActiveAndEnabled) { chestsSkipped++; continue; }
+                    handled.Add(chest.gameObject.GetInstanceID());
+                    chests.Add(chest.ToDef());
+                    _gizmoChest.Add(chest.ToRect());
+                }
+
                 if (!bakeUnityColliders) continue;
 
-                // 2. Then every ordinary collider not already handled.
+                // 3. Then every ordinary collider not already handled.
                 root.GetComponentsInChildren(true, _colliderBuffer);
                 foreach (Collider col in _colliderBuffer)
                 {
@@ -162,7 +180,8 @@ namespace GulagRunners.Game
             {
                 Solids = solids.ToArray(),
                 OneWay = oneWay.ToArray(),
-                Ladders = ladders.ToArray()
+                Ladders = ladders.ToArray(),
+                Chests = chests.ToArray()
             };
 
             LastReport =
@@ -170,7 +189,8 @@ namespace GulagRunners.Game
                 $"{collidersSeen} Unity collider (skipped: {skippedAlreadyMarked} already marked, " +
                 $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedLayer} wrong layer, " +
                 $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid, " +
-                $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder";
+                $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
+                $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
 
             if (Application.isPlaying)
             {
@@ -222,6 +242,7 @@ namespace GulagRunners.Game
             Draw(_gizmoSolid, new Color(0.2f, 0.9f, 1f, 0.8f));
             Draw(_gizmoOneWay, new Color(1f, 0.85f, 0.2f, 0.8f));
             Draw(_gizmoLadder, new Color(0.4f, 1f, 0.4f, 0.8f));
+            Draw(_gizmoChest, new Color(1f, 0.45f, 0.85f, 0.8f));
         }
 
         void Draw(List<Rect> rects, Color color)

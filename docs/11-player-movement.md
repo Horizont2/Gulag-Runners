@@ -506,9 +506,10 @@ Unity-фізику не використовує взагалі ([06](06-tech-an
 | `sim_motor_tests.py` | спавн, біг, стрибок, драбини, платформи, ухил, гучність, поворот | 23 |
 | `arena_traversal_test.py` | що арену реально можна пройти і що кожна перешкода працює | 17 |
 | `ladder_transition_test.py` | що межі «земля ↔ драбина» не ривкові — **у метрах за тік** | 29 |
+| `loot_test.py` | скрині й лут: числа [03](03-loot-and-chests.md), ресурс зброї, економіка фази ([13](13-chests-and-loot.md)) | 29 |
 
 Запустити: `cd docs/refs && python3 sim_motor_tests.py && python3 arena_traversal_test.py &&
-python3 ladder_transition_test.py`.
+python3 ladder_transition_test.py && python3 loot_test.py`.
 
 `ladder_transition_test.py` навмисно не вірить на слово: «ривок» там — число. Крок ходьби
 0.050 м/тік, лазіння 0.033, ухил 0.117. Ухил — найшвидше, що гра взагалі робить свідомо, тож

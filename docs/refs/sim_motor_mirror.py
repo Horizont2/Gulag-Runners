@@ -21,7 +21,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          STEP=M(300), CORNER=M(250), FALLTHRU=18,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
-L, R, UP, DN, JMP, DOD = 1, 2, 4, 8, 16, 32
+L, R, UP, DN, JMP, DOD, ACTION, ATTACK = 1, 2, 4, 8, 16, 32, 64, 128
 
 class S:
     def __init__(s, x, y):
@@ -33,6 +33,8 @@ class S:
         s.script_t = 0; s.script_frames = 0; s.script_dir = 1
         s.script_from = (0,0); s.script_to = (0,0)
         s.stam = C["SMAX"]; s.stam_t = 0; s.ladder = -1; s.noise = 0
+        # loot (LootMotor): three slots, the chest claim, and the per-tick outputs
+        s.inv = None; s.opening = -1; s.picked = 0; s.opened_chest = -1
 
 def boxes(scene_pieces, kind):
     return [b for b in scene_pieces if b[4] == kind]
