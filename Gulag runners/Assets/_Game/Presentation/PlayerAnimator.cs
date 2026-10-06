@@ -81,6 +81,11 @@ namespace GulagRunners.Game
             // simulation's back and desync the two clients.
             animator.applyRootMotion = false;
 
+            // The pack ships with CullUpdateTransforms, which stops animating whatever a camera
+            // cannot see. With two cameras each showing one player, that is a character frozen
+            // mid-stride on the other half of the screen.
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+
             // Squashing a rigged character looks wrong; the crouch clip conveys it instead.
             player.squashOnCrouch = false;
         }
