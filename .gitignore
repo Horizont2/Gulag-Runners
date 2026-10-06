@@ -1,0 +1,102 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Gulag Runners — кореневий .gitignore
+#
+# Unity-проєкт лежить у підтеці ("Gulag runners/"), тому всі правила тут навмисно
+# НЕ прив'язані до кореня: вони починаються з **/ і спрацюють, хоч би де лежав проєкт.
+#
+# ЩО МУСИТЬ БУТИ В РЕПОЗИТОРІЇ (ніколи не ігноруй це):
+#   Assets/**            усе, включно з *.meta — без .meta у команди роз'їдуться посилання
+#   ProjectSettings/**   налаштування проєкту
+#   Packages/manifest.json і packages-lock.json
+#
+# ЧОГО В РЕПОЗИТОРІЇ БУТИ НЕ ПОВИННО (Unity згенерує сам при першому відкритті):
+#   Library/ Temp/ Obj/ Build/ Logs/ UserSettings/
+#   Якщо колега бачить, що цих тек немає після клонування — це нормально.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Unity: згенероване, відтворюване ────────────────────────────────────────
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Bb]uild/
+**/[Bb]uilds/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+**/[Mm]emoryCaptures/
+**/[Rr]ecordings/
+**/.utmp/
+**/sysinfo.txt
+**/crashlytics-build.properties
+mono_crash.*
+*.log
+
+# ── Згенеровані проєктні файли IDE ──────────────────────────────────────────
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.DotSettings.user
+ExportedObj/
+.consulo/
+.vs/
+.gradle/
+.idea/
+**/[Aa]ssets/Plugins/Editor/JetBrains*
+
+# ── Unity: тимчасове в Assets ───────────────────────────────────────────────
+**/[Aa]ssets/StreamingAssets/aa*
+**/[Aa]ssets/AddressableAssetsData/link.xml*
+**/[Aa]ssets/AddressableAssetsData/*/*.bin*
+**/[Aa]ssets/Addressables_Temp*
+**/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+**/[Aa]ssets/[Ss]ceneDependencyCache*
+**/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db*
+**/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property\ Providers*
+InitTestScene*.unity*
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# ── Збірки ──────────────────────────────────────────────────────────────────
+*.apk
+*.aab
+*.app
+*.ipa
+
+# ── УВАГА: .unitypackage ────────────────────────────────────────────────────
+# Архіви .unitypackage ігноруються навмисно: вони великі й дублюють те, що вже
+# імпортовано в Assets/. Якщо колега поклав пак у репозиторій САМЕ як .unitypackage,
+# ніхто його не побачить. Правильно: імпортувати пак у Unity й закомітити
+# розпаковані файли з Assets/ (для CC0-паків), або доставити вручну за CREDITS.md
+# (для паків з Asset Store, які перепоширювати заборонено).
+*.unitypackage
+*.unitypackage.meta
+
+# ── Сторонні паки ───────────────────────────────────────────────────────────
+# Asset Store дозволяє використання в грі, але забороняє перепоширення,
+# тому такі паки в репозиторій не кладемо. CC0-паки можна — у підтеці CC0/.
+# Деталі й облік ліцензій — у CREDITS.md і docs/10-free-assets.md.
+**/[Aa]ssets/_ThirdParty/**
+!**/[Aa]ssets/_ThirdParty/CC0/
+!**/[Aa]ssets/_ThirdParty/CC0/**
+!**/[Aa]ssets/_ThirdParty/**/*.meta
+
+# ── Операційна система ──────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini

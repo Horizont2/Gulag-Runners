@@ -1,0 +1,113 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Gulag Runners — .gitattributes
+#
+# Без цього файлу Unity-проєкт у команді ламається двома способами:
+#   1) Windows і macOS по-різному перетворюють кінці рядків, і YAML-файли сцен
+#      та префабів дають конфлікти на кожному рядку;
+#   2) бінарні ассети git намагається злити як текст і псує їх.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# За замовчуванням git сам визначає текст і нормалізує до LF у репозиторії.
+* text=auto
+
+# ── Unity YAML: текст, але зливати тільки UnityYAMLMerge ────────────────────
+# Щоб merge=unity запрацював, кожен має один раз виконати:
+#   git config merge.unity.name "UnityYAMLMerge"
+#   git config merge.unity.driver "'<шлях до UnityYAMLMerge>' merge -p %O %B %A %A"
+# UnityYAMLMerge лежить у теці редактора: Editor/Data/Tools/UnityYAMLMerge(.exe)
+*.unity      text eol=lf merge=unity
+*.prefab     text eol=lf merge=unity
+*.asset      text eol=lf merge=unity
+*.mat        text eol=lf merge=unity
+*.anim       text eol=lf merge=unity
+*.controller text eol=lf merge=unity
+*.overrideController text eol=lf merge=unity
+*.physicMaterial     text eol=lf merge=unity
+*.physicsMaterial2D  text eol=lf merge=unity
+*.playable   text eol=lf merge=unity
+*.mask       text eol=lf merge=unity
+*.brush      text eol=lf merge=unity
+*.flare      text eol=lf merge=unity
+*.fontsettings text eol=lf merge=unity
+*.guiskin    text eol=lf merge=unity
+*.giparams   text eol=lf merge=unity
+*.renderTexture text eol=lf merge=unity
+*.lighting   text eol=lf merge=unity
+*.terrainlayer  text eol=lf merge=unity
+*.signal     text eol=lf merge=unity
+*.spriteatlas   text eol=lf merge=unity
+*.meta       text eol=lf merge=unity
+
+# ── Код і конфіги ───────────────────────────────────────────────────────────
+*.cs        text eol=lf diff=csharp
+*.shader    text eol=lf
+*.hlsl      text eol=lf
+*.cginc     text eol=lf
+*.compute   text eol=lf
+*.asmdef    text eol=lf
+*.asmref    text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.inputactions text eol=lf
+*.gitignore    text eol=lf
+*.gitattributes text eol=lf
+
+# ── Скрипти: кінці рядків мають значення для запуску ────────────────────────
+*.sh        text eol=lf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# ── Бінарне: ніколи не чіпати ───────────────────────────────────────────────
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.psd  binary
+*.tga  binary
+*.tif  binary
+*.tiff binary
+*.exr  binary
+*.hdr  binary
+*.bmp  binary
+*.ico  binary
+*.fbx  binary
+*.obj  binary
+*.blend binary
+*.dae  binary
+*.3ds  binary
+*.gltf binary
+*.glb  binary
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.aif  binary
+*.aiff binary
+*.mp4  binary
+*.mov  binary
+*.webm binary
+*.ttf  binary
+*.otf  binary
+*.unitypackage binary
+*.dll  binary
+*.so   binary
+*.a    binary
+*.dylib binary
+*.pdb  binary
+*.zip  binary
+*.7z   binary
+
+# ── Git LFS ─────────────────────────────────────────────────────────────────
+# НЕ вмикайте, доки git-lfs не встановлений У ВСІХ у команді.
+# Якщо увімкнути LFS, а в когось його нема — він отримає замість текстур і
+# моделей текстові файли-заглушки на кілька рядків. Це рівно той симптом
+# "у мене немає файлів", і полагодити його потім дорожче, ніж домовитись зараз.
+#
+# Коли всі поставлять git-lfs (git lfs install), розкоментуйте:
+# *.png  filter=lfs diff=lfs merge=lfs -text
+# *.psd  filter=lfs diff=lfs merge=lfs -text
+# *.fbx  filter=lfs diff=lfs merge=lfs -text
+# *.wav  filter=lfs diff=lfs merge=lfs -text
+# *.mp4  filter=lfs diff=lfs merge=lfs -text

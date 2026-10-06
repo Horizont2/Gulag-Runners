@@ -25,6 +25,8 @@
 | [docs/08-arena-art-prompts.md](docs/08-arena-art-prompts.md) | Промти для генерації арен (low poly, розріз із кімнатами) |
 | [docs/09-economy-and-ranking.md](docs/09-economy-and-ranking.md) | Золото, скіни, ліги, захист новачків, матчмейкінг |
 | [docs/10-free-assets.md](docs/10-free-assets.md) | Безкоштовні асет-паки під кожен біом, ліцензії, що качати під M0 |
+| [docs/11-player-movement.md](docs/11-player-movement.md) | Рух гравця: архітектура, числа, налаштування сцени в інспекторі |
+| [docs/12-git-setup.md](docs/12-git-setup.md) | Git для Unity: що має бути в репозиторії, діагностика «немає файлів» |
 
 ## Чотири речення, які тримають весь дизайн
 
