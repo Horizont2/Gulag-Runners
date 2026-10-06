@@ -174,9 +174,9 @@ Camera:
   m_LensShift: {x: 0, y: 0}
   m_NormalizedViewPortRect:
     serializedVersion: 2
-    x: 0
+    x: 0.195312
     y: 0.5
-    width: 1
+    width: 0.609375
     height: 0.5
   near clip plane: 0.3
   far clip plane: 1000
@@ -3323,12 +3323,15 @@ MonoBehaviour:
   target: {fileID: 1900000119}
   secondTarget: {fileID: 0}
   autoFindPlayer: 0
+  bodyScreenFraction: 0.18
+  framingBodyHeight: 0
+  manualFraming: 0
   visibleWorldHeight: 10
   fieldOfView: 30
   pitchDegrees: 12
   planeZ: 0
   scaleFramingToViewport: 1
-  aimHeight: 1.1
+  aimHeightBodies: 0.6
   deadZoneX: 0.12
   deadZoneY: 0.18
   hardEdgeX: 0.38
@@ -3336,15 +3339,15 @@ MonoBehaviour:
   horizontalSmoothTime: 0.18
   verticalSmoothTime: 0.22
   climbSmoothTime: 0.1
-  lookAhead: 2
+  lookAheadFraction: 0.2
   lookAheadSmoothTime: 0.45
   lookAheadMinSpeed: 0.4
   anchorToGround: 1
-  airRiseSlack: 2.2
-  airFallSlack: 1.6
+  airRiseSlackFraction: 0.22
+  airFallSlackFraction: 0.16
   fallFollowSpeed: 3
   fallSmoothTime: 0.07
-  fallLookAhead: 1.4
+  fallLookAheadFraction: 0.14
   framingPadding: 3
   minZoom: 0.6
   maxZoom: 1.1
@@ -3359,6 +3362,7 @@ MonoBehaviour:
   shakeFrequency: 22
   traumaDecay: 1.8
   applyViewportRect: 1
+  deviceAspect: 2.1666667
   viewportRect:
     serializedVersion: 2
     x: 0
@@ -3408,9 +3412,9 @@ Camera:
   m_LensShift: {x: 0, y: 0}
   m_NormalizedViewPortRect:
     serializedVersion: 2
-    x: 0
+    x: 0.195312
     y: 0
-    width: 1
+    width: 0.609375
     height: 0.5
   near clip plane: 0.3
   far clip plane: 1000
@@ -3492,12 +3496,15 @@ MonoBehaviour:
   target: {fileID: 1900000127}
   secondTarget: {fileID: 0}
   autoFindPlayer: 0
+  bodyScreenFraction: 0.18
+  framingBodyHeight: 0
+  manualFraming: 0
   visibleWorldHeight: 10
   fieldOfView: 30
   pitchDegrees: 12
   planeZ: 0
   scaleFramingToViewport: 1
-  aimHeight: 1.1
+  aimHeightBodies: 0.6
   deadZoneX: 0.12
   deadZoneY: 0.18
   hardEdgeX: 0.38
@@ -3505,15 +3512,15 @@ MonoBehaviour:
   horizontalSmoothTime: 0.18
   verticalSmoothTime: 0.22
   climbSmoothTime: 0.1
-  lookAhead: 2
+  lookAheadFraction: 0.2
   lookAheadSmoothTime: 0.45
   lookAheadMinSpeed: 0.4
   anchorToGround: 1
-  airRiseSlack: 2.2
-  airFallSlack: 1.6
+  airRiseSlackFraction: 0.22
+  airFallSlackFraction: 0.16
   fallFollowSpeed: 3
   fallSmoothTime: 0.07
-  fallLookAhead: 1.4
+  fallLookAheadFraction: 0.14
   framingPadding: 3
   minZoom: 0.6
   maxZoom: 1.1
@@ -3528,6 +3535,7 @@ MonoBehaviour:
   shakeFrequency: 22
   traumaDecay: 1.8
   applyViewportRect: 1
+  deviceAspect: 2.1666667
   viewportRect:
     serializedVersion: 2
     x: 0
