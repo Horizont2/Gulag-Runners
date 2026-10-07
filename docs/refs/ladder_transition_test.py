@@ -178,4 +178,54 @@ tb, _ = record(b, UP, 300)
 check("bit-identical replay", ta == tb and (a.x, a.y) == (b.x, b.y),
       f"end {F(a.x):.4f},{F(a.y):.4f}")
 
+print("\n10. a ladder that leans")
+# Nothing in Arena_Demo leans yet, so this builds one: a ladder whose foot is at x 0.2 and
+# whose head is at x 0.8, and which also leans 1.0 m away from the camera as it rises. A climb
+# that holds the middle of the box climbs the air beside the rungs at one end of it and the
+# rungs themselves at the other; a climb that holds one depth pushes the body through them.
+LEAN = {
+    "solid": [(X(-4.0), X(-0.3), X(4.0), X(0.0)),          # floor
+              (X(-0.4), X(2.9), X(1.4), X(3.2))],          # the landing it leans against
+    "oneway": [],
+    "ladder": [(X(0.0), X(0.0), X(1.0), X(3.0))],
+    "solidz": [(X(-9.0), X(9.0)), (X(-2.2), X(0.5))],
+    "onewayz": [],
+    "ladderz": [(X(-2.5), X(-0.5))],
+    "ladderlean": [(X(0.2), X(0.8))],                      # foot x 0.2, head x 0.8
+    "ladderleanz": [(X(-2.0), X(-1.0))],                   # leans a metre away as it rises
+}
+
+def line_at(y, lo, hi):
+    """Where the lean line stands at this height, as the motor computes it."""
+    t = max(0.0, min(3.0, y))
+    return lo + (hi - lo) * t / 3.0
+
+s = S(0.5, 0.1)
+s.depth = X(-2.0)
+for _ in range(180):
+    step(s, 0, LEAN, )
+    if s.mode == "ground":
+        break
+check("there is floor under the leaning ladder", s.mode == "ground", f"y {F(s.y):.2f}")
+
+worstX = worstZ = 0.0
+climbed = 0
+for _ in range(400):
+    step(s, UP, LEAN)
+    if s.mode != "ladder":
+        continue
+    climbed += 1
+    # The first fifth of a second is the body being drawn onto the line it grabbed off-centre.
+    # What matters is that it then stays there while the line itself walks sideways under it.
+    if climbed < 12:
+        continue
+    worstX = max(worstX, abs(F(s.x) - line_at(F(s.y), 0.2, 0.8)))
+    worstZ = max(worstZ, abs(F(s.depth) - line_at(F(s.y), -2.0, -1.0)))
+check("the climb stays on the leaning ladder's own line in x", climbed and worstX < 0.05,
+      f"worst {worstX * 100:.1f} cm off it")
+check("and follows it in depth as well", climbed and worstZ < 0.05,
+      f"worst {worstZ * 100:.1f} cm off it")
+check("and it still gets to the top", F(s.y) > 2.7 or s.mode in ("ground", "mantle"),
+      f"y {F(s.y):.2f} mode {s.mode}")
+
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

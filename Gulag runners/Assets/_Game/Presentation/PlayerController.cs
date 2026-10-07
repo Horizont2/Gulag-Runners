@@ -72,6 +72,24 @@ namespace GulagRunners.Game
                  "tracks the feet. For the scaled capsule this is 0.9, half the body height.")]
         public float visualYOffset = 0.9f;
 
+        [Tooltip("Seconds to ease the drawn height onto a step the simulation has already " +
+                 "taken. 0 draws every step the instant it happens.\n\n" +
+                 "An AABB world has no slopes, so every ramp in the game is a staircase — the " +
+                 "plank in Arena_Demo is seven steps of 11 cm. Walked at running speed that is " +
+                 "a 11 cm jump ten times a second, and it reads as exactly what it is: a " +
+                 "character going up stairs that are not drawn. The simulation keeps its exact " +
+                 "heights, because collision and rollback depend on them; only the drawing is " +
+                 "eased, and at this length the steps blend into the straight line the plank " +
+                 "actually is.")]
+        [Range(0f, 0.3f)] public float stepSmoothTime = 0.07f;
+
+        [Tooltip("The largest height change this will ease, in metres. Anything bigger is drawn " +
+                 "at once.\n\n" +
+                 "A step is eased; a fall is not. Smoothing a two-metre drop would float the " +
+                 "character down after the simulation has already landed him, so this stays " +
+                 "just above the step-up height and no higher.")]
+        public float stepSmoothMax = 0.4f;
+
         [Tooltip("Squash the visual when crouching. Leave off for a rigged character — the " +
                  "crouch clip conveys it, and squashing a skeleton reads as a bug.")]
         public bool squashOnCrouch = true;
@@ -94,6 +112,20 @@ namespace GulagRunners.Game
                  "clips are authored with the character facing the rungs, so played side-on they " +
                  "read as someone climbing sideways through thin air.")]
         public bool faceLadderWhenClimbing = true;
+
+        [Tooltip("Lean the body along a ladder that leans.\n\n" +
+                 "A ladder propped against a wall is climbed at its own angle. Standing bolt " +
+                 "upright on one puts the character's legs through the rungs at one end and " +
+                 "leaves them in the air at the other, which is the whole of \"he climbs into " +
+                 "the texture\". The angle is measured from the ladder's own geometry at the " +
+                 "bake, so there is nothing to keep in step by hand: stand a ladder up and the " +
+                 "lean is zero.")]
+        public bool matchLadderTilt = true;
+
+        [Tooltip("How much of a leaning ladder's angle the body actually takes, 0 to 1. " +
+                 "1 lies the body exactly along the rungs; a little less keeps a climb up a " +
+                 "steep ladder from reading as a crawl.")]
+        [Range(0f, 1f)] public float ladderTiltAmount = 1f;
 
         [Tooltip("Degrees turned back towards the camera while on a ladder. Square to the ladder " +
                  "is a flat back and a dead silhouette; a few degrees of angle keeps the body " +
@@ -278,9 +310,10 @@ namespace GulagRunners.Game
 
             _previous = _state;
             _accumulator = 0f;
+            _drawnYValid = false;                      // a spawn is not a step
 
             // Start already facing the right way: a spin on spawn looks like a glitch.
-            _yaw = TargetYaw(_state.Facing, FacingLadder(_state.Mode));
+            _yaw = TargetYaw(_state.Facing, FacingLadder(in _state));
             _yawVelocity = 0f;
             GroundedY = position.Y.Raw / (float)Fix.RawOne;
 
@@ -386,6 +419,9 @@ namespace GulagRunners.Game
 
         float _depth;
         float _depthVelocity;
+        float _drawnY;
+        float _drawnYVelocity;
+        bool _drawnYValid;
 
         void Render(float alpha)
         {
@@ -393,18 +429,18 @@ namespace GulagRunners.Game
             Vector2 b = ToVector(_state.Position);
             Vector2 p = Vector2.Lerp(a, b, alpha);
 
-            transform.position = new Vector3(p.x, p.y + visualYOffset, Depth(alpha));
+            transform.position = new Vector3(p.x, DrawnY(p.y) + visualYOffset, Depth(alpha));
 
             // The visual root keeps whatever local offset it was authored with: a capsule sits
             // centred on this object, while a character model hangs from it by its feet.
             Transform v = visualRoot != null ? visualRoot : transform;
 
-            float target = TargetYaw(_state.Facing, FacingLadder(_state.Mode));
+            float target = TargetYaw(_state.Facing, FacingLadder(in _state));
             _yaw = turnSmoothTime <= 0.001f
                 ? target
                 : Mathf.SmoothDampAngle(_yaw, target, ref _yawVelocity, turnSmoothTime,
                                         Mathf.Infinity, Time.deltaTime);
-            v.localRotation = Quaternion.Euler(0f, _yaw, 0f);
+            v.localRotation = LadderTilt() * Quaternion.Euler(0f, _yaw, 0f);
 
             if (squashOnCrouch)
             {
@@ -413,6 +449,68 @@ namespace GulagRunners.Game
                                            _baseVisualScale.y * squash,
                                            _baseVisualScale.z);
             }
+        }
+
+        /// <summary>
+        /// The lean of the ladder being climbed, as a rotation to lay the body along it.
+        ///
+        /// Taken from the ladder's own baked lean line, so an upright ladder gives identity
+        /// and nothing changes. Rotating about world Z tips the model's up axis towards world
+        /// X, which is the plane the fight and the lean both live in; the body keeps facing
+        /// the rungs while it does it.
+        /// </summary>
+        Quaternion LadderTilt()
+        {
+            if (!matchLadderTilt || ladderTiltAmount <= 0.001f) return Quaternion.identity;
+            if (!FacingLadder(in _state)) return Quaternion.identity;
+
+            int i = _state.LadderIndex;
+            if (_world == null || i < 0 || i >= _world.Ladders.Length ||
+                i >= _world.LadderLean.Length)
+                return Quaternion.identity;
+
+            Aabb box = _world.Ladders[i];
+            float height = (box.MaxY - box.MinY).Raw / (float)Fix.RawOne;
+            if (height <= 0.01f) return Quaternion.identity;
+
+            Span lean = _world.LadderLean[i];
+            float run = (lean.Max - lean.Min).Raw / (float)Fix.RawOne;
+            if (Mathf.Abs(run) < 0.001f) return Quaternion.identity;
+
+            float degrees = Mathf.Atan2(run, height) * Mathf.Rad2Deg * ladderTiltAmount;
+            return Quaternion.AngleAxis(-degrees, Vector3.forward);
+        }
+
+        /// <summary>
+        /// What height to draw at this frame.
+        ///
+        /// The simulation's own height, eased by a few hundredths of a second while the
+        /// fighter is on the ground. That is the whole fix for a ramp that is really a
+        /// staircase: the body steps up 11 cm ten times a second and the drawing follows it
+        /// as a line. Nothing here feeds back into the simulation — it keeps its exact
+        /// heights, because collision and rollback are decided on them.
+        ///
+        /// Only while grounded, and only for a step-sized change: a fall is drawn as it
+        /// happens, or the character would float down after already having landed.
+        /// </summary>
+        float DrawnY(float simY)
+        {
+            bool eased = _drawnYValid
+                         && stepSmoothTime > 0.001f
+                         && _state.Mode == MoveMode.Grounded
+                         && Mathf.Abs(simY - _drawnY) <= stepSmoothMax;
+
+            if (!eased)
+            {
+                _drawnY = simY;
+                _drawnYVelocity = 0f;
+                _drawnYValid = true;
+                return _drawnY;
+            }
+
+            _drawnY = Mathf.SmoothDamp(_drawnY, simY, ref _drawnYVelocity, stepSmoothTime,
+                                       Mathf.Infinity, Time.deltaTime);
+            return _drawnY;
         }
 
         /// <summary>
@@ -477,8 +575,19 @@ namespace GulagRunners.Game
         /// on it, instead of swinging round afterwards. The climb-out does not — it steps off
         /// sideways, and that is the direction it should be looking.
         /// </summary>
-        static bool FacingLadder(MoveMode mode) =>
-            mode == MoveMode.Climbing || mode == MoveMode.Mounting;
+        /// <summary>
+        /// Should the model be facing the rungs this frame.
+        ///
+        /// A climb-out counts when it goes FORWARD — onto the floor the ladder ends at, which
+        /// in this location is every ladder, since they all stand in front of the walkway they
+        /// serve. Dropping the ladder facing the moment the climb-out began turned the body
+        /// side-on while it was still on the rungs, and the whole move then read as a fighter
+        /// hauling himself out sideways onto a platform that is in fact straight ahead of him.
+        /// A hatch climb-out really is sideways, and that one still turns.
+        /// </summary>
+        static bool FacingLadder(in PlayerSimState s) =>
+            s.Mode == MoveMode.Climbing || s.Mode == MoveMode.Mounting ||
+            (s.Mode == MoveMode.Mantling && s.ScriptForward);
 
         /// <summary>
         /// Yaw that points the model where it should look.

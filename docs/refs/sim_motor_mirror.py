@@ -35,6 +35,7 @@ class S:
         s.script_t = 0; s.script_frames = 0; s.script_dir = 1
         s.script_from = (0,0); s.script_to = (0,0)
         s.script_from_depth = s.script_to_depth = 0
+        s.script_forward = False
         s.stam = C["SMAX"]; s.stam_t = 0; s.ladder = -1; s.noise = 0
         # loot (LootMotor): three slots, the chest claim, and the per-tick outputs
         s.landed_speed = 0
@@ -84,10 +85,17 @@ def nearest_in(sp, depth, inset):
     return lo if depth < lo else (hi if depth > hi else depth)
 
 
-def any_solid(w, box, depth=None):
+def any_solid(w, box, depth=None, shaft=-1):
+    """Anything solid in this box, on this slice. A shaft index exempts the floors that ladder
+    runs up into: while climbing, those are what the body is going past, not what is in its way."""
     half = C["BODYZ"] // 2
-    return any(overlaps(box, sol) and (depth is None or reaches(span(w, "solid", i), depth, half))
-               for i, sol in enumerate(w["solid"]))
+    has_shaft = 0 <= shaft < len(w["ladder"])
+    for i, sol in enumerate(w["solid"]):
+        if not overlaps(box, sol): continue
+        if depth is not None and not reaches(span(w, "solid", i), depth, half): continue
+        if has_shaft and in_shaft(sol, w["ladder"][shaft]): continue
+        return True
+    return False
 
 def support_under(x, y, fallthru, w, shaft=-1, depth=None):
     half = C["W"] // 2
@@ -109,10 +117,10 @@ def support_under(x, y, fallthru, w, shaft=-1, depth=None):
 def grounded(s, w, shaft=-1):
     return support_under(s.x, s.y, s.fallthru, w, shaft, s.depth)
 
-def sweep_free(from_x, to_x, y, w, depth=None):
+def sweep_free(from_x, to_x, y, w, depth=None, shaft=-1):
     half = C["W"] // 2
     swept = (min(from_x, to_x) - half, y + SKIN, max(from_x, to_x) + half, y + C["H"])
-    return not any_solid(w, swept, depth)
+    return not any_solid(w, swept, depth, shaft)
 
 def on_oneway_only(s, w):
     half = C["W"] // 2
@@ -217,7 +225,10 @@ def update_depth(s, w):
         return
     inset = C["BODYZ"] // 2
     if 0 <= s.ladder < len(w["ladder"]):
-        want = nearest_in(span(w, "ladder", s.ladder), s.depth, inset)
+        # At this height, not just anywhere on the ladder: one propped against a walkway leans
+        # away from the camera as it rises, and holding one depth pushes the body through the
+        # rungs near one end of it.
+        want = ladder_depth_at(w, s.ladder, s.y, s.depth, inset)
     elif s.mode != "ground":
         return
     else:
@@ -354,7 +365,15 @@ def step_flat(s, inp, w):
     move_x(s, mul(s.vx, DT), w)
     move_y(s, mul(s.vy, DT), w)
 
-    if grounded(s, w):
+    now = grounded(s, w)
+    # Walking off the edge of a step is not falling. Every ramp here is a staircase, so walking
+    # down one left the floor ten times a second: the fall animation strobed and the descent
+    # arrived in lurches. `g` is already False on the frame a jump fires, so this can never glue
+    # a jump back down.
+    if not now and g and s.vy <= 0 and s.fallthru == 0 and step_down(s, w):
+        now = True
+
+    if now:
         if was_air:
             s.noise = 3 if impact > C["HARD"] else 2
             s.stepn = C["STEPN"]
@@ -371,6 +390,31 @@ def step_flat(s, inp, w):
             s.noise = 3 if sp >= C["LOUD"] else 1
             s.stepn = C["STEPN"]
 
+def step_down(s, w):
+    """Puts the feet on the next floor down when it is within one step of them. False when
+    there is nothing that close, which is the difference between a step and a drop."""
+    if C["STEP"] <= 0: return False
+    g = ground_below(s.x, s.y, C["STEP"], w, s.depth)
+    if g is None or g >= s.y: return False
+    s.y = g; s.vy = 0
+    return True
+
+def ladder_depth_at(w, i, y, fallback, inset):
+    """The depth of a ladder's centre line at a height — where the rungs are. Not the nearest
+    point inside its depth span: a ladder that leans has a span as deep as the whole lean, so
+    "stay somewhere inside it" lets the body hang a metre off the rungs at one end."""
+    if i < 0 or i >= len(w["ladder"]): return fallback
+    leans = w.get("ladderleanz") or []
+    if i >= len(leans): return nearest_in(span(w, "ladder", i), fallback, inset)
+    return lean_at(leans[i], w["ladder"][i], y)
+
+def lean_at(lean, box, y):
+    """Where a lean line stands at a height, clamped to the box's own ends."""
+    height = box[3] - box[1]
+    if height <= 0: return lean[0]
+    t = max(0, min(height, y - box[1]))
+    return lean[0] + (lean[1] - lean[0]) * t // height
+
 def ladder_centre(w, i, y=None):
     """The middle of a ladder at a given height. Upright that is the middle of its box;
     leaning, it walks across as you climb."""
@@ -378,12 +422,7 @@ def ladder_centre(w, i, y=None):
     lean = w.get("ladderlean")
     if y is None or not lean or i >= len(lean):
         return l[0] + (l[2] - l[0]) // 2
-    lo, hi = lean[i]
-    height = l[3] - l[1]
-    if height <= 0:
-        return lo
-    t = max(0, min(height, y - l[1]))
-    return lo + (hi - lo) * t // height
+    return lean_at(lean[i], l, y)
 
 
 def lane_for(sp, depth):
@@ -460,6 +499,7 @@ def try_mount(s, wy, w):
         s.x = target; s.y = target_y; s.mode = "ladder"
         return True
     s.script_from = (s.x, s.y); s.script_to = (target, target_y)
+    s.script_forward = False
     s.script_frames = frames; s.script_t = frames
     s.mode = "mount"; s.noise = 1
     return True
@@ -552,6 +592,9 @@ def start_scripted(s, landing, side, to_depth=None):
     s.script_from=(s.x,s.y); s.script_to=(landing[0], landing[1])
     s.script_from_depth = s.depth
     s.script_to_depth = s.depth if to_depth is None else to_depth
+    # A climb-out that covers no ground sideways is a step FORWARD onto the floor the rungs
+    # end at. Presentation keeps the body facing the ladder through one of those.
+    s.script_forward = abs(landing[0] - s.x) <= C["LTOP"]
     span_x = abs(s.script_to[0]-s.x)*10//7  # noqa: the tuple is (x, y) from here on
     span_y = abs(s.script_to[1]-s.y)*3//2
     frames = frames_for(max(span_x, span_y)) or C["SMINF"]
@@ -600,8 +643,11 @@ def climb(s, wx, wy, w):
     centre = ladder_centre(w, s.ladder, s.y)
     # Every frame: nothing else moves X while climbing, and on a leaning ladder the centre line
     # walks sideways as the body rises, so it is a line to follow rather than a point to sit on.
+    # The floors this ladder runs up into are exempt, as they are for the climb itself: on the
+    # last metre of a ladder the body's head is inside the landing it is about to stand on, and
+    # counting that as a wall froze the pull exactly where a leaning ladder needs it most.
     want = move_towards(s.x, centre, mul(C["LSNAP"], DT))
-    if sweep_free(s.x, want, s.y, w, s.depth): s.x = want
+    if sweep_free(s.x, want, s.y, w, s.depth, s.ladder): s.x = want
     s.vx = 0
     s.vy = C["CUP"] if wy > 0 else (-C["CDN"] if wy < 0 else 0)
     move_y(s, mul(s.vy, DT), w, s.ladder)

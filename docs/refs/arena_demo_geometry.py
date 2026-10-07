@@ -315,8 +315,9 @@ class Scene:
         return out
 
     def corners(self, go):
-        """The eight world corners of this box, as (x, y). A tilted plank's silhouette is not
-        its bounding box, and baking the box is what makes a ramp a wall."""
+        """The eight world corners of this box, as (x, y, z). A tilted plank's silhouette is
+        not its bounding box, and baking the box is what makes a ramp a wall. Z comes along
+        because a ladder's lean is a question about depth as much as about X."""
         centre, half = self.local_box(go)
         origin, basis = self.basis(self.tr_of_go[go])
         out = []
@@ -327,7 +328,7 @@ class Scene:
                              centre[1] + half[1] * j,
                              centre[2] + half[2] * k]
                     w = _apply(basis, local)
-                    out.append((origin[0] + w[0], origin[1] + w[1]))
+                    out.append((origin[0] + w[0], origin[1] + w[1], origin[2] + w[2]))
         return out
 
     def visual_offsets(self):
@@ -417,8 +418,8 @@ def _top_at(corners, x):
     top = None
     for i in range(len(corners)):
         for j in range(i + 1, len(corners)):
-            px, py = corners[i]
-            qx, qy = corners[j]
+            px, py = corners[i][0], corners[i][1]
+            qx, qy = corners[j][0], corners[j][1]
             if px == qx or x < min(px, qx) or x > max(px, qx):
                 continue
             y = py + (qy - py) * (x - px) / (qx - px)
@@ -427,12 +428,13 @@ def _top_at(corners, x):
     return top
 
 
-def ladder_lean(corners):
-    """Where a ladder's centre line is at its foot and at its head. A leaning ladder's box is
-    wider than the ladder, and climbing the middle of the box is climbing the air beside it."""
+def ladder_lean(corners, axis=0):
+    """Where a ladder's centre line is at its foot and at its head, on one axis. A leaning
+    ladder's box is wider than the ladder, and climbing the middle of the box is climbing the
+    air beside it. axis 0 is X, axis 2 is depth: one propped against a walkway leans in both."""
     by_y = sorted(corners, key=lambda c: c[1])
-    bottom = sum(c[0] for c in by_y[:4]) / 4
-    top = sum(c[0] for c in by_y[4:]) / 4
+    bottom = sum(c[axis] for c in by_y[:4]) / 4
+    top = sum(c[axis] for c in by_y[4:]) / 4
     return (X(bottom), X(top))
 
 
@@ -513,6 +515,7 @@ def bake(scene=None, report=False):
 
     solids, oneway, ladders, chests = [], [], [], []
     solidz, onewayz, ladderz, ladderlean = [], [], [], []
+    ladderleanz = []
     culled = []
     slopes = 0
     step_m = _field(baker, 'slopeStep', float, 0.2)
@@ -567,7 +570,9 @@ def bake(scene=None, report=False):
         fill(onewayz, len(oneway), mz)
         fill(ladderz, len(ladders), mz)
         while len(ladderlean) < len(ladders):
-            ladderlean.append(ladder_lean(sc.corners(go)))
+            cn = sc.corners(go)
+            ladderlean.append(ladder_lean(cn, 0))
+            ladderleanz.append(ladder_lean(cn, 2))
 
     # 2. Chests, before the ordinary colliders, so a chest never becomes a wall.
     for go in sorted(sc.gos):
@@ -641,13 +646,14 @@ def bake(scene=None, report=False):
 
     return {"solid": solids, "oneway": oneway, "ladder": ladders, "chest": chests,
             "solidz": solidz, "onewayz": onewayz, "ladderz": ladderz,
-            "ladderlean": ladderlean}
+            "ladderlean": ladderlean, "ladderleanz": ladderleanz}
 
 
 def world(report=False):
     b = bake(report=report)
     return {k: b[k] for k in ("solid", "oneway", "ladder",
-                              "solidz", "onewayz", "ladderz", "ladderlean")}
+                              "solidz", "onewayz", "ladderz",
+                              "ladderlean", "ladderleanz")}
 
 
 CAMERA_GUID = "b921a9be9303a1887f282de341a5ae31"

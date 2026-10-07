@@ -149,6 +149,18 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix ScriptFromDepth;
         public Fix ScriptToDepth;
+
+        /// <summary>
+        /// Is this climb-out a step FORWARD onto the floor the rungs end at, rather than a
+        /// shuffle sideways out of a hatch.
+        ///
+        /// The two look nothing alike and presentation cannot tell them apart from the
+        /// positions alone. A fighter climbing out forwards is still facing the ladder at the
+        /// moment he steps off it, so turning him side-on the instant the climb-out starts —
+        /// which is what happened — plays the whole move as though the platform he is getting
+        /// onto were somewhere off to his left.
+        /// </summary>
+        public bool ScriptForward;
         /// <summary>Which way the scripted move goes: climb direction for a mount, step side for
         /// a climb-out. Presentation reads it to pick the matching clip.</summary>
         public sbyte ScriptDir;

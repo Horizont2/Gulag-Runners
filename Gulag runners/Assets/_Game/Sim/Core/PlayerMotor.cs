@@ -57,7 +57,10 @@ namespace GulagRunners.Sim
             Fix want;
 
             if (s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length)
-                want = world.LadderSpan(s.LadderIndex).Nearest(s.Depth, inset);
+                // The rungs at this height, not just anywhere on the ladder: one propped
+                // against a walkway leans away from the camera as it rises, and holding one
+                // depth the whole way up pushes the body through the rungs at one end of it.
+                want = world.LadderDepthAt(s.LadderIndex, s.Position.Y, s.Depth, inset);
             else if (s.Mode != MoveMode.Grounded)
                 return;                                   // mid-air you keep the slice you left
             else if (!TryLaneAhead(ref s, world, in cfg, out want) &&
@@ -326,6 +329,20 @@ namespace GulagRunners.Sim
             MoveY(ref s, s.Velocity.Y * Dt, world, cfg);
 
             bool nowGrounded = Grounded(ref s, world, cfg);
+
+            // Walking off the edge of a step is not falling. Every ramp in this game is a
+            // staircase — an AABB world has no slopes — so a fighter walking down one left the
+            // floor ten times a second: the fall animation strobed, the descent arrived in
+            // lurches, and each tiny drop was a frame of air the player never asked for. If the
+            // next floor is within one step of the feet, the feet go to it.
+            //
+            // Only from a walk: `grounded` is already false on the frame a jump fires, so this
+            // can never glue a jump back down, and FallThroughTimer keeps it off a one-way
+            // platform the player is dropping through on purpose.
+            if (!nowGrounded && grounded && s.Velocity.Y <= Fix.Zero &&
+                s.FallThroughTimer == 0 && TryStepDown(ref s, world, in cfg))
+                nowGrounded = true;
+
             if (nowGrounded)
             {
                 if (wasAirborne)
@@ -344,6 +361,24 @@ namespace GulagRunners.Sim
             }
 
             FootstepNoise(ref s, cfg);
+        }
+
+        /// <summary>
+        /// Puts the feet on the next floor down when it is within one step of them. False when
+        /// there is nothing that close, which is the whole difference between a step and a drop.
+        /// </summary>
+        static bool TryStepDown(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            if (cfg.StepUpHeight <= Fix.Zero) return false;
+
+            if (!TryFindGroundBelow(s.Position, s.Depth, world, in cfg, cfg.StepUpHeight,
+                                    out Fix groundY))
+                return false;
+            if (groundY >= s.Position.Y) return false;    // already standing on it
+
+            s.Position.Y = groundY;
+            s.Velocity.Y = Fix.Zero;
+            return true;
         }
 
         static void FootstepNoise(ref PlayerSimState s, in MoveConfig cfg)
@@ -492,6 +527,7 @@ namespace GulagRunners.Sim
 
             s.ScriptFrom = s.Position;
             s.ScriptTo = new FixVec2(targetX, targetY);
+            s.ScriptForward = false;
             s.ScriptFrames = frames;
             s.ScriptTimer = frames;
             s.Mode = MoveMode.Mounting;
@@ -549,8 +585,13 @@ namespace GulagRunners.Sim
             Fix want = Fix.MoveTowards(s.Position.X, rung, cfg.LadderSnapSpeed * Dt);
 
             // The pull writes X directly, so it has to check its own way: a ladder mounted from
-            // an awkward angle must not drag the body into the wall beside it.
-            if (SweepFree(s.Position.X, want, s.Position.Y, s.Depth, world, in cfg))
+            // an awkward angle must not drag the body into the wall beside it. The floors this
+            // ladder runs up into are exempt, as they are for the climb itself — a fighter on
+            // the last metre of a ladder has his head inside the landing he is about to stand
+            // on, and counting that as a wall froze the pull exactly where a leaning ladder
+            // needs it most.
+            if (SweepFree(s.Position.X, want, s.Position.Y, s.Depth, world, in cfg,
+                          s.LadderIndex))
                 s.Position.X = want;
 
             s.Velocity.X = Fix.Zero;
@@ -752,6 +793,11 @@ namespace GulagRunners.Sim
             s.ScriptTo = landing;
             s.ScriptFromDepth = s.Depth;
             s.ScriptToDepth = toDepth;
+
+            // A climb-out that covers no ground sideways is a step forward onto the floor the
+            // rungs end at. Presentation keeps the body facing the ladder through one of those,
+            // and turns side-on only once it is standing.
+            s.ScriptForward = Fix.Abs(landing.X - s.Position.X) <= cfg.LadderTopMargin;
 
             // Each axis is charged for the part of the window it actually gets — Y the first two
             // thirds, X the last seven tenths — so neither has to hurry to fit a window the other
@@ -1170,12 +1216,27 @@ namespace GulagRunners.Sim
         /// through — it only decides which boxes are here at all, which is what stops the
         /// backdrop of a location being a wall across the fight.
         /// </summary>
-        static bool AnySolidOverlap(SimWorld world, in Aabb box, Fix depth, in MoveConfig cfg)
+        static bool AnySolidOverlap(SimWorld world, in Aabb box, Fix depth, in MoveConfig cfg) =>
+            AnySolidOverlap(world, in box, depth, in cfg, -1);
+
+        /// <summary>
+        /// Anything solid in this box, on this slice. A shaft index exempts the floors that
+        /// ladder runs up into: while climbing, those are what the body is going past, not
+        /// what is in its way.
+        /// </summary>
+        static bool AnySolidOverlap(SimWorld world, in Aabb box, Fix depth, in MoveConfig cfg,
+                                    int shaft)
         {
             Fix half = cfg.BodyDepth / 2;
+            bool hasShaft = shaft >= 0 && shaft < world.Ladders.Length;
+
             for (int i = 0; i < world.Solids.Length; i++)
-                if (box.Overlaps(in world.Solids[i]) && world.SolidSpan(i).Reaches(depth, half))
-                    return true;
+            {
+                if (!box.Overlaps(in world.Solids[i])) continue;
+                if (!world.SolidSpan(i).Reaches(depth, half)) continue;
+                if (hasShaft && InShaft(in world.Solids[i], in world.Ladders[shaft])) continue;
+                return true;
+            }
             return false;
         }
 
@@ -1237,12 +1298,16 @@ namespace GulagRunners.Sim
         /// anything in the way of a straight sideways slide is inside that box.
         /// </summary>
         static bool SweepFree(Fix fromX, Fix toX, Fix y, Fix depth, SimWorld world,
-                              in MoveConfig cfg)
+                              in MoveConfig cfg) =>
+            SweepFree(fromX, toX, y, depth, world, in cfg, -1);
+
+        static bool SweepFree(Fix fromX, Fix toX, Fix y, Fix depth, SimWorld world,
+                              in MoveConfig cfg, int shaft)
         {
             Fix half = cfg.BodyWidth / 2;
             Aabb swept = new Aabb(Fix.Min(fromX, toX) - half, y + Skin,
                                   Fix.Max(fromX, toX) + half, y + cfg.BodyHeight);
-            return !AnySolidOverlap(world, in swept, depth, in cfg);
+            return !AnySolidOverlap(world, in swept, depth, in cfg, shaft);
         }
 
         static bool StandingOnOneWayOnly(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)

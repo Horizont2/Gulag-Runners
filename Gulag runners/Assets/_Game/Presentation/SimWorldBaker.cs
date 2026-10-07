@@ -205,6 +205,7 @@ namespace GulagRunners.Game
             List<Span> oneWayZ = new List<Span>();
             List<Span> ladderZ = new List<Span>();
             List<Span> ladderLean = new List<Span>();
+            List<Span> ladderLeanZ = new List<Span>();
             List<ChestDef> chests = new List<ChestDef>();
 
             _gizmoSolid.Clear();
@@ -284,7 +285,7 @@ namespace GulagRunners.Game
                     Fill(solidZ, solids.Count, mz);
                     Fill(oneWayZ, oneWay.Count, mz);
                     Fill(ladderZ, ladders.Count, mz);
-                    FillLean(ladderLean, ladders.Count, c.transform,
+                    FillLean(ladderLean, ladderLeanZ, ladders.Count, c.transform,
                              c.GetComponent<Collider>());
                 }
 
@@ -383,7 +384,8 @@ namespace GulagRunners.Game
                 SolidZ = solidZ.ToArray(),
                 OneWayZ = oneWayZ.ToArray(),
                 LadderZ = ladderZ.ToArray(),
-                LadderLean = ladderLean.ToArray()
+                LadderLean = ladderLean.ToArray(),
+                LadderLeanZ = ladderLeanZ.ToArray()
             };
             ChestSources = _chestSources.ToArray();
             LadderDepths = _ladderDepth.ToArray();
@@ -445,29 +447,34 @@ namespace GulagRunners.Game
             while (depths.Count < upTo) depths.Add(z);
         }
 
-        static readonly Vector2[] _corners = new Vector2[8];
+        // Vector3, not Vector2: the lean of a ladder is a question about Z as much as X, and
+        // a ladder propped against a walkway leans in both.
+        static readonly Vector3[] _corners = new Vector3[8];
 
         /// <summary>
         /// Where a ladder's centre line sits at its foot and at its head. A ladder leaning
         /// against a wall has a bounding box wider than itself, and climbing the middle of
         /// that box is climbing the air beside the rungs.
         /// </summary>
-        void FillLean(List<Span> lean, int upTo, Transform t, Collider col)
+        void FillLean(List<Span> leanX, List<Span> leanZ, int upTo, Transform t, Collider col)
         {
-            while (lean.Count < upTo)
+            while (leanX.Count < upTo)
             {
                 Corners(t, col);
                 int[] order = { 0, 1, 2, 3, 4, 5, 6, 7 };
                 System.Array.Sort(order, (p, q) => _corners[p].y.CompareTo(_corners[q].y));
 
-                float bottom = 0f, top = 0f;
-                for (int i = 0; i < 4; i++) bottom += _corners[order[i]].x;
-                for (int i = 4; i < 8; i++) top += _corners[order[i]].x;
-                lean.Add(new Span(ToFix(bottom / 4f), ToFix(top / 4f)));
+                // The four lowest corners are the foot, the four highest are the head; the
+                // middle of each is where the centre line passes through it.
+                float bx = 0f, tx = 0f, bz = 0f, tz = 0f;
+                for (int i = 0; i < 4; i++) { bx += _corners[order[i]].x; bz += _corners[order[i]].z; }
+                for (int i = 4; i < 8; i++) { tx += _corners[order[i]].x; tz += _corners[order[i]].z; }
+                leanX.Add(new Span(ToFix(bx / 4f), ToFix(tx / 4f)));
+                leanZ.Add(new Span(ToFix(bz / 4f), ToFix(tz / 4f)));
             }
         }
 
-        /// <summary>The eight world corners of a box, as (x, y).</summary>
+        /// <summary>The eight world corners of a box.</summary>
         static void Corners(Transform t, Collider col)
         {
             // The same box the bake uses, so a staircase cut out of a tilted plank follows the
@@ -481,7 +488,7 @@ namespace GulagRunners.Game
             for (int k = -1; k <= 1; k += 2)
             {
                 Vector3 w = t.TransformPoint(centre + new Vector3(e.x * i, e.y * j, e.z * k));
-                _corners[n++] = new Vector2(w.x, w.y);
+                _corners[n++] = w;
             }
         }
 

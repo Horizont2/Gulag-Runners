@@ -35,6 +35,14 @@ namespace GulagRunners.Sim
         public Span[] LadderLean = System.Array.Empty<Span>();
 
         /// <summary>
+        /// The same for depth: where a ladder's centre line sits in Z at its foot and at its
+        /// head. A ladder propped against a walkway leans AWAY from the camera as it rises as
+        /// well as along the arena, and a climb that holds one depth the whole way up pushes
+        /// the body through the rungs near one end of it.
+        /// </summary>
+        public Span[] LadderLeanZ = System.Array.Empty<Span>();
+
+        /// <summary>
         /// Chests, in the order the scene lists them. The order is part of the world: a round's
         /// chest states are an array parallel to this one, so both devices must agree on it.
         /// </summary>
@@ -56,12 +64,33 @@ namespace GulagRunners.Sim
             Aabb l = Ladders[index];
             if (!atHeight || index >= LadderLean.Length)
                 return l.MinX + (l.MaxX - l.MinX) / 2;
+            return LeanAt(LadderLean[index], in l, y);
+        }
 
-            Span lean = LadderLean[index];
-            Fix height = l.MaxY - l.MinY;
+        /// <summary>
+        /// The depth of a ladder's centre line at a given height — where the rungs are.
+        ///
+        /// Not the nearest point inside its depth span: a ladder that leans has a span as deep
+        /// as the whole lean, so "stay somewhere inside it" lets the body hang a metre off the
+        /// rungs at one end and inside them at the other. Upright, the line is the middle of
+        /// the box and there is nothing to follow.
+        /// </summary>
+        public Fix LadderDepthAt(int index, Fix y, Fix fallback, Fix inset)
+        {
+            if (index < 0 || index >= Ladders.Length) return fallback;
+            if (index >= LadderLeanZ.Length) return LadderSpan(index).Nearest(fallback, inset);
+
+            Aabb l = Ladders[index];
+            return LeanAt(LadderLeanZ[index], in l, y);
+        }
+
+        /// <summary>Where a lean line stands at a height, clamped to the box's own ends.</summary>
+        static Fix LeanAt(Span lean, in Aabb box, Fix y)
+        {
+            Fix height = box.MaxY - box.MinY;
             if (height <= Fix.Zero) return lean.Min;
 
-            Fix t = y - l.MinY;
+            Fix t = y - box.MinY;
             if (t < Fix.Zero) t = Fix.Zero;
             if (t > height) t = height;
 
