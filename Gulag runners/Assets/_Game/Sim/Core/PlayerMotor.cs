@@ -1022,6 +1022,46 @@ namespace GulagRunners.Sim
         /// a spawn that starts with a fall reads as "the collision is broken" even when it
         /// is not.
         /// </summary>
+        /// <summary>
+        /// Gets a body out of a solid it is standing inside, and says which one it was.
+        ///
+        /// Nothing else will. MoveY deliberately leaves a box the body already overlaps alone,
+        /// because resolving it would teleport a fighter who merely clipped a floor up a whole
+        /// storey — so a body that STARTS inside geometry is never pushed out, it falls
+        /// through the world instead, forever. That is one bad box in a hand-marked level away
+        /// at all times, and it has to be a nudge and a line in the console, not a match that
+        /// cannot be played.
+        /// </summary>
+        public static bool TryLiftClear(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                        out Aabb stuckIn)
+        {
+            stuckIn = default;
+            Aabb body = s.Body(in cfg);
+
+            bool inside = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (!body.Overlaps(in solid)) continue;
+                if (!inside || solid.MaxY > top) { top = solid.MaxY; stuckIn = solid; }
+                inside = true;
+            }
+            if (!inside) return false;
+
+            // Up and out, onto the thing it was inside. Only if there is room to stand there:
+            // lifting a body into a ceiling would trade one trap for another.
+            Fix half = cfg.BodyWidth / 2;
+            Fix raised = top + Skin;
+            Aabb standing = new Aabb(s.Position.X - half, raised,
+                                     s.Position.X + half, raised + cfg.BodyHeight);
+            if (AnySolidOverlap(world, in standing)) return true;   // stuck, and we said so
+
+            s.Position.Y = raised;
+            s.Velocity = FixVec2.Zero;
+            return true;
+        }
+
         public static bool TryFindGroundBelow(FixVec2 feet, SimWorld world, in MoveConfig cfg,
                                               Fix maxDistance, out Fix groundY)
         {

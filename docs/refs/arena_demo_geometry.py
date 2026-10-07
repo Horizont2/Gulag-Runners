@@ -349,6 +349,7 @@ def bake(scene=None, report=False):
     min_overlap = _field(baker, 'hatchMinOverlap', float, 0.05)
 
     solids, oneway, ladders, chests = [], [], [], []
+    culled = []
     marked, ignored, off_plane, triggers, on_player, on_chest = 0, 0, 0, 0, 0, 0
     handled = set()
 
@@ -370,6 +371,8 @@ def bake(scene=None, report=False):
         if filters_marked and restrict and not (b[1][2] >= plane_z - thickness
                                                 and b[0][2] <= plane_z + thickness):
             off_plane += 1
+            if kind == SOLID:
+                culled.append(_aabb(*b))
             continue
         (solids if kind == SOLID else oneway if kind == ONEWAY else ladders).append(_aabb(*b))
 
@@ -404,8 +407,14 @@ def bake(scene=None, report=False):
         lo, hi = b
         if restrict and not (hi[2] >= plane_z - thickness and lo[2] <= plane_z + thickness):
             off_plane += 1
+            culled.append(_aabb(lo, hi))
             continue
         solids.append(_aabb(lo, hi))
+
+    # A band that culls the whole arena is a band in the wrong place, not an empty arena.
+    band_took_everything = not solids and culled
+    if band_took_everything:
+        solids.extend(culled)
 
     hatches = 0
     if cuts_hatch:

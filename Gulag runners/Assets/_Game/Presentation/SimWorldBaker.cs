@@ -185,6 +185,11 @@ namespace GulagRunners.Game
 
             HashSet<int> handled = new HashSet<int>();
 
+            // Everything the depth band threw away, kept to hand: a band that culls the whole
+            // arena is a band in the wrong place, not an empty arena, and handing the match a
+            // world with no floor is the worst of the two answers.
+            List<Aabb> culled = new List<Aabb>();
+
             foreach (GameObject root in RootObjects())
             {
                 roots++;
@@ -201,7 +206,13 @@ namespace GulagRunners.Game
 
                     Bounds mb = c.WorldBounds;
                     if (planeFiltersMarked && restrictToPlane && !ReachesPlane(mb))
-                    { markedOffPlane++; continue; }
+                    {
+                        markedOffPlane++;
+                        if (c.kind == SimColliderKind.Solid)
+                            culled.Add(SimCollider.RectToAabb(
+                                new Rect(mb.min.x, mb.min.y, mb.size.x, mb.size.y)));
+                        continue;
+                    }
 
                     Add(c.kind, new Rect(mb.min.x, mb.min.y, mb.size.x, mb.size.y),
                         solids, oneWay, ladders, mb.center.z);
@@ -246,7 +257,13 @@ namespace GulagRunners.Game
                     { skippedChest++; continue; }
 
                     Bounds cb = col.bounds;
-                    if (restrictToPlane && !ReachesPlane(cb)) { skippedDepth++; continue; }
+                    if (restrictToPlane && !ReachesPlane(cb))
+                    {
+                        skippedDepth++;
+                        culled.Add(SimCollider.RectToAabb(
+                            new Rect(cb.min.x, cb.min.y, cb.size.x, cb.size.y)));
+                        continue;
+                    }
 
                     int layerBit = 1 << col.gameObject.layer;
                     SimColliderKind kind;
@@ -259,6 +276,12 @@ namespace GulagRunners.Game
                         solids, oneWay, ladders, cb.center.z);
                 }
             }
+
+            // The one failure this must not pass on: a band so far from the level that it
+            // leaves no floor at all. Take the band back rather than start a match nobody can
+            // stand up in, and say so with both numbers so it can be put right.
+            bool bandTookEverything = solids.Count == 0 && culled.Count > 0;
+            if (bandTookEverything) solids.AddRange(culled);
 
             int hatches = ladderCutsHatch ? CutHatches(solids, ladders) : 0;
 
@@ -284,6 +307,15 @@ namespace GulagRunners.Game
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
 
+            if (bandTookEverything)
+                Debug.LogError(
+                    $"{name}: the gameplay plane (z {planeZ} +-{planeThickness}) culled EVERY " +
+                    $"solid box in this scene, so the band is in the wrong place rather than " +
+                    $"the scene being empty. Baking all {culled.Count} of them anyway so the " +
+                    $"match is playable, which means the scenery is in the fight too. Move the " +
+                    $"band onto the level: the fighters' own Plane Z is where it belongs.\n" +
+                    $"{LastReport}", this);
+
             if (Application.isPlaying)
             {
                 if (World.Solids.Length == 0)
@@ -292,6 +324,10 @@ namespace GulagRunners.Game
                                    "If SimCollider count is 0, the arena objects are not in this " +
                                    "scene or are inactive. If they were seen but skipped, the " +
                                    "reason is in the list above.", this);
+                else if (World.Solids.Length < 4)
+                    Debug.LogWarning($"{name}: only {World.Solids.Length} solid boxes came out " +
+                                     $"of this scene, which is almost certainly not an arena.\n" +
+                                     $"{LastReport}", this);
                 else if (logBakeReport)
                     Debug.Log($"{name}: {LastReport}", this);
             }

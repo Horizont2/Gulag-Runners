@@ -100,6 +100,18 @@ for idx, (sx, sy, facing) in enumerate(SPAWNS):
     check(f"fighter {idx + 1} spawns facing the middle",
           (facing > 0) == (sx < -1.89), f"facing {facing:+d}")
 
+# A depth band is a guess about where the level is, and a wrong guess used to hand the match
+# a world with no floor at all. It now takes itself back rather than do that.
+import copy as _copy
+_narrow = G.Scene()
+for _fid, (_cls, _b) in list(_narrow.docs.items()):
+    if _cls == 114 and f'guid: {G.BAKER_GUID}' in _b:
+        _narrow.docs[_fid] = (_cls, _b.replace('planeZ: -1.6', 'planeZ: 400'))
+_rescued = G.bake(_narrow)
+check("a depth band that culls the whole arena takes itself back",
+      len(_rescued["solid"]) > 20,
+      f"a band 400 m away still bakes {len(_rescued['solid'])} solid boxes")
+
 # The whole failure mode of a hand-marked location in one check. Mark the building's back
 # wall solid along with everything else and it lands across the ground floor at chest height;
 # a body that starts inside a solid is not pushed out of it — MoveY leaves an overlapping box

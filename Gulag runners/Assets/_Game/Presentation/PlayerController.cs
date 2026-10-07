@@ -213,6 +213,35 @@ namespace GulagRunners.Game
             }
 
             _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
+
+            // Never start inside the level. One box marked solid that should not have been —
+            // the wall behind a location, say — lands across the floor, the fighter spawns in
+            // it, and because nothing pushes a body out of a box it already overlaps, they
+            // fall through the world instead. Loudly, with the offending box named, because
+            // the symptom on its own points nowhere.
+            if (_world != null &&
+                PlayerMotor.TryLiftClear(ref _state, _world, in _config, out Aabb stuckIn))
+            {
+                Debug.LogWarning(
+                    $"{name}: spawned inside a baked solid " +
+                    $"(x {stuckIn.MinX.ToMilli() / 1000f:0.00}..{stuckIn.MaxX.ToMilli() / 1000f:0.00}, " +
+                    $"y {stuckIn.MinY.ToMilli() / 1000f:0.00}..{stuckIn.MaxY.ToMilli() / 1000f:0.00}) " +
+                    $"and was lifted out to y {_state.Position.Y.ToMilli() / 1000f:0.00}. " +
+                    "Something in the scene is marked solid that should not be: check that box " +
+                    "against the gameplay plane, or mark it Ignore.\n" +
+                    (worldBaker != null ? worldBaker.LastReport : "no baker"), this);
+            }
+            else if (_world != null && _world.Solids.Length > 0 &&
+                     !PlayerMotor.TryFindGroundBelow(_state.Position, _world, in _config,
+                                                     ToFix(snapSearchDistance), out _))
+            {
+                Debug.LogWarning(
+                    $"{name}: nothing to stand on within {snapSearchDistance} m of the spawn " +
+                    $"at ({_state.Position.X.ToMilli() / 1000f:0.00}, " +
+                    $"{_state.Position.Y.ToMilli() / 1000f:0.00}), so this fighter will fall.\n" +
+                    (worldBaker != null ? worldBaker.LastReport : "no baker"), this);
+            }
+
             _previous = _state;
             _accumulator = 0f;
 
