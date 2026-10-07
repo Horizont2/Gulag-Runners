@@ -103,6 +103,16 @@ namespace GulagRunners.Game
         [Header("Ledge assist")]
         [Tooltip("Steps this low are climbed instead of blocking you.")]
         public float stepUpHeight = 0.3f;
+
+        [Tooltip("The tallest ledge a standing fighter hauls themselves onto without jumping. " +
+                 "Anything above Step Up Height costs most of the speed they were carrying, so " +
+                 "a slope built out of boxes — the only kind an AABB world has — is walked up " +
+                 "at a crawl instead of hopped up one box at a time, and a kerb is still a " +
+                 "kerb. 0 leaves only the free step.")]
+        public float clamberHeight = 0.55f;
+
+        [Tooltip("Share of the speed kept after hauling up. The cost that makes it read.")]
+        [Range(0f, 1f)] public float clamberSpeed = 0.4f;
         [Tooltip("A rising jump clipping a corner by less than this is nudged through.")]
         public float cornerCorrect = 0.25f;
         public int fallThroughFrames = 18;
@@ -150,6 +160,8 @@ namespace GulagRunners.Game
             c.BodyHeight = M(bodyHeight);
             c.CrouchHeight = M(Mathf.Min(crouchHeight, bodyHeight * 0.75f));
             c.StepUpHeight = M(stepUpHeight);
+            c.ClamberHeight = M(clamberHeight);
+            c.ClamberSpeedPermille = Mathf.RoundToInt(Mathf.Clamp01(clamberSpeed) * 1000f);
             c.CornerCorrect = M(cornerCorrect);
             c.FallThroughFrames = fallThroughFrames;
             c.LoudSpeed = M(loudSpeed);

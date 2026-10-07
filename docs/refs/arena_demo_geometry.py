@@ -235,6 +235,22 @@ class Scene:
             wc = [origin[i] + lc[i] for i in range(3)]
             ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
             return [wc[i] - ext[i] for i in range(3)], [wc[i] + ext[i] for i in range(3)]
+
+        # No collider at all: SimCollider.RotatedBounds takes the box from the transform,
+        # which is right for the unit cubes this location is built from.
+        if self.script(go, SIM_COLLIDER_GUID) is not None:
+            origin, basis = self.basis(self.tr_of_go[go])
+            half = [0.5, 0.5, 0.5]
+            ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
+            return [origin[i] - ext[i] for i in range(3)], [origin[i] + ext[i] for i in range(3)]
+        return None
+
+    def _unused(self, go, centre, size, half, basis, origin):
+        if True:
+            lc = _apply(basis, [centre['x'], centre['y'], centre['z']])
+            wc = [origin[i] + lc[i] for i in range(3)]
+            ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
+            return [wc[i] - ext[i] for i in range(3)], [wc[i] + ext[i] for i in range(3)]
         return None
 
     def renders(self, go):
@@ -328,6 +344,7 @@ def bake(scene=None, report=False):
     thickness = _field(baker, 'planeThickness', float, 1.5)
     restrict = _field(baker, 'restrictToPlane', int, 1)
     cuts_hatch = _field(baker, 'ladderCutsHatch', int, 0)
+    filters_marked = _field(baker, 'planeFiltersMarked', int, 1)
     margin = _field(baker, 'hatchMargin', float, 0.1)
     min_overlap = _field(baker, 'hatchMinOverlap', float, 0.05)
 
@@ -348,6 +365,11 @@ def bake(scene=None, report=False):
             continue
         b = sc.bounds(go)
         if b is None:
+            continue
+        # A marker says WHAT a box is, not that it is on the gameplay plane.
+        if filters_marked and restrict and not (b[1][2] >= plane_z - thickness
+                                                and b[0][2] <= plane_z + thickness):
+            off_plane += 1
             continue
         (solids if kind == SOLID else oneway if kind == ONEWAY else ladders).append(_aabb(*b))
 

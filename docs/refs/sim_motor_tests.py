@@ -133,6 +133,39 @@ for hold in (3, 8, 20, 200):
     peaks.append(round(top, 3))
 check("every tap gives the same jump", len(set(peaks)) == 1, f"apex {peaks} m for 3/8/20/200 frames held")
 
+print("\n10c. a slope made of boxes is walked up, a wall is not")
+# An AABB world has no slopes, only stairs. A step over the free 0.30 m is hauled up at the
+# cost of the speed carried into it, which is what turns a stack of crates into a ramp —
+# and the haul has to find the HIGHEST reachable surface, or a stack stops the body at its
+# first step with the second one sitting on top of the landing.
+STAIRS = {"solid": [(X(-6.0), X(-1.0), X(6.0), X(0.0))] +
+                   [(X(-1.0 + i), X(-1.0), X(6.0), X(i * 0.5)) for i in range(1, 5)] +
+                   [(X(4.0), X(-1.0), X(5.0), X(3.5))],
+          "oneway": [], "ladder": []}
+
+
+def walk(st, inp, cond, limit=600):
+    for _ in range(limit):
+        step(st, inp, STAIRS)
+        if cond(st):
+            return True
+    return False
+
+
+s2 = S(-3.0, 0.2)
+walk(s2, 0, lambda st: st.mode == "ground", 120)
+base = F(s2.y)
+check("four 0.50 m steps are walked up with no jump at all",
+      walk(s2, R, lambda st: F(st.y) > 1.95), f"{base:.2f} -> {F(s2.y):.2f} m")
+check("and the 1.5 m wall at the top is still a wall",
+      not walk(s2, R, lambda st: F(st.y) > 2.1, 240), f"y {F(s2.y):.2f}")
+
+s2 = S(-3.0, 0.2)
+walk(s2, 0, lambda st: st.mode == "ground", 120)
+walk(s2, R, lambda st: F(st.y) > 0.4)
+check("the haul costs most of the speed it was walked at", F(s2.vx) < 1.5,
+      f"{F(s2.vx):.2f} m/s of {F(T.C['RUN']):.2f} on the step up")
+
 print("\n11b. the dodge is rare and short")
 s2 = S(-3.0, 0.9)
 for _ in range(120):

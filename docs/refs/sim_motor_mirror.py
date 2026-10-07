@@ -18,7 +18,8 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          LDIS=M(1500), LSNAP=M(2000), LTOP=M(60), MREACH=M(1600),
          SSPD=M(2400), SMINF=10, SMAXF=30, LREGRAB=12,
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
-         STEP=M(300), CORNER=M(250), FALLTHRU=18,
+         STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
+         CORNER=M(250), FALLTHRU=18,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
 L, R, UP, DN, JMP, DOD, ACTION, ATTACK = 1, 2, 4, 8, 16, 32, 64, 128
@@ -94,20 +95,38 @@ def on_oneway_only(s, w):
     return any(overlaps(feet, p) for p in w["oneway"])
 
 def move_x(s, dx, w):
+    """Two passes: a stack of boxes is not a list of separate problems. One at a time takes
+    the first ledge in array order, finds the next layer on top of it, gives up, and stops
+    the body at the foot of a staircase it could have walked up."""
     if dx == 0: return
     half = C["W"] // 2
     h = C["CH"] if s.crouch else C["H"]
     tx = s.x + dx
+    limit = max(C["CLAMBER"], C["STEP"])
+
+    best = None
     for sol in w["solid"]:
         b = (tx - half, s.y, tx + half, s.y + h)
         if not overlaps(b, sol): continue
         step = sol[3] - s.y
-        if 0 < step <= C["STEP"]:
-            raised = sol[3] + SKIN
-            rb = (tx - half, raised, tx + half, raised + h)
-            if not any_solid(w, rb):
-                s.y = raised
-                continue
+        if step <= 0 or step > limit: continue
+        if step > C["STEP"] and s.mode != "ground": continue
+        if best is not None and sol[3] <= best: continue
+        raised = sol[3] + SKIN
+        if any_solid(w, (tx - half, raised, tx + half, raised + h)): continue
+        best = sol[3]
+
+    if best is not None:
+        clamber = best - s.y > C["STEP"]
+        s.y = best + SKIN
+        s.x = tx
+        if clamber:
+            s.vx = (s.vx * C["CLAMBER_SPD"]) // 1000
+        return
+
+    for sol in w["solid"]:
+        b = (tx - half, s.y, tx + half, s.y + h)
+        if not overlaps(b, sol): continue
         tx = sol[0] - half - SKIN if dx > 0 else sol[2] + half + SKIN
         s.vx = 0
     s.x = tx

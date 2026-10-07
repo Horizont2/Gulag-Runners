@@ -769,24 +769,61 @@ namespace GulagRunners.Sim
             Fix height = s.Crouching ? cfg.CrouchHeight : cfg.BodyHeight;
             Fix targetX = s.Position.X + dx;
 
+            // Two passes, because a stack of boxes is not a list of separate problems.
+            // Resolving them one at a time takes the first ledge in array order, finds the
+            // next layer of the stack sitting on top of it, gives up on the step — and the
+            // body stops dead at the foot of a staircase it could have walked up. So: find
+            // the HIGHEST surface this step could put the feet on, and only if there is none
+            // treat what is left as a wall.
+            Fix limit = cfg.ClamberHeight > cfg.StepUpHeight ? cfg.ClamberHeight
+                                                             : cfg.StepUpHeight;
+            bool found = false;
+            Fix bestTop = Fix.Zero;
+
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
-                Aabb body = new Aabb(targetX - half, s.Position.Y, targetX + half, s.Position.Y + height);
+                Aabb body = new Aabb(targetX - half, s.Position.Y,
+                                     targetX + half, s.Position.Y + height);
                 if (!body.Overlaps(in solid)) continue;
 
-                // Ledge assist: a low step is climbed instead of stopping you dead.
-                Fix stepHeight = solid.MaxY - s.Position.Y;
-                if (stepHeight > Fix.Zero && stepHeight <= cfg.StepUpHeight)
-                {
-                    Fix raised = solid.MaxY + Skin;
-                    Aabb raisedBody = new Aabb(targetX - half, raised, targetX + half, raised + height);
-                    if (!AnySolidOverlap(world, in raisedBody))
-                    {
-                        s.Position.Y = raised;
-                        continue;
-                    }
-                }
+                Fix step = solid.MaxY - s.Position.Y;
+                if (step <= Fix.Zero || step > limit) continue;
+
+                // Hauling up is for a body with its feet on something. Mid-jump it would be
+                // a second, free climb out of anything you happened to brush.
+                if (step > cfg.StepUpHeight && s.Mode != MoveMode.Grounded) continue;
+                if (found && solid.MaxY <= bestTop) continue;
+
+                Fix raised = solid.MaxY + Skin;
+                Aabb raisedBody = new Aabb(targetX - half, raised,
+                                           targetX + half, raised + height);
+                if (AnySolidOverlap(world, in raisedBody)) continue;
+
+                bestTop = solid.MaxY;
+                found = true;
+            }
+
+            if (found)
+            {
+                bool clamber = bestTop - s.Position.Y > cfg.StepUpHeight;
+                s.Position.Y = bestTop + Skin;
+                s.Position.X = targetX;
+
+                // A haul costs the speed it was walked at, so a stepped slope is climbed at a
+                // crawl and a kerb still feels like nothing.
+                if (clamber)
+                    s.Velocity.X = new Fix((int)(((long)s.Velocity.X.Raw *
+                                                  cfg.ClamberSpeedPermille) / 1000));
+                return;
+            }
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                Aabb body = new Aabb(targetX - half, s.Position.Y,
+                                     targetX + half, s.Position.Y + height);
+                if (!body.Overlaps(in solid)) continue;
 
                 targetX = dx > Fix.Zero ? solid.MinX - half - Skin : solid.MaxX + half + Skin;
                 s.Velocity.X = Fix.Zero;

@@ -61,6 +61,16 @@ namespace GulagRunners.Game
                  "the backdrop alone.")]
         public float planeThickness = 1.5f;
 
+        [Tooltip("Hold objects marked with a SimCollider to the same depth band.\n\n" +
+                 "On by default. A marker says WHAT a box is — solid, one-way, a ladder — not " +
+                 "that it is on the gameplay plane, and the quickest way to author a location " +
+                 "is to mark everything in it. With this off, marking the whole level puts the " +
+                 "whole level on the plane, including the wall behind it, and the first " +
+                 "symptom is a fighter who spawns inside that wall and falls through the floor. " +
+                 "Ignore is still honoured either way: that is the escape hatch for something " +
+                 "that IS on the plane and still must not be solid.")]
+        public bool planeFiltersMarked = true;
+
         [Header("Ladders")]
         [Tooltip("Cut a hole in the baked floor wherever a ladder runs through it.\n\n" +
                  "Off by default, and usually wants to stay off: the motor already treats a " +
@@ -167,7 +177,7 @@ namespace GulagRunners.Game
             _chestSources.Clear();
             _ladderDepth.Clear();
 
-            int roots = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0,
+            int roots = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0, markedOffPlane = 0,
                 chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
             int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
@@ -188,7 +198,13 @@ namespace GulagRunners.Game
                     if (!c.isActiveAndEnabled) { markedSkipped++; continue; }
                     handled.Add(c.gameObject.GetInstanceID());
                     if (c.kind == SimColliderKind.Ignore) { markedIgnored++; continue; }
-                    Add(c.kind, c.ToRect(), solids, oneWay, ladders, c.Depth);
+
+                    Bounds mb = c.WorldBounds;
+                    if (planeFiltersMarked && restrictToPlane && !ReachesPlane(mb))
+                    { markedOffPlane++; continue; }
+
+                    Add(c.kind, new Rect(mb.min.x, mb.min.y, mb.size.x, mb.size.y),
+                        solids, oneWay, ladders, mb.center.z);
                 }
 
                 // 2. Chests. Collected before the ordinary colliders so that a chest's own
@@ -258,7 +274,8 @@ namespace GulagRunners.Game
 
             LastReport =
                 $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider " +
-                $"({markedSkipped} inactive, {markedIgnored} ignored), " +
+                $"({markedSkipped} inactive, {markedIgnored} ignored, " +
+                $"{markedOffPlane} off the plane), " +
                 $"{collidersSeen} Unity collider (skipped: {skippedAlreadyMarked} already marked, " +
                 $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedChest} on a chest, " +
                 $"{skippedDepth} off the plane, {skippedLayer} wrong layer, " +

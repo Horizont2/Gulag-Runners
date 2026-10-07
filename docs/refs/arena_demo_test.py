@@ -100,6 +100,21 @@ for idx, (sx, sy, facing) in enumerate(SPAWNS):
     check(f"fighter {idx + 1} spawns facing the middle",
           (facing > 0) == (sx < -1.89), f"facing {facing:+d}")
 
+# The whole failure mode of a hand-marked location in one check. Mark the building's back
+# wall solid along with everything else and it lands across the ground floor at chest height;
+# a body that starts inside a solid is not pushed out of it — MoveY leaves an overlapping box
+# alone on purpose, or a fighter who clips a floor teleports a storey — so it falls through
+# the world instead, forever.
+for idx, (sx, sy, _) in enumerate(SPAWNS):
+    s = S(sx, sy)
+    until(s, 0, lambda s: s.mode == "ground", 180)
+    inside = [b for b in W["solid"] if T.overlaps(T.body(s), b)]
+    check(f"fighter {idx + 1} does not spawn inside anything", not inside,
+          f"{len(inside)} solid(s) around ({F(s.x):.2f}, {F(s.y):.2f})")
+    check(f"fighter {idx + 1} is still on the ground a second later",
+          until(s, 0, lambda s: F(s.y) < -1.0, 60) is False and s.mode == "ground",
+          f"y {F(s.y):.2f} mode {s.mode}")
+
 check("the two spawns are mirrored about the arena centre",
       abs((SPAWNS[0][0] + SPAWNS[1][0]) / 2 + 1.89) < 0.02,
       f"midpoint x {(SPAWNS[0][0] + SPAWNS[1][0]) / 2:.3f}")
@@ -219,6 +234,24 @@ for i, (lo, hi) in enumerate(runs):
         check("the middle walkway is reached up the right crate stack",
               s is not None and s.mode == "ground" and abs(F(s.y) - 3.83) < 0.08,
               f"ended at ({F(s.x):.2f}, {F(s.y):.2f})" if s else "never left the floor")
+
+# The crate staircases rise 0.38 to 0.52 m a step, over the free step of 0.30, so before the
+# clamber every one of them needed a jump. They are the slope this location has.
+for name, start, target, toward in (("left", -11.5, -6.4, R), ("right", 7.2, 2.7, L)):
+    s = S(start, 0.4)
+    until(s, 0, lambda s: s.mode == "ground", 180)
+    base = F(s.y)
+    climbed = until(s, toward, lambda s: F(s.y) > 2.4, 900)
+    check(f"the {name} crate staircase is walked up without a single jump", climbed,
+          f"{base:.2f} -> {F(s.y):.2f} m")
+
+# And it is not a free lift: a wall is still a wall.
+s = S(-13.0, 0.3)
+until(s, 0, lambda s: s.mode == "ground", 180)
+before = F(s.y)
+until(s, L, lambda s: F(s.y) > before + 0.1, 240)
+check("a clamber does not climb the step up to the plateau", F(s.y) - before < 0.1,
+      f"the 0.83 m step onto the plateau still needs a jump, y {F(s.y):.2f}")
 
 # And the gaps themselves stay gaps: knocked into one, a fighter leaves the upper walkway and
 # has to climb back. Each one has a crate stack under it, so the drop is onto the stairs he

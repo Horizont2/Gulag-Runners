@@ -39,20 +39,31 @@ namespace GulagRunners.Game
                  "dropped from with down + jump. Ladder connects floors.")]
         public SimColliderKind kind = SimColliderKind.Solid;
 
-        public Rect ToRect() => WorldRect(this, GetComponent<Collider>());
+        /// <summary>
+        /// The box this marker stands for, in world space: the collider's own bounds when
+        /// there is one, and the transform's own box when there is not. A level can be marked
+        /// up with no Unity colliders at all, which is the cheaper way to author one.
+        /// </summary>
+        public Bounds WorldBounds
+        {
+            get
+            {
+                Collider c = GetComponent<Collider>();
+                return c != null ? c.bounds : RotatedBounds(transform);
+            }
+        }
+
+        public Rect ToRect()
+        {
+            Bounds b = WorldBounds;
+            return new Rect(b.min.x, b.min.y, b.size.x, b.size.y);
+        }
 
         /// <summary>
         /// The Z this collider was modelled at. The simulation is flat and never asks;
         /// presentation does, to draw a body on the same plane as the thing it is touching.
         /// </summary>
-        public float Depth
-        {
-            get
-            {
-                Collider c = GetComponent<Collider>();
-                return c != null ? c.bounds.center.z : transform.position.z;
-            }
-        }
+        public float Depth => WorldBounds.center.z;
 
         /// <summary>
         /// World-space X/Y footprint of a marked object.

@@ -96,6 +96,17 @@ namespace GulagRunners.Sim
 
         /// <summary>Ledge assist: steps this high are climbed instead of blocking you.</summary>
         public Fix StepUpHeight;
+
+        /// <summary>
+        /// The tallest ledge a standing body will haul itself onto without jumping. Anything
+        /// over StepUpHeight costs most of the speed it was carrying, so a stepped slope is
+        /// walked up at a crawl rather than hopped up one box at a time — and a kerb is still
+        /// a kerb. 0 leaves only the free step.
+        /// </summary>
+        public Fix ClamberHeight;
+
+        /// <summary>Share of the speed kept after hauling up. The cost that makes it read.</summary>
+        public int ClamberSpeedPermille;
         /// <summary>Ledge assist: a jump clipping a corner by less than this is nudged through.</summary>
         public Fix CornerCorrect;
 
@@ -151,6 +162,8 @@ namespace GulagRunners.Sim
             c.CrouchHeight = Fix.FromMilli(1100);
 
             c.StepUpHeight  = Fix.FromMilli(300);
+            c.ClamberHeight = Fix.FromMilli(550);   // one crate of this location's staircases
+            c.ClamberSpeedPermille = 400;
             c.CornerCorrect = Fix.FromMilli(250);
 
             c.FallThroughFrames = 18;
