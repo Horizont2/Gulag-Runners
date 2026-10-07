@@ -78,10 +78,10 @@ namespace GulagRunners.Sim
             //
             // The deadzone matters: a fighter stands INSIDE a chest's box to open it, so
             // without one, shuffling across its middle flips him back and forth.
-            Fix centre = def.Box.MinX + (def.Box.MaxX - def.Box.MinX) / 2;
+            Fix chestX = def.Box.MinX + (def.Box.MaxX - def.Box.MinX) / 2;
             Fix deadzone = move.BodyWidth / 4;
-            if (centre > s.Position.X + deadzone) s.Facing = 1;
-            else if (centre < s.Position.X - deadzone) s.Facing = -1;
+            if (chestX > s.Position.X + deadzone) s.Facing = 1;
+            else if (chestX < s.Position.X - deadzone) s.Facing = -1;
 
             // The weapon is the crowbar. Bare hands are slower and quieter, and that is the trade
             // the whole scavenge phase is built on (docs/03).
