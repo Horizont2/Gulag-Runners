@@ -217,6 +217,10 @@ def resolve(players):
                 continue
             if not overlaps(box, body(vic)):
                 continue
+            # Not through the level: two fighters on different slices of a building are not
+            # within reach of each other however their flattened boxes overlap.
+            if abs(atk.depth - vic.depth) > M.C["BODYZ"]:
+                continue
             atk.swing_spent = True
             land(atk, vic)
             break

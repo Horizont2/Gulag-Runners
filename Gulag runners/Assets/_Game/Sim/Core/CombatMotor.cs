@@ -289,6 +289,13 @@ namespace GulagRunners.Sim
                     Aabb body = players[b].Body(in move);
                     if (!box.Overlaps(in body)) continue;
 
+                    // Not through the level. Two fighters on different slices of a building —
+                    // one on the gallery's lane, one out on the ramp — are not within reach of
+                    // each other however their flattened boxes overlap.
+                    if (move.BodyDepth > Fix.Zero &&
+                        Fix.Abs(players[a].Depth - players[b].Depth) > move.BodyDepth)
+                        continue;
+
                     players[a].SwingSpent = true;
                     Land(ref players[a], ref players[b], in cfg, in move);
                     break;                       // one swing, one victim

@@ -27,7 +27,137 @@ namespace GulagRunners.Sim
         static readonly Fix GroundProbe = Fix.FromMilli(20);
         static readonly Fix GroundStick = Fix.FromMilli(200);
 
-        public static void Step(ref PlayerSimState s, InputFlags input, SimWorld world, in MoveConfig cfg)
+        public static void Step(ref PlayerSimState s, InputFlags input, SimWorld world,
+                                in MoveConfig cfg)
+        {
+            StepFlat(ref s, input, world, in cfg);
+            UpdateDepth(ref s, world, in cfg);
+        }
+
+        /// <summary>
+        /// Which slice of the level the body is on, and how it gets there.
+        ///
+        /// A location built in 3D does not have one floor at one depth: this one has a ground
+        /// floor nine metres deep carrying a ramp at z -3.0 and a crate staircase at z -1.4,
+        /// and a gallery above at z -0.6 that the ladder in between reaches at z -2.1. Climbing
+        /// is therefore a move AWAY from the camera and coming down is a move towards it, which
+        /// is the thing the fighter has to work out for themselves because there is no button
+        /// for it and docs/06 has no input bit to spare for one.
+        ///
+        /// Three rules, in order: a ladder is a thing you are holding, so it wins; otherwise
+        /// whatever is just ahead and low enough to step onto, because that is where you are
+        /// evidently going; otherwise the floor underfoot, which only moves you if it does not
+        /// already hold you.
+        /// </summary>
+        static void UpdateDepth(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            if (cfg.DepthSnapSpeed <= Fix.Zero || world.SolidZ.Length == 0) return;
+
+            Fix inset = cfg.BodyDepth / 2;
+            Fix want;
+
+            if (s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length)
+                want = world.LadderSpan(s.LadderIndex).Nearest(s.Depth, inset);
+            else if (s.Mode != MoveMode.Grounded)
+                return;                                   // mid-air you keep the slice you left
+            else if (!TryLaneAhead(ref s, world, in cfg, out want) &&
+                     !TryFloorLane(ref s, world, in cfg, out want))
+                return;
+
+            s.Depth = Fix.MoveTowards(s.Depth, want, cfg.DepthSnapSpeed * Dt);
+        }
+
+        /// <summary>The slice of the nearest thing ahead that is low enough to climb onto.</summary>
+        static bool TryLaneAhead(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                 out Fix lane)
+        {
+            lane = s.Depth;
+            if (cfg.LaneLookahead <= Fix.Zero) return false;
+
+            Fix half = cfg.BodyWidth / 2;
+            Fix limit = cfg.ClamberHeight > cfg.StepUpHeight ? cfg.ClamberHeight
+                                                             : cfg.StepUpHeight;
+            Fix from = s.Facing > 0 ? s.Position.X + half : s.Position.X - half - cfg.LaneLookahead;
+            Fix to = s.Facing > 0 ? s.Position.X + half + cfg.LaneLookahead : s.Position.X - half;
+
+            bool found = false;
+            Fix nearestX = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (solid.MaxX <= from || solid.MinX >= to) continue;
+
+                Fix step = solid.MaxY - s.Position.Y;
+                if (step <= Fix.Zero || step > limit) continue;
+
+                // Strictly ahead. A box whose X already surrounds the body is not somewhere
+                // the body is going — and the wall at the back of a building runs the length
+                // of the arena, so measured by its near edge it is ahead of everything and
+                // would win every time.
+                Fix gap = s.Facing > 0 ? solid.MinX - (s.Position.X + half)
+                                       : (s.Position.X - half) - solid.MaxX;
+                if (gap < Fix.Zero) continue;
+                if (found && gap >= nearestX) continue;
+
+                Fix want = world.SolidSpan(i).Nearest(s.Depth, cfg.BodyDepth / 2);
+                if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
+
+                nearestX = gap;
+                lane = want;
+                found = true;
+            }
+
+            // A ladder counts as somewhere you are going too, and it has to: this location's
+            // ladders stand a metre in front of the floor they rise from, so a fighter who
+            // could not walk onto their slice could never reach one at all.
+            for (int i = 0; i < world.Ladders.Length; i++)
+            {
+                Aabb l = world.Ladders[i];
+                if (l.MaxX <= from || l.MinX >= to) continue;
+                if (l.MaxY <= s.Position.Y || l.MinY > s.Position.Y + cfg.BodyHeight) continue;
+
+                Fix gap = s.Facing > 0 ? l.MinX - (s.Position.X + half)
+                                       : (s.Position.X - half) - l.MaxX;
+                if (gap < Fix.Zero) gap = Fix.Zero;
+                if (found && gap >= nearestX) continue;
+
+                Fix want = world.LadderSpan(i).Nearest(s.Depth, cfg.BodyDepth / 2);
+                if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
+
+                nearestX = gap;
+                lane = want;
+                found = true;
+            }
+            return found;
+        }
+
+        /// <summary>The slice of the floor underfoot. Keeps the body where it is if it fits.</summary>
+        static bool TryFloorLane(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                 out Fix lane)
+        {
+            lane = s.Depth;
+            Fix half = cfg.BodyWidth / 2;
+            Fix halfZ = cfg.BodyDepth / 2;
+            Aabb feet = new Aabb(s.Position.X - half + Skin, s.Position.Y - GroundProbe,
+                                 s.Position.X + half - Skin, s.Position.Y);
+
+            bool found = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!feet.Overlaps(in world.Solids[i])) continue;
+                if (!world.SolidSpan(i).Reaches(s.Depth, halfZ)) continue;
+                if (found && world.Solids[i].MaxY <= top) continue;
+
+                top = world.Solids[i].MaxY;
+                lane = world.SolidSpan(i).Nearest(s.Depth, halfZ);
+                found = true;
+            }
+            return found;
+        }
+
+        static void StepFlat(ref PlayerSimState s, InputFlags input, SimWorld world,
+                             in MoveConfig cfg)
         {
             s.Noise = NoiseLevel.Silent;
 
@@ -286,7 +416,7 @@ namespace GulagRunners.Sim
             if (s.Crouching && !HasHeadroom(ref s, world, cfg)) return false;
 
             Aabb body = s.Body(in cfg);
-            int ladder = world.FindLadder(in body);
+            int ladder = world.FindLadder(in body, s.Depth, cfg.BodyDepth / 2);
 
             // Standing on top of a ladder whose rungs start just under the feet. A ladder with
             // no hatch beside it is the whole level here, and without this the only ones you
@@ -321,14 +451,15 @@ namespace GulagRunners.Sim
                 // over the top of a ladder is the exception: the floor underfoot is the floor
                 // the ladder runs through, which is exactly what you are leaving.
                 if (!steppingOn &&
-                    SupportUnder(centreX, s.Position.Y, s.FallThroughTimer, world, in cfg))
+                    SupportUnder(centreX, s.Position.Y, s.Depth, s.FallThroughTimer,
+                                 world, in cfg))
                     return false;
             }
 
             // The reach is a straight slide sideways, so it must not pass through anything. If it
             // would, grab the ladder where the body already stands instead of refusing: being on
             // the rungs slightly off centre is harmless, being pushed into a wall is not.
-            Fix targetX = SweepFree(s.Position.X, centreX, s.Position.Y, world, in cfg)
+            Fix targetX = SweepFree(s.Position.X, centreX, s.Position.Y, s.Depth, world, in cfg)
                 ? centreX : s.Position.X;
 
             // Stepping over the top means the grab also has to come DOWN onto the top rung,
@@ -415,7 +546,7 @@ namespace GulagRunners.Sim
 
                 // The pull writes X directly, so it has to check its own way: a ladder mounted
                 // from an awkward angle must not drag the body into the wall beside it.
-                if (SweepFree(s.Position.X, want, s.Position.Y, world, in cfg))
+                if (SweepFree(s.Position.X, want, s.Position.Y, s.Depth, world, in cfg))
                     s.Position.X = want;
             }
 
@@ -499,6 +630,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Ladders.Length; i++)
             {
                 Aabb l = world.Ladders[i];
+                if (!world.LadderSpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
                 if (l.MinX >= s.Position.X + half || l.MaxX <= s.Position.X - half) continue;
 
                 Fix drop = s.Position.Y - l.MaxY;
@@ -542,7 +674,8 @@ namespace GulagRunners.Sim
                 // No direction asked for, and both sides work: take the one with more floor
                 // beyond it. Climbing out of a hatch into the narrow side means the first step
                 // back is into the hole you just left.
-                side = FloorRun(landRight, 1, world, in cfg) >= FloorRun(landLeft, -1, world, in cfg)
+                side = FloorRun(landRight, 1, s.Depth, world, in cfg)
+                       >= FloorRun(landLeft, -1, s.Depth, world, in cfg)
                     ? 1 : -1;
             }
 
@@ -595,6 +728,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
+                if (!world.SolidSpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
                 if (solid.MinX >= x + half || solid.MaxX <= x - half) continue;
                 if (ladder.MaxY < solid.MinY) continue;
                 if (ladder.MaxY > solid.MaxY + cfg.LadderTopMargin) continue;
@@ -604,8 +738,8 @@ namespace GulagRunners.Sim
 
             // Climbing out has to end standing, not wedged under the next floor up.
             Aabb standing = new Aabb(x - half, top + Skin, x + half, top + cfg.BodyHeight);
-            if (AnySolidOverlap(world, in standing)) return false;
-            if (!FullySupported(x, top, world, in cfg)) return false;
+            if (AnySolidOverlap(world, in standing, s.Depth, in cfg)) return false;
+            if (!FullySupported(x, top, s.Depth, world, in cfg)) return false;
 
             landing = new FixVec2(x, top + Skin);
             return true;
@@ -624,7 +758,8 @@ namespace GulagRunners.Sim
                 Fix x = s.Position.X + step * (i * side);
 
                 FixVec2 probe = new FixVec2(x, s.Position.Y + cfg.BodyHeight);
-                if (!TryFindGroundBelow(probe, world, in cfg, cfg.BodyHeight * 2, out Fix groundY))
+                if (!TryFindGroundBelow(probe, s.Depth, world, in cfg, cfg.BodyHeight * 2,
+                                        out Fix groundY, true))
                     continue;
 
                 // Only ever climb UP and out, never down into something.
@@ -632,12 +767,12 @@ namespace GulagRunners.Sim
 
                 Aabb standing = new Aabb(x - half, groundY + Skin,
                                          x + half, groundY + cfg.BodyHeight);
-                if (AnySolidOverlap(world, in standing)) continue;
+                if (AnySolidOverlap(world, in standing, s.Depth, in cfg)) continue;
 
                 // The whole footprint must be supported, not just its middle. Without this the
                 // climb-out happily picks the lip of a slab, leaving the body half over the hole
                 // it just climbed out of, and the next step walks straight back in.
-                if (!FullySupported(x, groundY, world, in cfg)) continue;
+                if (!FullySupported(x, groundY, s.Depth, world, in cfg)) continue;
 
                 landing = new FixVec2(x, groundY + Skin);
                 return true;
@@ -648,7 +783,8 @@ namespace GulagRunners.Sim
         }
 
         /// <summary>How far unbroken floor continues beyond a landing point.</summary>
-        static Fix FloorRun(FixVec2 from, int dir, SimWorld world, in MoveConfig cfg)
+        static Fix FloorRun(FixVec2 from, int dir, Fix depth, SimWorld world,
+                            in MoveConfig cfg)
         {
             Fix step = Fix.FromMilli(200);
             Fix reached = Fix.Zero;
@@ -657,9 +793,10 @@ namespace GulagRunners.Sim
             {
                 Fix x = from.X + step * (i * dir);
                 FixVec2 probe = new FixVec2(x, from.Y + cfg.BodyHeight);
-                if (!TryFindGroundBelow(probe, world, in cfg, cfg.BodyHeight * 2, out Fix groundY))
+                if (!TryFindGroundBelow(probe, depth, world, in cfg, cfg.BodyHeight * 2,
+                                        out Fix groundY, true))
                     break;
-                if (!FullySupported(x, groundY, world, in cfg)) break;
+                if (!FullySupported(x, groundY, depth, world, in cfg)) break;
                 reached = step * i;
             }
 
@@ -667,7 +804,8 @@ namespace GulagRunners.Sim
         }
 
         /// <summary>Solid under the left edge, the middle and the right edge of the footprint.</summary>
-        static bool FullySupported(Fix x, Fix groundY, SimWorld world, in MoveConfig cfg)
+        static bool FullySupported(Fix x, Fix groundY, Fix depth, SimWorld world,
+                                   in MoveConfig cfg)
         {
             Fix half = cfg.BodyWidth / 2;
             for (int i = -1; i <= 1; i++)
@@ -675,7 +813,7 @@ namespace GulagRunners.Sim
                 Fix px = x + half * i;
                 Aabb probe = new Aabb(px - Skin * 4, groundY - GroundProbe,
                                       px + Skin * 4, groundY - Skin);
-                if (!AnySolidOverlap(world, in probe)) return false;
+                if (!AnySolidOverlap(world, in probe, depth, in cfg)) return false;
             }
             return true;
         }
@@ -780,9 +918,12 @@ namespace GulagRunners.Sim
             bool found = false;
             Fix bestTop = Fix.Zero;
 
+            Fix halfZ = cfg.BodyDepth / 2;
+
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
+                if (!world.SolidSpan(i).Reaches(s.Depth, halfZ)) continue;
                 Aabb body = new Aabb(targetX - half, s.Position.Y,
                                      targetX + half, s.Position.Y + height);
                 if (!body.Overlaps(in solid)) continue;
@@ -798,7 +939,7 @@ namespace GulagRunners.Sim
                 Fix raised = solid.MaxY + Skin;
                 Aabb raisedBody = new Aabb(targetX - half, raised,
                                            targetX + half, raised + height);
-                if (AnySolidOverlap(world, in raisedBody)) continue;
+                if (AnySolidOverlap(world, in raisedBody, s.Depth, in cfg)) continue;
 
                 bestTop = solid.MaxY;
                 found = true;
@@ -821,6 +962,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
+                if (!world.SolidSpan(i).Reaches(s.Depth, halfZ)) continue;
                 Aabb body = new Aabb(targetX - half, s.Position.Y,
                                      targetX + half, s.Position.Y + height);
                 if (!body.Overlaps(in solid)) continue;
@@ -857,6 +999,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
+                if (!world.SolidSpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
                 if (shaft >= 0 && InShaft(in solid, in world.Ladders[shaft])) continue;
                 Aabb body = new Aabb(s.Position.X - half, targetY, s.Position.X + half, targetY + height);
                 if (!body.Overlaps(in solid)) continue;
@@ -890,6 +1033,7 @@ namespace GulagRunners.Sim
                 for (int i = 0; i < world.OneWay.Length; i++)
                 {
                     Aabb plat = world.OneWay[i];
+                    if (!world.OneWaySpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
                     if (startY + Skin < plat.MaxY) continue;   // we were already below it
 
                     Aabb body = new Aabb(s.Position.X - half, targetY, s.Position.X + half, targetY + height);
@@ -916,7 +1060,7 @@ namespace GulagRunners.Sim
 
             Fix shiftedX = s.Position.X + shift;
             Aabb shifted = new Aabb(shiftedX - half, targetY, shiftedX + half, targetY + height);
-            if (AnySolidOverlap(world, in shifted)) return false;
+            if (AnySolidOverlap(world, in shifted, s.Depth, in cfg)) return false;
 
             s.Position.X = shiftedX;
             return true;
@@ -935,32 +1079,42 @@ namespace GulagRunners.Sim
         static bool InShaft(in Aabb solid, in Aabb ladder) =>
             solid.MinY > ladder.MinY && solid.MinY < ladder.MaxY;
 
-        static bool AnySolidOverlap(SimWorld world, in Aabb box)
+        /// <summary>
+        /// Is anything solid in this box, on this slice of the level. Depth is never moved
+        /// through — it only decides which boxes are here at all, which is what stops the
+        /// backdrop of a location being a wall across the fight.
+        /// </summary>
+        static bool AnySolidOverlap(SimWorld world, in Aabb box, Fix depth, in MoveConfig cfg)
         {
+            Fix half = cfg.BodyDepth / 2;
             for (int i = 0; i < world.Solids.Length; i++)
-                if (box.Overlaps(in world.Solids[i])) return true;
+                if (box.Overlaps(in world.Solids[i]) && world.SolidSpan(i).Reaches(depth, half))
+                    return true;
             return false;
         }
 
         static bool Grounded(ref PlayerSimState s, SimWorld world, in MoveConfig cfg) =>
-            SupportUnder(s.Position.X, s.Position.Y, s.FallThroughTimer, world, in cfg, -1);
+            SupportUnder(s.Position.X, s.Position.Y, s.Depth, s.FallThroughTimer,
+                         world, in cfg, -1);
 
         static bool Grounded(ref PlayerSimState s, SimWorld world, in MoveConfig cfg, int shaft) =>
-            SupportUnder(s.Position.X, s.Position.Y, s.FallThroughTimer, world, in cfg, shaft);
+            SupportUnder(s.Position.X, s.Position.Y, s.Depth, s.FallThroughTimer,
+                         world, in cfg, shaft);
 
         /// <summary>
         /// Whether a footprint placed at this x, with its feet at this y, has something to stand
         /// on. Grounded is this question asked about where the body actually is; the ladder grab
         /// asks it about where the body is about to be, which is why it is a free function.
         /// </summary>
-        static bool SupportUnder(Fix x, Fix y, int fallThroughTimer, SimWorld world,
+        static bool SupportUnder(Fix x, Fix y, Fix depth, int fallThroughTimer, SimWorld world,
                                  in MoveConfig cfg) =>
-            SupportUnder(x, y, fallThroughTimer, world, in cfg, -1);
+            SupportUnder(x, y, depth, fallThroughTimer, world, in cfg, -1);
 
-        static bool SupportUnder(Fix x, Fix y, int fallThroughTimer, SimWorld world,
+        static bool SupportUnder(Fix x, Fix y, Fix depth, int fallThroughTimer, SimWorld world,
                                  in MoveConfig cfg, int shaft)
         {
             Fix half = cfg.BodyWidth / 2;
+            Fix halfZ = cfg.BodyDepth / 2;
             Aabb feet = new Aabb(x - half + Skin, y - GroundProbe, x + half - Skin, y);
 
             // Inside a ladder's shaft the floor it runs through is not floor: it is the hole.
@@ -971,16 +1125,18 @@ namespace GulagRunners.Sim
                 for (int i = 0; i < world.Solids.Length; i++)
                 {
                     if (InShaft(in world.Solids[i], in world.Ladders[shaft])) continue;
-                    if (feet.Overlaps(in world.Solids[i])) return true;
+                    if (feet.Overlaps(in world.Solids[i]) &&
+                        world.SolidSpan(i).Reaches(depth, halfZ)) return true;
                 }
             }
-            else if (AnySolidOverlap(world, in feet)) return true;
+            else if (AnySolidOverlap(world, in feet, depth, in cfg)) return true;
 
             if (fallThroughTimer == 0)
             {
                 for (int i = 0; i < world.OneWay.Length; i++)
                 {
                     Aabb plat = world.OneWay[i];
+                    if (!world.OneWaySpan(i).Reaches(depth, halfZ)) continue;
                     if (y + Skin < plat.MaxY) continue;
                     if (feet.Overlaps(in plat)) return true;
                 }
@@ -994,12 +1150,13 @@ namespace GulagRunners.Sim
         /// through anything. One box covering both ends is enough: the world is axis-aligned, so
         /// anything in the way of a straight sideways slide is inside that box.
         /// </summary>
-        static bool SweepFree(Fix fromX, Fix toX, Fix y, SimWorld world, in MoveConfig cfg)
+        static bool SweepFree(Fix fromX, Fix toX, Fix y, Fix depth, SimWorld world,
+                              in MoveConfig cfg)
         {
             Fix half = cfg.BodyWidth / 2;
             Aabb swept = new Aabb(Fix.Min(fromX, toX) - half, y + Skin,
                                   Fix.Max(fromX, toX) + half, y + cfg.BodyHeight);
-            return !AnySolidOverlap(world, in swept);
+            return !AnySolidOverlap(world, in swept, depth, in cfg);
         }
 
         static bool StandingOnOneWayOnly(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
@@ -1008,7 +1165,7 @@ namespace GulagRunners.Sim
             Aabb feet = new Aabb(s.Position.X - half + Skin, s.Position.Y - GroundProbe,
                                  s.Position.X + half - Skin, s.Position.Y);
 
-            if (AnySolidOverlap(world, in feet)) return false;
+            if (AnySolidOverlap(world, in feet, s.Depth, in cfg)) return false;
 
             for (int i = 0; i < world.OneWay.Length; i++)
                 if (feet.Overlaps(in world.OneWay[i])) return true;
@@ -1043,6 +1200,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
+                if (!world.SolidSpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
                 if (!body.Overlaps(in solid)) continue;
                 if (!inside || solid.MaxY > top) { top = solid.MaxY; stuckIn = solid; }
                 inside = true;
@@ -1055,7 +1213,8 @@ namespace GulagRunners.Sim
             Fix raised = top + Skin;
             Aabb standing = new Aabb(s.Position.X - half, raised,
                                      s.Position.X + half, raised + cfg.BodyHeight);
-            if (AnySolidOverlap(world, in standing)) return true;   // stuck, and we said so
+            if (AnySolidOverlap(world, in standing, s.Depth, in cfg))
+                return true;                                   // stuck, and we said so
 
             s.Position.Y = raised;
             s.Velocity = FixVec2.Zero;
@@ -1063,9 +1222,15 @@ namespace GulagRunners.Sim
         }
 
         public static bool TryFindGroundBelow(FixVec2 feet, SimWorld world, in MoveConfig cfg,
-                                              Fix maxDistance, out Fix groundY)
+                                              Fix maxDistance, out Fix groundY) =>
+            TryFindGroundBelow(feet, Fix.Zero, world, in cfg, maxDistance, out groundY, false);
+
+        public static bool TryFindGroundBelow(FixVec2 feet, Fix depth, SimWorld world,
+                                              in MoveConfig cfg, Fix maxDistance,
+                                              out Fix groundY, bool byDepth)
         {
             Fix half = cfg.BodyWidth / 2;
+            Fix halfZ = cfg.BodyDepth / 2;
             Fix lowest = feet.Y - maxDistance;
             bool found = false;
             groundY = feet.Y;
@@ -1073,6 +1238,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
+                if (byDepth && !world.SolidSpan(i).Reaches(depth, halfZ)) continue;
                 if (solid.MaxX <= feet.X - half || solid.MinX >= feet.X + half) continue;
                 if (solid.MaxY > feet.Y + Skin) continue;      // above the feet
                 if (solid.MaxY < lowest) continue;             // too far down
@@ -1092,7 +1258,7 @@ namespace GulagRunners.Sim
             Fix half = cfg.BodyWidth / 2;
             Aabb standing = new Aabb(s.Position.X - half, s.Position.Y,
                                      s.Position.X + half, s.Position.Y + cfg.BodyHeight);
-            return !AnySolidOverlap(world, in standing);
+            return !AnySolidOverlap(world, in standing, s.Depth, in cfg);
         }
     }
 }

@@ -11,11 +11,20 @@ namespace GulagRunners.Sim
         /// <summary>Walls, floors and ceilings. Block from every direction.</summary>
         public Aabb[] Solids = System.Array.Empty<Aabb>();
 
+        /// <summary>
+        /// How deep each solid reaches, parallel to Solids. Empty means a world with no depth
+        /// at all, where everything is on every slice — which is exactly the greybox, and the
+        /// reason none of this changes it.
+        /// </summary>
+        public Span[] SolidZ = System.Array.Empty<Span>();
+
         /// <summary>Platforms you can jump up through and drop down from.</summary>
         public Aabb[] OneWay = System.Array.Empty<Aabb>();
+        public Span[] OneWayZ = System.Array.Empty<Span>();
 
         /// <summary>Ladders and hatches: the connections between floors (docs/05).</summary>
         public Aabb[] Ladders = System.Array.Empty<Aabb>();
+        public Span[] LadderZ = System.Array.Empty<Span>();
 
         /// <summary>
         /// Chests, in the order the scene lists them. The order is part of the world: a round's
@@ -23,11 +32,15 @@ namespace GulagRunners.Sim
         /// </summary>
         public ChestDef[] Chests = System.Array.Empty<ChestDef>();
 
-        /// <summary>Index of the ladder the box touches, or -1.</summary>
-        public int FindLadder(in Aabb body)
+        public Span SolidSpan(int i) => i < SolidZ.Length ? SolidZ[i] : Span.Everywhere;
+        public Span OneWaySpan(int i) => i < OneWayZ.Length ? OneWayZ[i] : Span.Everywhere;
+        public Span LadderSpan(int i) => i < LadderZ.Length ? LadderZ[i] : Span.Everywhere;
+
+        /// <summary>Index of the ladder the box touches on this slice of the level, or -1.</summary>
+        public int FindLadder(in Aabb body, Fix depth, Fix half)
         {
             for (int i = 0; i < Ladders.Length; i++)
-                if (body.Overlaps(in Ladders[i])) return i;
+                if (body.Overlaps(in Ladders[i]) && LadderSpan(i).Reaches(depth, half)) return i;
             return -1;
         }
 

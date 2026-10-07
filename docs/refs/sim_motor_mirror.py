@@ -19,6 +19,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SSPD=M(2400), SMINF=10, SMAXF=30, LREGRAB=12,
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
+         BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
          CORNER=M(250), FALLTHRU=18,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
@@ -36,6 +37,7 @@ class S:
         s.stam = C["SMAX"]; s.stam_t = 0; s.ladder = -1; s.noise = 0
         # loot (LootMotor): three slots, the chest claim, and the per-tick outputs
         s.landed_speed = 0
+        s.depth = 0
         s.inv = None; s.opening = -1; s.picked = 0; s.opened_chest = -1
         s.dropped = 0; s.standing_on = -1; s.action_held = False
         # combat (CombatMotor)
@@ -63,35 +65,58 @@ def in_shaft(sol, lad):
     rather than the floor it stands on. The tell is the solid's underside."""
     return lad[1] < sol[1] < lad[3]
 
-def any_solid(w, box):
-    return any(overlaps(box, s) for s in w["solid"])
+def span(w, kind, i):
+    """How deep this box reaches. A world with no depths at all is a world where every box
+    is on every slice, which is exactly the greybox — and why none of this changes it."""
+    z = w.get(kind + "z")
+    return z[i] if z and i < len(z) else None
 
-def support_under(x, y, fallthru, w, shaft=-1):
+
+def reaches(sp, depth, half):
+    return sp is None or (depth + half > sp[0] and depth - half < sp[1])
+
+
+def nearest_in(sp, depth, inset):
+    room = (sp[1] - sp[0]) // 2
+    inset = min(inset, room)
+    lo, hi = sp[0] + inset, sp[1] - inset
+    return lo if depth < lo else (hi if depth > hi else depth)
+
+
+def any_solid(w, box, depth=None):
+    half = C["BODYZ"] // 2
+    return any(overlaps(box, sol) and (depth is None or reaches(span(w, "solid", i), depth, half))
+               for i, sol in enumerate(w["solid"]))
+
+def support_under(x, y, fallthru, w, shaft=-1, depth=None):
     half = C["W"] // 2
+    halfz = C["BODYZ"] // 2
     feet = (x - half + SKIN, y - GROUND_PROBE, x + half - SKIN, y)
     # Inside a ladder's shaft the floor it runs through is the hole, not the floor.
     if shaft >= 0:
-        if any(overlaps(feet, sol) for sol in w["solid"]
-               if not in_shaft(sol, w["ladder"][shaft])): return True
-    elif any_solid(w, feet): return True
+        if any(overlaps(feet, sol) for i, sol in enumerate(w["solid"])
+               if not in_shaft(sol, w["ladder"][shaft])
+               and (depth is None or reaches(span(w, "solid", i), depth, halfz))): return True
+    elif any_solid(w, feet, depth): return True
     if fallthru == 0:
-        for p in w["oneway"]:
+        for i, p in enumerate(w["oneway"]):
+            if depth is not None and not reaches(span(w, "oneway", i), depth, halfz): continue
             if y + SKIN < p[3]: continue
             if overlaps(feet, p): return True
     return False
 
 def grounded(s, w, shaft=-1):
-    return support_under(s.x, s.y, s.fallthru, w, shaft)
+    return support_under(s.x, s.y, s.fallthru, w, shaft, s.depth)
 
-def sweep_free(from_x, to_x, y, w):
+def sweep_free(from_x, to_x, y, w, depth=None):
     half = C["W"] // 2
     swept = (min(from_x, to_x) - half, y + SKIN, max(from_x, to_x) + half, y + C["H"])
-    return not any_solid(w, swept)
+    return not any_solid(w, swept, depth)
 
 def on_oneway_only(s, w):
     half = C["W"] // 2
     feet = (s.x - half + SKIN, s.y - GROUND_PROBE, s.x + half - SKIN, s.y)
-    if any_solid(w, feet): return False
+    if any_solid(w, feet, s.depth): return False
     return any(overlaps(feet, p) for p in w["oneway"])
 
 def move_x(s, dx, w):
@@ -105,7 +130,9 @@ def move_x(s, dx, w):
     limit = max(C["CLAMBER"], C["STEP"])
 
     best = None
-    for sol in w["solid"]:
+    halfz = C["BODYZ"] // 2
+    for i, sol in enumerate(w["solid"]):
+        if not reaches(span(w, "solid", i), s.depth, halfz): continue
         b = (tx - half, s.y, tx + half, s.y + h)
         if not overlaps(b, sol): continue
         step = sol[3] - s.y
@@ -113,7 +140,7 @@ def move_x(s, dx, w):
         if step > C["STEP"] and s.mode != "ground": continue
         if best is not None and sol[3] <= best: continue
         raised = sol[3] + SKIN
-        if any_solid(w, (tx - half, raised, tx + half, raised + h)): continue
+        if any_solid(w, (tx - half, raised, tx + half, raised + h), s.depth): continue
         best = sol[3]
 
     if best is not None:
@@ -124,7 +151,8 @@ def move_x(s, dx, w):
             s.vx = (s.vx * C["CLAMBER_SPD"]) // 1000
         return
 
-    for sol in w["solid"]:
+    for i, sol in enumerate(w["solid"]):
+        if not reaches(span(w, "solid", i), s.depth, halfz): continue
         b = (tx - half, s.y, tx + half, s.y + h)
         if not overlaps(b, sol): continue
         tx = sol[0] - half - SKIN if dx > 0 else sol[2] + half + SKIN
@@ -137,7 +165,8 @@ def move_y(s, dy, w, shaft=-1):
     h = C["CH"] if s.crouch else C["H"]
     start = s.y
     ty = s.y + dy
-    for sol in w["solid"]:
+    for i, sol in enumerate(w["solid"]):
+        if not reaches(span(w, "solid", i), s.depth, C["BODYZ"] // 2): continue
         # A ladder is its own shaft: everything it passes through is the hole it climbs.
         if shaft >= 0 and in_shaft(sol, w["ladder"][shaft]): continue
         b = (s.x - half, ty, s.x + half, ty + h)
@@ -150,7 +179,7 @@ def move_y(s, dy, w, shaft=-1):
             elif 0 < orl <= C["CORNER"]: shift = orl + SKIN
             if shift is not None:
                 nx = s.x + shift
-                if not any_solid(w, (nx - half, ty, nx + half, ty + h)):
+                if not any_solid(w, (nx - half, ty, nx + half, ty + h), s.depth):
                     s.x = nx
                     continue
             ty = sol[1] - h - SKIN
@@ -159,7 +188,8 @@ def move_y(s, dy, w, shaft=-1):
             ty = sol[3] + SKIN
         s.vy = 0
     if dy < 0 and s.fallthru == 0:
-        for p in w["oneway"]:
+        for i, p in enumerate(w["oneway"]):
+            if not reaches(span(w, "oneway", i), s.depth, C["BODYZ"] // 2): continue
             if start + SKIN < p[3]: continue
             if not overlaps((s.x - half, ty, s.x + half, ty + h), p): continue
             ty = p[3] + SKIN
@@ -171,6 +201,79 @@ def move_towards(cur, tgt, md):
     return tgt if abs(d) <= md else cur + (md if d > 0 else -md)
 
 def step(s, inp, w):
+    step_flat(s, inp, w)
+    update_depth(s, w)
+
+
+def update_depth(s, w):
+    """Which slice of the level the body is on. A ladder wins, then whatever is just ahead
+    and low enough to step onto, then the floor underfoot — which only moves you if it does
+    not already hold you. Climbing is therefore a move away from the camera and coming down
+    is a move towards it, worked out from the level rather than from a button."""
+    if C["DEPTHSPD"] <= 0 or not w.get("solidz"):
+        return
+    inset = C["BODYZ"] // 2
+    if 0 <= s.ladder < len(w["ladder"]):
+        want = nearest_in(span(w, "ladder", s.ladder), s.depth, inset)
+    elif s.mode != "ground":
+        return
+    else:
+        want = lane_ahead(s, w)
+        if want is None:
+            want = floor_lane(s, w)
+        if want is None:
+            return
+    s.depth = move_towards(s.depth, want, mul(C["DEPTHSPD"], DT))
+
+
+def lane_ahead(s, w):
+    if C["LOOKAHEAD"] <= 0: return None
+    half = C["W"] // 2
+    limit = max(C["CLAMBER"], C["STEP"])
+    frm = s.x + half if s.facing > 0 else s.x - half - C["LOOKAHEAD"]
+    to = s.x + half + C["LOOKAHEAD"] if s.facing > 0 else s.x - half
+    best = None; near = 0
+    for i, sol in enumerate(w["solid"]):
+        if sol[2] <= frm or sol[0] >= to: continue
+        step_h = sol[3] - s.y
+        if step_h <= 0 or step_h > limit: continue
+        # Strictly ahead: a box whose X already surrounds the body is not somewhere it is
+        # going, and the wall at the back runs the length of the arena.
+        gap = sol[0] - (s.x + half) if s.facing > 0 else (s.x - half) - sol[2]
+        if gap < 0: continue
+        if best is not None and gap >= near: continue
+        want = nearest_in(span(w, "solid", i), s.depth, C["BODYZ"] // 2)
+        if abs(want - s.depth) > C["LANEREACH"]: continue
+        near = gap
+        best = want
+    # A ladder counts as somewhere you are going too: this location's ladders stand a metre
+    # in front of the floor they rise from.
+    for i, l in enumerate(w["ladder"]):
+        if l[2] <= frm or l[0] >= to: continue
+        if l[3] <= s.y or l[1] > s.y + C["H"]: continue
+        gap = max(0, l[0] - (s.x + half) if s.facing > 0 else (s.x - half) - l[2])
+        if best is not None and gap >= near: continue
+        want = nearest_in(span(w, "ladder", i), s.depth, C["BODYZ"] // 2)
+        if abs(want - s.depth) > C["LANEREACH"]: continue
+        near = gap
+        best = want
+    return best
+
+
+def floor_lane(s, w):
+    half = C["W"] // 2; halfz = C["BODYZ"] // 2
+    feet = (s.x - half + SKIN, s.y - GROUND_PROBE, s.x + half - SKIN, s.y)
+    best = None; top = 0
+    for i, sol in enumerate(w["solid"]):
+        if not overlaps(feet, sol): continue
+        if not reaches(span(w, "solid", i), s.depth, halfz): continue
+        if best is not None and sol[3] <= top: continue
+        top = sol[3]
+        best = nearest_in(span(w, "solid", i), s.depth, halfz)
+    return best
+
+
+def step_flat(s, inp, w):
     s.noise = 0
     for a in ("coyote", "buf", "dodge_rec", "fallthru", "stepn", "ladder_cd"):
         if getattr(s, a) > 0: setattr(s, a, getattr(s, a) - 1)
@@ -214,7 +317,7 @@ def step(s, inp, w):
     want_crouch = g and wy < 0
     if s.crouch and not want_crouch:
         stand = (s.x - C["W"]//2, s.y, s.x + C["W"]//2, s.y + C["H"])
-        if any_solid(w, stand): want_crouch = True
+        if any_solid(w, stand, s.depth): want_crouch = True
     s.crouch = want_crouch
 
     if g and wy < 0 and s.buf > 0 and on_oneway_only(s, w):
@@ -264,8 +367,9 @@ def step(s, inp, w):
 
 def ladder_at(s, w):
     b = body(s)
+    half = C["BODYZ"] // 2
     for i, l in enumerate(w["ladder"]):
-        if overlaps(b, l): return i
+        if overlaps(b, l) and reaches(span(w, "ladder", i), s.depth, half): return i
     return -1
 
 def frames_for(dist):
@@ -279,6 +383,7 @@ def ladder_under_feet(s, w):
     under them. This is how you get onto a ladder that has no hatch beside it."""
     half = C["W"]//2; reach = C["H"]//2
     for i, l in enumerate(w["ladder"]):
+        if not reaches(span(w, "ladder", i), s.depth, C["BODYZ"] // 2): continue
         if l[0] >= s.x+half or l[2] <= s.x-half: continue
         drop = s.y - l[3]
         if drop < -SKIN or drop > reach: continue
@@ -288,7 +393,7 @@ def ladder_under_feet(s, w):
 def try_mount(s, wy, w):
     if not wy: return False
     if s.ladder_cd > 0: return False
-    if s.crouch and any_solid(w, (s.x - C["W"]//2, s.y, s.x + C["W"]//2, s.y + C["H"])):
+    if s.crouch and any_solid(w, (s.x - C["W"]//2, s.y, s.x + C["W"]//2, s.y + C["H"]), s.depth):
         return False
     i = ladder_at(s, w)
     # Standing on top of a ladder whose rungs start just under the feet: stepping over the
@@ -304,9 +409,10 @@ def try_mount(s, wy, w):
         if s.y >= box[3] - C["LTOP"] - C["H"]//4: return False
     else:
         if s.mode == "ground" and box[1] >= s.y and not stepping_on: return False
-        if not stepping_on and support_under(centre, s.y, s.fallthru, w): return False
+        if not stepping_on and support_under(centre, s.y, s.fallthru, w, -1, s.depth):
+            return False
 
-    target = centre if sweep_free(s.x, centre, s.y, w) else s.x
+    target = centre if sweep_free(s.x, centre, s.y, w, s.depth) else s.x
     target_y = box[3] - C["LTOP"] if stepping_on else s.y
     frames = frames_for(max(abs(target - s.x), abs(target_y - s.y)))
 
@@ -346,19 +452,19 @@ def step_scripted(s, w):
     s.x = s.script_from[0] + mul(s.script_to[0]-s.script_from[0], xT)
     s.y = s.script_from[1] + mul(s.script_to[1]-s.script_from[1], yT)
 
-def supported(x, g, w):
+def supported(x, g, w, depth=None):
     half=C["W"]//2
     for k in (-1,0,1):
         px=x+half*k
-        if not any_solid(w,(px-SKIN*4, g-GROUND_PROBE, px+SKIN*4, g-SKIN)): return False
+        if not any_solid(w,(px-SKIN*4, g-GROUND_PROBE, px+SKIN*4, g-SKIN), depth): return False
     return True
 
-def floor_run(frm, d, w):
+def floor_run(frm, d, w, depth=None):
     step=M(200); reached=0
     for i in range(1,26):
         x=frm[0]+step*(i*d)
-        g=ground_below(x, frm[1]+C["H"], C["H"]*2, w)
-        if g is None or not supported(x,g,w): break
+        g=ground_below(x, frm[1]+C["H"], C["H"]*2, w, depth)
+        if g is None or not supported(x,g,w,depth): break
         reached=step*i
     return reached
 
@@ -366,11 +472,11 @@ def find_landing(s, side, w):
     half=C["W"]//2; step=M(100); steps=C["MREACH"]//step
     for i in range(1,steps+1):
         x=s.x+step*(i*side)
-        g=ground_below(x, s.y+C["H"], C["H"]*2, w)
+        g=ground_below(x, s.y+C["H"], C["H"]*2, w, s.depth)
         if g is None: continue
         if g < s.y - C["LTOP"]*4: continue
-        if any_solid(w,(x-half, g+SKIN, x+half, g+C["H"])): continue
-        if not supported(x,g,w): continue
+        if any_solid(w,(x-half, g+SKIN, x+half, g+C["H"]), s.depth): continue
+        if not supported(x,g,w,s.depth): continue
         return (x, g+SKIN)
     return None
 
@@ -386,8 +492,8 @@ def step_out(s, ladder, w):
         if l[3] < sol[1] or l[3] > sol[3] + C["LTOP"]: continue
         if top is None or sol[3] > top: top = sol[3]
     if top is None: return None
-    if any_solid(w, (s.x-half, top+SKIN, s.x+half, top+C["H"])): return None
-    if not supported(s.x, top, w): return None
+    if any_solid(w, (s.x-half, top+SKIN, s.x+half, top+C["H"]), s.depth): return None
+    if not supported(s.x, top, w, s.depth): return None
     return (s.x, top+SKIN)
 
 def start_scripted(s, landing, side):
@@ -410,14 +516,16 @@ def try_mantle(s, prefer, ladder, w):
     elif prefer<0 and l: side=-1
     elif l is None: side=1
     elif r is None: side=-1
-    else: side = 1 if floor_run(r,1,w) >= floor_run(l,-1,w) else -1
+    else: side = 1 if floor_run(r,1,w,s.depth) >= floor_run(l,-1,w,s.depth) else -1
     start_scripted(s, r if side>0 else l, side)
     return True
 
-def ground_below(x, y, maxd, w):
+def ground_below(x, y, maxd, w, depth=None):
     half = C["W"]//2
+    halfz = C["BODYZ"]//2
     best = None
-    for sol in w["solid"]:
+    for i, sol in enumerate(w["solid"]):
+        if depth is not None and not reaches(span(w, "solid", i), depth, halfz): continue
         if sol[2] <= x-half or sol[0] >= x+half: continue
         if sol[3] > y + SKIN: continue
         if sol[3] < y - maxd: continue
@@ -434,7 +542,7 @@ def climb(s, wx, wy, w):
     centre = l[0] + (l[2]-l[0])//2
     if not wx:
         want = move_towards(s.x, centre, mul(C["LSNAP"], DT))
-        if sweep_free(s.x, want, s.y, w): s.x = want
+        if sweep_free(s.x, want, s.y, w, s.depth): s.x = want
     s.vx = 0
     s.vy = C["CUP"] if wy > 0 else (-C["CDN"] if wy < 0 else 0)
     move_y(s, mul(s.vy, DT), w, s.ladder)

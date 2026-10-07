@@ -82,6 +82,19 @@ namespace GulagRunners.Game
                  "walkable-into.")]
         public bool ladderCutsHatch;
 
+        [Header("Slopes")]
+        [Tooltip("Step width when a tilted box is turned into a staircase, in metres.\n\n" +
+                 "An AABB world has no slopes. A plank leaning against a platform bakes as its " +
+                 "bounding box, which is a wall nobody can climb and a lip sticking out of the " +
+                 "level — so instead it is cut into steps that follow its top edge. 0.3 m of " +
+                 "run on a one-in-four slope is 0.08 m of rise, well under the free step, so a " +
+                 "ramp is walked up rather than climbed. 0 bakes the bounding box.")]
+        public float slopeStep = 0.3f;
+
+        [Tooltip("How far a box's top edge has to rise across its own width before it counts " +
+                 "as a slope rather than a box, in metres.")]
+        public float slopeMinRise = 0.12f;
+
         [Tooltip("Extra clearance either side of the hatch, in metres.")]
         public float hatchMargin = 0.1f;
 
@@ -168,6 +181,9 @@ namespace GulagRunners.Game
             List<Aabb> solids = new List<Aabb>();
             List<Aabb> oneWay = new List<Aabb>();
             List<Aabb> ladders = new List<Aabb>();
+            List<Span> solidZ = new List<Span>();
+            List<Span> oneWayZ = new List<Span>();
+            List<Span> ladderZ = new List<Span>();
             List<ChestDef> chests = new List<ChestDef>();
 
             _gizmoSolid.Clear();
@@ -177,7 +193,7 @@ namespace GulagRunners.Game
             _chestSources.Clear();
             _ladderDepth.Clear();
 
-            int roots = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0, markedOffPlane = 0,
+            int roots = 0, slopes = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0, markedOffPlane = 0,
                 chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
             int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
@@ -222,8 +238,17 @@ namespace GulagRunners.Game
                         continue;
                     }
 
-                    Add(c.kind, new Rect(mb.min.x, mb.min.y, mb.size.x, mb.size.y),
-                        solids, oneWay, ladders, mb.center.z);
+                    Span mz = new Span(ToFix(mb.min.z), ToFix(mb.max.z));
+                    int before = solids.Count;
+                    if (c.kind == SimColliderKind.Solid &&
+                        TrySlope(c.transform, c.GetComponent<Collider>(), solids))
+                        slopes++;
+                    else
+                        Add(c.kind, new Rect(mb.min.x, mb.min.y, mb.size.x, mb.size.y),
+                            solids, oneWay, ladders, mb.center.z);
+                    Fill(solidZ, solids.Count, mz);
+                    Fill(oneWayZ, oneWay.Count, mz);
+                    Fill(ladderZ, ladders.Count, mz);
                 }
 
                 // 2. Chests. Collected before the ordinary colliders so that a chest's own
@@ -281,8 +306,15 @@ namespace GulagRunners.Game
                     else if ((solidLayers.value & layerBit) != 0) kind = SimColliderKind.Solid;
                     else { skippedLayer++; continue; }
 
-                    Add(kind, new Rect(cb.min.x, cb.min.y, cb.size.x, cb.size.y),
-                        solids, oneWay, ladders, cb.center.z);
+                    Span cz = new Span(ToFix(cb.min.z), ToFix(cb.max.z));
+                    if (kind == SimColliderKind.Solid && TrySlope(col.transform, col, solids))
+                        slopes++;
+                    else
+                        Add(kind, new Rect(cb.min.x, cb.min.y, cb.size.x, cb.size.y),
+                            solids, oneWay, ladders, cb.center.z);
+                    Fill(solidZ, solids.Count, cz);
+                    Fill(oneWayZ, oneWay.Count, cz);
+                    Fill(ladderZ, ladders.Count, cz);
                 }
             }
 
@@ -290,16 +322,29 @@ namespace GulagRunners.Game
             // leaves no floor at all. Take the band back rather than start a match nobody can
             // stand up in, and say so with both numbers so it can be put right.
             bool bandTookEverything = solids.Count == 0 && culled.Count > 0;
-            if (bandTookEverything) solids.AddRange(culled);
+            if (bandTookEverything)
+            {
+                solids.AddRange(culled);
+                Fill(solidZ, solids.Count, Span.Everywhere);
+            }
 
             int hatches = ladderCutsHatch ? CutHatches(solids, ladders) : 0;
+
+            // CutHatches rewrites the solid list, so the depths have to be rebuilt against
+            // whatever came out of it rather than assumed to still line up.
+            while (solidZ.Count < solids.Count) solidZ.Add(Span.Everywhere);
+            if (solidZ.Count > solids.Count) solidZ.RemoveRange(solids.Count,
+                                                                solidZ.Count - solids.Count);
 
             World = new SimWorld
             {
                 Solids = solids.ToArray(),
                 OneWay = oneWay.ToArray(),
                 Ladders = ladders.ToArray(),
-                Chests = chests.ToArray()
+                Chests = chests.ToArray(),
+                SolidZ = solidZ.ToArray(),
+                OneWayZ = oneWayZ.ToArray(),
+                LadderZ = ladderZ.ToArray()
             };
             ChestSources = _chestSources.ToArray();
             LadderDepths = _ladderDepth.ToArray();
@@ -314,6 +359,7 @@ namespace GulagRunners.Game
                 $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid " +
                 $"({hatches} cut by ladders), " +
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
+                $"{slopes} slope(s) cut into steps, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
 
             if (markedSeen > 0 && markedSkipped == markedSeen)
@@ -350,6 +396,85 @@ namespace GulagRunners.Game
             }
 
             return World;
+        }
+
+        static Fix ToFix(float metres) => Fix.FromMilli(Mathf.RoundToInt(metres * 1000f));
+
+        /// <summary>Gives every box added since the last call the depth it was modelled at.</summary>
+        static void Fill(List<Span> depths, int upTo, Span z)
+        {
+            while (depths.Count < upTo) depths.Add(z);
+        }
+
+        static readonly Vector2[] _corners = new Vector2[8];
+
+        /// <summary>
+        /// Cuts a tilted box into a staircase that follows its top edge, and says whether it
+        /// did. An AABB world has no slopes; a plank leaning against a platform would otherwise
+        /// bake as its bounding box, which is a wall nobody can climb.
+        /// </summary>
+        bool TrySlope(Transform t, Collider col, List<Aabb> solids)
+        {
+            if (slopeStep <= 0.01f) return false;
+
+            Vector3 centre = Vector3.zero, size = Vector3.one;
+            if (col is BoxCollider box) { centre = box.center; size = box.size; }
+            else if (col != null) return false;          // only a box has corners worth cutting
+
+            Vector3 e = size * 0.5f;
+            int n = 0;
+            for (int i = -1; i <= 1; i += 2)
+            for (int j = -1; j <= 1; j += 2)
+            for (int k = -1; k <= 1; k += 2)
+            {
+                Vector3 w = t.TransformPoint(centre + new Vector3(e.x * i, e.y * j, e.z * k));
+                _corners[n++] = new Vector2(w.x, w.y);
+            }
+
+            float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue;
+            for (int i = 0; i < 8; i++)
+            {
+                if (_corners[i].x < minX) minX = _corners[i].x;
+                if (_corners[i].x > maxX) maxX = _corners[i].x;
+                if (_corners[i].y < minY) minY = _corners[i].y;
+            }
+            if (maxX - minX < slopeStep) return false;
+
+            float riseL = TopAt(minX), riseR = TopAt(maxX);
+            if (Mathf.Abs(riseL - riseR) < slopeMinRise) return false;   // flat enough to be a box
+
+            int steps = Mathf.Clamp(Mathf.CeilToInt((maxX - minX) / slopeStep), 1, 64);
+            float run = (maxX - minX) / steps;
+            for (int i = 0; i < steps; i++)
+            {
+                float a = minX + run * i, b = a + run;
+                float top = Mathf.Max(TopAt(a), TopAt(b));
+                for (int c = 0; c < 8; c++)
+                    if (_corners[c].x >= a && _corners[c].x <= b && _corners[c].y > top)
+                        top = _corners[c].y;
+                if (top - minY <= 0.001f) continue;
+
+                Rect r = new Rect(a, minY, b - a, top - minY);
+                solids.Add(SimCollider.RectToAabb(r));
+                _gizmoSolid.Add(r);
+            }
+            return true;
+        }
+
+        /// <summary>The highest the silhouette reaches at this x. Convex, so a scan is exact.</summary>
+        static float TopAt(float x)
+        {
+            float top = float.MinValue;
+            for (int i = 0; i < 8; i++)
+            for (int j = i + 1; j < 8; j++)
+            {
+                Vector2 p = _corners[i], q = _corners[j];
+                if (p.x == q.x) continue;
+                if (x < Mathf.Min(p.x, q.x) || x > Mathf.Max(p.x, q.x)) continue;
+                float y = p.y + (q.y - p.y) * (x - p.x) / (q.x - p.x);
+                if (y > top) top = y;
+            }
+            return top;
         }
 
         /// <summary>

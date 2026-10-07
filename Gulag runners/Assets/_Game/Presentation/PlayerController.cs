@@ -213,6 +213,7 @@ namespace GulagRunners.Game
             }
 
             _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
+            _state.Depth = ToFix(planeZ);
 
             // Never start inside the level. One box marked solid that should not have been —
             // the wall behind a location, say — lands across the floor, the fighter spawns in
@@ -359,7 +360,7 @@ namespace GulagRunners.Game
             Vector2 b = ToVector(_state.Position);
             Vector2 p = Vector2.Lerp(a, b, alpha);
 
-            transform.position = new Vector3(p.x, p.y + visualYOffset, Depth());
+            transform.position = new Vector3(p.x, p.y + visualYOffset, Depth(alpha));
 
             // The visual root keeps whatever local offset it was authored with: a capsule sits
             // centred on this object, while a character model hangs from it by its feet.
@@ -385,13 +386,14 @@ namespace GulagRunners.Game
         /// What depth to draw at this frame: the ladder's while climbing one, the plane's
         /// otherwise, eased between the two so the step out of a climb is a step and not a cut.
         /// </summary>
-        float Depth()
+        float Depth(float alpha)
         {
-            float want = planeZ;
-            int ladder = _state.LadderIndex;
-            if (ladder >= 0 && worldBaker != null &&
-                ladder < worldBaker.LadderDepths.Length)
-                want = worldBaker.LadderDepths[ladder];
+            // The simulation owns this now: which slice of the level a body is on decides
+            // which boxes are in its way, so it cannot be a presentation flourish. All that
+            // is left here is the same interpolation x and y get between ticks.
+            float a = _previous.Depth.ToMilli() / 1000f;
+            float b = _state.Depth.ToMilli() / 1000f;
+            float want = Mathf.Lerp(a, b, alpha);
 
             if (depthSmoothTime <= 0.001f) { _depth = want; return _depth; }
 

@@ -17,6 +17,27 @@ from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD
 W = G.world(report=True)
 CHESTS = G.bake()["chest"]
 SPAWNS = G.spawns()
+
+
+LANE = X(SPAWNS[0][3])
+HALF_Z = T.C["BODYZ"] // 2
+
+
+def here(i, depth=LANE):
+    """Is solid i on this slice of the level. The motor asks this of every box it touches,
+    so a check that does not ask it is measuring a different game."""
+    return T.reaches(T.span(W, "solid", i), depth, HALF_Z)
+
+
+def solids_here(depth=LANE):
+    return [b for i, b in enumerate(W["solid"]) if here(i, depth)]
+
+
+def fighter_at(x, y, depth=None):
+    """A body starts on the slice the scene puts it on, exactly as PlayerController does."""
+    st = S(x, y)
+    st.depth = X(SPAWNS[0][3] if depth is None else depth)
+    return st
 HALF = F(T.C["W"]) / 2
 BODY = F(T.C["H"])
 
@@ -45,7 +66,7 @@ def hold(s, inp, frames):
 def surface_under(x, y):
     """The highest solid top at or below y under a body standing at x."""
     best = None
-    for b in W["solid"]:
+    for b in solids_here():
         if b[0] < X(x + HALF) and b[2] > X(x - HALF) and F(b[3]) <= y + 0.02:
             if best is None or b[3] > best:
                 best = b[3]
@@ -61,7 +82,7 @@ def approach(cx, base, side, reach=2.6):
         if surface_under(x, base + 0.05) is not None and \
                 not any(b[0] < X(x + HALF) and b[2] > X(x - HALF)
                         and b[1] < X(base + BODY) and b[3] > X(base + 0.02)
-                        for b in W["solid"]):
+                        for b in solids_here()):
             return x
         d += step_m
     return None
@@ -73,26 +94,26 @@ check("the arena has a floor", len(W["solid"]) > 20, f"{len(W['solid'])} solid b
 check("both ladders survived the bake", len(W["ladder"]) == 2)
 check("all six chests baked", len(CHESTS) == 6, f"{len(CHESTS)}")
 
-floor = max((b for b in W["solid"] if F(b[3]) < 0.2), key=lambda b: b[2] - b[0])
+floor = max((b for b in solids_here() if F(b[3]) < 0.2), key=lambda b: b[2] - b[0])
 check("the ground floor is unbroken", F(floor[2]) - F(floor[0]) > 30,
       f"x {F(floor[0]):.2f}..{F(floor[2]):.2f}, top y {F(floor[3]):.2f}")
 
 # A ladder standing one centimetre inside its own platform must not punch a hole in it.
 for i, (x, want) in enumerate(((-16.03, 0.95), (12.60, 0.95))):
-    plat = [b for b in W["solid"]
+    plat = [b for b in solids_here()
             if b[0] <= X(x) <= b[2] and abs(F(b[3]) - want) < 0.05]
     check(f"ladder {i} keeps the platform it stands on", plat,
           f"x {x:.2f}: {'solid' if plat else 'HOLE'}")
 
 # Nothing may roof the upper walkway: the handrail sits 0.64 m above it, a fighter is 0.91 m.
-roof = [b for b in W["solid"] if 3.9 < F(b[1]) < 3.83 + BODY and F(b[2]) - F(b[0]) > 5]
+roof = [b for b in solids_here() if 3.9 < F(b[1]) < 3.83 + BODY and F(b[2]) - F(b[0]) > 5]
 check("no ceiling over the upper walkway", not roof,
       f"{len(roof)} long box(es) in the headroom")
 
 # ---------------------------------------------------------------- spawns
 print("\nSpawns")
-for idx, (sx, sy, facing) in enumerate(SPAWNS):
-    s = S(sx, sy)
+for idx, (sx, sy, facing, sz) in enumerate(SPAWNS):
+    s = fighter_at(sx, sy, sz)
     landed = until(s, 0, lambda s: s.mode == "ground", 180)
     surf = surface_under(sx, F(s.y) + 0.1)
     check(f"fighter {idx + 1} lands on the plateau", landed and F(s.y) > 0.9,
@@ -117,10 +138,11 @@ check("a depth band that culls the whole arena takes itself back",
 # a body that starts inside a solid is not pushed out of it — MoveY leaves an overlapping box
 # alone on purpose, or a fighter who clips a floor teleports a storey — so it falls through
 # the world instead, forever.
-for idx, (sx, sy, _) in enumerate(SPAWNS):
-    s = S(sx, sy)
+for idx, (sx, sy, _, sz) in enumerate(SPAWNS):
+    s = fighter_at(sx, sy, sz)
     until(s, 0, lambda s: s.mode == "ground", 180)
-    inside = [b for b in W["solid"] if T.overlaps(T.body(s), b)]
+    inside = [b for i, b in enumerate(W["solid"])
+              if T.overlaps(T.body(s), b) and here(i, s.depth)]
     check(f"fighter {idx + 1} does not spawn inside anything", not inside,
           f"{len(inside)} solid(s) around ({F(s.x):.2f}, {F(s.y):.2f})")
     check(f"fighter {idx + 1} is still on the ground a second later",
@@ -136,9 +158,9 @@ print("\nThe ground floor")
 # The two crate stacks are 2 m tall and the step-up is 0.30 m, so crossing the arena means
 # hopping up and over them. It has to be possible, and it has to cost both fighters the same.
 times = []
-for idx, (sx, sy, _) in enumerate(SPAWNS):
+for idx, (sx, sy, _, _z) in enumerate(SPAWNS):
     target = SPAWNS[1 - idx][0]
-    s = S(sx, sy)
+    s = fighter_at(sx, sy)
     until(s, 0, lambda s: s.mode == "ground", 180)
     inp = R if target > sx else L
     frames = None
@@ -151,8 +173,10 @@ for idx, (sx, sy, _) in enumerate(SPAWNS):
     check(f"fighter {idx + 1} can cross the arena to the other spawn", frames is not None,
           f"{sx:.2f} -> {F(s.x):.2f} in {frames / 60:.1f} s" if frames
           else f"stuck at x {F(s.x):.2f}, y {F(s.y):.2f}")
-check("the crossing costs both fighters the same",
-      all(times) and abs(times[0] - times[1]) < 30,
+# Not exactly equal: the two crate clusters are a few centimetres apart in width and the
+# fighters drift onto slightly different slices crossing them. Within a tenth of the trip.
+check("the crossing costs both fighters about the same",
+      all(times) and abs(times[0] - times[1]) < 60,
       f"{times[0] / 60:.1f} s and {times[1] / 60:.1f} s" if all(times) else "one of them is stuck")
 
 # ---------------------------------------------------------------- ladders
@@ -161,7 +185,7 @@ LADDERS = sorted(W["ladder"], key=lambda b: b[0])
 for idx, lad in enumerate(LADDERS):
     cx = (F(lad[0]) + F(lad[2])) / 2
     base = F(lad[1])
-    s = S(cx + (0.9 if idx == 0 else -0.9), base + 0.2)
+    s = fighter_at(cx + (0.9 if idx == 0 else -0.9), base + 0.2)
     until(s, 0, lambda s: s.mode == "ground", 180)
     check(f"ladder {idx}: a fighter can walk to its foot",
           until(s, L if idx == 0 else R, lambda s: abs(F(s.x) - cx) < 0.35, 300),
@@ -182,7 +206,7 @@ for idx, lad in enumerate(LADDERS):
     check(f"ladder {idx}: climbs out forwards, not sideways",
           abs(F(s.x) - at_top) < 0.2, f"moved {abs(F(s.x) - at_top):.2f} m sideways")
     check(f"ladder {idx}: the walkway it serves has no hole cut in it",
-          any(b[0] <= X(cx) <= b[2] and abs(F(b[3]) - 3.83) < 0.02 for b in W["solid"]),
+          any(b[0] <= X(cx) <= b[2] and abs(F(b[3]) - 3.83) < 0.02 for b in solids_here()),
           f"solid over x {cx:.2f}")
 
     # And back down: standing on the ladder's top, pressing down steps over the edge onto it.
@@ -196,7 +220,7 @@ for idx, lad in enumerate(LADDERS):
 
 # ---------------------------------------------------------------- the walkway gaps
 print("\nThe gaps in the upper walkway")
-tops = sorted((b for b in W["solid"] if abs(F(b[3]) - 3.83) < 0.02), key=lambda b: b[0])
+tops = sorted((b for b in solids_here() if abs(F(b[3]) - 3.83) < 0.02), key=lambda b: b[0])
 
 
 def spanned_by_ladder(a, b):
@@ -219,7 +243,7 @@ check("the upper walkway is in three segments with two gaps", len(gaps) == 2)
 
 def climb_to(target_x, from_x, from_y):
     """Walk and hop from here toward there, the way a player works up a crate stack."""
-    s = S(from_x, from_y)
+    s = fighter_at(from_x, from_y)
     if not until(s, 0, lambda s: s.mode == "ground", 180):
         return None
     toward = R if target_x > from_x else L
@@ -250,31 +274,67 @@ for i, (lo, hi) in enumerate(runs):
 # The crate staircases rise 0.38 to 0.52 m a step, over the free step of 0.30, so before the
 # clamber every one of them needed a jump. They are the slope this location has.
 for name, start, target, toward in (("left", -11.5, -6.4, R), ("right", 7.2, 2.7, L)):
-    s = S(start, 0.4)
+    s = fighter_at(start, 0.4)
     until(s, 0, lambda s: s.mode == "ground", 180)
     base = F(s.y)
     climbed = until(s, toward, lambda s: F(s.y) > 2.4, 900)
     check(f"the {name} crate staircase is walked up without a single jump", climbed,
           f"{base:.2f} -> {F(s.y):.2f} m")
 
-# And it is not a free lift: a wall is still a wall.
-s = S(-13.0, 0.3)
+# The two planks leaning against the plateaus. An AABB world has no slopes, so the bake cuts
+# a tilted box into steps that follow its top edge; the free step then walks them. Before
+# that the plank baked as its bounding box: a 0.89 m wall at the foot of a ramp.
+for name, start, toward, top in (("left", -12.0, L, 0.96), ("right", 8.2, R, 0.96)):
+    s = fighter_at(start, 0.3)
+    until(s, 0, lambda s: s.mode == "ground", 180)
+    base = F(s.y)
+    walked = until(s, toward, lambda s: F(s.y) > top - 0.08, 600)
+    check(f"the {name} plank is walked up without a jump", walked,
+          f"{base:.2f} -> {F(s.y):.2f} m")
+    check(f"and walking up it moves the fighter onto the plank's own slice",
+          -3.2 < F(s.depth) < -2.6, f"depth {F(s.depth):.2f} (the plank is z -3.4..-2.5)")
+
+print("\nDepth: the fight is flat, the building is not")
+# The whole point of the slices. The wall behind the arena and the pillars holding the
+# gallery up are solid, and they are also nowhere near the fighter.
+BEHIND = [i for i, z in enumerate(W["solidz"]) if z[0] / 65536 > -0.3]
+check("the building behind the fight is baked, not thrown away", len(BEHIND) > 5,
+      f"{len(BEHIND)} solid boxes sit behind z -0.3")
+check("and none of them is on the fighters' slice",
+      not any(here(i) for i in BEHIND),
+      f"{sum(1 for i in BEHIND if here(i))} of them reach z {F(LANE):.2f}")
+
+s = fighter_at(-2.0, 0.3)
 until(s, 0, lambda s: s.mode == "ground", 180)
-before = F(s.y)
-until(s, L, lambda s: F(s.y) > before + 0.1, 240)
-check("a clamber does not climb the step up to the plateau", F(s.y) - before < 0.1,
-      f"the 0.83 m step onto the plateau still needs a jump, y {F(s.y):.2f}")
+start_x = F(s.x)
+check("and a fighter walks the whole open floor without hitting any of it",
+      until(s, R, lambda s: F(s.x) > 1.5, 900), f"{start_x:.2f} -> {F(s.x):.2f}")
+
+# Climbing is a move away from the camera, because the ladder stands in front of the floor
+# it rises from and the gallery sits behind both.
+s = fighter_at(-15.5, 1.05)
+until(s, 0, lambda s: s.mode == "ground", 180)
+on_plateau = F(s.depth)
+until(s, L, lambda s: abs(F(s.x) + 16.38) < 0.35, 400)
+at_ladder = F(s.depth)
+check("walking up to a ladder steps onto the ladder's slice",
+      at_ladder < on_plateau - 0.3, f"{on_plateau:.2f} -> {at_ladder:.2f} (ladder z -2.45..-1.73)")
+check("the fighter then reaches it at all",
+      until(s, UP, lambda s: s.mode in ("ladder", "mount"), 90), f"mode {s.mode}")
+check("and rides it to the walkway",
+      until(s, UP, lambda s: s.mode == "ground" and F(s.y) > 3.5, 600),
+      f"({F(s.x):.2f}, {F(s.y):.2f}) depth {F(s.depth):.2f}")
 
 # And the gaps themselves stay gaps: knocked into one, a fighter leaves the upper walkway and
 # has to climb back. Each one has a crate stack under it, so the drop is onto the stairs he
 # came up rather than into nothing.
 for i, (a, b) in enumerate(gaps):
-    s = S((a + b) / 2, 3.9)
+    s = fighter_at((a + b) / 2, 3.9)
     fell = until(s, 0, lambda s: s.mode == "ground", 300)
     check(f"gap {i + 1} ({b - a:.2f} m) puts a fighter back on the crate stack under it",
           fell and 1.9 < F(s.y) < 3.0, f"landed at y {F(s.y):.2f}")
 
-    s = S(a - 3.0, 3.95)
+    s = fighter_at(a - 3.0, 3.95)
     until(s, 0, lambda s: s.mode == "ground", 180)
     until(s, R, lambda s: F(s.x) > a - 0.45, 600)
     step(s, R | JMP, W)
@@ -285,8 +345,8 @@ for i, (a, b) in enumerate(gaps):
 # ---------------------------------------------------------------- the edges
 print("\nThe ends of the arena")
 for idx, (toward, label) in enumerate(((-1, "left"), (1, "right"))):
-    sx, sy, _ = SPAWNS[0 if toward < 0 else 1]
-    s = S(sx, sy)
+    sx, sy, _, _z = SPAWNS[0 if toward < 0 else 1]
+    s = fighter_at(sx, sy)
     until(s, 0, lambda s: s.mode == "ground", 180)
     inp = L if toward < 0 else R
     # walk at it, and keep jumping, which is the honest way a player finds an open edge
@@ -362,7 +422,7 @@ for box, kind, contents, name in CHESTS:
     check(f"{name} stands on a surface", surf is not None and abs(surf - F(box[1])) < 0.05,
           f"base y {F(box[1]):.2f}, surface {surf}")
     # nothing solid may sit inside the reach box, or the fighter cannot get to it
-    blocked = [b for b in W["solid"]
+    blocked = [b for b in solids_here()
                if b[0] < box[2] and b[2] > box[0] and b[1] < box[3] and b[3] > box[1] + X(0.02)]
     check(f"{name} is not buried in scenery", not blocked, f"{len(blocked)} overlapping solid(s)")
     # And a fighter walking along the surface reaches it, from whichever side is clear.
@@ -371,7 +431,7 @@ for box, kind, contents, name in CHESTS:
         start = approach(cx, F(box[1]), side)
         if start is None:
             continue
-        s = S(start, F(box[1]) + 0.12)
+        s = fighter_at(start, F(box[1]) + 0.12)
         if not until(s, 0, lambda s: s.mode == "ground", 180):
             continue
         if until(s, R if side < 0 else L, lambda s: T.overlaps(T.body(s), box), 400):

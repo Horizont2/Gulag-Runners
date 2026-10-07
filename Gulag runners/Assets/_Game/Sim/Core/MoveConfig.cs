@@ -91,6 +91,30 @@ namespace GulagRunners.Sim
         public int StaminaRecoverFrames;
 
         public Fix BodyWidth;
+
+        /// <summary>
+        /// How much of the level's DEPTH a body occupies. The fight is flat, so this is never
+        /// moved through — it only decides which slice of a 3D location a body is standing on,
+        /// and therefore which boxes are in its way. docs/02: the arena is 3D, the fight is not.
+        /// </summary>
+        public Fix BodyDepth;
+
+        /// <summary>How fast a body slides between slices, in m/s. 0 snaps.</summary>
+        public Fix DepthSnapSpeed;
+
+        /// <summary>
+        /// How far ahead to look for the next thing worth standing on, in metres. A body walks
+        /// onto the slice of whatever it is about to climb: that is what lets one floor hold a
+        /// ramp at one depth and a crate staircase at another, and a fighter use both.
+        /// </summary>
+        public Fix LaneLookahead;
+
+        /// <summary>
+        /// The furthest a body will shift in depth to meet something, in metres. Without it a
+        /// fighter is pulled onto the slice of anything they could step onto, including the
+        /// wall at the back of the building, and walks out of the fight into the scenery.
+        /// </summary>
+        public Fix LaneReach;
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
@@ -158,6 +182,10 @@ namespace GulagRunners.Sim
             c.StaminaRecoverFrames  = 72;  // 1.2 s a charge, straight from docs/02
 
             c.BodyWidth   = Fix.FromMilli(600);
+            c.BodyDepth   = Fix.FromMilli(600);
+            c.DepthSnapSpeed = Fix.FromMilli(4000);
+            c.LaneLookahead  = Fix.FromMilli(1200);
+            c.LaneReach      = Fix.FromMilli(2000);
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 

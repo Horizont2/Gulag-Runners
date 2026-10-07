@@ -154,6 +154,13 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix LandedSpeed;
 
+        /// <summary>
+        /// Which slice of the level this body is on, in metres of Z. Simulation state, not
+        /// presentation: it decides which boxes are in the way, so both devices must agree on
+        /// it to the millimetre.
+        /// </summary>
+        public Fix Depth;
+
         public bool Invulnerable => DodgeTimer > 0;
         /// <summary>Unable to act: hit, parried, or dead.</summary>
         public bool Reeling => HitstunTimer > 0 || StaggerTimer > 0 || Dead;

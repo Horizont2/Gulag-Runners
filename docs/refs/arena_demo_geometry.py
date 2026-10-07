@@ -276,6 +276,30 @@ class Scene:
         out.sort(key=lambda r: r[1][2])
         return out
 
+    def corners(self, go):
+        """The eight world corners of this box, as (x, y). A tilted plank's silhouette is not
+        its bounding box, and baking the box is what makes a ramp a wall."""
+        centre = {'x': 0, 'y': 0, 'z': 0}
+        half = [0.5, 0.5, 0.5]
+        for c in self.gos[go]['comps']:
+            cls, body = self.docs.get(c, (0, ''))
+            if cls == 65:
+                centre = _vec(body, 'm_Center', centre)
+                size = _vec(body, 'm_Size', {'x': 1, 'y': 1, 'z': 1})
+                half = [size['x'] / 2, size['y'] / 2, size['z'] / 2]
+                break
+        origin, basis = self.basis(self.tr_of_go[go])
+        out = []
+        for i in (-1, 1):
+            for j in (-1, 1):
+                for k in (-1, 1):
+                    local = [centre['x'] + half[0] * i,
+                             centre['y'] + half[1] * j,
+                             centre['z'] + half[2] * k]
+                    w = _apply(basis, local)
+                    out.append((origin[0] + w[0], origin[1] + w[1]))
+        return out
+
     def trigger(self, go):
         for c in self.gos[go]['comps']:
             cls, body = self.docs.get(c, (0, ''))
@@ -304,6 +328,48 @@ class Scene:
 
 def _aabb(lo, hi):
     return (X(lo[0]), X(lo[1]), X(hi[0]), X(hi[1]))
+
+
+def _top_at(corners, x):
+    """The highest the silhouette reaches at this x. Convex, so a scan over edges is exact."""
+    top = None
+    for i in range(len(corners)):
+        for j in range(i + 1, len(corners)):
+            px, py = corners[i]
+            qx, qy = corners[j]
+            if px == qx or x < min(px, qx) or x > max(px, qx):
+                continue
+            y = py + (qy - py) * (x - px) / (qx - px)
+            if top is None or y > top:
+                top = y
+    return top
+
+
+def slope_steps(corners, step, min_rise):
+    """A tilted box cut into a staircase that follows its top edge, or None if it is a box."""
+    if step <= 0.01:
+        return None
+    xs = [c[0] for c in corners]
+    lo_x, hi_x, lo_y = min(xs), max(xs), min(c[1] for c in corners)
+    if hi_x - lo_x < step:
+        return None
+    if abs(_top_at(corners, lo_x) - _top_at(corners, hi_x)) < min_rise:
+        return None
+
+    count = max(1, min(64, int(math.ceil((hi_x - lo_x) / step))))
+    run = (hi_x - lo_x) / count
+    out = []
+    for i in range(count):
+        a = lo_x + run * i
+        b = a + run
+        top = max(_top_at(corners, a), _top_at(corners, b))
+        for cx, cy in corners:
+            if a <= cx <= b and cy > top:
+                top = cy
+        if top - lo_y <= 0.001:
+            continue
+        out.append(((a, lo_y, 0.0), (b, top, 0.0)))
+    return out or None
 
 
 def cut_hatches(solids, ladders, margin, min_overlap):
@@ -349,7 +415,15 @@ def bake(scene=None, report=False):
     min_overlap = _field(baker, 'hatchMinOverlap', float, 0.05)
 
     solids, oneway, ladders, chests = [], [], [], []
+    solidz, onewayz, ladderz = [], [], []
     culled = []
+    slopes = 0
+    step_m = _field(baker, 'slopeStep', float, 0.3)
+    min_rise = _field(baker, 'slopeMinRise', float, 0.12)
+
+    def fill(depths, upto, z):
+        while len(depths) < upto:
+            depths.append(z)
     marked, ignored, off_plane, triggers, on_player, on_chest = 0, 0, 0, 0, 0, 0
     handled = set()
 
@@ -374,7 +448,17 @@ def bake(scene=None, report=False):
             if kind == SOLID:
                 culled.append(_aabb(*b))
             continue
-        (solids if kind == SOLID else oneway if kind == ONEWAY else ladders).append(_aabb(*b))
+        mz = (X(b[0][2]), X(b[1][2]))
+        cut = slope_steps(sc.corners(go), step_m, min_rise) if kind == SOLID else None
+        if cut:
+            slopes += 1
+            for lo2, hi2 in cut:
+                solids.append(_aabb(lo2, hi2))
+        else:
+            (solids if kind == SOLID else oneway if kind == ONEWAY else ladders).append(_aabb(*b))
+        fill(solidz, len(solids), mz)
+        fill(onewayz, len(oneway), mz)
+        fill(ladderz, len(ladders), mz)
 
     # 2. Chests, before the ordinary colliders, so a chest never becomes a wall.
     for go in sorted(sc.gos):
@@ -409,30 +493,46 @@ def bake(scene=None, report=False):
             off_plane += 1
             culled.append(_aabb(lo, hi))
             continue
-        solids.append(_aabb(lo, hi))
+        cz = (X(lo[2]), X(hi[2]))
+        cut = slope_steps(sc.corners(go), step_m, min_rise)
+        if cut:
+            slopes += 1
+            for lo2, hi2 in cut:
+                solids.append(_aabb(lo2, hi2))
+        else:
+            solids.append(_aabb(lo, hi))
+        fill(solidz, len(solids), cz)
 
     # A band that culls the whole arena is a band in the wrong place, not an empty arena.
     band_took_everything = not solids and culled
     if band_took_everything:
         solids.extend(culled)
+        fill(solidz, len(solids), (X(-1000.0), X(1000.0)))
 
     hatches = 0
     if cuts_hatch:
         solids, hatches = cut_hatches(solids, ladders, margin, min_overlap)
+
+    while len(solidz) < len(solids):
+        solidz.append((X(-1000.0), X(1000.0)))
+    del solidz[len(solids):]
 
     if report:
         print(f"bake: plane z {plane_z} +-{thickness} -> {len(solids)} solid "
               f"({hatches} cut by ladders), {len(oneway)} one-way, {len(ladders)} ladder, "
               f"{len(chests)} chest; {marked} marked ({ignored} ignored), "
               f"{off_plane} off the plane, {triggers} trigger, "
-              f"{on_player} on a fighter, {on_chest} on a chest")
+              f"{on_player} on a fighter, {on_chest} on a chest, "
+              f"{slopes} slope(s) cut into steps")
 
-    return {"solid": solids, "oneway": oneway, "ladder": ladders, "chest": chests}
+    return {"solid": solids, "oneway": oneway, "ladder": ladders, "chest": chests,
+            "solidz": solidz, "onewayz": onewayz, "ladderz": ladderz}
 
 
 def world(report=False):
     b = bake(report=report)
-    return {k: b[k] for k in ("solid", "oneway", "ladder")}
+    return {k: b[k] for k in ("solid", "oneway", "ladder",
+                              "solidz", "onewayz", "ladderz")}
 
 
 CAMERA_GUID = "b921a9be9303a1887f282de341a5ae31"
@@ -493,7 +593,8 @@ def spawns(scene=None):
         offset = _field(body, 'visualYOffset', float, 0.0)
         out.append((_field(body, 'playerIndex', int, 0),
                     tr['pos']['x'], tr['pos']['y'] - offset,
-                    _field(body, 'spawnFacing', int, 1)))
+                    _field(body, 'spawnFacing', int, 1),
+                    tr['pos']['z']))
     return [s[1:] for s in sorted(out)]
 
 
