@@ -34,6 +34,24 @@ def solids_here(depth=LANE):
     return [b for i, b in enumerate(W["solid"]) if here(i, depth)]
 
 
+def lane_on(i):
+    """The slice a fighter STANDING on this box would be on.
+
+    Not the spawn lane. This location is authored a metre apart in depth between one surface
+    and the next — the crate stacks sit where the spawn lane reaches them and the upper
+    walkway does not, and the other way round — and the fighter changes lane as he moves, so
+    a question about a surface has to be asked on that surface's own slice. Asking all of
+    them on the spawn's slice is how the walkway came to read as having no segments at all.
+    """
+    return T.nearest_in(T.span(W, "solid", i), LANE, HALF_Z)
+
+
+def standable(top, tol=0.02):
+    """Every box a fighter could stand on at this height, each with the lane he would be on."""
+    return sorted(((b, lane_on(i)) for i, b in enumerate(W["solid"])
+                   if abs(F(b[3]) - top) < tol), key=lambda p: p[0][0])
+
+
 def fighter_at(x, y, depth=None):
     """A body starts on the slice the scene puts it on, exactly as PlayerController does."""
     st = S(x, y)
@@ -64,26 +82,41 @@ def hold(s, inp, frames):
         step(s, inp, W)
 
 
-def surface_under(x, y):
-    """The highest solid top at or below y under a body standing at x."""
+def surface_under(x, y, depth=LANE):
+    """The highest solid top at or below y under a body standing at x, on this slice."""
     best = None
-    for b in solids_here():
+    for b in solids_here(depth):
         if b[0] < X(x + HALF) and b[2] > X(x - HALF) and F(b[3]) <= y + 0.02:
             if best is None or b[3] > best:
                 best = b[3]
     return F(best) if best is not None else None
 
 
-def approach(cx, base, side, reach=2.6):
+def surface_lane_under(x, y):
+    """The surface under a body here, and the slice he would be standing on it.
+
+    Asked of every box rather than of one lane's worth, because that is the question: a
+    fighter arrives on whatever slice the surface he reaches puts him on, and in this
+    location the upper walkway's slice is a metre from the one the spawns are on.
+    """
+    best, lane = None, LANE
+    for i, b in enumerate(W["solid"]):
+        if b[0] < X(x + HALF) and b[2] > X(x - HALF) and F(b[3]) <= y + 0.02:
+            if best is None or b[3] > best:
+                best, lane = b[3], lane_on(i)
+    return (F(best) if best is not None else None), lane
+
+
+def approach(cx, base, side, reach=2.6, depth=LANE):
     """Somewhere on the same surface, this side of x, where a whole body can stand."""
     step_m = 0.1
     d = 0.5
     while d <= reach:
         x = cx + side * d
-        if surface_under(x, base + 0.05) is not None and \
+        if surface_under(x, base + 0.05, depth) is not None and \
                 not any(b[0] < X(x + HALF) and b[2] > X(x - HALF)
                         and b[1] < X(base + BODY) and b[3] > X(base + 0.02)
-                        for b in solids_here()):
+                        for b in solids_here(depth)):
             return x
         d += step_m
     return None
@@ -228,7 +261,7 @@ for idx, lad in enumerate(LADDERS):
     check(f"ladder {idx}: climbs out forwards, not sideways",
           abs(F(s.x) - at_top) < 0.2, f"moved {abs(F(s.x) - at_top):.2f} m sideways")
     check(f"ladder {idx}: the walkway it serves has no hole cut in it",
-          any(b[0] <= X(cx) <= b[2] and abs(F(b[3]) - 3.83) < 0.02 for b in solids_here()),
+          any(b[0] <= X(cx) <= b[2] for b, _ in standable(3.83)),
           f"solid over x {cx:.2f}")
 
     # And back down: standing on the ladder's top, pressing down steps over the edge onto it.
@@ -312,7 +345,9 @@ check("nothing standing behind the gameplay plane is baked at all",
 
 # ---------------------------------------------------------------- the walkway gaps
 print("\nThe gaps in the upper walkway")
-tops = sorted((b for b in solids_here() if abs(F(b[3]) - 3.83) < 0.02), key=lambda b: b[0])
+WALKWAY = standable(3.83)
+WALKWAY_LANE = WALKWAY[0][1] if WALKWAY else LANE
+tops = [b for b, _ in WALKWAY]
 
 
 def spanned_by_ladder(a, b):
@@ -536,20 +571,21 @@ for cam in G.cameras():
 print("\nChests")
 for box, kind, contents, name in CHESTS:
     cx = (F(box[0]) + F(box[2])) / 2
-    surf = surface_under(cx, F(box[1]) + 0.05)
+    surf, lane = surface_lane_under(cx, F(box[1]) + 0.05)
     check(f"{name} stands on a surface", surf is not None and abs(surf - F(box[1])) < 0.05,
           f"base y {F(box[1]):.2f}, surface {surf}")
     # nothing solid may sit inside the reach box, or the fighter cannot get to it
-    blocked = [b for b in solids_here()
+    blocked = [b for b in solids_here(lane)
                if b[0] < box[2] and b[2] > box[0] and b[1] < box[3] and b[3] > box[1] + X(0.02)]
     check(f"{name} is not buried in scenery", not blocked, f"{len(blocked)} overlapping solid(s)")
-    # And a fighter walking along the surface reaches it, from whichever side is clear.
+    # And a fighter walking along the surface reaches it, from whichever side is clear — on
+    # the slice that surface puts him on, which for the walkway chests is not the spawn's.
     reached, frm = False, None
     for side in (-1, 1):
-        start = approach(cx, F(box[1]), side)
+        start = approach(cx, F(box[1]), side, depth=lane)
         if start is None:
             continue
-        s = fighter_at(start, F(box[1]) + 0.12)
+        s = fighter_at(start, F(box[1]) + 0.12, F(lane))
         if not until(s, 0, lambda s: s.mode == "ground", 180):
             continue
         if until(s, R if side < 0 else L, lambda s: T.overlaps(T.body(s), box), 400):
