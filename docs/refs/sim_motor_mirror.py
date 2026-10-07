@@ -155,7 +155,8 @@ def step(s, inp, w):
     s.noise = 0
     for a in ("coyote", "buf", "dodge_rec", "fallthru", "stepn", "ladder_cd"):
         if getattr(s, a) > 0: setattr(s, a, getattr(s, a) - 1)
-    if s.stam < C["SMAX"]:
+    # Nothing comes back while the guard is up.
+    if s.stam < C["SMAX"] and not s.blocking:
         s.stam_t += 1
         if s.stam_t >= C["SREC"]: s.stam_t = 0; s.stam += 1
     else: s.stam_t = 0

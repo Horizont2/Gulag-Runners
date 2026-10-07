@@ -10154,6 +10154,7 @@ MonoBehaviour:
     guardBreakTime: 0.7
     blockSpeed: 0.42
     parryWindow: 0.2
+    guardDrainTime: 0.8
     staggerTime: 0.8
     deathTime: 1.5
     desperationHealth: 0.3
@@ -12390,6 +12391,8 @@ MonoBehaviour:
   ladderExitState: Ladder Down End
   crouchIdleState: Sitting
   crouchMoveState: Walk
+  blockIdleState: 
+  blockMoveState: 
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4
@@ -12507,6 +12510,8 @@ MonoBehaviour:
   ladderExitState: Ladder Down End
   crouchIdleState: Sitting
   crouchMoveState: Walk
+  blockIdleState: 
+  blockMoveState: 
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4

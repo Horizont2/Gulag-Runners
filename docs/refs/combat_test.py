@@ -311,6 +311,30 @@ tick([a], [DOD | R])
 check("a dodge costs two of the four charges", a.stam == start - 2,
       f"{start} -> {a.stam}")
 
+print("\n10b2. a raised guard is an action, not a posture")
+a = fighter(-3.0)
+start = a.stam
+held = 0
+for f in range(400):
+    tick([a], [DOD])
+    if a.blocking:
+        held = f + 1
+    elif held:
+        break
+check("holding the guard spends the pool", a.stam == 0, f"{start} -> {a.stam}")
+check("and it runs out in about three seconds", 2.8 < held / 60 < 3.6,
+      f"the guard held {held / 60:.1f} s")
+check("the arm drops rather than breaking: holding too long is not a hit",
+      not a.blocking and a.guard_break == 0 and a.stun == 0)
+
+a = fighter(-3.0)
+for _ in range(120):
+    tick([a], [DOD])
+braced = a.stam
+for _ in range(180):
+    tick([a], [DOD])
+check("nothing comes back while braced", a.stam <= braced, f"{braced} -> {a.stam}")
+
 print("\n10c. a fall off a floor is a way the fight ends (docs/02)")
 a = fighter(0.0)                   # above the hole in the top floor, so the fall is clear
 a.y = X(6.2)

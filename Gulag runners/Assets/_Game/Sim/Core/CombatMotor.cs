@@ -72,6 +72,21 @@ namespace GulagRunners.Sim
             else if (canGuard) s.GuardTimer++;
             s.Blocking = canGuard;
 
+            // Holding the guard is an action, not a posture. Standing braced is slower (42%
+            // of run speed) and that reads as the character mysteriously slowing down until
+            // it also visibly runs out — so it runs out.
+            if (s.Blocking && cfg.GuardDrainFrames > 0 && s.GuardTimer > 0 &&
+                s.GuardTimer % cfg.GuardDrainFrames == 0)
+            {
+                s.StaminaCharges--;
+                if (s.StaminaCharges <= 0)
+                {
+                    s.StaminaCharges = 0;
+                    s.Blocking = false;         // the arm drops; no stun, it was not a hit
+                    s.Noise = NoiseLevel.Quiet;
+                }
+            }
+
             if (!s.Blocking && !s.Swinging) TryStartSwing(ref s, input, in cfg);
 
             s.SpeedPermille = s.Blocking ? (short)cfg.BlockSpeedPermille : (short)0;

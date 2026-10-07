@@ -62,6 +62,13 @@ namespace GulagRunners.Sim
         public int ParryFrames;
 
         /// <summary>
+        /// Frames of holding the guard that cost one charge. docs/02 spends stamina on holding
+        /// the block, and without that a raised guard is free: a fighter can walk the whole
+        /// arena braced at 42% speed and never find out why they are slow. 0 turns it off.
+        /// </summary>
+        public int GuardDrainFrames;
+
+        /// <summary>
         /// Below this share of full health, bare hands hit for DesperationDamagePermille.
         /// docs/02 asks for it by name: it is the only thing that makes an unarmed fighter
         /// frightening, and it only ever helps whoever is losing.
@@ -107,6 +114,7 @@ namespace GulagRunners.Sim
             c.BlockSpeedPermille = 420;
 
             c.ParryFrames = 12;            // 0.20 s, straight from docs/02
+            c.GuardDrainFrames = 48;       // a charge every 0.8 s, so a full pool holds 3.2 s
             c.StaggerFrames = 48;          // 0.80 s, likewise: the parry is the skill ceiling
 
             c.DesperationHealthPermille = 300;   // docs/02: bare hands below 30% HP

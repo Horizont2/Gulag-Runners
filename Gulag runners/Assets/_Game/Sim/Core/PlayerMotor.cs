@@ -93,7 +93,9 @@ namespace GulagRunners.Sim
             if (s.LadderCooldownTimer > 0) s.LadderCooldownTimer--;
             if (s.StepNoiseTimer > 0) s.StepNoiseTimer--;
 
-            if (s.StaminaCharges < cfg.StaminaMax)
+            // Nothing comes back while the guard is up: a brace you can hold and recover
+            // through is a brace you never have to drop.
+            if (s.StaminaCharges < cfg.StaminaMax && !s.Blocking)
             {
                 s.StaminaTimer++;
                 if (s.StaminaTimer >= cfg.StaminaRecoverFrames)

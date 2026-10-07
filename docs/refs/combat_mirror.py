@@ -9,7 +9,7 @@ K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          HEAVY_DMG=1700, HEAVY_TIME=1500, STUN_PER_DMG=1, MAX_STUN=26,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
          CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
-         PARRY=12, STAGGER=48, DEATH=90,
+         PARRY=12, STAGGER=48, DEATH=90, GUARD_DRAIN=48,
          DESPERATE_HP=300, DESPERATE_DMG=1400,
          FALL_SPEED=M.M(12500), FALL_PER_SPEED=8)
 
@@ -104,6 +104,14 @@ def combat_step(s, inp):
     elif can_guard:
         s.guard_t += 1
     s.blocking = can_guard
+
+    # Holding the guard is an action, not a posture.
+    if s.blocking and K["GUARD_DRAIN"] > 0 and s.guard_t > 0 \
+            and s.guard_t % K["GUARD_DRAIN"] == 0:
+        s.stam -= 1
+        if s.stam <= 0:
+            s.stam = 0
+            s.blocking = False
 
     if not s.blocking and not swinging(s):
         start_swing(s, inp)

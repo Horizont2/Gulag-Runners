@@ -60,6 +60,12 @@ namespace GulagRunners.Game
                  "no damage at all, and the attacker is staggered. The one window in the game " +
                  "that rewards reading the other player rather than reacting to them.")]
         public float parryWindow = 0.2f;
+
+        [Tooltip("Seconds of holding the guard that cost one stamina charge. docs/02 spends " +
+                 "stamina on holding the block. Without it a raised guard is free, and since " +
+                 "a braced fighter walks at Block Speed, the only thing the player notices is " +
+                 "that they have mysteriously become slow. 0 turns it off.")]
+        public float guardDrainTime = 0.8f;
         public float staggerTime = 0.8f;
 
         [Header("Death")]
@@ -106,6 +112,7 @@ namespace GulagRunners.Game
             GuardBreakFrames = F(guardBreakTime),
             BlockSpeedPermille = P(blockSpeed),
             ParryFrames = F(parryWindow),
+            GuardDrainFrames = F(guardDrainTime),
             StaggerFrames = F(staggerTime),
             DeathFrames = F(deathTime),
             DesperationHealthPermille = P(desperationHealth),

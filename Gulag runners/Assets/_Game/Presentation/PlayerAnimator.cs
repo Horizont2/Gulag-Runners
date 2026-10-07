@@ -42,6 +42,13 @@ namespace GulagRunners.Game
         [Tooltip("Crouching and still.")]                  public string crouchIdleState = "Sitting";
         [Tooltip("Crouch-walking.")]                       public string crouchMoveState = "Walk";
 
+        [Tooltip("Guard up and standing. Leave empty until there is a clip for it — the state " +
+                 "then falls back to idle, and the only thing the player can see of a raised " +
+                 "guard is that they have gone slow, which reads as a bug rather than a brace.")]
+        public string blockIdleState = "";
+        [Tooltip("Guard up and walking. Empty falls back to the walk.")]
+        public string blockMoveState = "";
+
         [Header("Blending")]
         [Tooltip("Cross-fade time between states, in seconds.")]
         [Range(0f, 0.5f)] public float crossFade = 0.12f;
@@ -205,6 +212,20 @@ namespace GulagRunners.Game
                         if (speed <= idleThreshold) return crouchIdleState;
                         playback = Scale(speed, referenceWalkSpeed);
                         return crouchMoveState;
+                    }
+
+                    // A raised guard is a pose, and it has to be one the opponent can read:
+                    // it is the difference between walking into a fighter and walking into a
+                    // parry (docs/02 wants the silhouette to carry the information).
+                    if (s.Blocking)
+                    {
+                        if (speed <= idleThreshold && !string.IsNullOrEmpty(blockIdleState))
+                            return blockIdleState;
+                        if (speed > idleThreshold && !string.IsNullOrEmpty(blockMoveState))
+                        {
+                            playback = Scale(speed, referenceWalkSpeed);
+                            return blockMoveState;
+                        }
                     }
 
                     if (speed <= idleThreshold) return idleState;
