@@ -3144,6 +3144,7 @@ GameObject:
   - component: {fileID: 1900000123}
   - component: {fileID: 1900000124}
   - component: {fileID: 1900000125}
+  - component: {fileID: 1900000830}
   m_Layer: 0
   m_Name: Player 1
   m_TagString: Untagged
@@ -3359,6 +3360,7 @@ GameObject:
   - component: {fileID: 1900000131}
   - component: {fileID: 1900000132}
   - component: {fileID: 1900000133}
+  - component: {fileID: 1900000840}
   m_Layer: 0
   m_Name: Player 2
   m_TagString: Untagged
@@ -5978,3 +5980,57 @@ MonoBehaviour:
   localScale: 1
   drawGizmo: 1
   gizmoSize: 0.08
+--- !u!114 &1900000830
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000126}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a2e91c7b4d3486fa71c08e5d9f2436b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  player: {fileID: 1900000122}
+  body: []
+  drainsBelow: 0.75
+  drainedColour: {r: 0.62, g: 0.52, b: 0.52, a: 1}
+  hitFlash: {r: 1, g: 0.15, b: 0.1, a: 1}
+  blockFlash: {r: 0.85, g: 0.9, b: 1, a: 1}
+  parryFlash: {r: 1, g: 0.92, b: 0.5, a: 1}
+  flashSeconds: 0.12
+  flashPerDamage: 0.12
+  flashCeiling: 1.6
+  wounds: []
+  bloodOnHit: {fileID: 0}
+  sparksOnBlock: {fileID: 0}
+  particlesPerDamage: 3
+  deathBurst: {fileID: 0}
+--- !u!114 &1900000840
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a2e91c7b4d3486fa71c08e5d9f2436b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  player: {fileID: 1900000130}
+  body: []
+  drainsBelow: 0.75
+  drainedColour: {r: 0.62, g: 0.52, b: 0.52, a: 1}
+  hitFlash: {r: 1, g: 0.15, b: 0.1, a: 1}
+  blockFlash: {r: 0.85, g: 0.9, b: 1, a: 1}
+  parryFlash: {r: 1, g: 0.92, b: 0.5, a: 1}
+  flashSeconds: 0.12
+  flashPerDamage: 0.12
+  flashCeiling: 1.6
+  wounds: []
+  bloodOnHit: {fileID: 0}
+  sparksOnBlock: {fileID: 0}
+  particlesPerDamage: 3
+  deathBurst: {fileID: 0}

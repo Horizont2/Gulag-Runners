@@ -273,6 +273,7 @@ def block(atk, vic, dmg, side):
     chip = max(1, chip)
 
     wound(vic, chip)
+    vic.damage_taken = chip          # what got through, for the view to size
     vic.was_blocked = True
     vic.noise = 2
     vic.vx = (K["KNOCK"] // 2) * side

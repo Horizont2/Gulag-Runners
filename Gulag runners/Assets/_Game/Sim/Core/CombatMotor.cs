@@ -377,6 +377,7 @@ namespace GulagRunners.Sim
             if (chip < 1) chip = 1;
 
             Wound(ref victim, chip);
+            victim.DamageTaken = (short)chip;        // what got through, for the view to size
             victim.WasBlocked = true;
             victim.Noise = NoiseLevel.Medium;
             victim.Velocity.X = cfg.KnockbackSpeed / 2 * side;

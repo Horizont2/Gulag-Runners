@@ -162,6 +162,17 @@ namespace GulagRunners.Game
         /// <summary>Raised on the tick this player is hurt, with the damage that got through.</summary>
         public event Action<int> Hurt;
 
+        /// <summary>
+        /// A hit the guard ate, with what got through it. Separate from Hurt because the two
+        /// have to look nothing alike: docs/02 wants the difference between taking a hit and
+        /// meeting one readable from across the arena, since it is the whole reason to hold
+        /// the guard up.
+        /// </summary>
+        public event Action<int> Blocked;
+
+        /// <summary>A hit turned on its owner. The loudest thing a defender can do.</summary>
+        public event Action Parried;
+
         /// <summary>Raised on the tick this player dies.</summary>
         public event Action Died;
 
@@ -169,6 +180,14 @@ namespace GulagRunners.Game
         public float GroundedY { get; private set; }
 
         public PlayerSimState State => _state;
+
+        /// <summary>
+        /// Full health for this round, from the match's combat tuning. Views need it to say
+        /// what a share of health is, and the number lives in one place for everyone.
+        /// </summary>
+        public int MaxHealth => matchState != null && matchState.Combat.MaxHealth > 0
+            ? matchState.Combat.MaxHealth
+            : 100;
         public MoveConfig Config => _config;
         public SimWorld World => _world;
         /// <summary>Simulated feet position in world units.</summary>
@@ -385,7 +404,12 @@ namespace GulagRunners.Game
 
             PlayerMotor.Step(ref _state, moveInput, _world, in _config);
 
+            // Fired from inside the tick, not sampled from State in a later frame: these last
+            // one tick each, and a frame that happens to run two ticks or none would double
+            // them or lose them.
             if (_state.WasHit) Hurt?.Invoke(_state.DamageTaken);
+            if (_state.WasBlocked) Blocked?.Invoke(_state.DamageTaken);
+            if (_state.WasParried) Parried?.Invoke();
             if (_state.JustDied) Died?.Invoke();
 
             // Loot after movement: where the body ended up this tick decides which chest it is
