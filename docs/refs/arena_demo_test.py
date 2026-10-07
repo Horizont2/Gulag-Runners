@@ -154,6 +154,19 @@ check("the two spawns are mirrored about the arena centre",
       abs((SPAWNS[0][0] + SPAWNS[1][0]) / 2 + 1.89) < 0.02,
       f"midpoint x {(SPAWNS[0][0] + SPAWNS[1][0]) / 2:.3f}")
 
+# ------------------------------------------- the model has to stand where the body stands
+print("\nThe fighters' models")
+
+# Render writes the simulated position, slice included, onto the PlayerController's own
+# object every frame — so an offset on the visual root under it draws the fighter somewhere
+# he is not. One model here was 2.92 m in front of its body and the other 3.28 m to the side
+# and 3.3 m in the air, which looks exactly like a fighter standing on invisible geometry,
+# because that is what it is: the collision is right and the picture is somewhere else.
+for who, (ox, oy, oz) in _SC.visual_offsets():
+    off = max(abs(ox), abs(oy), abs(oz))
+    check(f"{who}: the model sits on the body the simulation moves", off < 0.001,
+          f"offset ({ox:.2f}, {oy:.2f}, {oz:.2f})")
+
 # ---------------------------------------------------------------- ground floor
 print("\nThe ground floor")
 # The two crate stacks are 2 m tall and the step-up is 0.30 m, so crossing the arena means

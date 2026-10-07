@@ -194,6 +194,31 @@ namespace GulagRunners.Game
             if (visualRoot == null) visualRoot = transform;
             _baseVisualScale = visualRoot.localScale;
 
+            // The model has to stand where the fighter stands. Render writes the simulated
+            // position — including which slice of the level the body is on — onto THIS
+            // object every frame, so an offset on the visual root underneath it is not a
+            // presentation choice: it is the model and the body coming apart. The fighter
+            // then collides where the simulation says and is DRAWN somewhere else, standing
+            // on nothing and swinging from somewhere he is not. In this scene one fighter's
+            // model was 2.92 m in front of his body and the other was 3.28 m to the side and
+            // 3.3 m in the air, which is every "he is standing on invisible geometry" report
+            // at once.
+            //
+            // visualYOffset is the one knob for this, and it is on the controller, where the
+            // simulation can see it: use it for a model that hangs from its root by the
+            // middle rather than by the feet.
+            if (visualRoot != transform &&
+                visualRoot.localPosition.sqrMagnitude > 0.000001f)
+            {
+                Vector3 lp = visualRoot.localPosition;
+                Debug.LogWarning(
+                    $"{name}: the visual root sits ({lp.x:0.00}, {lp.y:0.00}, {lp.z:0.00}) " +
+                    "away from the body the simulation moves, so the fighter would be drawn " +
+                    "somewhere he is not. Zeroed. Move the fighter itself, and use Visual Y " +
+                    "Offset for a model that hangs by its middle.", this);
+                visualRoot.localPosition = Vector3.zero;
+            }
+
             Vector3 p = transform.position;
             if (depthFromScene) planeZ = p.z;
             _depth = planeZ;

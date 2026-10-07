@@ -53,6 +53,28 @@ namespace GulagRunners.Game
             }
         }
 
+        /// <summary>
+        /// The box this object occupies in its OWN space: the BoxCollider's if it has one, the
+        /// mesh's own bounds if it has a mesh, a unit cube when it has neither.
+        ///
+        /// Asking the mesh is the whole point. This used to assume a unit cube at the pivot for
+        /// anything without a BoxCollider, which is right for Unity's Cube and wrong for
+        /// everything else: Unity's own Cylinder and Capsule meshes are two units tall, so each
+        /// of the pillars in this location baked a box half its visible height, and any
+        /// modelled piece whose pivot is not its centre baked a box beside itself. Invisible
+        /// collision that does not line up with the art is the worst bug this project can
+        /// have, because the scene view says everything is fine.
+        /// </summary>
+        public static Bounds LocalBox(Component owner, Collider collider)
+        {
+            if (collider is BoxCollider box) return new Bounds(box.center, box.size);
+
+            MeshFilter mf = owner != null ? owner.GetComponent<MeshFilter>() : null;
+            if (mf != null && mf.sharedMesh != null) return mf.sharedMesh.bounds;
+
+            return new Bounds(Vector3.zero, Vector3.one);
+        }
+
         public Rect ToRect()
         {
             Bounds b = WorldBounds;
@@ -81,16 +103,20 @@ namespace GulagRunners.Game
             return new Rect(b.min.x, b.min.y, b.size.x, b.size.y);
         }
 
-        /// <summary>A unit cube at this transform, turned and scaled the way the transform is.</summary>
+        /// <summary>This object's own box, turned and scaled the way the transform is.</summary>
         static Bounds RotatedBounds(Transform t)
         {
-            Vector3 s = t.lossyScale * 0.5f;
+            Bounds local = LocalBox(t, null);
+            Vector3 s = Vector3.Scale(local.extents, t.lossyScale);
             Vector3 x = t.right * s.x, y = t.up * s.y, z = t.forward * s.z;
             Vector3 extents = new Vector3(
                 Mathf.Abs(x.x) + Mathf.Abs(y.x) + Mathf.Abs(z.x),
                 Mathf.Abs(x.y) + Mathf.Abs(y.y) + Mathf.Abs(z.y),
                 Mathf.Abs(x.z) + Mathf.Abs(y.z) + Mathf.Abs(z.z));
-            return new Bounds(t.position, extents * 2f);
+
+            // TransformPoint, not t.position: a mesh whose pivot is not its centre sits beside
+            // its own transform, and the box has to sit on the mesh.
+            return new Bounds(t.TransformPoint(local.center), extents * 2f);
         }
 
         public Aabb ToAabb() => RectToAabb(ToRect());

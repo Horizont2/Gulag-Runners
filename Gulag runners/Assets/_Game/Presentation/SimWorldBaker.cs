@@ -470,10 +470,11 @@ namespace GulagRunners.Game
         /// <summary>The eight world corners of a box, as (x, y).</summary>
         static void Corners(Transform t, Collider col)
         {
-            Vector3 centre = Vector3.zero, size = Vector3.one;
-            if (col is BoxCollider box) { centre = box.center; size = box.size; }
-
-            Vector3 e = size * 0.5f;
+            // The same box the bake uses, so a staircase cut out of a tilted plank follows the
+            // plank and not a unit cube imagined at its pivot.
+            Bounds local = SimCollider.LocalBox(t, col);
+            Vector3 centre = local.center;
+            Vector3 e = local.extents;
             int n = 0;
             for (int i = -1; i <= 1; i += 2)
             for (int j = -1; j <= 1; j += 2)

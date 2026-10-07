@@ -22,6 +22,17 @@ CHEST_GUID = "b133d746e1ad16c0613fc1ce415afb0c"
 PLAYER_GUID = "882fe3a922af38d6658c85cd54734955"
 BAKER_GUID = "dbc7640cd37666d57e8cc1de33f92772"
 
+# Unity's built-in meshes, as (local centre, local half-extents). Cylinder and Capsule are TWO
+# units tall, which is the whole reason the bake may not assume a unit cube.
+PRIMITIVE_BOX = {
+    "10202": ([0.0, 0.0, 0.0], [0.5, 0.5, 0.5]),    # Cube
+    "10206": ([0.0, 0.0, 0.0], [0.5, 1.0, 0.5]),    # Cylinder
+    "10207": ([0.0, 0.0, 0.0], [0.5, 0.5, 0.5]),    # Sphere
+    "10208": ([0.0, 0.0, 0.0], [0.5, 1.0, 0.5]),    # Capsule
+    "10209": ([0.0, 0.0, 0.0], [5.0, 0.0, 5.0]),    # Plane
+    "10210": ([0.0, 0.0, 0.0], [0.5, 0.5, 0.0]),    # Quad
+}
+
 SOLID, ONEWAY, LADDER, IGNORE = 0, 1, 2, 3
 
 
@@ -53,7 +64,9 @@ def _ref(body, name):
 
 
 def _field(body, name, cast=float, default=None):
-    m = re.search(r'^\s+' + re.escape(name) + r': (\S+)\s*$', body, re.M)
+    # (.+?) rather than (\S+): a value with a space in it is still a value, and m_Name is
+    # the one that matters — "Player 1" used to read back as nothing at all.
+    m = re.search(r'^\s+' + re.escape(name) + r': (.+?)\s*$', body, re.M)
     return cast(m.group(1)) if m else default
 
 
@@ -213,6 +226,28 @@ class Scene:
 
     # --- colliders
 
+    def local_box(self, go):
+        """The box this object occupies in its OWN space, exactly as SimCollider.LocalBox:
+        the BoxCollider's if it has one, the mesh's own bounds if it has a mesh, a unit cube
+        when it has neither. Unity's Cylinder and Capsule meshes are TWO units tall, so a
+        unit cube guessed at the pivot bakes a pillar at half its visible height."""
+        for c in self.gos[go]['comps']:
+            cls, body = self.docs.get(c, (0, ''))
+            if cls == 65:                                   # BoxCollider
+                centre = _vec(body, 'm_Center', {'x': 0, 'y': 0, 'z': 0})
+                size = _vec(body, 'm_Size', {'x': 1, 'y': 1, 'z': 1})
+                return ([centre['x'], centre['y'], centre['z']],
+                        [size['x'] / 2, size['y'] / 2, size['z'] / 2])
+        for c in self.gos[go]['comps']:
+            cls, body = self.docs.get(c, (0, ''))
+            if cls != 33:                                   # MeshFilter
+                continue
+            m = re.search(r'm_Mesh: \{fileID: (-?\d+)', body)
+            if m and m.group(1) in PRIMITIVE_BOX:
+                return PRIMITIVE_BOX[m.group(1)]
+            break
+        return ([0.0, 0.0, 0.0], [0.5, 0.5, 0.5])
+
     def bounds(self, go):
         """World-space Collider.bounds of the first collider on this object, or None."""
         for c in self.gos[go]['comps']:
@@ -236,13 +271,16 @@ class Scene:
             ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
             return [wc[i] - ext[i] for i in range(3)], [wc[i] + ext[i] for i in range(3)]
 
-        # No collider at all: SimCollider.RotatedBounds takes the box from the transform,
-        # which is right for the unit cubes this location is built from.
+        # No collider at all: SimCollider.RotatedBounds takes the box from the MESH, and
+        # places it with TransformPoint, so a mesh whose pivot is not its centre gets a box
+        # that sits on the mesh rather than beside it.
         if self.script(go, SIM_COLLIDER_GUID) is not None:
             origin, basis = self.basis(self.tr_of_go[go])
-            half = [0.5, 0.5, 0.5]
+            centre, half = self.local_box(go)
+            lc = _apply(basis, centre)
+            wc = [origin[i] + lc[i] for i in range(3)]
             ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
-            return [origin[i] - ext[i] for i in range(3)], [origin[i] + ext[i] for i in range(3)]
+            return [wc[i] - ext[i] for i in range(3)], [wc[i] + ext[i] for i in range(3)]
         return None
 
     def _unused(self, go, centre, size, half, basis, origin):
@@ -279,26 +317,61 @@ class Scene:
     def corners(self, go):
         """The eight world corners of this box, as (x, y). A tilted plank's silhouette is not
         its bounding box, and baking the box is what makes a ramp a wall."""
-        centre = {'x': 0, 'y': 0, 'z': 0}
-        half = [0.5, 0.5, 0.5]
-        for c in self.gos[go]['comps']:
-            cls, body = self.docs.get(c, (0, ''))
-            if cls == 65:
-                centre = _vec(body, 'm_Center', centre)
-                size = _vec(body, 'm_Size', {'x': 1, 'y': 1, 'z': 1})
-                half = [size['x'] / 2, size['y'] / 2, size['z'] / 2]
-                break
+        centre, half = self.local_box(go)
         origin, basis = self.basis(self.tr_of_go[go])
         out = []
         for i in (-1, 1):
             for j in (-1, 1):
                 for k in (-1, 1):
-                    local = [centre['x'] + half[0] * i,
-                             centre['y'] + half[1] * j,
-                             centre['z'] + half[2] * k]
+                    local = [centre[0] + half[0] * i,
+                             centre[1] + half[1] * j,
+                             centre[2] + half[2] * k]
                     w = _apply(basis, local)
                     out.append((origin[0] + w[0], origin[1] + w[1]))
         return out
+
+    def visual_offsets(self):
+        """Where each fighter's MODEL sits relative to the body the simulation moves.
+
+        Render() writes the simulated slice into the PlayerController's own transform.z every
+        frame, so a visual root pushed forward in Z is the model and the body coming apart:
+        the fighter collides where the simulation says and is drawn somewhere else, standing
+        on nothing. Here it was 2.92 m — three metres in front of the platform under his feet.
+        """
+        out = []
+        for fid, (cls, body) in self.docs.items():
+            if cls != 114 or f'guid: {PLAYER_GUID}' not in body:
+                continue
+            go = _ref(body, 'm_GameObject')
+            name = self.gos[go]['name'] if go in self.gos else '?'
+            vr = re.search(r'visualRoot: \{fileID: (-?\d+)\}', body)
+            if not vr or vr.group(1) == '0':
+                out.append((name, (0.0, 0.0, 0.0)))
+                continue
+            out.append((name, self._local_pos(int(vr.group(1)))))
+        return sorted(out)
+
+    def _local_pos(self, tfid):
+        """A transform's local position, read the way Unity reads it: a stripped prefab
+        transform keeps its position in the PrefabInstance's modification list."""
+        cls, body = self.docs.get(tfid, (0, ''))
+        inst = re.search(r'm_PrefabInstance: \{fileID: (\d+)\}', body)
+        src_tf = re.search(r'm_CorrespondingSourceObject: \{fileID: (-?\d+)', body)
+        if inst and inst.group(1) != '0' and src_tf:
+            _, ibody = self.docs.get(int(inst.group(1)), (0, ''))
+            # Match the modification by TARGET. One PrefabInstance carries overrides for every
+            # object in the prefab, bones included, so the first m_LocalPosition.x in the list
+            # is almost never the root's.
+            v = []
+            for axis in 'xyz':
+                m = re.search(
+                    r'- target: \{fileID: ' + src_tf.group(1) + r',[^\n]*\n'
+                    r'\s+propertyPath: m_LocalPosition\.' + axis + r'\n'
+                    r'\s+value: ([-\d.eE+]+)', ibody)
+                v.append(float(m.group(1)) if m else 0.0)
+            return tuple(v)
+        p = _vec(body, 'm_LocalPosition', {'x': 0, 'y': 0, 'z': 0})
+        return (p['x'], p['y'], p['z'])
 
     def baker_field(self, name, cast=float, default=None):
         """One value off the scene's SimWorldBaker, so a test can measure against what the
