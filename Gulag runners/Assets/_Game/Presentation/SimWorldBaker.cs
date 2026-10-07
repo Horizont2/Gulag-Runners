@@ -71,6 +71,26 @@ namespace GulagRunners.Game
                  "that IS on the plane and still must not be solid.")]
         public bool planeFiltersMarked = true;
 
+        [Tooltip("Drop whatever stands wholly behind the gameplay plane instead of baking it.\n\n" +
+                 "docs/02: the location is 3D, the fight is a flat lane through the front of it. " +
+                 "Everything behind that lane — the wall at the back, the pillars holding the " +
+                 "walkway up, the handrail — is there to be looked at. The depth band alone does " +
+                 "not settle it: the band is wide enough to catch geometry authored a little off " +
+                 "the plane, so the backdrop comes in too, and from then on it is only each box's " +
+                 "own depth span that keeps it out of the way. That holds exactly as long as the " +
+                 "fighter stays in their lane, and a fighter does not: they shift a lane to walk " +
+                 "up a ramp or onto a ladder, and the backdrop they were never meant to touch is " +
+                 "suddenly in front of them. Dropping it at the bake is the one answer no later " +
+                 "mistake can undo.")]
+        public bool dropBackdrop = true;
+
+        [Tooltip("How far behind the gameplay plane the backdrop starts, in metres.\n\n" +
+                 "A box counts as level, not backdrop, when its NEAREST face is in front of this " +
+                 "line — so anything the fight can see the front of is kept, including a slab " +
+                 "that starts on the plane and runs back into the scenery. Leave room for " +
+                 "geometry authored just behind the plane and still meant to be stood on.")]
+        public float backdropBehind = 0.5f;
+
         [Header("Ladders")]
         [Tooltip("Cut a hole in the baked floor wherever a ladder runs through it.\n\n" +
                  "Off by default, and usually wants to stay off: the motor already treats a " +
@@ -89,7 +109,7 @@ namespace GulagRunners.Game
                  "level — so instead it is cut into steps that follow its top edge. 0.3 m of " +
                  "run on a one-in-four slope is 0.08 m of rise, well under the free step, so a " +
                  "ramp is walked up rather than climbed. 0 bakes the bounding box.")]
-        public float slopeStep = 0.3f;
+        public float slopeStep = 0.2f;
 
         [Tooltip("How far a box's top edge has to rise across its own width before it counts " +
                  "as a slope rather than a box, in metres.")]
@@ -184,6 +204,7 @@ namespace GulagRunners.Game
             List<Span> solidZ = new List<Span>();
             List<Span> oneWayZ = new List<Span>();
             List<Span> ladderZ = new List<Span>();
+            List<Span> ladderLean = new List<Span>();
             List<ChestDef> chests = new List<ChestDef>();
 
             _gizmoSolid.Clear();
@@ -197,7 +218,8 @@ namespace GulagRunners.Game
                 chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
             int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
-                skippedAlreadyMarked = 0, skippedInactive = 0, skippedChest = 0, skippedDepth = 0;
+                skippedAlreadyMarked = 0, skippedInactive = 0, skippedChest = 0, skippedDepth = 0,
+                backdrop = 0;
 
             HashSet<int> handled = new HashSet<int>();
 
@@ -217,6 +239,14 @@ namespace GulagRunners.Game
                 {
                     markedSeen++;
 
+                    // Claimed before it is judged. A SimCollider says this object's collision
+                    // is described HERE, so switching the marker off has to mean the object has
+                    // no collision — not "fall back to whatever BoxCollider came with the art",
+                    // which is what claiming it afterwards did: turning off the markers on the
+                    // backdrop left every one of those boxes to be baked again by the ordinary
+                    // collider pass, on its layer, as a solid wall.
+                    handled.Add(c.gameObject.GetInstanceID());
+
                     // enabled && activeInHierarchy, NOT isActiveAndEnabled. The two are not
                     // the same here: isActiveAndEnabled is false for a component Unity has
                     // not activated yet, and this bake runs in Awake at execution order -100,
@@ -225,10 +255,15 @@ namespace GulagRunners.Game
                     // arena of two boxes, and both fighters fell through the world.
                     if (!c.enabled || !c.gameObject.activeInHierarchy)
                     { markedSkipped++; continue; }
-                    handled.Add(c.gameObject.GetInstanceID());
                     if (c.kind == SimColliderKind.Ignore) { markedIgnored++; continue; }
 
                     Bounds mb = c.WorldBounds;
+
+                    // Backdrop goes nowhere, not even to the rescue list below: a location with
+                    // no floor left is a band in the wrong place, and the backdrop is not the
+                    // floor it is missing.
+                    if (IsBackdrop(mb)) { backdrop++; continue; }
+
                     if (planeFiltersMarked && restrictToPlane && !ReachesPlane(mb))
                     {
                         markedOffPlane++;
@@ -249,6 +284,8 @@ namespace GulagRunners.Game
                     Fill(solidZ, solids.Count, mz);
                     Fill(oneWayZ, oneWay.Count, mz);
                     Fill(ladderZ, ladders.Count, mz);
+                    FillLean(ladderLean, ladders.Count, c.transform,
+                             c.GetComponent<Collider>());
                 }
 
                 // 2. Chests. Collected before the ordinary colliders so that a chest's own
@@ -259,9 +296,9 @@ namespace GulagRunners.Game
                 foreach (Chest chest in _chestBuffer)
                 {
                     chestsSeen++;
+                    handled.Add(chest.gameObject.GetInstanceID());
                     if (!chest.enabled || !chest.gameObject.activeInHierarchy)
                     { chestsSkipped++; continue; }
-                    handled.Add(chest.gameObject.GetInstanceID());
                     chests.Add(chest.ToDef());
                     _chestSources.Add(chest);
                     _gizmoChest.Add(chest.ToRect());
@@ -291,6 +328,7 @@ namespace GulagRunners.Game
                     { skippedChest++; continue; }
 
                     Bounds cb = col.bounds;
+                    if (IsBackdrop(cb)) { backdrop++; continue; }
                     if (restrictToPlane && !ReachesPlane(cb))
                     {
                         skippedDepth++;
@@ -344,7 +382,8 @@ namespace GulagRunners.Game
                 Chests = chests.ToArray(),
                 SolidZ = solidZ.ToArray(),
                 OneWayZ = oneWayZ.ToArray(),
-                LadderZ = ladderZ.ToArray()
+                LadderZ = ladderZ.ToArray(),
+                LadderLean = ladderLean.ToArray()
             };
             ChestSources = _chestSources.ToArray();
             LadderDepths = _ladderDepth.ToArray();
@@ -352,7 +391,7 @@ namespace GulagRunners.Game
             LastReport =
                 $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider " +
                 $"({markedSkipped} inactive, {markedIgnored} ignored, " +
-                $"{markedOffPlane} off the plane), " +
+                $"{markedOffPlane} off the plane), {backdrop} backdrop, " +
                 $"{collidersSeen} Unity collider (skipped: {skippedAlreadyMarked} already marked, " +
                 $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedChest} on a chest, " +
                 $"{skippedDepth} off the plane, {skippedLayer} wrong layer, " +
@@ -409,17 +448,30 @@ namespace GulagRunners.Game
         static readonly Vector2[] _corners = new Vector2[8];
 
         /// <summary>
-        /// Cuts a tilted box into a staircase that follows its top edge, and says whether it
-        /// did. An AABB world has no slopes; a plank leaning against a platform would otherwise
-        /// bake as its bounding box, which is a wall nobody can climb.
+        /// Where a ladder's centre line sits at its foot and at its head. A ladder leaning
+        /// against a wall has a bounding box wider than itself, and climbing the middle of
+        /// that box is climbing the air beside the rungs.
         /// </summary>
-        bool TrySlope(Transform t, Collider col, List<Aabb> solids)
+        void FillLean(List<Span> lean, int upTo, Transform t, Collider col)
         {
-            if (slopeStep <= 0.01f) return false;
+            while (lean.Count < upTo)
+            {
+                Corners(t, col);
+                int[] order = { 0, 1, 2, 3, 4, 5, 6, 7 };
+                System.Array.Sort(order, (p, q) => _corners[p].y.CompareTo(_corners[q].y));
 
+                float bottom = 0f, top = 0f;
+                for (int i = 0; i < 4; i++) bottom += _corners[order[i]].x;
+                for (int i = 4; i < 8; i++) top += _corners[order[i]].x;
+                lean.Add(new Span(ToFix(bottom / 4f), ToFix(top / 4f)));
+            }
+        }
+
+        /// <summary>The eight world corners of a box, as (x, y).</summary>
+        static void Corners(Transform t, Collider col)
+        {
             Vector3 centre = Vector3.zero, size = Vector3.one;
             if (col is BoxCollider box) { centre = box.center; size = box.size; }
-            else if (col != null) return false;          // only a box has corners worth cutting
 
             Vector3 e = size * 0.5f;
             int n = 0;
@@ -430,6 +482,19 @@ namespace GulagRunners.Game
                 Vector3 w = t.TransformPoint(centre + new Vector3(e.x * i, e.y * j, e.z * k));
                 _corners[n++] = new Vector2(w.x, w.y);
             }
+        }
+
+        /// <summary>
+        /// Cuts a tilted box into a staircase that follows its top edge, and says whether it
+        /// did. An AABB world has no slopes; a plank leaning against a platform would otherwise
+        /// bake as its bounding box, which is a wall nobody can climb.
+        /// </summary>
+        bool TrySlope(Transform t, Collider col, List<Aabb> solids)
+        {
+            if (slopeStep <= 0.01f) return false;
+
+            if (col != null && !(col is BoxCollider)) return false;
+            Corners(t, col);
 
             float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue;
             for (int i = 0; i < 8; i++)
@@ -448,10 +513,13 @@ namespace GulagRunners.Game
             for (int i = 0; i < steps; i++)
             {
                 float a = minX + run * i, b = a + run;
-                float top = Mathf.Max(TopAt(a), TopAt(b));
-                for (int c = 0; c < 8; c++)
-                    if (_corners[c].x >= a && _corners[c].x <= b && _corners[c].y > top)
-                        top = _corners[c].y;
+
+                // The surface at the MIDDLE of the step, not the higher of its two ends.
+                // Taking the high end puts every step above the board it is standing in for,
+                // and a fighter walking down the ramp walks down it through the air. The
+                // middle splits the error either way, and it is half a step's rise — four
+                // centimetres on this location's planks.
+                float top = TopAt((a + b) * 0.5f);
                 if (top - minY <= 0.001f) continue;
 
                 Rect r = new Rect(a, minY, b - a, top - minY);
@@ -536,6 +604,13 @@ namespace GulagRunners.Game
         /// Does this collider reach the gameplay plane. A level built in 3D has a foreground and
         /// a background, and only the slab in the middle is the game.
         /// </summary>
+        /// <summary>
+        /// Is this box behind the fight rather than part of it. Measured on the box's NEAREST
+        /// face, so a slab that starts on the plane and runs back into the scenery is level and
+        /// only something standing entirely behind the plane is backdrop.
+        /// </summary>
+        bool IsBackdrop(Bounds b) => dropBackdrop && b.min.z >= planeZ + backdropBehind;
+
         bool ReachesPlane(Bounds b) =>
             b.max.z >= planeZ - planeThickness && b.min.z <= planeZ + planeThickness;
 

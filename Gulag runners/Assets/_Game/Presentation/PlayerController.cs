@@ -205,15 +205,22 @@ namespace GulagRunners.Game
         {
             FixVec2 position = new FixVec2(ToFix(feet.x), ToFix(feet.y));
 
+            // The slice comes first, because the seating below is only meaningful on one. The
+            // search used to run over every baked box: in a location whose backdrop stands a
+            // metre taller than the platform in front of it, that seated the fighter on the
+            // backdrop, a box their own lane cannot touch, and the match opened with them
+            // falling through the floor.
+            Fix depth = ToFix(planeZ);
+
             if (snapToGroundOnSpawn && _world != null &&
-                PlayerMotor.TryFindGroundBelow(position, _world, in _config,
+                PlayerMotor.TryFindGroundBelow(position, depth, _world, in _config,
                                                ToFix(snapSearchDistance), out Fix groundY))
             {
                 position.Y = groundY;
             }
 
             _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
-            _state.Depth = ToFix(planeZ);
+            _state.Depth = depth;
 
             // Never start inside the level. One box marked solid that should not have been —
             // the wall behind a location, say — lands across the floor, the fighter spawns in
@@ -233,7 +240,8 @@ namespace GulagRunners.Game
                     (worldBaker != null ? worldBaker.LastReport : "no baker"), this);
             }
             else if (_world != null && _world.Solids.Length > 0 &&
-                     !PlayerMotor.TryFindGroundBelow(_state.Position, _world, in _config,
+                     !PlayerMotor.TryFindGroundBelow(_state.Position, _state.Depth, _world,
+                                                     in _config,
                                                      ToFix(snapSearchDistance), out _))
             {
                 Debug.LogWarning(

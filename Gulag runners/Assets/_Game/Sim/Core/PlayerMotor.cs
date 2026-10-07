@@ -80,6 +80,11 @@ namespace GulagRunners.Sim
             Fix from = s.Facing > 0 ? s.Position.X + half : s.Position.X - half - cfg.LaneLookahead;
             Fix to = s.Facing > 0 ? s.Position.X + half + cfg.LaneLookahead : s.Position.X - half;
 
+            // Ladders are looked for on BOTH sides: you face a ladder to climb it, and which
+            // way you happen to be facing when you reach for one is not information.
+            Fix ladderFrom = s.Position.X - half - cfg.LaneLookahead;
+            Fix ladderTo = s.Position.X + half + cfg.LaneLookahead;
+
             bool found = false;
             Fix nearestX = Fix.Zero;
             for (int i = 0; i < world.Solids.Length; i++)
@@ -113,9 +118,12 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Ladders.Length; i++)
             {
                 Aabb l = world.Ladders[i];
-                if (l.MaxX <= from || l.MinX >= to) continue;
+                if (l.MaxX <= ladderFrom || l.MinX >= ladderTo) continue;
                 if (l.MaxY <= s.Position.Y || l.MinY > s.Position.Y + cfg.BodyHeight) continue;
 
+                // Unlike a wall, a ladder you are ALREADY standing at is exactly where you
+                // are going: clamped to zero rather than skipped, or pressing up in front of
+                // one does nothing at all, because the lane never comes to meet it.
                 Fix gap = s.Facing > 0 ? l.MinX - (s.Position.X + half)
                                        : (s.Position.X - half) - l.MaxX;
                 if (gap < Fix.Zero) gap = Fix.Zero;
@@ -416,7 +424,7 @@ namespace GulagRunners.Sim
             if (s.Crouching && !HasHeadroom(ref s, world, cfg)) return false;
 
             Aabb body = s.Body(in cfg);
-            int ladder = world.FindLadder(in body, s.Depth, cfg.BodyDepth / 2);
+            int ladder = FindLadderInReach(in body, s.Depth, world, in cfg);
 
             // Standing on top of a ladder whose rungs start just under the feet. A ladder with
             // no hatch beside it is the whole level here, and without this the only ones you
@@ -430,7 +438,7 @@ namespace GulagRunners.Sim
             if (ladder < 0) return false;
 
             Aabb box = world.Ladders[ladder];
-            Fix centreX = world.LadderCentreX(ladder);
+            Fix centreX = world.LadderCentreAt(ladder, s.Position.Y);
 
             if (wishY > 0)
             {
@@ -532,23 +540,18 @@ namespace GulagRunners.Sim
             }
 
             Aabb ladder = world.Ladders[s.LadderIndex];
+            Fix rung = world.LadderCentreAt(s.LadderIndex, s.Position.Y);
 
-            // Keep the body on the ladder's centre line. The grab already put it there, so this
-            // only has to undo a sideways nudge, and it does so at climbing speed: at the 6 m/s it
-            // used to run at, letting go of the stick after edging along the rungs snapped the body
-            // back twice as fast as a run.
-            //
-            // Only while the player is not pushing sideways, or it would fight the step off.
-            if (wishX == 0)
-            {
-                Fix want = Fix.MoveTowards(s.Position.X, world.LadderCentreX(s.LadderIndex),
-                                           cfg.LadderSnapSpeed * Dt);
+            // Keep the body on the ladder's centre line, every frame: nothing else moves X
+            // while climbing, and on a leaning ladder that line walks sideways as the body
+            // rises, so it is a line to follow rather than a point to sit on. At climbing speed
+            // it cannot be seen; at the 6 m/s this used to run at it was a yank.
+            Fix want = Fix.MoveTowards(s.Position.X, rung, cfg.LadderSnapSpeed * Dt);
 
-                // The pull writes X directly, so it has to check its own way: a ladder mounted
-                // from an awkward angle must not drag the body into the wall beside it.
-                if (SweepFree(s.Position.X, want, s.Position.Y, s.Depth, world, in cfg))
-                    s.Position.X = want;
-            }
+            // The pull writes X directly, so it has to check its own way: a ladder mounted from
+            // an awkward angle must not drag the body into the wall beside it.
+            if (SweepFree(s.Position.X, want, s.Position.Y, s.Depth, world, in cfg))
+                s.Position.X = want;
 
             s.Velocity.X = Fix.Zero;
             s.Velocity.Y = wishY > 0 ? cfg.ClimbUpSpeed
@@ -573,7 +576,13 @@ namespace GulagRunners.Sim
             // Hold a direction and you climb out that way; hold nothing and the climb-out picks
             // the side with more floor on it, rather than depositing you in whatever pocket
             // happens to be nearest.
-            if (atTop && wishY > 0 && TryStartMantle(ref s, wishX, s.LadderIndex, world, cfg))
+            //
+            // A direction on its own counts as asking, not only up. At the top of a ladder
+            // sideways means "get me out this way", and the climb-out is the move that does it:
+            // edging off the rungs instead walks the body out over the hole it came up through,
+            // which is how a fighter ends up standing on air beside a hatch.
+            if (atTop && (wishY > 0 || wishX != 0) &&
+                TryStartMantle(ref s, wishX, s.LadderIndex, world, cfg))
                 return;
 
             // The same courtesy at the other end: keep holding down at the foot of a ladder and
@@ -590,9 +599,20 @@ namespace GulagRunners.Sim
                 return;
             }
 
-            // Pushing sideways edges off the ladder.
-            if (wishX != 0)
-                MoveX(ref s, cfg.LadderDismountSpeed * wishX * Dt, world, cfg);
+            // A direction, with the climb let go of, asks to get off the ladder on that side,
+            // and the climb-out is the move that does it: it looks for floor within reach at or
+            // above the feet, and refuses — leaving the fighter on the rungs — when there is
+            // none. Nothing edges the body sideways off the rungs any more. That was the trap
+            // under two separate complaints: you walk INTO a ladder holding a direction, so
+            // pressing up while still holding it slid the body straight back off and dropped
+            // it, and pressing sideways at the top walked it out over the hole it had just come
+            // up through, standing on air beside the hatch.
+            if (wishX != 0 && wishY == 0 &&
+                TryFindLanding(ref s, wishX, world, in cfg, out FixVec2 stepOff))
+            {
+                StartScripted(ref s, stepOff, wishX, s.Depth, in cfg);
+                return;
+            }
 
             if (wishY != 0 && s.StepNoiseTimer == 0)
             {
@@ -608,14 +628,52 @@ namespace GulagRunners.Sim
                 return;
             }
 
-            // Landed on a floor while edging sideways: let go of the ladder.
-            if (wishX != 0 && Grounded(ref s, world, cfg, s.LadderIndex))
+        }
+
+        /// <summary>
+        /// Can a body standing on this slice get onto that piece of collision by changing lane,
+        /// and which slice would it be standing on. True with no shift at all when the body
+        /// already reaches it.
+        ///
+        /// This is the question a location modelled in 3D keeps asking. Nothing here lines its
+        /// floors up: the ladder stands in FRONT of the walkway it serves, and the walkway is
+        /// half a metre further from the camera than the platform the ladder's foot is on. A
+        /// climb-out that insists on one slice finds nothing to step onto and leaves the fighter
+        /// hanging at the top of the ladder — which is precisely what it did.
+        ///
+        /// LaneReach bounds it, so this is a step back onto the next floor, never a teleport
+        /// into the scenery behind it.
+        /// </summary>
+        static bool LaneFor(Span span, Fix depth, in MoveConfig cfg, out Fix lane)
+        {
+            Fix half = cfg.BodyDepth / 2;
+            if (span.Reaches(depth, half)) { lane = depth; return true; }
+
+            lane = span.Nearest(depth, half);
+            return cfg.LaneReach > Fix.Zero && Fix.Abs(lane - depth) <= cfg.LaneReach;
+        }
+
+        /// <summary>
+        /// The ladder a body is touching, on its own slice or one lane away. Nearest lane wins,
+        /// so a ladder the body already stands on is never passed over for one behind it.
+        /// </summary>
+        static int FindLadderInReach(in Aabb body, Fix depth, SimWorld world,
+                                     in MoveConfig cfg)
+        {
+            int best = -1;
+            Fix bestShift = Fix.Zero;
+
+            for (int i = 0; i < world.Ladders.Length; i++)
             {
-                s.LadderIndex = -1;
-                s.LadderCooldownTimer = cfg.LadderRegrabFrames;
-                s.Mode = MoveMode.Grounded;
-                s.Velocity = FixVec2.Zero;
+                if (!body.Overlaps(in world.Ladders[i])) continue;
+                if (!LaneFor(world.LadderSpan(i), depth, in cfg, out Fix lane)) continue;
+
+                Fix shift = Fix.Abs(lane - depth);
+                if (best >= 0 && shift >= bestShift) continue;
+                best = i;
+                bestShift = shift;
             }
+            return best;
         }
 
         /// <summary>
@@ -630,7 +688,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Ladders.Length; i++)
             {
                 Aabb l = world.Ladders[i];
-                if (!world.LadderSpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
+                if (!LaneFor(world.LadderSpan(i), s.Depth, in cfg, out _)) continue;
                 if (l.MinX >= s.Position.X + half || l.MaxX <= s.Position.X - half) continue;
 
                 Fix drop = s.Position.Y - l.MaxY;
@@ -653,9 +711,10 @@ namespace GulagRunners.Sim
             // floor the rungs end at, not a shuffle sideways. Try that first — a ladder with a
             // hatch has nothing above it to find, so it falls through to the sideways search on
             // its own, with no flag to set and nothing to keep in step with the art.
-            if (TryStepOut(ref s, ladderIndex, world, in cfg, out FixVec2 landUp))
+            if (TryStepOut(ref s, ladderIndex, world, in cfg, out FixVec2 landUp,
+                           out Fix laneUp))
             {
-                StartScripted(ref s, landUp, s.Facing, in cfg);
+                StartScripted(ref s, landUp, s.Facing, laneUp, in cfg);
                 return true;
             }
 
@@ -679,16 +738,20 @@ namespace GulagRunners.Sim
                     ? 1 : -1;
             }
 
-            StartScripted(ref s, side > 0 ? landRight : landLeft, side, in cfg);
+            // A sideways climb-out stays on its own slice: it is a step along this floor, not
+            // onto the next one.
+            StartScripted(ref s, side > 0 ? landRight : landLeft, side, s.Depth, in cfg);
             return true;
         }
 
         /// <summary>Hands the body to the climb-out animation, wherever it is climbing out to.</summary>
-        static void StartScripted(ref PlayerSimState s, FixVec2 landing, int side,
+        static void StartScripted(ref PlayerSimState s, FixVec2 landing, int side, Fix toDepth,
                                   in MoveConfig cfg)
         {
             s.ScriptFrom = s.Position;
             s.ScriptTo = landing;
+            s.ScriptFromDepth = s.Depth;
+            s.ScriptToDepth = toDepth;
 
             // Each axis is charged for the part of the window it actually gets — Y the first two
             // thirds, X the last seven tenths — so neither has to hurry to fit a window the other
@@ -714,9 +777,10 @@ namespace GulagRunners.Sim
         /// nothing overhead to step onto.
         /// </summary>
         static bool TryStepOut(ref PlayerSimState s, int ladderIndex, SimWorld world,
-                               in MoveConfig cfg, out FixVec2 landing)
+                               in MoveConfig cfg, out FixVec2 landing, out Fix lane)
         {
             landing = default;
+            lane = s.Depth;
             if (ladderIndex < 0 || ladderIndex >= world.Ladders.Length) return false;
 
             Aabb ladder = world.Ladders[ladderIndex];
@@ -728,18 +792,29 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
-                if (!world.SolidSpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
                 if (solid.MinX >= x + half || solid.MaxX <= x - half) continue;
                 if (ladder.MaxY < solid.MinY) continue;
                 if (ladder.MaxY > solid.MaxY + cfg.LadderTopMargin) continue;
-                if (!found || solid.MaxY > top) { top = solid.MaxY; found = true; }
+
+                // The landing may be a lane behind the rungs — here it always is.
+                if (!LaneFor(world.SolidSpan(i), s.Depth, in cfg, out Fix candidate)) continue;
+                if (found && solid.MaxY <= top) continue;
+
+                // Climbing out has to end standing, not wedged under the next floor up, and the
+                // whole footprint has to be on it. Both judged on the slice it would land on,
+                // and both now only rule THIS candidate out: the old version took the highest
+                // floor it could see and gave up if that one did not work, so one awkward box
+                // over a ladder's head cancelled the climb-out altogether.
+                Aabb standing = new Aabb(x - half, solid.MaxY + Skin,
+                                         x + half, solid.MaxY + cfg.BodyHeight);
+                if (AnySolidOverlap(world, in standing, candidate, in cfg)) continue;
+                if (!FullySupported(x, solid.MaxY, candidate, world, in cfg)) continue;
+
+                top = solid.MaxY;
+                lane = candidate;
+                found = true;
             }
             if (!found) return false;
-
-            // Climbing out has to end standing, not wedged under the next floor up.
-            Aabb standing = new Aabb(x - half, top + Skin, x + half, top + cfg.BodyHeight);
-            if (AnySolidOverlap(world, in standing, s.Depth, in cfg)) return false;
-            if (!FullySupported(x, top, s.Depth, world, in cfg)) return false;
 
             landing = new FixVec2(x, top + Skin);
             return true;
@@ -759,7 +834,7 @@ namespace GulagRunners.Sim
 
                 FixVec2 probe = new FixVec2(x, s.Position.Y + cfg.BodyHeight);
                 if (!TryFindGroundBelow(probe, s.Depth, world, in cfg, cfg.BodyHeight * 2,
-                                        out Fix groundY, true))
+                                        out Fix groundY))
                     continue;
 
                 // Only ever climb UP and out, never down into something.
@@ -794,7 +869,7 @@ namespace GulagRunners.Sim
                 Fix x = from.X + step * (i * dir);
                 FixVec2 probe = new FixVec2(x, from.Y + cfg.BodyHeight);
                 if (!TryFindGroundBelow(probe, depth, world, in cfg, cfg.BodyHeight * 2,
-                                        out Fix groundY, true))
+                                        out Fix groundY))
                     break;
                 if (!FullySupported(x, groundY, depth, world, in cfg)) break;
                 reached = step * i;
@@ -852,6 +927,11 @@ namespace GulagRunners.Sim
                 s.Position = s.ScriptTo;
                 s.Velocity = FixVec2.Zero;
 
+                // The climb-out owns the slice for its whole length, so it also has to finish on
+                // the one it promised. A mount does not: UpdateDepth is already drawing the body
+                // onto the ladder's own slice while the reach plays.
+                if (s.Mode == MoveMode.Mantling) s.Depth = s.ScriptToDepth;
+
                 if (s.Mode == MoveMode.Mounting)
                 {
                     // On the rungs, holding still. The climb itself starts on the next tick, from
@@ -891,6 +971,12 @@ namespace GulagRunners.Sim
             s.Position = new FixVec2(
                 s.ScriptFrom.X + (s.ScriptTo.X - s.ScriptFrom.X) * xT,
                 s.ScriptFrom.Y + (s.ScriptTo.Y - s.ScriptFrom.Y) * yT);
+
+            // Depth rides with the height: the fighter leans back onto the next floor as they
+            // come up over its edge, which is the one moment in the game where the lane moves
+            // because the move says so rather than because the floor underfoot asked for it.
+            if (s.Mode == MoveMode.Mantling)
+                s.Depth = s.ScriptFromDepth + (s.ScriptToDepth - s.ScriptFromDepth) * yT;
         }
 
         static Fix Clamp01(Fix v) => Fix.Clamp(v, Fix.Zero, Fix.One);
@@ -1168,7 +1254,8 @@ namespace GulagRunners.Sim
             if (AnySolidOverlap(world, in feet, s.Depth, in cfg)) return false;
 
             for (int i = 0; i < world.OneWay.Length; i++)
-                if (feet.Overlaps(in world.OneWay[i])) return true;
+                if (feet.Overlaps(in world.OneWay[i]) &&
+                    world.OneWaySpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) return true;
 
             return false;
         }
@@ -1221,13 +1308,18 @@ namespace GulagRunners.Sim
             return true;
         }
 
-        public static bool TryFindGroundBelow(FixVec2 feet, SimWorld world, in MoveConfig cfg,
-                                              Fix maxDistance, out Fix groundY) =>
-            TryFindGroundBelow(feet, Fix.Zero, world, in cfg, maxDistance, out groundY, false);
-
+        /// <summary>
+        /// The top of the floor under a body, on that body's own slice of the level.
+        ///
+        /// Depth is not a refinement here, it is the whole answer. This used to have an
+        /// overload that searched every baked box regardless of depth, and the spawn used it:
+        /// the wall standing behind this location is a metre taller than the platform in front
+        /// of it, so the spawn snapped the fighter onto the backdrop — a box their own lane
+        /// cannot touch — and the first frame of the match dropped them through the floor.
+        /// </summary>
         public static bool TryFindGroundBelow(FixVec2 feet, Fix depth, SimWorld world,
                                               in MoveConfig cfg, Fix maxDistance,
-                                              out Fix groundY, bool byDepth)
+                                              out Fix groundY)
         {
             Fix half = cfg.BodyWidth / 2;
             Fix halfZ = cfg.BodyDepth / 2;
@@ -1238,7 +1330,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
-                if (byDepth && !world.SolidSpan(i).Reaches(depth, halfZ)) continue;
+                if (!world.SolidSpan(i).Reaches(depth, halfZ)) continue;
                 if (solid.MaxX <= feet.X - half || solid.MinX >= feet.X + half) continue;
                 if (solid.MaxY > feet.Y + Skin) continue;      // above the feet
                 if (solid.MaxY < lowest) continue;             // too far down

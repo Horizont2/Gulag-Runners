@@ -27,6 +27,14 @@ namespace GulagRunners.Sim
         public Span[] LadderZ = System.Array.Empty<Span>();
 
         /// <summary>
+        /// Where each ladder's centre line is at its foot and at its head, parallel to Ladders.
+        /// A ladder leaning against a wall is the normal way to model one, and its bounding box
+        /// is wider than the ladder: climbing the middle of the box means climbing off the
+        /// rungs and out into the air. Empty means every ladder is upright.
+        /// </summary>
+        public Span[] LadderLean = System.Array.Empty<Span>();
+
+        /// <summary>
         /// Chests, in the order the scene lists them. The order is part of the world: a round's
         /// chest states are an array parallel to this one, so both devices must agree on it.
         /// </summary>
@@ -36,18 +44,28 @@ namespace GulagRunners.Sim
         public Span OneWaySpan(int i) => i < OneWayZ.Length ? OneWayZ[i] : Span.Everywhere;
         public Span LadderSpan(int i) => i < LadderZ.Length ? LadderZ[i] : Span.Everywhere;
 
-        /// <summary>Index of the ladder the box touches on this slice of the level, or -1.</summary>
-        public int FindLadder(in Aabb body, Fix depth, Fix half)
-        {
-            for (int i = 0; i < Ladders.Length; i++)
-                if (body.Overlaps(in Ladders[i]) && LadderSpan(i).Reaches(depth, half)) return i;
-            return -1;
-        }
+        public Fix LadderCentreX(int index) => LadderCentreAt(index, Fix.Zero, false);
 
-        public Fix LadderCentreX(int index)
+        /// <summary>
+        /// The middle of a ladder at a given height. Upright, that is the middle of its box;
+        /// leaning, it walks across as you climb, which is the whole difference between
+        /// climbing the rungs and climbing the air beside them.
+        /// </summary>
+        public Fix LadderCentreAt(int index, Fix y, bool atHeight = true)
         {
             Aabb l = Ladders[index];
-            return l.MinX + (l.MaxX - l.MinX) / 2;
+            if (!atHeight || index >= LadderLean.Length)
+                return l.MinX + (l.MaxX - l.MinX) / 2;
+
+            Span lean = LadderLean[index];
+            Fix height = l.MaxY - l.MinY;
+            if (height <= Fix.Zero) return lean.Min;
+
+            Fix t = y - l.MinY;
+            if (t < Fix.Zero) t = Fix.Zero;
+            if (t > height) t = height;
+
+            return lean.Min + (lean.Max - lean.Min) * t / height;
         }
     }
 }

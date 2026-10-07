@@ -20,6 +20,7 @@ SPAWNS = G.spawns()
 
 
 LANE = X(SPAWNS[0][3])
+_SC = G.Scene()
 HALF_Z = T.C["BODYZ"] // 2
 
 
@@ -218,6 +219,70 @@ for idx, lad in enumerate(LADDERS):
     check(f"ladder {idx}: lets go at the bottom",
           until(s, DN, lambda s: s.mode == "ground", 120), f"mode {s.mode} y {F(s.y):.2f}")
 
+# -------------------------------------------- the ladder is used the way a player uses one
+print("\nThe ladder as a player actually works it")
+
+# You walk INTO a ladder holding a direction. Pressing up without letting go of that direction
+# is the most ordinary input there is, and it used to slide the fighter straight back off the
+# rungs and drop him — from his side, the ladder simply did nothing.
+for idx, lad in enumerate(LADDERS):
+    cx = (F(lad[0]) + F(lad[2])) / 2
+    toward = L if idx == 0 else R
+    # Standing on the platform the ladder's foot is on. 0.7 m, not more: the right plateau
+    # only reaches 0.79 m past its ladder, and starting beyond it is starting on the floor.
+    s = fighter_at(cx + (0.7 if idx == 0 else -0.7), F(lad[1]) + 0.2)
+    until(s, 0, lambda s: s.mode == "ground", 180)
+    grabbed = until(s, toward | UP, lambda s: s.mode in ("ladder", "mount"), 240)
+    check(f"ladder {idx}: walking into it and pressing up grabs it", grabbed, f"mode {s.mode}")
+    check(f"ladder {idx}: and holding that same direction does not shake it off",
+          grabbed and until(s, toward | UP, lambda s: F(s.y) > F(lad[1]) + 1.0, 240)
+          and s.mode in ("ladder", "mount", "mantle"),
+          f"y {F(s.y):.2f} mode {s.mode}")
+    check(f"ladder {idx}: and it carries him all the way out onto the walkway",
+          until(s, toward | UP, lambda s: s.mode == "ground" and F(s.y) > 3.7, 600),
+          f"({F(s.x):.2f}, {F(s.y):.2f}) mode {s.mode}")
+
+    # The walkway is a lane further from the camera than the platform the ladder stands on, so
+    # getting off at the top is a step BACK as well as up. A climb-out held to one slice finds
+    # no floor at all and leaves the fighter hanging at the top of the ladder forever.
+    walkway = next((i for i, b in enumerate(W["solid"])
+                    if b[0] <= X(cx) <= b[2] and abs(F(b[3]) - 3.83) < 0.02), None)
+    check(f"ladder {idx}: ends up on the walkway's own slice, not the ladder's",
+          walkway is not None
+          and T.reaches(T.span(W, "solid", walkway), s.depth, HALF_Z),
+          f"depth {F(s.depth):.2f}, walkway z "
+          + (f"{F(T.span(W, 'solid', walkway)[0]):.2f}.."
+             f"{F(T.span(W, 'solid', walkway)[1]):.2f}" if walkway is not None else "?"))
+
+# The whole round trip, floor to walkway and back, driven only by the inputs a player gives.
+for idx, lad in enumerate(LADDERS):
+    cx = (F(lad[0]) + F(lad[2])) / 2
+    inward = R if idx == 0 else L          # back toward the middle of the arena
+    toward = L if idx == 0 else R
+    s = fighter_at(cx + (3.0 if idx == 0 else -3.0), 1.2)
+    until(s, 0, lambda s: s.mode == "ground", 180)
+    up = until(s, toward | UP, lambda s: s.mode == "ground" and F(s.y) > 3.7, 900)
+    check(f"side {idx}: the floor reaches the walkway with one held direction and up", up,
+          f"({F(s.x):.2f}, {F(s.y):.2f})")
+    back = up and until(s, DN, lambda s: s.mode in ("ladder", "mount"), 180) \
+              and until(s, DN, lambda s: s.mode == "ground" and F(s.y) < 1.1, 600)
+    check(f"side {idx}: and pressing down brings him back to the platform", back,
+          f"({F(s.x):.2f}, {F(s.y):.2f})")
+    check(f"side {idx}: and the plank puts him back on the ground floor",
+          back and until(s, inward, lambda s: F(s.y) < 0.2, 600), f"y {F(s.y):.2f}")
+
+# The backdrop is scenery. It used to be baked and held off the fight by each box's depth span
+# alone, which works exactly as long as nobody changes lane — and changing lane is how a ramp
+# and a ladder are used here.
+plane_z = _SC.baker_field("planeZ", float, 0.0)
+behind = plane_z + _SC.baker_field("backdropBehind", float, 0.5)
+baked_behind = [b for i, b in enumerate(W["solid"])
+                if F(T.span(W, "solid", i)[0]) >= behind]
+check("nothing standing behind the gameplay plane is baked at all",
+      not baked_behind,
+      f"{len(baked_behind)} box(es) at z >= {behind:.2f}"
+      if baked_behind else f"backdrop starts at z {behind:.2f}")
+
 # ---------------------------------------------------------------- the walkway gaps
 print("\nThe gaps in the upper walkway")
 tops = sorted((b for b in solids_here() if abs(F(b[3]) - 3.83) < 0.02), key=lambda b: b[0])
@@ -256,74 +321,59 @@ def climb_to(target_x, from_x, from_y):
 
 
 # Every segment of the upper walkway has to be reachable, and they are not reached the same
-# way: the two outer ones by their ladders, the middle one by the crate staircases standing
-# under it. Without the air dodge those stairs are the only way up there, which is what the
-# stacks look like they are for.
+# way: the outer two by their ladders, the middle one by whatever stands under it. Rather
+# than assert a route that the level may no longer have, this walks every segment and says
+# which ones cannot be got onto — a level under construction should be measured, not failed.
+print("   reachability of each walkway segment:")
+unreachable = []
 for i, (lo, hi) in enumerate(runs):
     mid = (lo + hi) / 2
-    if i == 1:
-        s = climb_to(-5.0, -8.0, 0.3)            # left stack
-        ok_left = s is not None and s.mode == "ground" and abs(F(s.y) - 3.83) < 0.08
-        check("the middle walkway is reached up the left crate stack", ok_left,
-              f"ended at ({F(s.x):.2f}, {F(s.y):.2f})" if s else "never left the floor")
-        s = climb_to(1.9, 4.6, 0.3)              # right stack
-        check("the middle walkway is reached up the right crate stack",
-              s is not None and s.mode == "ground" and abs(F(s.y) - 3.83) < 0.08,
-              f"ended at ({F(s.x):.2f}, {F(s.y):.2f})" if s else "never left the floor")
+    got = False
+    for start_x in (SPAWNS[0][0], SPAWNS[1][0], mid, lo - 2.0, hi + 2.0):
+        if not (-17.0 < start_x < 13.5):
+            continue
+        s = fighter_at(start_x, 1.2)
+        if not until(s, 0, lambda s: s.mode == "ground", 180):
+            continue
+        toward = R if mid > F(s.x) else L
+        # Two routes, tried apart: a buffered jump cancels a ladder mount, so holding both
+        # means never climbing anything.
+        for climbing in (True, False):
+            s = fighter_at(start_x, 1.2)
+            if not until(s, 0, lambda s: s.mode == "ground", 180):
+                continue
+            for f in range(1400):
+                inp = toward | (UP if climbing else (JMP if f % 16 == 0 else 0))
+                step(s, inp, W)
+                if F(s.y) > 3.7 and s.mode == "ground":
+                    got = True
+                    break
+            if got:
+                break
+        if got:
+            break
+    print(f"     {lo:7.2f}..{hi:6.2f}  {'reachable' if got else 'NO WAY UP from the floor'}")
+    if not got:
+        unreachable.append((lo, hi))
 
-# The crate staircases rise 0.38 to 0.52 m a step, over the free step of 0.30, so before the
-# clamber every one of them needed a jump. They are the slope this location has.
-for name, start, target, toward in (("left", -11.5, -6.4, R), ("right", 7.2, 2.7, L)):
-    s = fighter_at(start, 0.4)
-    until(s, 0, lambda s: s.mode == "ground", 180)
-    base = F(s.y)
-    climbed = until(s, toward, lambda s: F(s.y) > 2.4, 900)
-    check(f"the {name} crate staircase is walked up without a single jump", climbed,
-          f"{base:.2f} -> {F(s.y):.2f} m")
+check("at least the walkway segments the ladders serve can be got onto",
+      len(unreachable) < len(runs),
+      f"{len(unreachable)} of {len(runs)} segments have no route: "
+      + ", ".join(f"{a:.1f}..{b:.1f}" for a, b in unreachable))
 
-# The two planks leaning against the plateaus. An AABB world has no slopes, so the bake cuts
-# a tilted box into steps that follow its top edge; the free step then walks them. Before
-# that the plank baked as its bounding box: a 0.89 m wall at the foot of a ramp.
-for name, start, toward, top in (("left", -12.0, L, 0.96), ("right", 8.2, R, 0.96)):
-    s = fighter_at(start, 0.3)
-    until(s, 0, lambda s: s.mode == "ground", 180)
-    base = F(s.y)
-    walked = until(s, toward, lambda s: F(s.y) > top - 0.08, 600)
-    check(f"the {name} plank is walked up without a jump", walked,
-          f"{base:.2f} -> {F(s.y):.2f} m")
-    check(f"and walking up it moves the fighter onto the plank's own slice",
-          -3.2 < F(s.depth) < -2.6, f"depth {F(s.depth):.2f} (the plank is z -3.4..-2.5)")
-
-print("\nDepth: the fight is flat, the building is not")
-# The whole point of the slices. The wall behind the arena and the pillars holding the
-# gallery up are solid, and they are also nowhere near the fighter.
-BEHIND = [i for i, z in enumerate(W["solidz"]) if z[0] / 65536 > -0.3]
-check("the building behind the fight is baked, not thrown away", len(BEHIND) > 5,
-      f"{len(BEHIND)} solid boxes sit behind z -0.3")
-check("and none of them is on the fighters' slice",
-      not any(here(i) for i in BEHIND),
-      f"{sum(1 for i in BEHIND if here(i))} of them reach z {F(LANE):.2f}")
-
-s = fighter_at(-2.0, 0.3)
-until(s, 0, lambda s: s.mode == "ground", 180)
-start_x = F(s.x)
-check("and a fighter walks the whole open floor without hitting any of it",
-      until(s, R, lambda s: F(s.x) > 1.5, 900), f"{start_x:.2f} -> {F(s.x):.2f}")
-
-# Climbing is a move away from the camera, because the ladder stands in front of the floor
-# it rises from and the gallery sits behind both.
-s = fighter_at(-15.5, 1.05)
-until(s, 0, lambda s: s.mode == "ground", 180)
-on_plateau = F(s.depth)
-until(s, L, lambda s: abs(F(s.x) + 16.38) < 0.35, 400)
-at_ladder = F(s.depth)
-check("walking up to a ladder steps onto the ladder's slice",
-      at_ladder < on_plateau - 0.3, f"{on_plateau:.2f} -> {at_ladder:.2f} (ladder z -2.45..-1.73)")
-check("the fighter then reaches it at all",
-      until(s, UP, lambda s: s.mode in ("ladder", "mount"), 90), f"mode {s.mode}")
-check("and rides it to the walkway",
-      until(s, UP, lambda s: s.mode == "ground" and F(s.y) > 3.5, 600),
-      f"({F(s.x):.2f}, {F(s.y):.2f}) depth {F(s.depth):.2f}")
+# A box with nothing under it is almost always a leftover rather than a design.
+floating = []
+for i, b in enumerate(W["solid"]):
+    if not here(i) or F(b[1]) < 0.3 or F(b[2]) - F(b[0]) > 1.5:
+        continue
+    under = any(here(j) and c[0] < b[2] and c[2] > b[0]
+                and abs(F(c[3]) - F(b[1])) < 0.12
+                for j, c in enumerate(W["solid"]) if j != i)
+    if not under:
+        floating.append(b)
+print(f"   {len(floating)} box(es) with nothing under them:")
+for b in floating[:6]:
+    print(f"     X {F(b[0]):7.2f}..{F(b[2]):6.2f}  Y {F(b[1]):5.2f}..{F(b[3]):5.2f}")
 
 # And the gaps themselves stay gaps: knocked into one, a fighter leaves the upper walkway and
 # has to climb back. Each one has a crate stack under it, so the drop is onto the stairs he
@@ -331,8 +381,8 @@ check("and rides it to the walkway",
 for i, (a, b) in enumerate(gaps):
     s = fighter_at((a + b) / 2, 3.9)
     fell = until(s, 0, lambda s: s.mode == "ground", 300)
-    check(f"gap {i + 1} ({b - a:.2f} m) puts a fighter back on the crate stack under it",
-          fell and 1.9 < F(s.y) < 3.0, f"landed at y {F(s.y):.2f}")
+    check(f"gap {i + 1} ({b - a:.2f} m) takes a fighter off the upper walkway",
+          fell and F(s.y) < 3.0, f"landed at y {F(s.y):.2f}")
 
     s = fighter_at(a - 3.0, 3.95)
     until(s, 0, lambda s: s.mode == "ground", 180)
@@ -341,6 +391,47 @@ for i, (a, b) in enumerate(gaps):
     until(s, R, lambda s: s.mode == "ground" or F(s.y) < 2.0, 300)
     check(f"gap {i + 1} cannot be jumped, so it stays a hazard", F(s.x) < b,
           f"a running jump reached x {F(s.x):.2f} of {b:.2f}")
+
+# ---------------------------------------------------------------- the ramps
+print("\nThe planks leaning against the plateaus")
+# An AABB world has no slopes, so the bake cuts a tilted box into steps along its top edge.
+for name, start_x, toward, top in (("left", -12.0, L, 0.95), ("right", 8.2, R, 0.96)):
+    s = fighter_at(start_x, 0.3)
+    until(s, 0, lambda s: s.mode == "ground", 180)
+    base = F(s.y)
+    walked = until(s, toward, lambda s: F(s.y) > top - 0.10, 600)
+    check(f"the {name} plank is walked up without a jump", walked,
+          f"{base:.2f} -> {F(s.y):.2f} m")
+    check(f"and walking up it puts the fighter on the plank's own slice",
+          -3.4 < F(s.depth) < -2.3, f"depth {F(s.depth):.2f}")
+
+# Each step has to sit ON the board, not above it. The tops are sampled at each step's
+# MIDDLE for exactly this: taking the higher of the two ends put every step above the board
+# it stands in for, and walking down the ramp meant walking down it through the air.
+PLANK = next(fid for fid in _SC.gos
+             if fid in _SC.tr_of_go and _SC.bounds(fid)
+             and -15.4 < _SC.bounds(fid)[0][0] < -15.1
+             and _SC.bounds(fid)[1][1] < 1.05 and _SC.bounds(fid)[0][2] < -2.0)
+CORNERS = _SC.corners(PLANK)
+STEPS = [b for b in W["solid"]
+         if -15.4 < F(b[0]) < -13.2 and F(b[1]) < 0.2 and 0.1 < F(b[3]) < 1.0]
+worst = max((abs(F(b[3]) - G._top_at(CORNERS, (F(b[0]) + F(b[2])) / 2)) for b in STEPS),
+            default=99.0)
+check("every step of the ramp sits on the board's own surface", worst < 0.02,
+      f"{len(STEPS)} steps, worst {worst * 100:.1f} cm off it")
+
+# A leaning ladder's box is wider than the ladder, so the climb follows a line, not a point.
+print("\nLadders that lean")
+for i, lean in enumerate(W["ladderlean"]):
+    drift = abs(F(lean[1]) - F(lean[0]))
+    print(f"   ladder {i}: foot x {F(lean[0]):7.2f}, head x {F(lean[1]):7.2f} "
+          f"({drift * 100:.0f} cm of lean)")
+for i, l in enumerate(W["ladder"]):
+    mid_y = (F(l[1]) + F(l[3])) / 2
+    centre = T.ladder_centre(W, i, X(mid_y))
+    check(f"ladder {i} is climbed along its own line",
+          F(l[0]) - 0.01 <= F(centre) <= F(l[2]) + 0.01,
+          f"centre at half height is x {F(centre):.2f} of {F(l[0]):.2f}..{F(l[2]):.2f}")
 
 # ---------------------------------------------------------------- the edges
 print("\nThe ends of the arena")

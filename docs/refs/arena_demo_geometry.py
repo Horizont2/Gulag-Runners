@@ -300,6 +300,15 @@ class Scene:
                     out.append((origin[0] + w[0], origin[1] + w[1]))
         return out
 
+    def baker_field(self, name, cast=float, default=None):
+        """One value off the scene's SimWorldBaker, so a test can measure against what the
+        scene actually asks for rather than against a number copied into the test."""
+        body = next((b for fid, (cls, b) in self.docs.items()
+                     if cls == 114 and f'guid: {BAKER_GUID}' in b), None)
+        if body is None:
+            raise SystemExit('Arena_Demo has no SimWorldBaker')
+        return _field(body, name, cast, default)
+
     def trigger(self, go):
         for c in self.gos[go]['comps']:
             cls, body = self.docs.get(c, (0, ''))
@@ -345,6 +354,15 @@ def _top_at(corners, x):
     return top
 
 
+def ladder_lean(corners):
+    """Where a ladder's centre line is at its foot and at its head. A leaning ladder's box is
+    wider than the ladder, and climbing the middle of the box is climbing the air beside it."""
+    by_y = sorted(corners, key=lambda c: c[1])
+    bottom = sum(c[0] for c in by_y[:4]) / 4
+    top = sum(c[0] for c in by_y[4:]) / 4
+    return (X(bottom), X(top))
+
+
 def slope_steps(corners, step, min_rise):
     """A tilted box cut into a staircase that follows its top edge, or None if it is a box."""
     if step <= 0.01:
@@ -362,10 +380,10 @@ def slope_steps(corners, step, min_rise):
     for i in range(count):
         a = lo_x + run * i
         b = a + run
-        top = max(_top_at(corners, a), _top_at(corners, b))
-        for cx, cy in corners:
-            if a <= cx <= b and cy > top:
-                top = cy
+        # The surface at the MIDDLE of the step, not the higher of its two ends: taking the
+        # high end puts every step above the board it stands in for, and a fighter walking
+        # down the ramp walks down it through the air.
+        top = _top_at(corners, (a + b) / 2)
         if top - lo_y <= 0.001:
             continue
         out.append(((a, lo_y, 0.0), (b, top, 0.0)))
@@ -413,33 +431,49 @@ def bake(scene=None, report=False):
     filters_marked = _field(baker, 'planeFiltersMarked', int, 1)
     margin = _field(baker, 'hatchMargin', float, 0.1)
     min_overlap = _field(baker, 'hatchMinOverlap', float, 0.05)
+    drop_backdrop = _field(baker, 'dropBackdrop', int, 1)
+    backdrop_behind = _field(baker, 'backdropBehind', float, 0.5)
+
+    def is_backdrop(b):
+        """Behind the fight rather than part of it, judged on the box's nearest face."""
+        return bool(drop_backdrop) and b[0][2] >= plane_z + backdrop_behind
 
     solids, oneway, ladders, chests = [], [], [], []
-    solidz, onewayz, ladderz = [], [], []
+    solidz, onewayz, ladderz, ladderlean = [], [], [], []
     culled = []
     slopes = 0
-    step_m = _field(baker, 'slopeStep', float, 0.3)
+    step_m = _field(baker, 'slopeStep', float, 0.2)
     min_rise = _field(baker, 'slopeMinRise', float, 0.12)
 
     def fill(depths, upto, z):
         while len(depths) < upto:
             depths.append(z)
     marked, ignored, off_plane, triggers, on_player, on_chest = 0, 0, 0, 0, 0, 0
+    backdrop = 0
     handled = set()
 
     # 1. SimCollider wins, and is never depth-culled: it is an explicit decision.
     for go in sorted(sc.gos):
         body = sc.script(go, SIM_COLLIDER_GUID)
-        if body is None or not sc.active(go):
+        if body is None:
+            continue
+        # A marker claims the object whether or not it is switched on: turning it off means no
+        # collision, not "fall back to the BoxCollider the art came with".
+        handled.add(go)
+        if not sc.active(go):
             continue
         marked += 1
-        handled.add(go)
         kind = _field(body, 'kind', int, 0)
         if kind == IGNORE:
             ignored += 1
             continue
         b = sc.bounds(go)
         if b is None:
+            continue
+        # The backdrop is dropped outright, and never to the rescue list: a location with no
+        # floor left needs its band moved, and the backdrop is not the floor it is missing.
+        if is_backdrop(b):
+            backdrop += 1
             continue
         # A marker says WHAT a box is, not that it is on the gameplay plane.
         if filters_marked and restrict and not (b[1][2] >= plane_z - thickness
@@ -459,13 +493,17 @@ def bake(scene=None, report=False):
         fill(solidz, len(solids), mz)
         fill(onewayz, len(oneway), mz)
         fill(ladderz, len(ladders), mz)
+        while len(ladderlean) < len(ladders):
+            ladderlean.append(ladder_lean(sc.corners(go)))
 
     # 2. Chests, before the ordinary colliders, so a chest never becomes a wall.
     for go in sorted(sc.gos):
         body = sc.script(go, CHEST_GUID)
-        if body is None or not sc.active(go):
+        if body is None:
             continue
         handled.add(go)
+        if not sc.active(go):
+            continue
         b = sc.bounds(go)
         if b is not None:
             chests.append((_aabb(*b), _field(body, 'kind', int, 0),
@@ -489,6 +527,9 @@ def bake(scene=None, report=False):
             on_chest += 1
             continue
         lo, hi = b
+        if is_backdrop(b):
+            backdrop += 1
+            continue
         if restrict and not (hi[2] >= plane_z - thickness and lo[2] <= plane_z + thickness):
             off_plane += 1
             culled.append(_aabb(lo, hi))
@@ -521,18 +562,19 @@ def bake(scene=None, report=False):
         print(f"bake: plane z {plane_z} +-{thickness} -> {len(solids)} solid "
               f"({hatches} cut by ladders), {len(oneway)} one-way, {len(ladders)} ladder, "
               f"{len(chests)} chest; {marked} marked ({ignored} ignored), "
-              f"{off_plane} off the plane, {triggers} trigger, "
+              f"{off_plane} off the plane, {backdrop} backdrop, {triggers} trigger, "
               f"{on_player} on a fighter, {on_chest} on a chest, "
               f"{slopes} slope(s) cut into steps")
 
     return {"solid": solids, "oneway": oneway, "ladder": ladders, "chest": chests,
-            "solidz": solidz, "onewayz": onewayz, "ladderz": ladderz}
+            "solidz": solidz, "onewayz": onewayz, "ladderz": ladderz,
+            "ladderlean": ladderlean}
 
 
 def world(report=False):
     b = bake(report=report)
     return {k: b[k] for k in ("solid", "oneway", "ladder",
-                              "solidz", "onewayz", "ladderz")}
+                              "solidz", "onewayz", "ladderz", "ladderlean")}
 
 
 CAMERA_GUID = "b921a9be9303a1887f282de341a5ae31"

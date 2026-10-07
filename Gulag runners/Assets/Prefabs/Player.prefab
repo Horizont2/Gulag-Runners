@@ -148,7 +148,6 @@ MonoBehaviour:
     jumpBufferFrames: 7
     climbUpSpeed: 2
     climbDownSpeed: 2.6
-    ladderDismountSpeed: 1.5
     dodgeSpeed: 7
     dodgeFrames: 21
     dodgeRecoverFrames: 9

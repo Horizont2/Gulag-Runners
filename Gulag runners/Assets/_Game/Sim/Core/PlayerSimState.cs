@@ -140,6 +140,15 @@ namespace GulagRunners.Sim
         public FixVec2 ScriptTo;
         public int ScriptTimer;
         public int ScriptFrames;
+
+        /// <summary>
+        /// The slices a climb-out starts and ends on. A location modelled in 3D does not line
+        /// its floors up: the ladder here stands in FRONT of the walkway it serves, so getting
+        /// off at the top is a step back as well as up, and the climb-out carries the body
+        /// across in depth over the same frames it carries it in height.
+        /// </summary>
+        public Fix ScriptFromDepth;
+        public Fix ScriptToDepth;
         /// <summary>Which way the scripted move goes: climb direction for a mount, step side for
         /// a climb-out. Presentation reads it to pick the matching clip.</summary>
         public sbyte ScriptDir;

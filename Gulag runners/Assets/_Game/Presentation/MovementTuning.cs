@@ -44,9 +44,6 @@ namespace GulagRunners.Game
         [Header("Ladders")]
         public float climbUpSpeed = 2.0f;
         public float climbDownSpeed = 2.6f;
-        [Tooltip("How fast you edge sideways off a ladder onto a landing.")]
-        public float ladderDismountSpeed = 1.5f;
-
         [Tooltip("How fast the body is pulled back to a ladder's centre line after drifting off " +
                  "it. The grab eases on by itself, so this only has a sideways nudge to undo: at " +
                  "climbing speed it is invisible, and at four times that it is a yank.")]
@@ -56,7 +53,12 @@ namespace GulagRunners.Game
                  "the character pop off the ladder and fall straight back onto it.")]
         public float ladderTopMargin = 0.06f;
 
-        [Tooltip("How far to either side the climb-out looks for floor to step onto.")]
+        [Tooltip("How far to either side the climb-out looks for floor to step onto.\n\n" +
+                 "It is the whole way off a ladder sideways now, at the top of one or halfway " +
+                 "up it: hold a direction with no up or down and the fighter climbs out onto " +
+                 "whatever floor is within this of them on that side, or stays on the rungs " +
+                 "when there is none. Nothing edges the body off the ladder any more — that " +
+                 "walked a fighter out over the hatch they had just come up through.")]
         public float mantleReach = 1.6f;
 
         [Tooltip("Average speed of the two scripted ladder moves: the grab at the bottom and the " +
@@ -142,7 +144,6 @@ namespace GulagRunners.Game
             c.JumpBufferFrames = jumpBufferFrames;
             c.ClimbUpSpeed = M(climbUpSpeed);
             c.ClimbDownSpeed = M(climbDownSpeed);
-            c.LadderDismountSpeed = M(ladderDismountSpeed);
             c.LadderSnapSpeed = M(ladderSnapSpeed);
             c.LadderTopMargin = M(ladderTopMargin);
             c.MantleReach = M(mantleReach);

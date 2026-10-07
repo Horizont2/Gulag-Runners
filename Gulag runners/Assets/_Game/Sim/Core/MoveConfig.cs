@@ -40,8 +40,6 @@ namespace GulagRunners.Sim
 
         public Fix ClimbUpSpeed;
         public Fix ClimbDownSpeed;
-        /// <summary>How fast you edge sideways off a ladder.</summary>
-        public Fix LadderDismountSpeed;
 
         /// <summary>
         /// How fast the body is drawn back to the ladder's centre line after drifting off it. The
@@ -162,7 +160,6 @@ namespace GulagRunners.Sim
 
             c.ClimbUpSpeed   = Fix.FromMilli(2000);
             c.ClimbDownSpeed = Fix.FromMilli(2600);
-            c.LadderDismountSpeed = Fix.FromMilli(1500);
             c.LadderSnapSpeed = Fix.FromMilli(2000);
             c.LadderTopMargin = Fix.FromMilli(60);
             c.MantleReach = Fix.FromMilli(1600);

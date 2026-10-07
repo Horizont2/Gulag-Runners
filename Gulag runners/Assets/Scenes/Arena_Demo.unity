@@ -8031,6 +8031,8 @@ MonoBehaviour:
   planeZ: -0.5
   planeThickness: 3
   planeFiltersMarked: 1
+  dropBackdrop: 1
+  backdropBehind: 0.5
   ladderCutsHatch: 0
   slopeStep: 0.3
   slopeMinRise: 0.12
@@ -8163,7 +8165,6 @@ MonoBehaviour:
     jumpBufferFrames: 7
     climbUpSpeed: 2
     climbDownSpeed: 2.6
-    ladderDismountSpeed: 1.5
     ladderSnapSpeed: 2
     ladderTopMargin: 0.06
     mantleReach: 1.6
@@ -8378,7 +8379,6 @@ MonoBehaviour:
     jumpBufferFrames: 7
     climbUpSpeed: 2
     climbDownSpeed: 2.6
-    ladderDismountSpeed: 1.5
     ladderSnapSpeed: 2
     ladderTopMargin: 0.06
     mantleReach: 1.6

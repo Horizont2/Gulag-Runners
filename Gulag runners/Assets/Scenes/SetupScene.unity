@@ -3010,7 +3010,6 @@ MonoBehaviour:
     jumpBufferFrames: 7
     climbUpSpeed: 2
     climbDownSpeed: 2.6
-    ladderDismountSpeed: 1.5
     ladderSnapSpeed: 2
     ladderTopMargin: 0.06
     mantleReach: 1.6
@@ -3221,7 +3220,6 @@ MonoBehaviour:
     jumpBufferFrames: 7
     climbUpSpeed: 2
     climbDownSpeed: 2.6
-    ladderDismountSpeed: 1.5
     ladderSnapSpeed: 2
     ladderTopMargin: 0.06
     mantleReach: 1.6
