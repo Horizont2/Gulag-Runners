@@ -37,6 +37,11 @@ namespace GulagRunners.Game
                  "A drop with the pool full recycles the stalest item on the floor.")]
         [Range(1, 32)] public int groundItemCapacity = 6;
 
+        [Tooltip("Seed the round's loot is dealt from. 0 rolls a new one every round, which is " +
+                 "what a match wants; set it to replay an arena that produced something worth " +
+                 "looking at, and both devices dealt from the same number will agree (docs/06).")]
+        public uint seed;
+
         [Header("The fight (docs/02)")]
         public CombatTuning combat = new CombatTuning();
 
@@ -84,6 +89,20 @@ namespace GulagRunners.Game
             if (ChestStates.Length == 0) ResetRound();
         }
 
+        /// <summary>
+        /// The seed this round is dealt from. Rolled forward each round so "Reset round" twice
+        /// gives two different arenas, and settable so a seed that produced something worth
+        /// looking at can be played again.
+        /// </summary>
+        uint NextSeed()
+        {
+            if (seed != 0) return seed;                  // pinned in the inspector
+            _rollingSeed = _rollingSeed * 1664525u + 1013904223u;
+            return _rollingSeed;
+        }
+
+        uint _rollingSeed = 0x5EED1234u;
+
         /// <summary>Shuts every chest again. One call is a new round.</summary>
         [ContextMenu("Reset round")]
         public void ResetRound()
@@ -97,6 +116,12 @@ namespace GulagRunners.Game
 
             int count = world != null ? world.Chests.Length : 0;
             ChestStates = ChestSimState.FreshSet(count);
+
+            // Deal the round. docs/01's symmetric start and asymmetric result: both sides of
+            // the arena have the same chests and different things in them, which is what makes
+            // the scavenge phase a set of decisions rather than a race down a known list.
+            if (world != null)
+                LootTable.Deal(world.Chests, ChestStates, NextSeed());
             GroundItems = GroundItem.Pool(groundItemCapacity);
             _tickOwner = null;
         }

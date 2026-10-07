@@ -18,7 +18,18 @@ namespace GulagRunners.Sim
         /// </summary>
         public int Opener;
 
-        public static ChestSimState Fresh() => new ChestSimState { Progress = 0, Opened = false, Opener = -1 };
+        /// <summary>
+        /// What is in it this round. Dealt at the start from the round's seed, unless the
+        /// chest was authored with something pinned in it — see <see cref="LootTable.Deal"/>.
+        /// It lives here rather than on the def because the def is the arena, which does not
+        /// change between rounds, and this does.
+        /// </summary>
+        public ItemId Contents;
+
+        public static ChestSimState Fresh() => new ChestSimState
+        {
+            Progress = 0, Opened = false, Opener = -1, Contents = ItemId.None
+        };
 
         public static ChestSimState[] FreshSet(int count)
         {

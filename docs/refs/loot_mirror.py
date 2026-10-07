@@ -15,36 +15,73 @@ BANDAGE = 30
 WEAPON, ARMOUR, UTILITY = 1, 2, 3
 
 
-def _w(name, tier, dmg, frames, reach, dur, pry, pierce=0):
+def _w(name, tier, dmg, frames, reach, dur, pry, pierce=0, weight=0):
     return dict(kind=WEAPON, tier=tier, dmg=dmg, frames=frames, reach=M(reach),
-                pry=M(pry), dur=dur, pierce=pierce, name=name)
+                pry=M(pry), dur=dur, pierce=pierce, weight=weight, name=name)
 
 
-def _a(name, tier, reduction, chip=0, parry=0):
+def _a(name, tier, reduction, chip=0, parry=0, weight=0):
     return dict(kind=ARMOUR, tier=tier, dmg=0, frames=0, reach=0, pry=0, dur=0,
-                pierce=0, reduction=reduction, chip=chip, parry=parry, name=name)
+                pierce=0, reduction=reduction, chip=chip, parry=parry, weight=weight,
+                name=name)
 
 
 ITEMS = {
     NONE:      dict(kind=0, tier=0, pry=0, dur=0, name="-"),
     FISTS:     _w("fists", 0, 4, 12, 600, 0, 1000),
-    CLUB:      _w("club", 1, 8, 15, 950, 14, 2000),
-    SPEAR:     _w("spear", 2, 13, 27, 1700, 9, 1600),
-    DAGGER:    _w("dagger", 1, 5, 9, 700, 18, 1200),
-    SWORD:     _w("sword", 2, 10, 19, 1150, 12, 1500),
-    AXE:       _w("axe", 2, 12, 23, 1050, 10, 2400, pierce=350),
-    GLADIUS:   _w("gladius", 1, 7, 12, 900, 16, 1300),
-    MACE:      _w("mace", 1, 9, 18, 850, 12, 1100, pierce=200),
-    SABER:     _w("saber", 2, 9, 14, 1100, 11, 1300),
-    SCYTHE:    _w("scythe", 2, 11, 29, 1850, 8, 1200, pierce=500),
-    FLANGED_MACE: _w("flanged mace", 3, 12, 21, 1300, 9, 1400, pierce=700),
-    WARHAMMER: _w("warhammer", 3, 21, 34, 1400, 6, 2600, pierce=450),
-    LEATHER:   _a("leather vest", 1, 150),
-    CHAINMAIL: _a("chainmail", 2, 300),
-    PLATE:     _a("plate", 3, 450),
-    SHIELD:    _a("shield", 2, 100, chip=400, parry=4),
-    BANDAGE:   dict(kind=UTILITY, tier=1, pry=0, dur=0, heal=30, name="bandage"),
+    CLUB:      _w("club", 1, 8, 15, 950, 14, 2000, weight=120),
+    SPEAR:     _w("spear", 2, 13, 27, 1700, 9, 1600, weight=90),
+    DAGGER:    _w("dagger", 1, 5, 9, 700, 18, 1200, weight=90),
+    SWORD:     _w("sword", 2, 10, 19, 1150, 12, 1500, weight=110),
+    AXE:       _w("axe", 2, 12, 23, 1050, 10, 2400, pierce=350, weight=100),
+    GLADIUS:   _w("gladius", 1, 7, 12, 900, 16, 1300, weight=100),
+    MACE:      _w("mace", 1, 9, 18, 850, 12, 1100, pierce=200, weight=80),
+    SABER:     _w("saber", 2, 9, 14, 1100, 11, 1300, weight=100),
+    SCYTHE:    _w("scythe", 2, 11, 29, 1850, 8, 1200, pierce=500, weight=70),
+    FLANGED_MACE: _w("flanged mace", 3, 12, 21, 1300, 9, 1400, pierce=700, weight=100),
+    WARHAMMER: _w("warhammer", 3, 21, 34, 1400, 6, 2600, pierce=450, weight=70),
+    LEATHER:   _a("leather vest", 1, 150, weight=100),
+    CHAINMAIL: _a("chainmail", 2, 300, weight=100),
+    PLATE:     _a("plate", 3, 450, weight=90),
+    SHIELD:    _a("shield", 2, 100, chip=400, parry=4, weight=90),
+    BANDAGE:   dict(kind=UTILITY, tier=1, pry=0, dur=0, heal=30, weight=110, name="bandage"),
 }
+
+# ---------------------------------------------------------------- the deal (LootTable)
+class Rng:
+    """xorshift32, the same sequence the sim's Rng produces. System.Random is out: docs/06
+    needs two devices to make the same round from the same seed."""
+
+    def __init__(s, seed):
+        s.state = 0x9E3779B9 if seed == 0 else (seed & 0xFFFFFFFF)
+
+    def next(s):
+        x = s.state
+        x ^= (x << 13) & 0xFFFFFFFF
+        x ^= x >> 17
+        x ^= (x << 5) & 0xFFFFFFFF
+        s.state = x
+        return x
+
+    def below(s, limit):
+        return 0 if limit <= 1 else s.next() % limit
+
+    def weighted(s, weights):
+        total = sum(w for w in weights if w > 0)
+        if total <= 0: return -1
+        roll = s.below(total)
+        for i, w in enumerate(weights):
+            if w <= 0: continue
+            roll -= w
+            if roll < 0: return i
+        return -1
+
+    def fork(s, salt):
+        v = (s.state ^ ((salt * 0x9E3779B9) & 0xFFFFFFFF)) & 0xFFFFFFFF
+        v ^= v >> 15
+        v = (v * 0x2545F491) & 0xFFFFFFFF
+        return Rng(v)
+
 
 def pry_milli(weapon):
     """ToMilli() of the pry speed: what one tick of holding adds."""
@@ -58,6 +95,43 @@ CHEST_CFG = {
     LOCKER: dict(bare=300, bare_noise=2, tool_noise=3, wear=2, name="locker"),
     SAFE:   dict(bare=360, bare_noise=3, tool_noise=3, wear=3, name="safe"),
 }
+# Chance of each tier per chest kind, in percent. Rows sum to 100.
+TIER_ODDS = {
+    CRATE:  (80, 20, 0),
+    LOCKER: (35, 55, 10),
+    SAFE:   (5, 45, 50),
+}
+
+
+def roll_tier(kind, rng):
+    roll = rng.below(100)
+    for t, chance in enumerate(TIER_ODDS[kind]):
+        roll -= chance
+        if roll < 0: return t + 1
+    return 1
+
+
+def roll_in_tier(tier, rng):
+    pool = [(i, v) for i, v in sorted(ITEMS.items())
+            if v["kind"] != 0 and v.get("tier") == tier and v.get("weight", 0) > 0]
+    pick = rng.weighted([v["weight"] for _, v in pool])
+    return NONE if pick < 0 else pool[pick][0]
+
+
+def roll_chest(kind, rng):
+    return roll_in_tier(roll_tier(kind, rng), rng)
+
+
+def deal(chests, seed):
+    """Fills in every chest that was not pinned by hand, each from its own stream."""
+    round_rng = Rng(seed)
+    for i, chest in enumerate(chests):
+        if getattr(chest, "pinned", NONE) != NONE:
+            chest.contents = chest.pinned
+            continue
+        chest.contents = roll_chest(chest.kind, round_rng.fork(i + 1))
+
+
 DECAY_MUL = 2
 NOISE_FRAMES = 20
 

@@ -13,6 +13,17 @@ namespace GulagRunners.Sim
         /// <summary>0 for fists, 1 white, 2 blue, 3 gold. Drives the glow, and nothing else.</summary>
         public byte Tier;
 
+        /// <summary>
+        /// How often this comes up against the others of its tier. 0 keeps it out of chests
+        /// altogether, which is what fists are and what a tutorial-only item would be.
+        ///
+        /// Rarity within a tier is a separate dial from the tier itself on purpose: a scythe
+        /// and a sword are both T2 and should not be equally common, because one of them is a
+        /// plan most players will not want and the other is the plan everything else is read
+        /// against.
+        /// </summary>
+        public int Weight;
+
         // ---- weapon
         public Fix Damage;
         /// <summary>Frames from pressing attack to the hit landing. Lower is faster.</summary>

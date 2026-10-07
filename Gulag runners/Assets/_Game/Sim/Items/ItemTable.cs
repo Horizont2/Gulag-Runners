@@ -53,6 +53,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Club] = new ItemDef
             {
                 Id = ItemId.Club,
+                Weight = 120,
                 Kind = ItemKind.Weapon,
                 Tier = 1,
                 Damage = Fix.FromMilli(8000),
@@ -65,6 +66,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Spear] = new ItemDef
             {
                 Id = ItemId.Spear,
+                Weight = 90,
                 Kind = ItemKind.Weapon,
                 Tier = 2,
                 Damage = Fix.FromMilli(13000),
@@ -77,6 +79,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Dagger] = new ItemDef
             {
                 Id = ItemId.Dagger,
+                Weight = 90,
                 Kind = ItemKind.Weapon,
                 Tier = 1,
                 Damage = Fix.FromMilli(5000),       // a hair above bare hands, or why pick it up
@@ -89,6 +92,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Sword] = new ItemDef
             {
                 Id = ItemId.Sword,
+                Weight = 110,
                 Kind = ItemKind.Weapon,
                 Tier = 2,
                 Damage = Fix.FromMilli(10000),
@@ -101,6 +105,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Axe] = new ItemDef
             {
                 Id = ItemId.Axe,
+                Weight = 100,
                 Kind = ItemKind.Weapon,
                 Tier = 2,
                 Damage = Fix.FromMilli(12000),
@@ -117,6 +122,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Gladius] = new ItemDef
             {
                 Id = ItemId.Gladius,
+                Weight = 100,
                 Kind = ItemKind.Weapon,
                 Tier = 1,
                 Damage = Fix.FromMilli(7000),
@@ -132,6 +138,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Mace] = new ItemDef
             {
                 Id = ItemId.Mace,
+                Weight = 80,
                 Kind = ItemKind.Weapon,
                 Tier = 1,
                 Damage = Fix.FromMilli(9000),
@@ -147,6 +154,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Saber] = new ItemDef
             {
                 Id = ItemId.Saber,
+                Weight = 100,
                 Kind = ItemKind.Weapon,
                 Tier = 2,
                 Damage = Fix.FromMilli(9000),
@@ -162,6 +170,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Scythe] = new ItemDef
             {
                 Id = ItemId.Scythe,
+                Weight = 70,
                 Kind = ItemKind.Weapon,
                 Tier = 2,
                 Damage = Fix.FromMilli(11000),
@@ -175,6 +184,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.FlangedMace] = new ItemDef
             {
                 Id = ItemId.FlangedMace,
+                Weight = 100,
                 Kind = ItemKind.Weapon,
                 Tier = 3,
                 Damage = Fix.FromMilli(12000),
@@ -188,6 +198,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Warhammer] = new ItemDef
             {
                 Id = ItemId.Warhammer,
+                Weight = 70,
                 Kind = ItemKind.Weapon,
                 Tier = 3,
                 Damage = Fix.FromMilli(21000),
@@ -201,6 +212,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.LeatherVest] = new ItemDef
             {
                 Id = ItemId.LeatherVest,
+                Weight = 100,
                 Kind = ItemKind.Armour,
                 Tier = 1,
                 DamageReduction = Fix.FromMilli(150)
@@ -209,6 +221,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Chainmail] = new ItemDef
             {
                 Id = ItemId.Chainmail,
+                Weight = 100,
                 Kind = ItemKind.Armour,
                 Tier = 2,
                 DamageReduction = Fix.FromMilli(300)
@@ -217,6 +230,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Plate] = new ItemDef
             {
                 Id = ItemId.Plate,
+                Weight = 90,
                 Kind = ItemKind.Armour,
                 Tier = 3,
                 DamageReduction = Fix.FromMilli(450)
@@ -229,6 +243,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Shield] = new ItemDef
             {
                 Id = ItemId.Shield,
+                Weight = 90,
                 Kind = ItemKind.Armour,
                 Tier = 2,
                 DamageReduction = Fix.FromMilli(100),   // 10%: it is not armour
@@ -239,6 +254,7 @@ namespace GulagRunners.Sim
             t[(int)ItemId.Bandage] = new ItemDef
             {
                 Id = ItemId.Bandage,
+                Weight = 110,
                 Kind = ItemKind.Utility,
                 Tier = 1,
                 Heal = 30

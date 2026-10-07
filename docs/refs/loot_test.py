@@ -6,9 +6,12 @@ import sim_motor_mirror as M
 import loot_mirror as T
 from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, ACTION
 from arena_geometry import floor_h, ladder_x, world
+import collections
 from loot_mirror import (Chest, Inv, loot_step, frames_to_open, fresh, pool, step_ground,
                          drop_item, CRATE, LOCKER, SAFE, NONE, FISTS, CLUB, SPEAR, CHAINMAIL,
-                         BANDAGE, ITEMS, CHEST_CFG, D, RESTING, FLYING)
+                         BANDAGE, ITEMS, CHEST_CFG, D, RESTING, FLYING,
+                         Rng, roll_chest, roll_tier, TIER_ODDS, deal,
+                         WEAPON, ARMOUR, UTILITY)
 
 W = world()
 
@@ -409,5 +412,117 @@ for approach, stop, want, label in ((R, 0.45, -1, "walked in from the left, past
         tick(s, approach, chests)
     check(f"and facing is movement's again once he lets go, {label}",
           s.facing == approach_sign(approach), f"facing {s.facing:+d}")
+
+# ---------------------------------------------------------------- the deal and the economy
+print("\nThe simulation's only source of chance")
+# A known answer, written into Rng.cs as well, so the two implementations cannot drift apart
+# in silence. If this goes red, one side of the deal is dealing a different arena.
+r = Rng(1)
+check("xorshift32 is the sequence both sides agree on",
+      [r.next() for _ in range(6)] ==
+      [270369, 67634689, 2647435461, 307599695, 2398689233, 745495504])
+check("and seed 0 is mapped off the one state it could never leave",
+      Rng(0).state == 0x9E3779B9, f"{Rng(0).state}")
+
+print("\nWhat a chest is worth (LootTable)")
+ROLLS = 20000
+for kind, name in ((CRATE, "crate"), (LOCKER, "locker"), (SAFE, "safe")):
+    seen = collections.Counter()
+    for s in range(1, ROLLS + 1):
+        seen[ITEMS[roll_chest(kind, Rng(s))]["tier"]] += 1
+    share = [100 * seen[t] / ROLLS for t in (1, 2, 3)]
+    want = TIER_ODDS[kind]
+    print(f"   {name:7s} " + "  ".join(f"T{t} {share[t-1]:5.1f}% (want {want[t-1]}%)"
+                                       for t in (1, 2, 3)))
+    check(f"a {name} pays out the tiers the table says",
+          all(abs(share[i] - want[i]) < 2.0 for i in range(3)))
+
+# Nothing that should never drop ever does.
+never = set()
+for kind in (CRATE, LOCKER, SAFE):
+    for s in range(1, 4000):
+        got = roll_chest(kind, Rng(s))
+        if ITEMS[got].get("weight", 0) <= 0:
+            never.add(ITEMS[got]["name"])
+check("nothing with no weight is ever dealt", not never,
+      "fists and None stay out" if not never else f"dealt {never}")
+
+# Within a tier, rarity is the weight and not the order of the list.
+pool = [(i, v) for i, v in sorted(ITEMS.items())
+        if v["kind"] != 0 and v.get("tier") == 2 and v.get("weight", 0) > 0]
+seen = collections.Counter()
+for s in range(1, 40001):
+    seen[roll_chest(SAFE, Rng(s))] += 1
+t2 = sum(seen[i] for i, _ in pool)
+worst = 0.0
+for i, v in pool:
+    want = 100 * v["weight"] / sum(w["weight"] for _, w in pool)
+    got = 100 * seen[i] / t2
+    worst = max(worst, abs(got - want))
+check("and within a tier each item comes up as often as its weight",
+      worst < 2.5, f"worst item is {worst:.1f} points off its share")
+
+print("\nThe economy of one round")
+
+
+class Pinned:
+    """A chest as LootTable.Deal sees it: a kind, and contents only if they were pinned."""
+    def __init__(s, kind, pinned=NONE):
+        s.kind, s.pinned, s.contents = kind, pinned, NONE
+
+
+# Arena_Demo's six: two of each kind, mirrored across the arena (docs/01).
+def round_of(seed):
+    chests = [Pinned(CRATE), Pinned(CRATE), Pinned(LOCKER),
+              Pinned(LOCKER), Pinned(SAFE), Pinned(SAFE)]
+    deal(chests, seed)
+    return [c.contents for c in chests]
+
+
+tiers = collections.Counter()
+kinds = collections.Counter()
+golds = collections.Counter()
+for s in range(1, 5001):
+    got = round_of(s)
+    gold = 0
+    for item in got:
+        tiers[ITEMS[item]["tier"]] += 1
+        kinds[ITEMS[item]["kind"]] += 1
+        if ITEMS[item]["tier"] == 3:
+            gold += 1
+    golds[gold] += 1
+
+total = sum(tiers.values())
+print("   six chests, 5000 rounds dealt:")
+for t in (1, 2, 3):
+    print(f"      T{t}: {tiers[t] / 5000:.2f} per round ({100 * tiers[t] / total:.0f}% of drops)")
+print(f"      weapons {kinds[WEAPON] / 5000:.2f}, armour {kinds[ARMOUR] / 5000:.2f}, "
+      f"utility {kinds[UTILITY] / 5000:.2f} per round")
+print("   gold items in a round: " +
+      ", ".join(f"{n}x {100 * golds[n] / 5000:.0f}%" for n in sorted(golds)))
+
+check("a round always has something to find", tiers[1] + tiers[2] + tiers[3] == 6 * 5000)
+check("gold is rare enough to be the reason you went for the safe",
+      0.8 < tiers[3] / 5000 < 1.6, f"{tiers[3] / 5000:.2f} gold items per round of six chests")
+check("and a round with no gold at all is uncommon but possible",
+      0.05 < golds[0] / 5000 < 0.45, f"{100 * golds[0] / 5000:.0f}% of rounds have none")
+check("every round offers both a weapon and something to wear",
+      kinds[WEAPON] / 5000 > 2.5 and kinds[ARMOUR] / 5000 > 1.0,
+      f"{kinds[WEAPON] / 5000:.1f} weapons, {kinds[ARMOUR] / 5000:.1f} armour")
+
+# The two sides get the same chests and different contents — docs/01's whole premise.
+same = 0
+for s in range(1, 2001):
+    got = round_of(s)
+    left, right = got[0::2], got[1::2]
+    if left == right:
+        same += 1
+check("the two sides of the arena are dealt differently", same / 2000 < 0.05,
+      f"{100 * same / 2000:.1f}% of rounds deal both sides the same three items")
+
+# Same seed, same arena. docs/06 has no room for anything else.
+check("the same seed deals the same round", round_of(777) == round_of(777),
+      " ".join(ITEMS[i]["name"] for i in round_of(777)))
+check("and a different seed does not", round_of(777) != round_of(778))
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

@@ -116,7 +116,10 @@ namespace GulagRunners.Sim
             // facing into it, and loot that lands on the far side is loot you have to walk round
             // the thing you just opened to reach.
             FixVec2 centre = Centre(in def.Box);
-            Pop(ground, def.Contents, centre, ThrowDirection(in s, in def.Box), in drop);
+            // What the round dealt into it, not what the arena was authored with: the two are
+            // the same only for a chest whose contents were pinned by hand.
+            ItemId prize = state.Contents != ItemId.None ? state.Contents : def.Contents;
+            Pop(ground, prize, centre, ThrowDirection(in s, in def.Box), in drop);
 
             s.OpenedChest = target;
             s.Noise = NoiseLevel.Loud;             // a chest coming open is heard across the floor
