@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 2e29de5d550424f3d97c3dff906e602f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 313704
+  packageName: 3D Medieval Fantasy Weapon Collection
+  packageVersion: 1.0
+  assetPath: Assets/FlexUnit/MedievalWeaponPack/Animation/BowAnimator.controller
+  uploadId: 742406
