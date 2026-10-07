@@ -279,6 +279,16 @@ namespace GulagRunners.Sim
 
             Aabb body = s.Body(in cfg);
             int ladder = world.FindLadder(in body);
+
+            // Standing on top of a ladder whose rungs start just under the feet. A ladder with
+            // no hatch beside it is the whole level here, and without this the only ones you
+            // could ever climb down are the ones with a hole to drop into first.
+            bool steppingOn = false;
+            if (ladder < 0 && wishY < 0 && s.Mode == MoveMode.Grounded)
+            {
+                ladder = LadderUnderFeet(ref s, world, in cfg);
+                steppingOn = ladder >= 0;
+            }
             if (ladder < 0) return false;
 
             Aabb box = world.Ladders[ladder];
@@ -299,8 +309,11 @@ namespace GulagRunners.Sim
 
                 // And there has to be a way down on the centre line — a hatch, or the lip of a
                 // ledge. At the foot of a ladder there is floor instead, and grabbing it there
-                // would be undone by the release at the bottom on the very next tick.
-                if (SupportUnder(centreX, s.Position.Y, s.FallThroughTimer, world, in cfg))
+                // would be undone by the release at the bottom on the very next tick. Stepping
+                // over the top of a ladder is the exception: the floor underfoot is the floor
+                // the ladder runs through, which is exactly what you are leaving.
+                if (!steppingOn &&
+                    SupportUnder(centreX, s.Position.Y, s.FallThroughTimer, world, in cfg))
                     return false;
             }
 
@@ -310,7 +323,12 @@ namespace GulagRunners.Sim
             Fix targetX = SweepFree(s.Position.X, centreX, s.Position.Y, world, in cfg)
                 ? centreX : s.Position.X;
 
-            int frames = FramesFor(Fix.Abs(targetX - s.Position.X), in cfg);
+            // Stepping over the top means the grab also has to come DOWN onto the top rung,
+            // which is below the floor being left.
+            Fix targetY = steppingOn ? box.MaxY - cfg.LadderTopMargin : s.Position.Y;
+
+            int frames = FramesFor(Fix.Max(Fix.Abs(targetX - s.Position.X),
+                                           Fix.Abs(targetY - s.Position.Y)), in cfg);
 
             s.LadderIndex = ladder;
             s.Crouching = false;
@@ -320,12 +338,13 @@ namespace GulagRunners.Sim
             if (frames <= 0)
             {
                 s.Position.X = targetX;
+                s.Position.Y = targetY;
                 s.Mode = MoveMode.Climbing;
                 return true;
             }
 
             s.ScriptFrom = s.Position;
-            s.ScriptTo = new FixVec2(targetX, s.Position.Y);
+            s.ScriptTo = new FixVec2(targetX, targetY);
             s.ScriptFrames = frames;
             s.ScriptTimer = frames;
             s.Mode = MoveMode.Mounting;
@@ -397,7 +416,7 @@ namespace GulagRunners.Sim
                          : wishY < 0 ? -cfg.ClimbDownSpeed
                          : Fix.Zero;
 
-            MoveY(ref s, s.Velocity.Y * Dt, world, cfg);
+            MoveY(ref s, s.Velocity.Y * Dt, world, cfg, s.LadderIndex);
 
             // Never climb past the top of the ladder box. Doing so dropped the body out of the
             // ladder with nothing underneath — the hatch is a hole — so it fell, touched the
@@ -415,14 +434,14 @@ namespace GulagRunners.Sim
             // Hold a direction and you climb out that way; hold nothing and the climb-out picks
             // the side with more floor on it, rather than depositing you in whatever pocket
             // happens to be nearest.
-            if (atTop && wishY > 0 && TryStartMantle(ref s, wishX, world, cfg))
+            if (atTop && wishY > 0 && TryStartMantle(ref s, wishX, s.LadderIndex, world, cfg))
                 return;
 
             // The same courtesy at the other end: keep holding down at the foot of a ladder and
             // you step off it onto the floor. Before this, the bottom was the trap the top used
             // to be — the body stopped on the ground still bolted to the rungs, in a climb-idle
             // pose, until the player thought to nudge sideways.
-            if (wishY < 0 && Grounded(ref s, world, cfg))
+            if (wishY < 0 && Grounded(ref s, world, cfg, s.LadderIndex))
             {
                 s.LadderIndex = -1;
                 s.LadderCooldownTimer = cfg.LadderRegrabFrames;
@@ -451,7 +470,7 @@ namespace GulagRunners.Sim
             }
 
             // Landed on a floor while edging sideways: let go of the ladder.
-            if (wishX != 0 && Grounded(ref s, world, cfg))
+            if (wishX != 0 && Grounded(ref s, world, cfg, s.LadderIndex))
             {
                 s.LadderIndex = -1;
                 s.LadderCooldownTimer = cfg.LadderRegrabFrames;
@@ -461,13 +480,45 @@ namespace GulagRunners.Sim
         }
 
         /// <summary>
+        /// The ladder a standing body is on top of: one that reaches the feet from below and
+        /// runs under them. This is how you get onto a ladder that has no hatch beside it.
+        /// </summary>
+        static int LadderUnderFeet(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Fix reach = cfg.BodyHeight / 2;
+
+            for (int i = 0; i < world.Ladders.Length; i++)
+            {
+                Aabb l = world.Ladders[i];
+                if (l.MinX >= s.Position.X + half || l.MaxX <= s.Position.X - half) continue;
+
+                Fix drop = s.Position.Y - l.MaxY;
+                if (drop < Fix.Zero - Skin || drop > reach) continue;
+                return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
         /// Looks for floor beside the ladder to climb out onto, nearest first and preferring the
         /// side asked for. Returns false when there is nothing to step onto, in which case the
         /// player simply stays on the ladder rather than being dropped into a hole.
         /// </summary>
-        static bool TryStartMantle(ref PlayerSimState s, int preferSide, SimWorld world,
-                                   in MoveConfig cfg)
+        static bool TryStartMantle(ref PlayerSimState s, int preferSide, int ladderIndex,
+                                   SimWorld world, in MoveConfig cfg)
         {
+            // A ladder that ends INSIDE its own landing has no hatch to climb out of: in the
+            // level it stands in front of the platform, and the last move is a step onto the
+            // floor the rungs end at, not a shuffle sideways. Try that first — a ladder with a
+            // hatch has nothing above it to find, so it falls through to the sideways search on
+            // its own, with no flag to set and nothing to keep in step with the art.
+            if (TryStepOut(ref s, ladderIndex, world, in cfg, out FixVec2 landUp))
+            {
+                StartScripted(ref s, landUp, s.Facing, in cfg);
+                return true;
+            }
+
             bool right = TryFindLanding(ref s, 1, world, in cfg, out FixVec2 landRight);
             bool left = TryFindLanding(ref s, -1, world, in cfg, out FixVec2 landLeft);
 
@@ -487,8 +538,16 @@ namespace GulagRunners.Sim
                     ? 1 : -1;
             }
 
+            StartScripted(ref s, side > 0 ? landRight : landLeft, side, in cfg);
+            return true;
+        }
+
+        /// <summary>Hands the body to the climb-out animation, wherever it is climbing out to.</summary>
+        static void StartScripted(ref PlayerSimState s, FixVec2 landing, int side,
+                                  in MoveConfig cfg)
+        {
             s.ScriptFrom = s.Position;
-            s.ScriptTo = side > 0 ? landRight : landLeft;
+            s.ScriptTo = landing;
 
             // Each axis is charged for the part of the window it actually gets — Y the first two
             // thirds, X the last seven tenths — so neither has to hurry to fit a window the other
@@ -500,12 +559,47 @@ namespace GulagRunners.Sim
 
             s.ScriptFrames = frames;
             s.ScriptTimer = frames;
-            s.ScriptDir = (sbyte)side;
+            s.ScriptDir = (sbyte)(side >= 0 ? 1 : -1);
             s.Mode = MoveMode.Mantling;
             s.LadderIndex = -1;
             s.Velocity = FixVec2.Zero;
-            s.Facing = (sbyte)side;
+            s.Facing = (sbyte)(side >= 0 ? 1 : -1);
             s.Noise = NoiseLevel.Quiet;
+        }
+
+        /// <summary>
+        /// The floor a ladder ends inside, which is the one it serves. Returns false for a
+        /// ladder that comes up through a hatch, because the hatch is a hole and there is
+        /// nothing overhead to step onto.
+        /// </summary>
+        static bool TryStepOut(ref PlayerSimState s, int ladderIndex, SimWorld world,
+                               in MoveConfig cfg, out FixVec2 landing)
+        {
+            landing = default;
+            if (ladderIndex < 0 || ladderIndex >= world.Ladders.Length) return false;
+
+            Aabb ladder = world.Ladders[ladderIndex];
+            Fix half = cfg.BodyWidth / 2;
+            Fix x = s.Position.X;
+
+            bool found = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (solid.MinX >= x + half || solid.MaxX <= x - half) continue;
+                if (ladder.MaxY < solid.MinY) continue;
+                if (ladder.MaxY > solid.MaxY + cfg.LadderTopMargin) continue;
+                if (!found || solid.MaxY > top) { top = solid.MaxY; found = true; }
+            }
+            if (!found) return false;
+
+            // Climbing out has to end standing, not wedged under the next floor up.
+            Aabb standing = new Aabb(x - half, top + Skin, x + half, top + cfg.BodyHeight);
+            if (AnySolidOverlap(world, in standing)) return false;
+            if (!FullySupported(x, top, world, in cfg)) return false;
+
+            landing = new FixVec2(x, top + Skin);
             return true;
         }
 
@@ -694,6 +788,19 @@ namespace GulagRunners.Sim
         }
 
         static void MoveY(ref PlayerSimState s, Fix dy, SimWorld world, in MoveConfig cfg)
+            => MoveY(ref s, dy, world, in cfg, -1);
+
+        /// <summary>
+        /// Vertical movement. <paramref name="shaft"/> is a ladder whose solids are not in the
+        /// way: everything it passes through is the hole it climbs through.
+        ///
+        /// A level built in 3D puts its ladders in front of the floors they serve, and the hole
+        /// is in depth — there is nothing to model in the flat world and nothing to cut out of
+        /// it. Treating the ladder itself as the shaft is what lets the same motor climb both
+        /// kinds of ladder, the one through a hatch and the one up a wall.
+        /// </summary>
+        static void MoveY(ref PlayerSimState s, Fix dy, SimWorld world, in MoveConfig cfg,
+                          int shaft)
         {
             if (dy == Fix.Zero) return;
 
@@ -705,6 +812,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
+                if (shaft >= 0 && InShaft(in solid, in world.Ladders[shaft])) continue;
                 Aabb body = new Aabb(s.Position.X - half, targetY, s.Position.X + half, targetY + height);
                 if (!body.Overlaps(in solid)) continue;
 
@@ -769,6 +877,19 @@ namespace GulagRunners.Sim
             return true;
         }
 
+        /// <summary>
+        /// Is this solid something the ladder comes up INTO from below — the floor it climbs
+        /// through — rather than the floor it stands on.
+        ///
+        /// The whole distinction is the solid's underside: a floor the ladder passes through
+        /// has its underside inside the ladder's span, while the floor at the ladder's foot has
+        /// its underside below the rungs entirely. Getting this wrong in either direction is
+        /// loud: too narrow and the climb stops at the underside of its own landing, too wide
+        /// and the ladder's own footing becomes a hole and the fighter falls out of the world.
+        /// </summary>
+        static bool InShaft(in Aabb solid, in Aabb ladder) =>
+            solid.MinY > ladder.MinY && solid.MinY < ladder.MaxY;
+
         static bool AnySolidOverlap(SimWorld world, in Aabb box)
         {
             for (int i = 0; i < world.Solids.Length; i++)
@@ -777,7 +898,10 @@ namespace GulagRunners.Sim
         }
 
         static bool Grounded(ref PlayerSimState s, SimWorld world, in MoveConfig cfg) =>
-            SupportUnder(s.Position.X, s.Position.Y, s.FallThroughTimer, world, in cfg);
+            SupportUnder(s.Position.X, s.Position.Y, s.FallThroughTimer, world, in cfg, -1);
+
+        static bool Grounded(ref PlayerSimState s, SimWorld world, in MoveConfig cfg, int shaft) =>
+            SupportUnder(s.Position.X, s.Position.Y, s.FallThroughTimer, world, in cfg, shaft);
 
         /// <summary>
         /// Whether a footprint placed at this x, with its feet at this y, has something to stand
@@ -785,12 +909,27 @@ namespace GulagRunners.Sim
         /// asks it about where the body is about to be, which is why it is a free function.
         /// </summary>
         static bool SupportUnder(Fix x, Fix y, int fallThroughTimer, SimWorld world,
-                                 in MoveConfig cfg)
+                                 in MoveConfig cfg) =>
+            SupportUnder(x, y, fallThroughTimer, world, in cfg, -1);
+
+        static bool SupportUnder(Fix x, Fix y, int fallThroughTimer, SimWorld world,
+                                 in MoveConfig cfg, int shaft)
         {
             Fix half = cfg.BodyWidth / 2;
             Aabb feet = new Aabb(x - half + Skin, y - GroundProbe, x + half - Skin, y);
 
-            if (AnySolidOverlap(world, in feet)) return true;
+            // Inside a ladder's shaft the floor it runs through is not floor: it is the hole.
+            // Without this the climb lets go the instant it reaches the underside of its own
+            // landing, and the fighter rides the ladder up and down forever.
+            if (shaft >= 0)
+            {
+                for (int i = 0; i < world.Solids.Length; i++)
+                {
+                    if (InShaft(in world.Solids[i], in world.Ladders[shaft])) continue;
+                    if (feet.Overlaps(in world.Solids[i])) return true;
+                }
+            }
+            else if (AnySolidOverlap(world, in feet)) return true;
 
             if (fallThroughTimer == 0)
             {

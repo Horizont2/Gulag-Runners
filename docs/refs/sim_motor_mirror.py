@@ -56,21 +56,30 @@ def body(s, at_x=None, at_y=None):
     y = s.y if at_y is None else at_y
     return (x - half, y, x + half, y + h)
 
+def in_shaft(sol, lad):
+    """Is this solid one the ladder comes up INTO from below - the floor it climbs through -
+    rather than the floor it stands on. The tell is the solid's underside."""
+    return lad[1] < sol[1] < lad[3]
+
 def any_solid(w, box):
     return any(overlaps(box, s) for s in w["solid"])
 
-def support_under(x, y, fallthru, w):
+def support_under(x, y, fallthru, w, shaft=-1):
     half = C["W"] // 2
     feet = (x - half + SKIN, y - GROUND_PROBE, x + half - SKIN, y)
-    if any_solid(w, feet): return True
+    # Inside a ladder's shaft the floor it runs through is the hole, not the floor.
+    if shaft >= 0:
+        if any(overlaps(feet, sol) for sol in w["solid"]
+               if not in_shaft(sol, w["ladder"][shaft])): return True
+    elif any_solid(w, feet): return True
     if fallthru == 0:
         for p in w["oneway"]:
             if y + SKIN < p[3]: continue
             if overlaps(feet, p): return True
     return False
 
-def grounded(s, w):
-    return support_under(s.x, s.y, s.fallthru, w)
+def grounded(s, w, shaft=-1):
+    return support_under(s.x, s.y, s.fallthru, w, shaft)
 
 def sweep_free(from_x, to_x, y, w):
     half = C["W"] // 2
@@ -102,13 +111,15 @@ def move_x(s, dx, w):
         s.vx = 0
     s.x = tx
 
-def move_y(s, dy, w):
+def move_y(s, dy, w, shaft=-1):
     if dy == 0: return
     half = C["W"] // 2
     h = C["CH"] if s.crouch else C["H"]
     start = s.y
     ty = s.y + dy
     for sol in w["solid"]:
+        # A ladder is its own shaft: everything it passes through is the hole it climbs.
+        if shaft >= 0 and in_shaft(sol, w["ladder"][shaft]): continue
         b = (s.x - half, ty, s.x + half, ty + h)
         if not overlaps(b, sol): continue
         if dy > 0:
@@ -239,12 +250,28 @@ def frames_for(dist):
     f = (((dist << 16) // C["SSPD"]) * 60 >> 16) + 1
     return max(C["SMINF"], min(C["SMAXF"], f))
 
+def ladder_under_feet(s, w):
+    """The ladder a standing body is on top of: it reaches the feet from below and runs
+    under them. This is how you get onto a ladder that has no hatch beside it."""
+    half = C["W"]//2; reach = C["H"]//2
+    for i, l in enumerate(w["ladder"]):
+        if l[0] >= s.x+half or l[2] <= s.x-half: continue
+        drop = s.y - l[3]
+        if drop < -SKIN or drop > reach: continue
+        return i
+    return -1
+
 def try_mount(s, wy, w):
     if not wy: return False
     if s.ladder_cd > 0: return False
     if s.crouch and any_solid(w, (s.x - C["W"]//2, s.y, s.x + C["W"]//2, s.y + C["H"])):
         return False
     i = ladder_at(s, w)
+    # Standing on top of a ladder whose rungs start just under the feet: stepping over the
+    # edge IS the way down when there is no hatch beside it.
+    stepping_on = False
+    if i < 0 and wy < 0 and s.mode == "ground":
+        i = ladder_under_feet(s, w); stepping_on = i >= 0
     if i < 0: return False
     box = w["ladder"][i]
     centre = box[0] + (box[2]-box[0])//2
@@ -252,18 +279,19 @@ def try_mount(s, wy, w):
     if wy > 0:
         if s.y >= box[3] - C["LTOP"] - C["H"]//4: return False
     else:
-        if s.mode == "ground" and box[1] >= s.y: return False
-        if support_under(centre, s.y, s.fallthru, w): return False
+        if s.mode == "ground" and box[1] >= s.y and not stepping_on: return False
+        if not stepping_on and support_under(centre, s.y, s.fallthru, w): return False
 
     target = centre if sweep_free(s.x, centre, s.y, w) else s.x
-    frames = frames_for(abs(target - s.x))
+    target_y = box[3] - C["LTOP"] if stepping_on else s.y
+    frames = frames_for(max(abs(target - s.x), abs(target_y - s.y)))
 
     s.ladder = i; s.crouch = False; s.vx = s.vy = 0
     s.script_dir = 1 if wy > 0 else -1
     if frames <= 0:
-        s.x = target; s.mode = "ladder"
+        s.x = target; s.y = target_y; s.mode = "ladder"
         return True
-    s.script_from = (s.x, s.y); s.script_to = (target, s.y)
+    s.script_from = (s.x, s.y); s.script_to = (target, target_y)
     s.script_frames = frames; s.script_t = frames
     s.mode = "mount"; s.noise = 1
     return True
@@ -322,7 +350,36 @@ def find_landing(s, side, w):
         return (x, g+SKIN)
     return None
 
-def try_mantle(s, prefer, w):
+def step_out(s, ladder, w):
+    """The floor a ladder ENDS INSIDE, which is the one it serves. None for a hatch ladder:
+    a hatch is a hole, so there is nothing overhead to step onto and the sideways search
+    takes over on its own."""
+    if not (0 <= ladder < len(w["ladder"])): return None
+    l = w["ladder"][ladder]; half = C["W"]//2
+    top = None
+    for sol in w["solid"]:
+        if sol[0] >= s.x+half or sol[2] <= s.x-half: continue
+        if l[3] < sol[1] or l[3] > sol[3] + C["LTOP"]: continue
+        if top is None or sol[3] > top: top = sol[3]
+    if top is None: return None
+    if any_solid(w, (s.x-half, top+SKIN, s.x+half, top+C["H"])): return None
+    if not supported(s.x, top, w): return None
+    return (s.x, top+SKIN)
+
+def start_scripted(s, landing, side):
+    s.script_from=(s.x,s.y); s.script_to=landing
+    span_x = abs(s.script_to[0]-s.x)*10//7
+    span_y = abs(s.script_to[1]-s.y)*3//2
+    frames = frames_for(max(span_x, span_y)) or C["SMINF"]
+    s.script_frames=frames; s.script_t=frames
+    s.script_dir = 1 if side>=0 else -1
+    s.mode="mantle"; s.ladder=-1
+    s.vx=s.vy=0; s.facing = 1 if side>=0 else -1
+
+def try_mantle(s, prefer, ladder, w):
+    up = step_out(s, ladder, w)
+    if up is not None:
+        start_scripted(s, up, s.facing); return True
     r=find_landing(s,1,w); l=find_landing(s,-1,w)
     if r is None and l is None: return False
     if prefer>0 and r: side=1
@@ -330,13 +387,7 @@ def try_mantle(s, prefer, w):
     elif l is None: side=1
     elif r is None: side=-1
     else: side = 1 if floor_run(r,1,w) >= floor_run(l,-1,w) else -1
-    s.script_from=(s.x,s.y); s.script_to = r if side>0 else l
-    span_x = abs(s.script_to[0]-s.x)*10//7
-    span_y = abs(s.script_to[1]-s.y)*3//2
-    frames = frames_for(max(span_x, span_y)) or C["SMINF"]
-    s.script_frames=frames; s.script_t=frames; s.script_dir=side
-    s.mode="mantle"; s.ladder=-1
-    s.vx=s.vy=0; s.facing=side
+    start_scripted(s, r if side>0 else l, side)
     return True
 
 def ground_below(x, y, maxd, w):
@@ -362,15 +413,15 @@ def climb(s, wx, wy, w):
         if sweep_free(s.x, want, s.y, w): s.x = want
     s.vx = 0
     s.vy = C["CUP"] if wy > 0 else (-C["CDN"] if wy < 0 else 0)
-    move_y(s, mul(s.vy, DT), w)
+    move_y(s, mul(s.vy, DT), w, s.ladder)
     ceiling = l[3] - C["LTOP"]
     at_top = s.y >= ceiling
     if at_top:
         s.y = ceiling
         if s.vy > 0: s.vy = 0
-    if at_top and wy > 0 and try_mantle(s, wx, w):
+    if at_top and wy > 0 and try_mantle(s, wx, s.ladder, w):
         return
-    if wy < 0 and grounded(s, w):
+    if wy < 0 and grounded(s, w, s.ladder):
         s.ladder = -1; s.ladder_cd = C["LREGRAB"]
         s.mode = "ground"; s.vx = s.vy = 0; s.noise = 1
         return
@@ -381,6 +432,6 @@ def climb(s, wx, wy, w):
         s.ladder = -1
         s.mode = "ground" if grounded(s, w) else "air"
         return
-    if wx and grounded(s, w):
+    if wx and grounded(s, w, s.ladder):
         s.ladder = -1; s.ladder_cd = C["LREGRAB"]
         s.mode = "ground"; s.vx = s.vy = 0

@@ -68,6 +68,11 @@ namespace GulagRunners.Game
         [Tooltip("Z of the gameplay plane the camera focuses on.")]
         public float planeZ;
 
+        [Tooltip("Take the plane's depth from the fighter this camera follows.\n\n" +
+                 "The camera and the fighter have to agree on which slice of the level the " +
+                 "fight is on, and keeping that in two fields is how they stop agreeing.")]
+        public bool depthFromPlayer = true;
+
         [Tooltip("Scale the framing by the viewport's height, so Visible World Height always " +
                  "means the full-screen framing of the real game.\n\n" +
                  "Without this a half-height split-screen view shows TWICE the width: 35.6 m " +
@@ -546,6 +551,8 @@ namespace GulagRunners.Game
 
         void Place(Vector2 focus, float zoom, Vector3 shake)
         {
+            if (depthFromPlayer && player != null) planeZ = player.planeZ;
+
             float halfFov = Mathf.Deg2Rad * fieldOfView * 0.5f;
             float pitch = Mathf.Deg2Rad * pitchDegrees;
 

@@ -62,13 +62,15 @@ namespace GulagRunners.Game
         public float planeThickness = 1.5f;
 
         [Header("Ladders")]
-        [Tooltip("Cut a hatch through anything a ladder passes through.\n\n" +
-                 "In a level built in 3D a ladder is BEHIND the floor it serves, and the hole is " +
-                 "in depth. Flattened onto one plane that hole disappears and the ladder runs " +
-                 "into the underside of its own landing — the climb stops a metre short and the " +
-                 "level reads as broken. docs/05 calls ladders and hatches the connections " +
-                 "between floors; this is what makes that true of a hand-built level.")]
-        public bool ladderCutsHatch = true;
+        [Tooltip("Cut a hole in the baked floor wherever a ladder runs through it.\n\n" +
+                 "Off by default, and usually wants to stay off: the motor already treats a " +
+                 "ladder as its own shaft, so the climb is never stopped by a floor the ladder " +
+                 "passes through, and a ladder that ends inside its landing sets the fighter " +
+                 "down ON it rather than beside it. Cutting the floor as well leaves a real " +
+                 "hole the fighter can fall through, in a level whose art has no hole in it. " +
+                 "Turn it on only where the art DOES have one and you want the hole to be " +
+                 "walkable-into.")]
+        public bool ladderCutsHatch;
 
         [Tooltip("Extra clearance either side of the hatch, in metres.")]
         public float hatchMargin = 0.1f;
@@ -100,6 +102,16 @@ namespace GulagRunners.Game
         /// find which baked chest it is drawing, which is a lookup rather than a guess.
         /// </summary>
         public Chest[] ChestSources { get; private set; } = System.Array.Empty<Chest>();
+
+        /// <summary>
+        /// The Z each baked ladder was modelled at, in the same order as World.Ladders.
+        ///
+        /// The simulation is flat and has no use for it. Presentation does: a ladder standing
+        /// in front of the platform it serves wants the body climbing at ITS depth, stepping
+        /// back onto the plane at the top, or the climb reads as a fighter swimming through
+        /// the floor.
+        /// </summary>
+        public float[] LadderDepths { get; private set; } = System.Array.Empty<float>();
         public string LastReport { get; private set; } = "not baked yet";
 
         readonly List<Rect> _gizmoSolid = new List<Rect>();
@@ -110,6 +122,7 @@ namespace GulagRunners.Game
         readonly List<Chest> _chestBuffer = new List<Chest>();
         readonly List<Chest> _chestSources = new List<Chest>();
         readonly List<Rect> _gizmoChest = new List<Rect>();
+        readonly List<float> _ladderDepth = new List<float>();
 
         void Awake()
         {
@@ -152,6 +165,7 @@ namespace GulagRunners.Game
             _gizmoLadder.Clear();
             _gizmoChest.Clear();
             _chestSources.Clear();
+            _ladderDepth.Clear();
 
             int roots = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0,
                 chestsSeen = 0, chestsSkipped = 0;
@@ -174,7 +188,7 @@ namespace GulagRunners.Game
                     if (!c.isActiveAndEnabled) { markedSkipped++; continue; }
                     handled.Add(c.gameObject.GetInstanceID());
                     if (c.kind == SimColliderKind.Ignore) { markedIgnored++; continue; }
-                    Add(c.kind, c.ToRect(), solids, oneWay, ladders);
+                    Add(c.kind, c.ToRect(), solids, oneWay, ladders, c.Depth);
                 }
 
                 // 2. Chests. Collected before the ordinary colliders so that a chest's own
@@ -226,7 +240,7 @@ namespace GulagRunners.Game
                     else { skippedLayer++; continue; }
 
                     Add(kind, new Rect(cb.min.x, cb.min.y, cb.size.x, cb.size.y),
-                        solids, oneWay, ladders);
+                        solids, oneWay, ladders, cb.center.z);
                 }
             }
 
@@ -240,6 +254,7 @@ namespace GulagRunners.Game
                 Chests = chests.ToArray()
             };
             ChestSources = _chestSources.ToArray();
+            LadderDepths = _ladderDepth.ToArray();
 
             LastReport =
                 $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider " +
@@ -343,7 +358,7 @@ namespace GulagRunners.Game
         }
 
         void Add(SimColliderKind kind, Rect r,
-                 List<Aabb> solids, List<Aabb> oneWay, List<Aabb> ladders)
+                 List<Aabb> solids, List<Aabb> oneWay, List<Aabb> ladders, float depth)
         {
             if (r.width <= 0f || r.height <= 0f) return;
 
@@ -351,7 +366,8 @@ namespace GulagRunners.Game
             switch (kind)
             {
                 case SimColliderKind.OneWay: oneWay.Add(box); _gizmoOneWay.Add(r); break;
-                case SimColliderKind.Ladder: ladders.Add(box); _gizmoLadder.Add(r); break;
+                case SimColliderKind.Ladder:
+                    ladders.Add(box); _gizmoLadder.Add(r); _ladderDepth.Add(depth); break;
                 default: solids.Add(box); _gizmoSolid.Add(r); break;
             }
         }

@@ -143,16 +143,24 @@ for idx, lad in enumerate(LADDERS):
           f"mode {s.mode}")
     check(f"ladder {idx}: climbs to the top",
           until(s, UP, lambda s: F(s.y) >= F(lad[3]) - 0.1, 600), f"y {F(s.y):.2f}")
+    at_top = F(s.x)
     check(f"ladder {idx}: climbs out onto the walkway by itself",
           until(s, UP, lambda s: s.mode == "ground", 300),
           f"mode {s.mode} at ({F(s.x):.2f}, {F(s.y):.2f})")
-    check(f"ladder {idx}: ends up on the walkway, not back in the hatch",
+    check(f"ladder {idx}: ends up standing on the walkway",
           abs(F(s.y) - 3.83) < 0.06, f"y {F(s.y):.2f}")
-    # And back down. There is no standing on a ladder top here: the rungs stop 6 cm below the
-    # walkway, so going down means stepping into the hatch and catching the ladder on the way.
-    toward_hatch = L if idx == 0 else R
-    caught = until(s, toward_hatch | DN, lambda s: s.mode in ("ladder", "mount"), 120)
-    check(f"ladder {idx}: stepping into the hatch catches the ladder", caught,
+    # This location's ladders stand in FRONT of the walkway they serve, so there is no hatch
+    # and no step sideways: the last move is onto the floor the rungs end at. A sideways
+    # climb-out here would be a fighter stepping through the slab he just climbed past.
+    check(f"ladder {idx}: climbs out forwards, not sideways",
+          abs(F(s.x) - at_top) < 0.2, f"moved {abs(F(s.x) - at_top):.2f} m sideways")
+    check(f"ladder {idx}: the walkway it serves has no hole cut in it",
+          any(b[0] <= X(cx) <= b[2] and abs(F(b[3]) - 3.83) < 0.02 for b in W["solid"]),
+          f"solid over x {cx:.2f}")
+
+    # And back down: standing on the ladder's top, pressing down steps over the edge onto it.
+    caught = until(s, DN, lambda s: s.mode in ("ladder", "mount"), 120)
+    check(f"ladder {idx}: pressing down on top of it steps onto the rungs", caught,
           f"mode {s.mode} at ({F(s.x):.2f}, {F(s.y):.2f})")
     check(f"ladder {idx}: carries a fighter back down",
           caught and until(s, DN, lambda s: F(s.y) <= base + 0.1, 600), f"y {F(s.y):.2f}")
@@ -276,10 +284,16 @@ OCC = G.Scene().occluders(CAM['planeZ'])
 
 
 def hidden(feet, x):
-    """Fraction of the frame covered by scenery in front of a fighter standing here."""
+    """Fraction of the frame ABOVE THE FLOOR covered by scenery in front of a fighter here.
+
+    Only the part of the frame a fighter can actually be in counts. Scenery across the bottom,
+    below the surface being stood on, is the foreground ledge that gives the shot its depth —
+    measuring it as occlusion would push the camera into flattening the one thing worth
+    keeping.
+    """
     focus = feet + 0.55
     cam_y = focus + CAM['rise']
-    lo_y, hi_y = focus - CAM['height'] / 2, focus + CAM['height'] / 2
+    lo_y, hi_y = max(feet, focus - CAM['height'] / 2), focus + CAM['height'] / 2
     half_w = CAM['height'] * CAM['aspect'] / 2
     worst, by = 0.0, None
     for name, lo, hi in OCC:
@@ -289,7 +303,7 @@ def hidden(feet, x):
         scale = CAM['distance'] / d
         top = (hi[1] - cam_y) * scale + cam_y
         bot = (lo[1] - cam_y) * scale + cam_y
-        tall = max(0.0, min(top, hi_y) - max(bot, lo_y)) / CAM['height']
+        tall = max(0.0, min(top, hi_y) - max(bot, lo_y)) / max(0.01, hi_y - lo_y)
         wide = (min(hi[0], x + half_w) - max(lo[0], x - half_w)) / (2 * half_w)
         if tall * wide > worst:
             worst, by = tall * wide, name or "(cube)"

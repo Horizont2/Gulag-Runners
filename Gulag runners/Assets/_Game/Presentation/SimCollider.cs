@@ -42,6 +42,19 @@ namespace GulagRunners.Game
         public Rect ToRect() => WorldRect(this, GetComponent<Collider>());
 
         /// <summary>
+        /// The Z this collider was modelled at. The simulation is flat and never asks;
+        /// presentation does, to draw a body on the same plane as the thing it is touching.
+        /// </summary>
+        public float Depth
+        {
+            get
+            {
+                Collider c = GetComponent<Collider>();
+                return c != null ? c.bounds.center.z : transform.position.z;
+            }
+        }
+
+        /// <summary>
         /// World-space X/Y footprint of a marked object.
         ///
         /// Taken from the collider's own world bounds when there is one, because lossyScale is

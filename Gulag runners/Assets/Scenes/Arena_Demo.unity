@@ -1933,13 +1933,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 3.05, z: 9.49}
+  m_LocalRotation: {x: 0.0348995, y: 0, z: 0, w: 0.9993908}
+  m_LocalPosition: {x: -13.22, y: 2.11, z: -9.08}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 4.0, y: 0, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8900,7 +8900,7 @@ MonoBehaviour:
   restrictToPlane: 1
   planeZ: -1.25
   planeThickness: 2.25
-  ladderCutsHatch: 1
+  ladderCutsHatch: 0
   hatchMargin: 0.1
   hatchMinOverlap: 0.05
   rebakeEveryFrame: 0
@@ -8933,7 +8933,7 @@ Transform:
   m_GameObject: {fileID: 1900000126}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.5, y: 1.05, z: 0}
+  m_LocalPosition: {x: -14.5, y: 1.05, z: -1.4}
   m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9054,6 +9054,8 @@ MonoBehaviour:
     stepNoiseFrames: 18
     hardLandSpeed: 8
   planeZ: -1.4
+  depthFromScene: 1
+  depthSmoothTime: 0.12
   visualYOffset: 0
   squashOnCrouch: 0
   modelForward: 0
@@ -9144,7 +9146,7 @@ Transform:
   m_GameObject: {fileID: 1900000134}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 10.72, y: 1.05, z: 0}
+  m_LocalPosition: {x: 10.72, y: 1.05, z: -1.4}
   m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9265,6 +9267,8 @@ MonoBehaviour:
     stepNoiseFrames: 18
     hardLandSpeed: 8
   planeZ: -1.4
+  depthFromScene: 1
+  depthSmoothTime: 0.12
   visualYOffset: 0
   squashOnCrouch: 0
   modelForward: 0
@@ -9367,8 +9371,9 @@ MonoBehaviour:
   manualFraming: 0
   visibleWorldHeight: 10
   fieldOfView: 30
-  pitchDegrees: 12
+  pitchDegrees: 4
   planeZ: -1.4
+  depthFromPlayer: 1
   scaleFramingToViewport: 1
   aimHeightBodies: 0.6
   deadZoneX: 0.12
@@ -9407,7 +9412,7 @@ MonoBehaviour:
     y: 0.5
     width: 1
     height: 0.5
-  deviceAspect: 2.1666667
+  deviceAspect: 0
   drawZones: 1
 --- !u!4 &1900000136
 Transform:
@@ -9417,13 +9422,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900000140}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 3.05, z: 9.49}
+  m_LocalRotation: {x: 0.0348995, y: 0, z: 0, w: 0.9993908}
+  m_LocalPosition: {x: 9.44, y: 2.11, z: -9.08}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 4.0, y: 0, z: 0}
 --- !u!20 &1900000137
 Camera:
   m_ObjectHideFlags: 0
@@ -9540,8 +9545,9 @@ MonoBehaviour:
   manualFraming: 0
   visibleWorldHeight: 10
   fieldOfView: 30
-  pitchDegrees: 12
+  pitchDegrees: 4
   planeZ: -1.4
+  depthFromPlayer: 1
   scaleFramingToViewport: 1
   aimHeightBodies: 0.6
   deadZoneX: 0.12
@@ -9580,7 +9586,7 @@ MonoBehaviour:
     y: 0
     width: 1
     height: 0.5
-  deviceAspect: 2.1666667
+  deviceAspect: 0
   drawZones: 1
 --- !u!1 &1900000140
 GameObject:

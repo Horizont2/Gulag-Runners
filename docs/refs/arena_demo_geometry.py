@@ -327,7 +327,7 @@ def bake(scene=None, report=False):
     plane_z = _field(baker, 'planeZ', float, 0.0)
     thickness = _field(baker, 'planeThickness', float, 1.5)
     restrict = _field(baker, 'restrictToPlane', int, 1)
-    cuts_hatch = _field(baker, 'ladderCutsHatch', int, 1)
+    cuts_hatch = _field(baker, 'ladderCutsHatch', int, 0)
     margin = _field(baker, 'hatchMargin', float, 0.1)
     min_overlap = _field(baker, 'hatchMinOverlap', float, 0.05)
 
@@ -440,7 +440,11 @@ def camera(scene=None):
     height = body_h / max(0.02, cam['fraction'])
     pitch = math.radians(cam['pitch'])
     distance = height * 0.5 * math.cos(pitch) / math.tan(math.radians(cam['fov'] / 2))
-    return dict(height=height, distance=distance, aspect=cam['aspect'],
+    # deviceAspect 0 means "do not letterbox", which is an editor convenience. What the
+    # fighter actually plays on is still a phone, so that is what the framing is measured
+    # against.
+    aspect = cam['aspect'] if cam['aspect'] > 0.01 else 19.5 / 9
+    return dict(height=height, distance=distance, aspect=aspect,
                 planeZ=cam['planeZ'],
                 z=cam['planeZ'] - distance * math.cos(pitch),
                 rise=distance * math.sin(pitch))

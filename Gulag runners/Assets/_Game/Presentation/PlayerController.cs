@@ -54,6 +54,20 @@ namespace GulagRunners.Game
         [Tooltip("The single gameplay plane. The arena is 3D; the fight is not (docs/02).")]
         public float planeZ;
 
+        [Tooltip("Take the plane's depth from wherever this object is placed in the scene, " +
+                 "instead of from the field above.\n\n" +
+                 "On a hand-built location the fighter belongs where the level artist put him, " +
+                 "and a configured depth silently teleports him somewhere else the moment you " +
+                 "press play. With this on, Plane Z is filled in from the scene and shows you " +
+                 "the depth you are actually on.")]
+        public bool depthFromScene = true;
+
+        [Tooltip("Follow a ladder's own depth while climbing it.\n\n" +
+                 "A ladder modelled in front of the platform it serves is climbed in front of " +
+                 "it too; staying on the plane would draw the body inside the floor it is " +
+                 "climbing past. 0 snaps.")]
+        public float depthSmoothTime = 0.12f;
+
         [Tooltip("Distance from this object's origin down to the feet, because the simulation " +
                  "tracks the feet. For the scaled capsule this is 0.9, half the body height.")]
         public float visualYOffset = 0.9f;
@@ -181,6 +195,8 @@ namespace GulagRunners.Game
             _baseVisualScale = visualRoot.localScale;
 
             Vector3 p = transform.position;
+            if (depthFromScene) planeZ = p.z;
+            _depth = planeZ;
             _spawnPoint = new Vector2(p.x, p.y - visualYOffset);
             SpawnAt(_spawnPoint, spawnFacing);
         }
@@ -305,13 +321,16 @@ namespace GulagRunners.Game
             }
         }
 
+        float _depth;
+        float _depthVelocity;
+
         void Render(float alpha)
         {
             Vector2 a = ToVector(_previous.Position);
             Vector2 b = ToVector(_state.Position);
             Vector2 p = Vector2.Lerp(a, b, alpha);
 
-            transform.position = new Vector3(p.x, p.y + visualYOffset, planeZ);
+            transform.position = new Vector3(p.x, p.y + visualYOffset, Depth());
 
             // The visual root keeps whatever local offset it was authored with: a capsule sits
             // centred on this object, while a character model hangs from it by its feet.
@@ -331,6 +350,25 @@ namespace GulagRunners.Game
                                            _baseVisualScale.y * squash,
                                            _baseVisualScale.z);
             }
+        }
+
+        /// <summary>
+        /// What depth to draw at this frame: the ladder's while climbing one, the plane's
+        /// otherwise, eased between the two so the step out of a climb is a step and not a cut.
+        /// </summary>
+        float Depth()
+        {
+            float want = planeZ;
+            int ladder = _state.LadderIndex;
+            if (ladder >= 0 && worldBaker != null &&
+                ladder < worldBaker.LadderDepths.Length)
+                want = worldBaker.LadderDepths[ladder];
+
+            if (depthSmoothTime <= 0.001f) { _depth = want; return _depth; }
+
+            _depth = Mathf.SmoothDamp(_depth, want, ref _depthVelocity, depthSmoothTime,
+                                      Mathf.Infinity, Time.deltaTime);
+            return _depth;
         }
 
         /// <summary>Teleports the simulation. Use this for spawning, not transform.position.</summary>
