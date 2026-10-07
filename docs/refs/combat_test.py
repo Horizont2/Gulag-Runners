@@ -91,8 +91,10 @@ check("armour buys most of a weapon tier",
       ttk["club vs chainmail"] > ttk["club, no armour"] * 1.3,
       f"{ttk['club, no armour']:.1f} s -> {ttk['club vs chainmail']:.1f} s")
 check("bare hands lose to anything, but are not a dead end",
-      ttk["fists, no armour"] > ttk["club, no armour"] * 1.8 and ttk["fists, no armour"] < 30,
-      f"{ttk['fists, no armour']:.1f} s — finding a weapon is most of a fight")
+      ttk["fists, no armour"] > ttk["club, no armour"] * 1.4 and ttk["fists, no armour"] < 12,
+      f"{ttk['fists, no armour']:.1f} s against a club's "
+      f"{ttk['club, no armour']:.1f} — finding a weapon is most of a fight, "
+      f"but a fistfight still ends")
 
 print("\n2. the combo, three and no more (docs/02)")
 a = fighter(-0.45, 1, CLUB)
@@ -274,6 +276,85 @@ for t in range(60 * 60):
 check("health reaches zero and stays there", b.dead and b.health == 0, f"hp {b.health}")
 tick([a, b], [ATTACK, ATTACK | R])
 check("the dead do not act", b.attack == K.NONE_P and not b.blocking)
+
+print("\n10b. one defensive button, two answers (docs/02)")
+# docs/02 gives the medieval fighter a block and no roll button; this project has both and
+# one bit of input to carry them. Standing still the press is the guard, moving it is a
+# dodge, and in the air it is neither. The bug this replaces had it exactly backwards: on
+# the ground the guard ate the press and nothing rolled, in the air there was no guard to
+# eat it and it rolled.
+a = fighter(-3.0)
+tick([a], [DOD])
+check("standing still, the press puts the guard up", a.blocking and a.mode == "ground",
+      f"blocking={a.blocking} mode={a.mode}")
+
+a = fighter(-3.0)
+tick([a], [DOD | R])
+check("with a direction held, the same press is a dodge",
+      a.mode == "dodge" and not a.blocking, f"mode={a.mode} blocking={a.blocking}")
+
+a = fighter(-3.0)
+tick([a], [JMP])
+for _ in range(8):
+    tick([a], [0])
+airborne = a.mode == "air"
+for _ in range(20):
+    tick([a], [DOD | R])
+    if a.mode == "dodge":
+        break
+check("in the air it is neither", airborne and a.mode != "dodge" and not a.blocking,
+      f"left the ground={airborne} mode={a.mode}")
+
+a = fighter(-3.0)
+start = a.stam
+tick([a], [DOD | R])
+check("a dodge costs two of the four charges", a.stam == start - 2,
+      f"{start} -> {a.stam}")
+
+print("\n10c. a fall off a floor is a way the fight ends (docs/02)")
+a = fighter(0.0)                   # above the hole in the top floor, so the fall is clear
+a.y = X(6.2)
+a.mode = "air"
+before = a.health
+for _ in range(240):
+    tick([a], [0])
+    if a.mode == "ground":
+        break
+tick([a], [0])                     # the combat pass spends what the motor measured
+check("a drop of a whole storey costs health", a.health < before,
+      f"{before} -> {a.health} hp from {6.2 - F(a.y):.2f} m")
+
+a = fighter(-3.0)
+a.y = X(2.0)
+a.mode = "air"
+before = a.health
+for _ in range(240):
+    tick([a], [0])
+    if a.mode == "ground":
+        break
+tick([a], [0])
+check("a drop inside a storey is free", a.health == before, f"{before} -> {a.health} hp")
+
+print("\n10d. bare hands get desperate below 30% HP (docs/02)")
+def fist_damage(health):
+    """Bare hands reach 0.6 m, so the two have to stand closer than a weapon fight."""
+    atk = fighter(-0.25, 1)
+    vic = fighter(0.25, -1)
+    atk.health = health
+    for _ in range(200):
+        atk.x, vic.x = X(-0.25), X(0.25)
+        vic.stun = 0
+        tick([atk, vic], [ATTACK, 0])
+        if vic.damage_taken:
+            return vic.damage_taken
+    return 0
+
+full = fist_damage(100)
+hurt = fist_damage(25)
+check("a cornered fighter hits harder with nothing in their hands", hurt > full,
+      f"{full} at full health, {hurt} at 25")
+check("and by the 40% docs/02 asks for", hurt == K.scale(full, CFG["DESPERATE_DMG"]),
+      f"{full} -> {hurt}")
 
 print("\n11. the same inputs give the same frames")
 runs = []

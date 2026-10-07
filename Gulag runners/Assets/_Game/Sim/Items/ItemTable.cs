@@ -42,7 +42,8 @@ namespace GulagRunners.Sim
                 Id = ItemId.Fists,
                 Kind = ItemKind.Weapon,
                 Tier = 0,
-                Damage = Fix.FromMilli(3000),
+                Damage = Fix.FromMilli(4000),      // docs/02 says 6 against weapons of 12-26;
+                                                    // these weapons are 0.6 of that scale
                 AttackFrames = 12,                  // 0.20 s
                 Reach = Fix.FromMilli(600),
                 Durability = 0,                     // never breaks
@@ -78,9 +79,9 @@ namespace GulagRunners.Sim
                 Id = ItemId.Dagger,
                 Kind = ItemKind.Weapon,
                 Tier = 1,
-                Damage = Fix.FromMilli(4000),
+                Damage = Fix.FromMilli(5000),       // a hair above bare hands, or why pick it up
                 AttackFrames = 9,                   // 0.15 s
-                Reach = Fix.FromMilli(500),
+                Reach = Fix.FromMilli(700),
                 Durability = 18,
                 PrySpeed = Fix.FromMilli(1200)      // a terrible crowbar
             };
@@ -106,6 +107,7 @@ namespace GulagRunners.Sim
                 AttackFrames = 23,                  // 0.38 s
                 Reach = Fix.FromMilli(1050),
                 Durability = 10,
+                BlockPierce = 350,                  // it is what you reach for against a turtle
                 PrySpeed = Fix.FromMilli(2400)      // the best lever in the game
             };
 
@@ -131,6 +133,7 @@ namespace GulagRunners.Sim
                 AttackFrames = 34,                  // 0.57 s: everyone can see it coming
                 Reach = Fix.FromMilli(1500),
                 Durability = 6,
+                BlockPierce = 400,
                 PrySpeed = Fix.FromMilli(2600)
             };
 

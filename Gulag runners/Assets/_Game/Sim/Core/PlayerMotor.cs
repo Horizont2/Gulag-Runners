@@ -192,6 +192,7 @@ namespace GulagRunners.Sim
                 {
                     s.Noise = impactSpeed > cfg.HardLandSpeed ? NoiseLevel.Loud : NoiseLevel.Medium;
                     s.StepNoiseTimer = cfg.StepNoiseFrames;
+                    s.LandedSpeed = impactSpeed;
                 }
                 s.Mode = MoveMode.Grounded;
                 s.CoyoteTimer = cfg.CoyoteFrames;
@@ -226,6 +227,11 @@ namespace GulagRunners.Sim
         {
             if (!input.Has(InputFlags.Dodge)) return false;
             if (s.DodgeRecoverTimer > 0) return false;
+
+            // Feet on the floor or it does not happen. A dodge in the air is a second jump
+            // with invulnerability on it, which is a different game from the one docs/02
+            // describes — there the ground is where you answer an attack.
+            if (s.Mode != MoveMode.Grounded) return false;
 
             int cost = cfg.DodgeStaminaCost > 0 ? cfg.DodgeStaminaCost : 1;
             if (s.StaminaCharges < cost) return false;

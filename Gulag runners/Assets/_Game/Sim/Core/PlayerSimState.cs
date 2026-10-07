@@ -147,6 +147,13 @@ namespace GulagRunners.Sim
         /// <summary>Output of the last tick. Read by presentation, and later by the audio-info system.</summary>
         public NoiseLevel Noise;
 
+        /// <summary>
+        /// How fast the body was falling on the tick it landed, and zero on every other tick.
+        /// The motor measures it; the combat pass spends it. Keeping health in one place is
+        /// worth the single tick of delay.
+        /// </summary>
+        public Fix LandedSpeed;
+
         public bool Invulnerable => DodgeTimer > 0;
         /// <summary>Unable to act: hit, parried, or dead.</summary>
         public bool Reeling => HitstunTimer > 0 || StaggerTimer > 0 || Dead;

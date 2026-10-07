@@ -52,10 +52,20 @@ namespace GulagRunners.Sim
             }
 
             AdvanceSwing(ref s, cfg);
+            TakeTheFall(ref s, in cfg);
+
+            // docs/02 gives the medieval fighter ONE defensive button, and it has to be both
+            // things it is for. Pressing it with a direction held is a dodge — you are already
+            // going somewhere, so go there properly. Pressing it standing still puts the guard
+            // up on the same frame, which is what makes the parry a tap rather than a bet on a
+            // delay. Neither happens in the air: a fighter off the ground has committed.
+            bool wantsDodge = guardPressed && input.MoveX() != 0 && !s.Swinging &&
+                              s.Mode == MoveMode.Grounded && s.DodgeRecoverTimer <= 0;
 
             // The guard goes up only while standing, only with stamina, and never mid-swing:
             // a block that cancels a committed attack removes every reason not to attack.
-            bool canGuard = guardHeld && s.GuardBreakTimer <= 0 && s.StaminaCharges > 0 &&
+            bool canGuard = guardHeld && !wantsDodge && s.GuardBreakTimer <= 0 &&
+                            s.StaminaCharges > 0 &&
                             s.Mode == MoveMode.Grounded && !s.Swinging;
 
             if (canGuard && !s.Blocking) s.GuardTimer = 0;
@@ -65,7 +75,7 @@ namespace GulagRunners.Sim
             if (!s.Blocking && !s.Swinging) TryStartSwing(ref s, input, in cfg);
 
             s.SpeedPermille = s.Blocking ? (short)cfg.BlockSpeedPermille : (short)0;
-            return MaskInput(in s, input, in cfg);
+            return MaskInput(in s, input, wantsDodge, in cfg);
         }
 
         static void ClearOutputs(ref PlayerSimState s)
@@ -170,7 +180,8 @@ namespace GulagRunners.Sim
         /// What the movement motor is allowed to see. Committing to a swing means committing to
         /// where you are standing, which is what makes reach and spacing matter at all.
         /// </summary>
-        static InputFlags MaskInput(in PlayerSimState s, InputFlags input, in CombatConfig cfg)
+        static InputFlags MaskInput(in PlayerSimState s, InputFlags input, bool wantsDodge,
+                                    in CombatConfig cfg)
         {
             if (s.Swinging)
                 return input & ~(InputFlags.Left | InputFlags.Right | InputFlags.Jump |
@@ -179,7 +190,35 @@ namespace GulagRunners.Sim
             if (s.Blocking)
                 return input & ~(InputFlags.Jump | InputFlags.Dodge);
 
-            return input;
+            // Only the press that was read as a dodge reaches the motor as one. Without this
+            // the button did both jobs at once: on the ground the guard swallowed it and
+            // nothing rolled, in the air there was no guard to swallow it and it rolled — the
+            // exact opposite of both.
+            return wantsDodge ? input : input & ~InputFlags.Dodge;
+        }
+
+        /// <summary>
+        /// Damage from the landing the motor recorded on the previous tick. docs/02 counts a
+        /// drop off a floor among the ways a fight ends, and this is what makes knocking
+        /// somebody through a gap in the walkway worth the opening it costs.
+        /// </summary>
+        static void TakeTheFall(ref PlayerSimState s, in CombatConfig cfg)
+        {
+            if (s.LandedSpeed <= cfg.FallDamageSpeed) { s.LandedSpeed = Fix.Zero; return; }
+
+            Fix over = s.LandedSpeed - cfg.FallDamageSpeed;
+            s.LandedSpeed = Fix.Zero;
+
+            int damage = over.ToMilli() * cfg.FallDamagePerSpeed / 1000;
+            if (damage < 1) return;
+
+            Wound(ref s, damage);
+            s.WasHit = true;
+            s.DamageTaken = (short)damage;
+            s.Noise = NoiseLevel.Loud;
+
+            int stun = damage * cfg.HitstunPerDamage;
+            s.HitstunTimer = stun > cfg.MaxHitstunFrames ? cfg.MaxHitstunFrames : stun;
         }
 
         /// <summary>Walking speed while the guard is up, as a fraction of the run speed.</summary>
@@ -252,6 +291,14 @@ namespace GulagRunners.Sim
             int damage = weapon.Damage.ToMilli() / 1000;
             if (damage < 1) damage = 1;
             if (heavy) damage = Scale(damage, cfg.HeavyDamagePermille);
+
+            // Bare hands get desperate. Only bare hands, and only while losing: it makes the
+            // fighter who dropped their weapon worth fearing without making unarmed a choice.
+            bool bare = attacker.Inventory.Weapon == ItemId.None ||
+                        attacker.Inventory.Weapon == ItemId.Fists;
+            if (bare && cfg.DesperationHealthPermille > 0 &&
+                attacker.Health * 1000 <= cfg.MaxHealth * cfg.DesperationHealthPermille)
+                damage = Scale(damage, cfg.DesperationDamagePermille);
 
             // A guard only works towards the blow. Being hit in the back while holding a shield
             // up is being hit in the back.

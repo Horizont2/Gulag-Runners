@@ -45,11 +45,11 @@ namespace GulagRunners.Game
 
         [Header("Guard")]
         [Tooltip("Damage that still gets through a block.")]
-        [Range(0f, 0.5f)] public float chip = 0.15f;
+        [Range(0f, 0.5f)] public float chip = 0.3f;
 
         [Tooltip("Stamina spent per hit absorbed. It has to outrun the stamina regen, or holding " +
                  "the guard is free — which is the one thing a guard must never be.")]
-        public int blockStaminaCost = 2;
+        public int blockStaminaCost = 1;
 
         public float guardBreakTime = 0.7f;
         [Tooltip("Walking speed with the guard up, as a share of the run speed.")]
@@ -59,11 +59,28 @@ namespace GulagRunners.Game
         [Tooltip("Seconds after raising the guard in which a hit is parried instead of blocked: " +
                  "no damage at all, and the attacker is staggered. The one window in the game " +
                  "that rewards reading the other player rather than reacting to them.")]
-        public float parryWindow = 0.12f;
-        public float staggerTime = 0.6f;
+        public float parryWindow = 0.2f;
+        public float staggerTime = 0.8f;
 
         [Header("Death")]
         public float deathTime = 1.5f;
+
+        [Header("Desperation")]
+        [Tooltip("Below this share of full health, BARE HANDS hit for the multiplier below. " +
+                 "docs/02 asks for it by name: it is what makes a fighter who lost their " +
+                 "weapon worth fearing, and it only ever helps whoever is losing.")]
+        [Range(0f, 1f)] public float desperationHealth = 0.3f;
+        public float desperationDamage = 1.4f;
+
+        [Header("Falling")]
+        [Tooltip("Landing faster than this hurts. 12.5 m/s is the speed reached dropping " +
+                 "about 2.8 m, so every drop inside a storey is free and the full height of " +
+                 "the arena is not. docs/02 counts a fall off a floor among the ways a fight " +
+                 "ends; this is what makes knocking somebody off one worth the opening.")]
+        public float fallDamageSpeed = 12.5f;
+
+        [Tooltip("Damage for every m/s over that.")]
+        public int fallDamagePerSpeed = 8;
 
         static int F(float seconds) =>
             Mathf.Max(1, Mathf.RoundToInt(seconds * PlayerMotor.TicksPerSecond));
@@ -90,7 +107,11 @@ namespace GulagRunners.Game
             BlockSpeedPermille = P(blockSpeed),
             ParryFrames = F(parryWindow),
             StaggerFrames = F(staggerTime),
-            DeathFrames = F(deathTime)
+            DeathFrames = F(deathTime),
+            DesperationHealthPermille = P(desperationHealth),
+            DesperationDamagePermille = P(desperationDamage),
+            FallDamageSpeed = M(fallDamageSpeed),
+            FallDamagePerSpeed = Mathf.Max(0, fallDamagePerSpeed)
         };
 
         /// <summary>

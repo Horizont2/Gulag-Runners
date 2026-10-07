@@ -16,7 +16,12 @@ namespace GulagRunners.Sim
         Up     = 1 << 2,   // climb / mount ladder
         Down   = 1 << 3,   // crouch / descend / drop through a one-way platform
         Jump   = 1 << 4,
-        Dodge  = 1 << 5,   // the dodge into depth; block in medieval mode
+        /// <summary>
+        /// The one defensive button. docs/02 gives the medieval fighter a block and no roll
+        /// button, and one bit has to carry both: pressed with a direction held it is a dodge,
+        /// pressed standing still it raises the guard, and in the air it is neither.
+        /// </summary>
+        Dodge  = 1 << 5,
         Action = 1 << 6,   // pick up, open a chest, grab
         Attack = 1 << 7
     }

@@ -60,6 +60,23 @@ namespace GulagRunners.Sim
         /// reading the other player rather than reacting to them.
         /// </summary>
         public int ParryFrames;
+
+        /// <summary>
+        /// Below this share of full health, bare hands hit for DesperationDamagePermille.
+        /// docs/02 asks for it by name: it is the only thing that makes an unarmed fighter
+        /// frightening, and it only ever helps whoever is losing.
+        /// </summary>
+        public int DesperationHealthPermille;
+        public int DesperationDamagePermille;
+
+        /// <summary>
+        /// Landing faster than this hurts, by FallDamagePerSpeed for every m/s over it.
+        /// docs/02 counts a fall off a floor among the ways a fight ends. 12.5 m/s is the
+        /// speed reached dropping about 2.8 m, so every drop inside a storey is free and the
+        /// full height of the arena is not.
+        /// </summary>
+        public Fix FallDamageSpeed;
+        public int FallDamagePerSpeed;
         public int StaggerFrames;
 
         public int DeathFrames;
@@ -84,13 +101,19 @@ namespace GulagRunners.Sim
             c.HeavyKnockbackSpeed = Fix.FromMilli(6000);
             c.KnockbackLift = Fix.FromMilli(1600);
 
-            c.ChipPermille = 150;
-            c.BlockStaminaCost = 2;        // against a 0.55 s regen, 1 a hit is break-even
+            c.ChipPermille = 300;          // docs/02: a block absorbs 70%, not 85%
+            c.BlockStaminaCost = 1;        // one of the three charges docs/02 gives a fighter
             c.GuardBreakFrames = 42;       // 0.7 s wide open
             c.BlockSpeedPermille = 420;
 
-            c.ParryFrames = 7;             // 0.12 s
-            c.StaggerFrames = 36;          // 0.6 s
+            c.ParryFrames = 12;            // 0.20 s, straight from docs/02
+            c.StaggerFrames = 48;          // 0.80 s, likewise: the parry is the skill ceiling
+
+            c.DesperationHealthPermille = 300;   // docs/02: bare hands below 30% HP
+            c.DesperationDamagePermille = 1400;
+
+            c.FallDamageSpeed = Fix.FromMilli(12500);
+            c.FallDamagePerSpeed = 8;
 
             c.DeathFrames = 90;
             return c;

@@ -190,70 +190,52 @@ for a, b in gaps:
 check("the upper walkway is in three segments with two gaps", len(gaps) == 2)
 
 
-def clear_run_up(brink, toward, segment):
-    """The nearest spot on this segment with a clear run at the edge.
-
-    The middle walkway has two 0.46 m crates standing on it and the step-up is 0.30 m, so a
-    fighter who starts on the wrong side of one never reaches the edge at all. Searching for
-    the run-up instead of assuming it is the difference between measuring the gap and
-    measuring a crate. 0.6 m is already more than enough: ground acceleration is 40 m/s2,
-    so run speed arrives in 0.11 m.
-    """
-    lo, hi = segment
-    d = 0.6
-    while d <= 3.2:
-        x = brink - toward * d
-        if x - HALF > lo + 0.02 and x + HALF < hi - 0.02:
-            a, b = min(x, brink) - HALF, max(x, brink) + HALF
-            clear = not any(b_[3] > X(3.84) and b_[1] < X(3.83 + BODY)
-                            and b_[0] < X(b) and b_[2] > X(a)
-                            for b_ in W["solid"])
-            if clear:
-                return x
-        d += 0.1
-    return None
-
-
-def jump_gap(brink, toward, far_edge, segment, delay):
-    """Run to the lip, leave it, and air-dodge across after `delay` frames.
-
-    The dodge drops gravity for its 21 frames, so it adds its whole 1.68 m to the jump instead
-    of arcing through it. That is the only thing in the kit that crosses these two gaps, and
-    how late the dodge comes is what decides how far it carries.
-    """
-    start = clear_run_up(brink, toward, segment)
-    if start is None:
-        return None, False
-    inp = R if toward > 0 else L
-    s = S(start, 3.95)
+def climb_to(target_x, from_x, from_y):
+    """Walk and hop from here toward there, the way a player works up a crate stack."""
+    s = S(from_x, from_y)
     if not until(s, 0, lambda s: s.mode == "ground", 180):
-        return None, False
-    for _ in range(900):
-        if (F(s.x) - brink) * toward > -(HALF + 0.02):
-            break
-        step(s, inp, W)
-    step(s, inp | JMP, W)
-    if delay is not None:
-        hold(s, inp, delay)
-        step(s, inp | DOD, W)
-    until(s, inp, lambda s: s.mode == "ground" or F(s.y) < 2.0, 300)
-    across = (F(s.x) - far_edge) * toward > 0 and s.mode == "ground" \
-        and abs(F(s.y) - 3.83) < 0.06
-    return s, across
+        return None
+    toward = R if target_x > from_x else L
+    for f in range(900):
+        up = F(s.y) > 3.7
+        step(s, toward if up else toward | (JMP if f % 16 == 0 else 0), W)
+        if up and s.mode == "ground":
+            return s
+    return s
 
 
+# Every segment of the upper walkway has to be reachable, and they are not reached the same
+# way: the two outer ones by their ladders, the middle one by the crate staircases standing
+# under it. Without the air dodge those stairs are the only way up there, which is what the
+# stacks look like they are for.
+for i, (lo, hi) in enumerate(runs):
+    mid = (lo + hi) / 2
+    if i == 1:
+        s = climb_to(-5.0, -8.0, 0.3)            # left stack
+        ok_left = s is not None and s.mode == "ground" and abs(F(s.y) - 3.83) < 0.08
+        check("the middle walkway is reached up the left crate stack", ok_left,
+              f"ended at ({F(s.x):.2f}, {F(s.y):.2f})" if s else "never left the floor")
+        s = climb_to(1.9, 4.6, 0.3)              # right stack
+        check("the middle walkway is reached up the right crate stack",
+              s is not None and s.mode == "ground" and abs(F(s.y) - 3.83) < 0.08,
+              f"ended at ({F(s.x):.2f}, {F(s.y):.2f})" if s else "never left the floor")
+
+# And the gaps themselves stay gaps: knocked into one, a fighter leaves the upper walkway and
+# has to climb back. Each one has a crate stack under it, so the drop is onto the stairs he
+# came up rather than into nothing.
 for i, (a, b) in enumerate(gaps):
-    width = b - a
-    for toward, brink, far, seg, where in ((1, a, b, runs[i], "left to right"),
-                                           (-1, b, a, runs[i + 1], "right to left")):
-        window = [d for d in range(2, 40)
-                  if jump_gap(brink, toward, far, seg, d)[1]]
-        check(f"gap {i + 1} ({width:.2f} m) can be crossed {where}", window,
-              f"dodge {window[0]}-{window[-1]} frames after the jump "
-              f"({(window[-1] - window[0] + 1) / 60:.2f} s window)" if window
-              else "no dodge timing clears it")
-        _, across = jump_gap(brink, toward, far, seg, None)
-        check(f"gap {i + 1} {where} is not free: a plain jump falls short", not across)
+    s = S((a + b) / 2, 3.9)
+    fell = until(s, 0, lambda s: s.mode == "ground", 300)
+    check(f"gap {i + 1} ({b - a:.2f} m) puts a fighter back on the crate stack under it",
+          fell and 1.9 < F(s.y) < 3.0, f"landed at y {F(s.y):.2f}")
+
+    s = S(a - 3.0, 3.95)
+    until(s, 0, lambda s: s.mode == "ground", 180)
+    until(s, R, lambda s: F(s.x) > a - 0.45, 600)
+    step(s, R | JMP, W)
+    until(s, R, lambda s: s.mode == "ground" or F(s.y) < 2.0, 300)
+    check(f"gap {i + 1} cannot be jumped, so it stays a hazard", F(s.x) < b,
+          f"a running jump reached x {F(s.x):.2f} of {b:.2f}")
 
 # ---------------------------------------------------------------- the edges
 print("\nThe ends of the arena")

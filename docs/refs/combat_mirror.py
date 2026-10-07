@@ -8,8 +8,10 @@ from loot_mirror import (ITEMS, NONE, FISTS, CLUB, SPEAR, DAGGER, SWORD, AXE, FL
 K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          HEAVY_DMG=1700, HEAVY_TIME=1500, STUN_PER_DMG=1, MAX_STUN=26,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
-         CHIP=150, BLOCK_STAM=2, GUARD_BREAK=42, BLOCK_SPEED=420,
-         PARRY=7, STAGGER=36, DEATH=90)
+         CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
+         PARRY=12, STAGGER=48, DEATH=90,
+         DESPERATE_HP=300, DESPERATE_DMG=1400,
+         FALL_SPEED=M.M(12500), FALL_PER_SPEED=8)
 
 NONE_P, WINDUP, ACTIVE, RECOVERY = 0, 1, 2, 3
 
@@ -76,7 +78,9 @@ def combat_step(s, inp):
     if s.dead:
         return 0
 
-    s.guard_held = bool(inp & DOD)
+    guard_held = bool(inp & DOD)
+    guard_pressed = guard_held and not s.guard_held
+    s.guard_held = guard_held
 
     if reeling(s):
         s.blocking = False
@@ -84,8 +88,16 @@ def combat_step(s, inp):
         return 0
 
     advance(s)
+    take_the_fall(s)
 
-    can_guard = (s.guard_held and s.guard_break <= 0 and s.stam > 0
+    # One defensive button, two answers: with a direction held it is a dodge, standing still
+    # it is the guard, and in the air it is neither.
+    from sim_motor_mirror import L, R
+    moving = bool(inp & L) != bool(inp & R)
+    wants_dodge = (guard_pressed and moving and not swinging(s)
+                   and s.mode == "ground" and s.dodge_rec <= 0)
+
+    can_guard = (guard_held and not wants_dodge and s.guard_break <= 0 and s.stam > 0
                  and s.mode == "ground" and not swinging(s))
     if can_guard and not s.blocking:
         s.guard_t = 0
@@ -97,7 +109,7 @@ def combat_step(s, inp):
         start_swing(s, inp)
 
     s.speed_permille = K["BLOCK_SPEED"] if s.blocking else 0
-    return mask(s, inp)
+    return mask(s, inp, wants_dodge)
 
 
 def start_swing(s, inp):
@@ -138,13 +150,30 @@ def advance(s):
             s.combo, s.combo_t = 0, 0
 
 
-def mask(s, inp):
+def mask(s, inp, wants_dodge=False):
     from sim_motor_mirror import L, R, JMP
     if swinging(s):
         return inp & ~(L | R | JMP | DOD)
     if s.blocking:
         return inp & ~(JMP | DOD)
-    return inp
+    # Only the press read as a dodge reaches the motor as one.
+    return inp if wants_dodge else inp & ~DOD
+
+
+def take_the_fall(s):
+    """Damage from the landing the motor recorded last tick."""
+    if s.landed_speed <= K["FALL_SPEED"]:
+        s.landed_speed = 0
+        return
+    over = s.landed_speed - K["FALL_SPEED"]
+    s.landed_speed = 0
+    dmg = over * K["FALL_PER_SPEED"] // ONE
+    if dmg < 1:
+        return
+    wound(s, dmg)
+    s.was_hit = True
+    s.damage_taken = dmg
+    s.stun = min(dmg * K["STUN_PER_DMG"], K["MAX_STUN"])
 
 
 def hitbox(s):
@@ -191,6 +220,10 @@ def land(atk, vic):
     dmg = max(1, weapon(atk)["dmg"])
     if heavy:
         dmg = scale(dmg, K["HEAVY_DMG"])
+    # Bare hands get desperate below 30% HP, and only bare hands.
+    if atk.inv.weapon in (NONE, FISTS) and \
+            atk.health * 1000 <= K["HP"] * K["DESPERATE_HP"]:
+        dmg = scale(dmg, K["DESPERATE_DMG"])
 
     facing_it = vic.facing != side
     if vic.blocking and facing_it:

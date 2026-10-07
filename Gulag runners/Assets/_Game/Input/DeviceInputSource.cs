@@ -16,9 +16,9 @@ namespace GulagRunners.Game
     {
         public enum Scheme
         {
-            /// <summary>WASD, Space, Left Shift, E, J.</summary>
+            /// <summary>WASD, Space, Left Shift (block / dodge), E, J.</summary>
             Primary = 0,
-            /// <summary>Arrows, Right Ctrl, Right Shift, Numpad 0, Numpad 1.</summary>
+            /// <summary>Arrows, Right Ctrl, Right Shift (block / dodge), Numpad 0, Numpad 1.</summary>
             Secondary = 1
         }
 

@@ -50,7 +50,12 @@ namespace GulagRunners.Game
                  "not knowing where they are.")]
         [Range(0f, 1f)] public float muffledAlpha = 0.55f;
 
-        public bool draw = true;
+        [Tooltip("Off by default. docs/02 lists a direction indicator among the settings a " +
+                 "player must be able to switch on — for playing muted and for deaf players — " +
+                 "and that is what it is: a setting, not something the game shows by default. " +
+                 "Left on it also hands you the opponent's position, which is the one thing " +
+                 "the noise system exists to make you work for.")]
+        public bool draw;
 
         Camera _camera;
 

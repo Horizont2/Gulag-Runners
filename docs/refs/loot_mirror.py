@@ -26,14 +26,14 @@ def _a(name, tier, reduction):
 
 ITEMS = {
     NONE:      dict(kind=0, tier=0, pry=0, dur=0, name="-"),
-    FISTS:     _w("fists", 0, 3, 12, 600, 0, 1000),
+    FISTS:     _w("fists", 0, 4, 12, 600, 0, 1000),
     CLUB:      _w("club", 1, 8, 15, 950, 14, 2000),
     SPEAR:     _w("spear", 2, 13, 27, 1700, 9, 1600),
-    DAGGER:    _w("dagger", 1, 4, 9, 500, 18, 1200),
+    DAGGER:    _w("dagger", 1, 5, 9, 700, 18, 1200),
     SWORD:     _w("sword", 2, 10, 19, 1150, 12, 1500),
-    AXE:       _w("axe", 2, 12, 23, 1050, 10, 2400),
+    AXE:       _w("axe", 2, 12, 23, 1050, 10, 2400, pierce=350),
     FLAIL:     _w("flail", 3, 12, 21, 1300, 9, 1400, pierce=700),
-    GREATAXE:  _w("greataxe", 3, 21, 34, 1500, 6, 2600),
+    GREATAXE:  _w("greataxe", 3, 21, 34, 1500, 6, 2600, pierce=400),
     LEATHER:   _a("leather vest", 1, 150),
     CHAINMAIL: _a("chainmail", 2, 300),
     PLATE:     _a("plate", 3, 450),

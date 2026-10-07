@@ -142,10 +142,10 @@ for _ in range(120):
 dodges = 0
 for t in range(95):
     was = s2.mode
-    step(s2, DOD if t % 30 == 0 else 0, W)
+    step(s2, (DOD | R) if t % 30 == 0 else 0, W)
     if s2.mode == "dodge" and was != "dodge": dodges += 1
 check("the pool pays for two in a row and then makes you wait", dodges == 2,
-      f"{dodges} dodges in 1.6 s, stamina {s2.stam}/6")
+      f"{dodges} dodges in 1.6 s, stamina {s2.stam}/{C['SMAX']}")
 
 s2 = S(-3.0, 0.9)
 for _ in range(120):

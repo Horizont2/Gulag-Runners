@@ -139,10 +139,12 @@ namespace GulagRunners.Sim
             c.DodgeSpeed         = Fix.FromMilli(4800);   // 1.68 m, down from 2.45
             c.DodgeFrames        = 21;  // 0.35 s of invulnerability, straight from docs/02
             c.DodgeRecoverFrames = 9;
-            c.DodgeStaminaCost   = 3;
+            c.DodgeStaminaCost   = 2;      // two dodges back to back, then 2.4 s of waiting
 
-            c.StaminaMax            = 6;   // two dodges, or six blocked hits
-            c.StaminaRecoverFrames  = 33;  // 0.55 s a charge, so a spent dodge is back in 1.65 s
+            c.StaminaMax            = 4;   // docs/02 says 3; 4 so a block can cost 1 and a
+                                           // dodge 2, which is the "two in a row" the dodge
+                                           // was retuned to in the movement pass
+            c.StaminaRecoverFrames  = 72;  // 1.2 s a charge, straight from docs/02
 
             c.BodyWidth   = Fix.FromMilli(600);
             c.BodyHeight  = Fix.FromMilli(1800);
