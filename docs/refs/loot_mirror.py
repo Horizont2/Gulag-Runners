@@ -8,8 +8,9 @@ BARE_GAIN = 1000
 
 # ---------------------------------------------------------------- items (docs/03, M0 cut)
 NONE, FISTS, CLUB, SPEAR = 0, 1, 2, 3
-DAGGER, SWORD, AXE, FLAIL, GREATAXE = 4, 5, 6, 7, 8
-LEATHER, CHAINMAIL, PLATE = 20, 21, 22
+DAGGER, SWORD, AXE, FLANGED_MACE, WARHAMMER = 4, 5, 6, 7, 8
+GLADIUS, MACE, SABER, SCYTHE = 9, 10, 11, 12
+LEATHER, CHAINMAIL, PLATE, SHIELD = 20, 21, 22, 23
 BANDAGE = 30
 WEAPON, ARMOUR, UTILITY = 1, 2, 3
 
@@ -19,9 +20,9 @@ def _w(name, tier, dmg, frames, reach, dur, pry, pierce=0):
                 pry=M(pry), dur=dur, pierce=pierce, name=name)
 
 
-def _a(name, tier, reduction):
+def _a(name, tier, reduction, chip=0, parry=0):
     return dict(kind=ARMOUR, tier=tier, dmg=0, frames=0, reach=0, pry=0, dur=0,
-                pierce=0, reduction=reduction, name=name)
+                pierce=0, reduction=reduction, chip=chip, parry=parry, name=name)
 
 
 ITEMS = {
@@ -32,11 +33,16 @@ ITEMS = {
     DAGGER:    _w("dagger", 1, 5, 9, 700, 18, 1200),
     SWORD:     _w("sword", 2, 10, 19, 1150, 12, 1500),
     AXE:       _w("axe", 2, 12, 23, 1050, 10, 2400, pierce=350),
-    FLAIL:     _w("flail", 3, 12, 21, 1300, 9, 1400, pierce=700),
-    GREATAXE:  _w("greataxe", 3, 21, 34, 1500, 6, 2600, pierce=400),
+    GLADIUS:   _w("gladius", 1, 7, 12, 900, 16, 1300),
+    MACE:      _w("mace", 1, 9, 18, 850, 12, 1100, pierce=200),
+    SABER:     _w("saber", 2, 9, 14, 1100, 11, 1300),
+    SCYTHE:    _w("scythe", 2, 11, 29, 1850, 8, 1200, pierce=500),
+    FLANGED_MACE: _w("flanged mace", 3, 12, 21, 1300, 9, 1400, pierce=700),
+    WARHAMMER: _w("warhammer", 3, 21, 34, 1400, 6, 2600, pierce=450),
     LEATHER:   _a("leather vest", 1, 150),
     CHAINMAIL: _a("chainmail", 2, 300),
     PLATE:     _a("plate", 3, 450),
+    SHIELD:    _a("shield", 2, 100, chip=400, parry=4),
     BANDAGE:   dict(kind=UTILITY, tier=1, pry=0, dur=0, heal=30, name="bandage"),
 }
 

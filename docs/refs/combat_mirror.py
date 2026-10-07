@@ -1,8 +1,9 @@
 """Faithful Python port of CombatMotor. Same integer arithmetic, same order of operations."""
 import sim_motor_mirror as M
 from sim_motor_mirror import C, ONE, mul, ATTACK, DOD
-from loot_mirror import (ITEMS, NONE, FISTS, CLUB, SPEAR, DAGGER, SWORD, AXE, FLAIL,
-                         GREATAXE, LEATHER, CHAINMAIL, PLATE, WEAPON, ARMOUR)
+from loot_mirror import (ITEMS, NONE, FISTS, CLUB, SPEAR, DAGGER, SWORD, AXE, FLANGED_MACE,
+                         WARHAMMER, GLADIUS, MACE, SABER, SCYTHE,
+                         LEATHER, CHAINMAIL, PLATE, SHIELD, WEAPON, ARMOUR)
 
 # ---------------------------------------------------------------- CombatConfig.Default()
 K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
@@ -239,7 +240,9 @@ def land(atk, vic):
 
     facing_it = vic.facing != side
     if vic.blocking and facing_it:
-        if vic.guard_t < K["PARRY"]:
+        # A shield is what makes the parry worth hunting for (docs/02's skill ceiling).
+        window = K["PARRY"] + ITEMS[vic.inv.armour].get("parry", 0)
+        if vic.guard_t < window:
             parry(atk, vic)
         else:
             block(atk, vic, dmg, side)
@@ -260,7 +263,14 @@ def block(atk, vic, dmg, side):
     # Some weapons answer a shield rather than being answered by one (docs/03).
     pierce = weapon(atk).get("pierce", 0)
     through = pierce if pierce > K["CHIP"] else K["CHIP"]
-    chip = max(1, scale(dmg, through))
+    chip = scale(dmg, through)
+
+    # And what a shield is FOR: the hits you meet, not the hits you stand and take. 0 means
+    # the ordinary chip, which is every other armour.
+    guard = ITEMS[vic.inv.armour].get("chip", 0)
+    if guard > 0:
+        chip = scale(chip, guard)
+    chip = max(1, chip)
 
     wound(vic, chip)
     vic.was_blocked = True

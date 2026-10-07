@@ -111,9 +111,70 @@ namespace GulagRunners.Sim
                 PrySpeed = Fix.FromMilli(2400)      // the best lever in the game
             };
 
-            t[(int)ItemId.Flail] = new ItemDef
+            // The short sword. Faster than the club and shorter, lasts longer than anything
+            // but the dagger, and it is a poor crowbar — the first weapon you keep because you
+            // want to FIGHT with it rather than because it opens chests.
+            t[(int)ItemId.Gladius] = new ItemDef
             {
-                Id = ItemId.Flail,
+                Id = ItemId.Gladius,
+                Kind = ItemKind.Weapon,
+                Tier = 1,
+                Damage = Fix.FromMilli(7000),
+                AttackFrames = 12,                  // 0.20 s, bare-handed speed with a blade on it
+                Reach = Fix.FromMilli(900),
+                Durability = 16,
+                PrySpeed = Fix.FromMilli(1300)
+            };
+
+            // Slow and short for T1, and the first thing in the table that beats a raised
+            // guard. docs/03 wants every item to have a counter-item; this is the early
+            // answer to someone who blocks and waits.
+            t[(int)ItemId.Mace] = new ItemDef
+            {
+                Id = ItemId.Mace,
+                Kind = ItemKind.Weapon,
+                Tier = 1,
+                Damage = Fix.FromMilli(9000),
+                AttackFrames = 18,                  // 0.30 s
+                Reach = Fix.FromMilli(850),
+                Durability = 12,
+                BlockPierce = 200,
+                PrySpeed = Fix.FromMilli(1100)      // a mace is not a lever
+            };
+
+            // The quickest weapon that still has reach. It wins the exchange and loses the
+            // trade: against the axe or the spear it has to hit twice for their once.
+            t[(int)ItemId.Saber] = new ItemDef
+            {
+                Id = ItemId.Saber,
+                Kind = ItemKind.Weapon,
+                Tier = 2,
+                Damage = Fix.FromMilli(9000),
+                AttackFrames = 14,                  // 0.23 s
+                Reach = Fix.FromMilli(1100),
+                Durability = 11,
+                PrySpeed = Fix.FromMilli(1300)
+            };
+
+            // The longest reach in the game and slow enough that it had better land. It
+            // out-ranges the spear and goes through a guard, which is the one combination the
+            // table otherwise does not have.
+            t[(int)ItemId.Scythe] = new ItemDef
+            {
+                Id = ItemId.Scythe,
+                Kind = ItemKind.Weapon,
+                Tier = 2,
+                Damage = Fix.FromMilli(11000),
+                AttackFrames = 29,                  // 0.48 s
+                Reach = Fix.FromMilli(1850),
+                Durability = 8,
+                BlockPierce = 500,
+                PrySpeed = Fix.FromMilli(1200)
+            };
+
+            t[(int)ItemId.FlangedMace] = new ItemDef
+            {
+                Id = ItemId.FlangedMace,
                 Kind = ItemKind.Weapon,
                 Tier = 3,
                 Damage = Fix.FromMilli(12000),
@@ -124,16 +185,16 @@ namespace GulagRunners.Sim
                 BlockPierce = 700                   // a shield is most of no use against it
             };
 
-            t[(int)ItemId.Greataxe] = new ItemDef
+            t[(int)ItemId.Warhammer] = new ItemDef
             {
-                Id = ItemId.Greataxe,
+                Id = ItemId.Warhammer,
                 Kind = ItemKind.Weapon,
                 Tier = 3,
                 Damage = Fix.FromMilli(21000),
                 AttackFrames = 34,                  // 0.57 s: everyone can see it coming
-                Reach = Fix.FromMilli(1500),
+                Reach = Fix.FromMilli(1400),        // a hammer, not a polearm: it has to close
                 Durability = 6,
-                BlockPierce = 400,
+                BlockPierce = 450,
                 PrySpeed = Fix.FromMilli(2600)
             };
 
@@ -159,6 +220,20 @@ namespace GulagRunners.Sim
                 Kind = ItemKind.Armour,
                 Tier = 3,
                 DamageReduction = Fix.FromMilli(450)
+            };
+
+            // The armour slot's real decision. Plate takes nearly half out of every hit you
+            // stand there and absorb; a shield does almost nothing for that and makes the hits
+            // you MEET nearly free, and widens the parry window enough to go hunting for one.
+            // Two opposite plans, one slot, and the silhouette says which you chose.
+            t[(int)ItemId.Shield] = new ItemDef
+            {
+                Id = ItemId.Shield,
+                Kind = ItemKind.Armour,
+                Tier = 2,
+                DamageReduction = Fix.FromMilli(100),   // 10%: it is not armour
+                BlockChipPermille = 400,                // a blocked hit costs 60% less
+                ParryBonusFrames = 4                    // docs/02's skill ceiling, widened
             };
 
             t[(int)ItemId.Bandage] = new ItemDef

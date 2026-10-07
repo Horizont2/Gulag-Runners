@@ -328,7 +328,10 @@ namespace GulagRunners.Sim
 
             if (victim.Blocking && facingIt)
             {
-                if (victim.GuardTimer < cfg.ParryFrames)
+                // A shield is what makes the parry worth hunting for (docs/02 calls it the
+                // skill ceiling of the medieval mode).
+                int window = cfg.ParryFrames + victim.Inventory.ArmourDef.ParryBonusFrames;
+                if (victim.GuardTimer < window)
                 {
                     Parry(ref attacker, ref victim, in cfg);
                     return;
@@ -364,6 +367,13 @@ namespace GulagRunners.Sim
             int through = pierce > cfg.ChipPermille ? pierce : cfg.ChipPermille;
 
             int chip = Scale(damage, through);
+
+            // And what a shield is FOR: the hits you meet, rather than the hits you stand and
+            // take. Zero is "the ordinary chip", which is what every other armour wants and
+            // what an unset field already is.
+            int guard = victim.Inventory.ArmourDef.BlockChipPermille;
+            if (guard > 0) chip = Scale(chip, guard);
+
             if (chip < 1) chip = 1;
 
             Wound(ref victim, chip);

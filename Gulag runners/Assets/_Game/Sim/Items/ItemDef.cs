@@ -44,6 +44,23 @@ namespace GulagRunners.Sim
         /// <summary>Fraction of incoming damage removed. docs/02: T1/T2/T3 = 15/30/45%.</summary>
         public Fix DamageReduction;
 
+        /// <summary>
+        /// What a raised guard lets through, in thousandths, for someone carrying this.
+        /// 0 means the ordinary chip — which is what every item that is not a shield wants,
+        /// and conveniently what an unset struct field already is.
+        ///
+        /// This is the shield's whole reason to exist. Plate removes nearly half of every hit
+        /// and does nothing for your guard; a shield barely softens a hit you take standing
+        /// and makes the hits you MEET almost free. One armour slot, two opposite plans.
+        /// </summary>
+        public int BlockChipPermille;
+
+        /// <summary>
+        /// Extra frames on the parry window. docs/02 makes the parry the skill ceiling of the
+        /// medieval mode; a shield is what widens it enough to go looking for.
+        /// </summary>
+        public int ParryBonusFrames;
+
         // ---- utility
         public int Heal;
 

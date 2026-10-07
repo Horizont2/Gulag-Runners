@@ -34,11 +34,23 @@ namespace GulagRunners.Sim
         /// <summary>T2. Slower and heavier than the sword, and the best lever in the game.</summary>
         Axe = 6,
 
-        /// <summary>T3. Slow, enormous, and it goes through a guard. The answer to turtling.</summary>
-        Flail = 7,
+        /// <summary>T3. Goes through a guard like nothing else. The answer to turtling.</summary>
+        FlangedMace = 7,
 
         /// <summary>T3. If it lands, the fight is decided.</summary>
-        Greataxe = 8,
+        Warhammer = 8,
+
+        /// <summary>T1. A short sword: faster than the club, shorter, and a poor crowbar.</summary>
+        Gladius = 9,
+
+        /// <summary>T1. Short and slow for its tier, but the first thing that beats a guard.</summary>
+        Mace = 10,
+
+        /// <summary>T2. The quickest weapon with real reach. Wins exchanges, loses trades.</summary>
+        Saber = 11,
+
+        /// <summary>T2. The longest reach in the game, and slow enough that it had better land.</summary>
+        Scythe = 12,
 
         /// <summary>T1 armour.</summary>
         LeatherVest = 20,
@@ -46,6 +58,12 @@ namespace GulagRunners.Sim
         Chainmail = 21,
         /// <summary>T3 armour.</summary>
         Plate = 22,
+
+        /// <summary>
+        /// T2, and the armour slot's real decision: it barely softens a hit, and it makes
+        /// BLOCKING work. Chainmail or shield, not both.
+        /// </summary>
+        Shield = 23,
 
         /// <summary>T1 utility.</summary>
         Bandage = 30
