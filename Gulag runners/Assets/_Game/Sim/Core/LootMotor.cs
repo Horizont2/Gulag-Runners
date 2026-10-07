@@ -70,6 +70,19 @@ namespace GulagRunners.Sim
             state.Opener = playerIndex;
             s.OpeningChest = target;
 
+            // Turn to what you are prying at. A fighter levering a crate open with his back to
+            // it is the kind of thing nobody files and everybody sees, and the search animation
+            // has to have something to face. LootMotor runs last in the tick, after movement
+            // has had its say, so this is the final word on facing for the frame, and it lapses
+            // the moment the chest does, because the claim goes with it.
+            //
+            // The deadzone matters: a fighter stands INSIDE a chest's box to open it, so
+            // without one, shuffling across its middle flips him back and forth.
+            Fix centre = def.Box.MinX + (def.Box.MaxX - def.Box.MinX) / 2;
+            Fix deadzone = move.BodyWidth / 4;
+            if (centre > s.Position.X + deadzone) s.Facing = 1;
+            else if (centre < s.Position.X - deadzone) s.Facing = -1;
+
             // The weapon is the crowbar. Bare hands are slower and quieter, and that is the trade
             // the whole scavenge phase is built on (docs/03).
             bool tool = !s.Inventory.BareHanded;

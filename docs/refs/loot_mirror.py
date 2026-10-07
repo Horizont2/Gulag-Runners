@@ -333,6 +333,15 @@ def loot_step(s, player, inp, chests, ground=None):
     chest.opener = player
     s.opening = target
 
+    # Turn to what you are prying at: the search animation has to have something to face, and
+    # the loot step runs last in the tick, so this is the final word on facing for the frame.
+    # The deadzone matters — a fighter stands INSIDE a chest's box to open it, so without one
+    # shuffling across its middle flips him back and forth.
+    centre = chest.box[0] + (chest.box[2] - chest.box[0]) // 2
+    dead = C["W"] // 4
+    if centre > s.x + dead: s.facing = 1
+    elif centre < s.x - dead: s.facing = -1
+
     tool = not s.inv.bare
     chest.progress += pry_milli(s.inv.weapon)
 

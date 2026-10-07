@@ -5690,8 +5690,22 @@ MonoBehaviour:
   ladderExitState: Ladder Down End
   crouchIdleState: Sitting
   crouchMoveState: Walk
-  blockIdleState: 
+  blockIdleState: Block Idle
   blockMoveState: 
+  searchState: 
+  scaleSearchByPrySpeed: 1
+  attackState: Attack
+  attackCombo:
+  - Attack
+  - Attack 2
+  - Attack 3
+  attackWindupState: 
+  attackRecoverState: 
+  poseAttackByPhase: 1
+  hitState: Hit
+  blockImpactState: Block Hit
+  staggerState: Stagger
+  deathState: 
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4
@@ -5809,8 +5823,22 @@ MonoBehaviour:
   ladderExitState: Ladder Down End
   crouchIdleState: Sitting
   crouchMoveState: Walk
-  blockIdleState: 
+  blockIdleState: Block Idle
   blockMoveState: 
+  searchState: 
+  scaleSearchByPrySpeed: 1
+  attackState: Attack
+  attackCombo:
+  - Attack
+  - Attack 2
+  - Attack 3
+  attackWindupState: 
+  attackRecoverState: 
+  poseAttackByPhase: 1
+  hitState: Hit
+  blockImpactState: Block Hit
+  staggerState: Stagger
+  deathState: 
   crossFade: 0.12
   idleThreshold: 0.15
   runThreshold: 2.4

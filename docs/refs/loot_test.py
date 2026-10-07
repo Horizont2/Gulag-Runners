@@ -59,6 +59,10 @@ def spawn(x, y, weapon=NONE):
     return s
 
 
+def approach_sign(inp):
+    return 1 if inp == R else -1
+
+
 def tick(s, inp, chests=None, player=0, shared=True):
     # Loot in the air belongs to nobody, so it steps once per tick for the whole match. With two
     # players in a test, only one of them passes shared=True, exactly as the tick owner does.
@@ -378,5 +382,32 @@ for _ in range(2):
     r.append((p.x, p.y, p.inv.weapon, p.inv.durability, c[0].progress,
               [(g.item, g.x, g.y, g.state) for g in GROUND]))
 check("bit-identical replay", r[0] == r[1], f"{r[0]}")
+
+print("\nTurning to face the chest being searched")
+# A fighter levering a crate open with his back to it is what the search animation would show
+# without this. Each case walks him PAST the chest's middle, so the facing he arrives with is
+# the wrong one, and then holds the button: the chest has to turn him, and hand the facing
+# back to movement the moment he lets go.
+for approach, stop, want, label in ((R, 0.45, -1, "walked in from the left, past its middle"),
+                                    (L, -0.45, 1, "walked in from the right, short of it")):
+    chests = build()
+    cx = LAYOUT[0][3]                                   # Chest_F0_Crate_L, centre x -5.5
+    s = spawn(cx - approach_sign(approach) * 2.0, 0.3, CLUB)
+    walk_to(s, cx + stop, chests)
+    arrived = s.facing
+    check(f"he reaches the chest, {label}", abs(F(s.x) - (cx + stop)) < 0.1,
+          f"x {F(s.x):.2f}, chest centre {cx:.1f}, facing {arrived:+d}")
+
+    for _ in range(10):
+        tick(s, ACTION, chests)
+    check(f"he is prying at it, {label}", s.opening >= 0, f"opening {s.opening}")
+    check(f"and has turned to face it, {label}", s.opening >= 0 and s.facing == want,
+          f"facing {s.facing:+d}, arrived facing {arrived:+d}")
+
+    # Let go and walk: facing is movement's business again, with nothing left over.
+    for _ in range(30):
+        tick(s, approach, chests)
+    check(f"and facing is movement's again once he lets go, {label}",
+          s.facing == approach_sign(approach), f"facing {s.facing:+d}")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

@@ -45,9 +45,64 @@ namespace GulagRunners.Game
         [Tooltip("Guard up and standing. Leave empty until there is a clip for it — the state " +
                  "then falls back to idle, and the only thing the player can see of a raised " +
                  "guard is that they have gone slow, which reads as a bug rather than a brace.")]
-        public string blockIdleState = "";
+        public string blockIdleState = "Block Idle";
         [Tooltip("Guard up and walking. Empty falls back to the walk.")]
         public string blockMoveState = "";
+
+        [Header("Searching a chest")]
+        [Tooltip("Working at a chest: prying, forcing, rummaging. Held for exactly as long as " +
+                 "the simulation says the chest is being opened, so the clip IS the progress " +
+                 "bar — and the fighter is turned to face the chest while it plays, which the " +
+                 "simulation does, so the hitbox and the picture agree.\n\n" +
+                 "Empty falls back to the crouch-idle pose, which at least reads as someone " +
+                 "stopped and busy rather than someone standing about.")]
+        public string searchState = "";
+
+        [Tooltip("Scale the search clip by how fast this fighter actually opens things, so " +
+                 "prying a crate with a club looks quicker than forcing a safe bare-handed. " +
+                 "Off plays it at its authored speed.")]
+        public bool scaleSearchByPrySpeed = true;
+
+        [Header("The fight")]
+        [Tooltip("The swing. One clip is enough: with Pose Attack By Phase on, the wind-up " +
+                 "shows its opening frames, the active window its middle and the recovery its " +
+                 "end, so a single animation carries the whole commitment the fight is built " +
+                 "on (docs/02 — the wind-up is the thing the opponent reads).")]
+        public string attackState = "Attack";
+
+        [Tooltip("The swings a combo cycles through, in order. The simulation already counts " +
+                 "which blow of the chain this is, so three clips make a chain read as a " +
+                 "chain rather than the same swing three times. Empty uses Attack State for " +
+                 "all of them.")]
+        public string[] attackCombo = { "Attack", "Attack 2", "Attack 3" };
+
+        [Tooltip("Optional. A separate clip for the wind-up only. Empty uses the swing.")]
+        public string attackWindupState = "";
+
+        [Tooltip("Optional. A separate clip for the recovery only. Empty uses the swing.")]
+        public string attackRecoverState = "";
+
+        [Tooltip("Drive one attack clip as a pose across the three phases instead of letting " +
+                 "it play at its own speed. The swing then always lands on the frame the " +
+                 "simulation says it lands on, which is the only way the picture can be read " +
+                 "as a warning.")]
+        public bool poseAttackByPhase = true;
+
+        [Tooltip("Taking a hit. Held for the hitstun the simulation gives, so a heavier hit " +
+                 "visibly costs more.")]
+        public string hitState = "Hit";
+
+        [Tooltip("A hit absorbed on the guard. Empty falls back to the block pose, which still " +
+                 "reads better than the hit clip: the point of blocking is that you did not " +
+                 "take it.")]
+        public string blockImpactState = "Block Hit";
+
+        [Tooltip("Guard broken, or a parry taken: open, off-balance and about to be punished. " +
+                 "Empty falls back to the hit clip.")]
+        public string staggerState = "Stagger";
+
+        [Tooltip("Dead. Held from the moment the simulation says so, and never left.")]
+        public string deathState = "";
 
         [Header("Blending")]
         [Tooltip("Cross-fade time between states, in seconds.")]
@@ -154,12 +209,73 @@ namespace GulagRunners.Game
             _lastMode = s.Mode;
         }
 
+        /// <summary>The first of these that has actually been filled in.</summary>
+        static string First(string a, string b = null, string c = null) =>
+            !string.IsNullOrEmpty(a) ? a
+            : !string.IsNullOrEmpty(b) ? b
+            : c;
+
         string PickState(in PlayerSimState s, float speed, out float playback, out float scrub,
                          out float fade)
         {
             playback = 1f;
             scrub = -1f;
             fade = crossFade;
+
+            // The fight comes first, and in this order, because every one of these overrides
+            // whatever the body happens to be doing with its feet: a fighter hit out of the
+            // air is reeling, not jumping, and a dead one is not walking anywhere.
+            if (s.Dead)
+                return First(deathState, staggerState, hitState) ?? idleState;
+
+            if (s.StaggerTimer > 0 || s.GuardBreakTimer > 0)
+                return First(staggerState, hitState) ?? idleState;
+
+            if (s.HitstunTimer > 0)
+            {
+                // A hit the guard ate is not a hit the body took. docs/02 wants the difference
+                // readable from across the arena: it is the whole reason to hold the guard up.
+                string hurt = s.Blocking
+                    ? First(blockImpactState, blockIdleState, hitState)
+                    : First(hitState, staggerState);
+                if (!string.IsNullOrEmpty(hurt)) return hurt;
+            }
+
+            if (s.Attack != AttackPhase.None)
+            {
+                string chained = ComboSwing(s.ComboIndex);
+                string swing = s.Attack == AttackPhase.Windup
+                        ? First(attackWindupState, chained)
+                        : s.Attack == AttackPhase.Recovery
+                            ? First(attackRecoverState, chained)
+                            : chained;
+
+                if (!string.IsNullOrEmpty(swing))
+                {
+                    // Posed, the one clip spans the whole swing: the wind-up over its opening
+                    // frames, the active window across its middle, the recovery to the end.
+                    // That puts the frame the hitbox goes live on at the same place in the
+                    // animation every time, which is what makes a wind-up readable at all.
+                    if (poseAttackByPhase && swing == chained)
+                    {
+                        scrub = SwingProgress(in s);
+                        playback = 0f;
+                    }
+                    return swing;
+                }
+            }
+
+            // Working at a chest. The simulation has already turned the fighter to face it.
+            if (s.OpeningChest >= 0)
+            {
+                string search = First(searchState, crouchIdleState, idleState);
+                if (!string.IsNullOrEmpty(search))
+                {
+                    if (scaleSearchByPrySpeed)
+                        playback = Scale(PrySpeed(in s), 1f);
+                    return search;
+                }
+            }
 
             switch (s.Mode)
             {
@@ -239,6 +355,44 @@ namespace GulagRunners.Game
                     playback = Scale(speed, referenceWalkSpeed);
                     return walkState;
             }
+        }
+
+        /// <summary>Which swing of a chain this is. Falls back to the single attack clip.</summary>
+        string ComboSwing(int comboIndex)
+        {
+            if (attackCombo == null || attackCombo.Length == 0) return attackState;
+
+            string pick = attackCombo[((comboIndex % attackCombo.Length) + attackCombo.Length)
+                                      % attackCombo.Length];
+            return First(pick, attackState);
+        }
+
+        /// <summary>
+        /// How far through the whole swing this frame is, 0 to 1. The three phases get the
+        /// shares a swing reads with: the wind-up the first two fifths, the active window a
+        /// fifth, the recovery the rest.
+        /// </summary>
+        static float SwingProgress(in PlayerSimState s)
+        {
+            int total = Mathf.Max(1, s.AttackPhaseFrames);
+            float within = Mathf.Clamp01(1f - s.AttackTimer / (float)total);
+
+            switch (s.Attack)
+            {
+                case AttackPhase.Windup: return within * 0.4f;
+                case AttackPhase.Active: return 0.4f + within * 0.2f;
+                default: return 0.6f + within * 0.4f;
+            }
+        }
+
+        /// <summary>
+        /// How fast this fighter opens things, against bare hands. The weapon is the crowbar
+        /// (docs/03), so a club through a crate should not look like fingernails on a safe.
+        /// </summary>
+        static float PrySpeed(in PlayerSimState s)
+        {
+            float pry = s.Inventory.WeaponDef.PrySpeed.ToMilli() / 1000f;
+            return pry > 0.01f ? pry : 1f;
         }
 
         float Scale(float speed, float reference) =>
