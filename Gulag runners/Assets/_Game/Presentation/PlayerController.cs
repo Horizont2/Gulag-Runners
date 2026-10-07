@@ -253,6 +253,11 @@ namespace GulagRunners.Game
 
             Vector3 p = transform.position;
             if (depthFromScene) planeZ = p.z;
+
+            // Now that the plane is known, and not before: the simulation needs it to bring a
+            // fighter back onto the plane after a fall, and with Depth From Scene on it is the
+            // object's own Z, which the config built at the top of Awake could not have seen.
+            ApplyTuning();
             _depth = planeZ;
             _spawnPoint = new Vector2(p.x, p.y - visualYOffset);
             SpawnAt(_spawnPoint, spawnFacing);
@@ -540,8 +545,17 @@ namespace GulagRunners.Game
             SpawnAt(feetPosition, facing);
         }
 
-        /// <summary>Re-reads the inspector tuning. Handy while tuning in play mode.</summary>
-        public void ApplyTuning() => _config = tuning.ToConfig();
+        /// <summary>
+        /// Re-reads the inspector tuning. Handy while tuning in play mode.
+        ///
+        /// Also the one place the config is built, so that re-reading it can never drop the
+        /// gameplay plane the simulation needs to bring a fighter back onto.
+        /// </summary>
+        public void ApplyTuning()
+        {
+            _config = tuning.ToConfig();
+            _config.HomeDepth = ToFix(planeZ);
+        }
 
         /// <summary>
         /// Replaces this player's whole simulation state.

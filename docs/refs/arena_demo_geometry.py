@@ -12,7 +12,7 @@ import math
 import os
 import re
 
-from sim_motor_mirror import X
+from sim_motor_mirror import X, C
 
 SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                      "..", "..", "Gulag runners", "Assets", "Scenes", "Arena_Demo.unity")
@@ -651,6 +651,14 @@ def bake(scene=None, report=False):
 
 def world(report=False):
     b = bake(report=report)
+
+    # The gameplay plane the fight happens at, taken from the scene exactly as
+    # PlayerController takes it from the fighter's own Z. The motor needs it to bring a body
+    # back onto the plane after a fall, so it belongs to the level, not to the test.
+    sp = spawns()
+    if sp:
+        C["HOME"] = X(sp[0][3])
+
     return {k: b[k] for k in ("solid", "oneway", "ladder",
                               "solidz", "onewayz", "ladderz",
                               "ladderlean", "ladderleanz")}

@@ -20,7 +20,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
          BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
-         CORNER=M(250), FALLTHRU=18,
+         CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
 L, R, UP, DN, JMP, DOD, ACTION, ATTACK = 1, 2, 4, 8, 16, 32, 64, 128
@@ -259,7 +259,7 @@ def lane_ahead(s, w):
         gap = sol[0] - (s.x + half) if s.facing > 0 else (s.x - half) - sol[2]
         if gap < 0: continue
         if best is not None and gap >= near: continue
-        want = nearest_in(span(w, "solid", i), s.depth, C["BODYZ"] // 2)
+        want = lane_on(span(w, "solid", i), s.depth)
         if abs(want - s.depth) > C["LANEREACH"]: continue
         near = gap
         best = want
@@ -270,12 +270,28 @@ def lane_ahead(s, w):
         if l[3] <= s.y or l[1] > s.y + C["H"]: continue
         gap = max(0, l[0] - (s.x + half) if s.facing > 0 else (s.x - half) - l[2])
         if best is not None and gap >= near: continue
+        # A ladder is never "home": you stand where its rungs are, and the climb-out
+        # carries you back to the floor's slice at the top.
         want = nearest_in(span(w, "ladder", i), s.depth, C["BODYZ"] // 2)
         if abs(want - s.depth) > C["LANEREACH"]: continue
         near = gap
         best = want
     return best
 
+
+def lane_on(sp, depth):
+    """Which slice of a box to stand on: the gameplay plane whenever the box reaches it, and
+    otherwise the nearest part of the box to where the body already is.
+
+    The plane is where the fight happens. Lanes exist so a fighter can step back onto a ramp
+    or a walkway modelled behind it, not so he can live there — and a floor wide enough to
+    hold both lanes used to hold him on whichever one he arrived with. Drop off the upper
+    walkway and you landed on the ground floor still on the walkway's slice, a metre behind
+    your opponent, and nothing either of you did would connect for the rest of the round."""
+    halfz = C["BODYZ"] // 2
+    home = C["HOME"]
+    return nearest_in(sp, home, halfz) if reaches(sp, home, halfz) \
+        else nearest_in(sp, depth, halfz)
 
 def floor_lane(s, w):
     half = C["W"] // 2; halfz = C["BODYZ"] // 2
@@ -286,7 +302,7 @@ def floor_lane(s, w):
         if not reaches(span(w, "solid", i), s.depth, halfz): continue
         if best is not None and sol[3] <= top: continue
         top = sol[3]
-        best = nearest_in(span(w, "solid", i), s.depth, halfz)
+        best = lane_on(span(w, "solid", i), s.depth)
     return best
 
 

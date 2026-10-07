@@ -51,6 +51,16 @@ namespace GulagRunners.Sim
         /// <summary>Clearance kept below the top of a ladder box, so climbing never leaves it.</summary>
         public Fix LadderTopMargin;
 
+        /// <summary>
+        /// The depth the fight happens at: the level's gameplay plane, which PlayerController
+        /// fills in from the fighter's own Plane Z.
+        ///
+        /// Lanes exist so a fighter can step back onto a ramp or a walkway that was modelled
+        /// behind the plane — not so he can take up residence there. Whenever the surface
+        /// under his feet reaches this, it is where he stands.
+        /// </summary>
+        public Fix HomeDepth;
+
         /// <summary>How far to either side the climb-out looks for floor to step onto.</summary>
         public Fix MantleReach;
 

@@ -454,6 +454,51 @@ for i, (a, b) in enumerate(gaps):
     check(f"gap {i + 1} cannot be jumped, so it stays a hazard", F(s.x) < b,
           f"a running jump reached x {F(s.x):.2f} of {b:.2f}")
 
+# ------------------------------------------- coming back down has to put you back in the fight
+print("\nComing down from the walkway")
+
+# The walkway is modelled a metre behind the plane the fight happens on, so a fighter standing
+# on it is on the walkway's slice. Drop off it and he lands on the ground floor — which is wide
+# enough in depth to hold BOTH slices, so nothing used to pull him off the walkway's one. He
+# stayed a metre behind his opponent for the rest of the round, and neither of them could land
+# a blow: a hit needs the two of them within one body depth of each other.
+HOME = F(T.C["HOME"])
+BODY_Z = F(T.C["BODYZ"])
+
+on_floor = fighter_at(SPAWNS[0][0], SPAWNS[0][1])
+until(on_floor, 0, lambda s: s.mode == "ground", 180)
+until(on_floor, R, lambda s: False, 240)
+check("a fighter who never left the floor stands on the plane",
+      abs(F(on_floor.depth) - HOME) < 0.05, f"z {F(on_floor.depth):.2f}, plane {HOME:.2f}")
+
+s = fighter_at(SPAWNS[0][0], SPAWNS[0][1])
+until(s, 0, lambda s: s.mode == "ground", 180)
+up = until(s, L | UP, lambda s: s.mode == "ground" and F(s.y) > 3.7, 900)
+check("he can get onto the walkway", up, f"({F(s.x):.2f}, {F(s.y):.2f})")
+check("and up there he is on the walkway's slice, not the plane",
+      up and abs(F(s.depth) - HOME) > 0.3,
+      f"z {F(s.depth):.2f}, plane {HOME:.2f}")
+
+landed = until(s, R, lambda s: s.mode == "ground" and F(s.y) < 1.0, 600)
+check("walking off it drops him to the floor", landed, f"y {F(s.y):.2f}")
+
+# How long he is unable to fight. The lane closes at DepthSnapSpeed, so this is a step, not a
+# wait — but it is measured rather than assumed, because it is the window in which an opponent
+# standing right next to him cannot be hit.
+out = 0
+for _ in range(180):
+    if abs(F(s.depth) - F(on_floor.depth)) <= BODY_Z:
+        break
+    step(s, 0, W)
+    out += 1
+check("and he is back within reach of the floor's fighters almost at once",
+      abs(F(s.depth) - F(on_floor.depth)) <= BODY_Z and out < 60,
+      f"{out / 60:.2f} s out of reach, then {abs(F(s.depth) - F(on_floor.depth)) * 100:.0f} cm apart")
+
+until(s, 0, lambda s: False, 120)
+check("and he ends up back on the plane the fight happens on",
+      abs(F(s.depth) - HOME) < 0.05, f"z {F(s.depth):.2f}, plane {HOME:.2f}")
+
 # ---------------------------------------------------------------- the ramps
 print("\nThe planks leaning against the plateaus")
 # An AABB world has no slopes, so the bake cuts a tilted box into steps along its top edge.

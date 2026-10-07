@@ -70,6 +70,25 @@ namespace GulagRunners.Sim
             s.Depth = Fix.MoveTowards(s.Depth, want, cfg.DepthSnapSpeed * Dt);
         }
 
+        /// <summary>
+        /// Which slice of a box to stand on: the gameplay plane whenever the box reaches it,
+        /// and otherwise the nearest part of the box to where the body already is.
+        ///
+        /// The plane is where the fight happens. Lanes exist so a fighter can step back onto a
+        /// ramp or a walkway modelled behind it, not so he can take up residence there — and a
+        /// floor wide enough to hold both lanes used to hold him on whichever one he arrived
+        /// with. Drop off the upper walkway and you landed on the ground floor still on the
+        /// walkway's slice, a metre behind your opponent, and nothing either of you could do
+        /// would connect for the rest of the round.
+        /// </summary>
+        static Fix LaneOn(Span span, Fix depth, in MoveConfig cfg)
+        {
+            Fix halfZ = cfg.BodyDepth / 2;
+            return span.Reaches(cfg.HomeDepth, halfZ)
+                ? span.Nearest(cfg.HomeDepth, halfZ)
+                : span.Nearest(depth, halfZ);
+        }
+
         /// <summary>The slice of the nearest thing ahead that is low enough to climb onto.</summary>
         static bool TryLaneAhead(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
                                  out Fix lane)
@@ -107,7 +126,7 @@ namespace GulagRunners.Sim
                 if (gap < Fix.Zero) continue;
                 if (found && gap >= nearestX) continue;
 
-                Fix want = world.SolidSpan(i).Nearest(s.Depth, cfg.BodyDepth / 2);
+                Fix want = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
                 if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
 
                 nearestX = gap;
@@ -132,6 +151,8 @@ namespace GulagRunners.Sim
                 if (gap < Fix.Zero) gap = Fix.Zero;
                 if (found && gap >= nearestX) continue;
 
+                // A ladder is never "home": you stand where its rungs are, and the
+                // climb-out carries you back to the floor's slice at the top.
                 Fix want = world.LadderSpan(i).Nearest(s.Depth, cfg.BodyDepth / 2);
                 if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
 
@@ -161,7 +182,7 @@ namespace GulagRunners.Sim
                 if (found && world.Solids[i].MaxY <= top) continue;
 
                 top = world.Solids[i].MaxY;
-                lane = world.SolidSpan(i).Nearest(s.Depth, halfZ);
+                lane = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
                 found = true;
             }
             return found;
