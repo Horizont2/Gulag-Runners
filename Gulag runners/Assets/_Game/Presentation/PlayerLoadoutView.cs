@@ -21,7 +21,17 @@ namespace GulagRunners.Game
         [Header("Wiring")]
         public PlayerController player;
 
-        [Tooltip("Weapon models, parented to the hand. Switched on one at a time.")]
+        [Tooltip("Where the weapon is held. Leave it empty and the models stay wherever they " +
+                 "are parented; set it and they are moved into the hand at load, keeping the " +
+                 "local offset each was authored with — which is how a dagger and a greataxe " +
+                 "end up gripped differently.")]
+        public WeaponSocket socket;
+
+        [Tooltip("Weapon models, one switched on at a time: the one actually being carried.\n\n" +
+                 "Drop a weapon pack's prefabs under the socket, list them here against the " +
+                 "item each one is, and that is the whole wiring. An item with no model here " +
+                 "simply shows nothing, so a half-filled list is a half-dressed fighter rather " +
+                 "than an error.")]
         public ItemModel[] weapons;
 
         [Tooltip("Armour models, parented to the body.")]
@@ -46,11 +56,23 @@ namespace GulagRunners.Game
         GameObject _weaponRoot;
         Renderer _weaponRenderer;
 
-        void Reset() => player = GetComponentInParent<PlayerController>();
+        void Reset()
+        {
+            player = GetComponentInParent<PlayerController>();
+            if (socket == null && player != null)
+                socket = player.GetComponentInChildren<WeaponSocket>(true);
+        }
 
         void Awake()
         {
             if (player == null) player = GetComponentInParent<PlayerController>();
+
+            // Into the hand before anything is shown, so the first frame a weapon appears it
+            // is already being held rather than standing on the floor next to its owner.
+            if (socket != null && weapons != null)
+                foreach (ItemModel m in weapons)
+                    if (m != null && m.root != null) socket.Adopt(m.root.transform);
+
             ItemModels.Show(weapons, ItemId.None);
             ItemModels.Show(armour, ItemId.None);
         }
