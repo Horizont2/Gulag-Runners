@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c988eedb075a54847a5831339ed948db
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 313704
+  packageName: 3D Medieval Fantasy Weapon Collection
+  packageVersion: 1.0
+  assetPath: Assets/FlexUnit/MedievalWeaponPack/Settings/HDRP_GlobalVolume_Settings.asset
+  uploadId: 742406
