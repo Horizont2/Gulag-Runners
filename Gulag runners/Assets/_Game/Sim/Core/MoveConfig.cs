@@ -172,6 +172,11 @@ namespace GulagRunners.Sim
             c.ClimbDownSpeed = Fix.FromMilli(2600);
             c.LadderSnapSpeed = Fix.FromMilli(2000);
             c.LadderTopMargin = Fix.FromMilli(60);
+
+            // The gameplay plane, which only the scene knows: PlayerController fills it in from
+            // the fighter's own Plane Z. Zero here is the right default — a world with no depth
+            // data has one slice and it is this one.
+            c.HomeDepth = Fix.Zero;
             c.MantleReach = Fix.FromMilli(1600);
             c.ScriptSpeed = Fix.FromMilli(2400);
             c.ScriptMinFrames = 10;       // 0.17 s
