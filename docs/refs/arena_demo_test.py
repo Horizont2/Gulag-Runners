@@ -99,12 +99,20 @@ floor = max((b for b in solids_here() if F(b[3]) < 0.2), key=lambda b: b[2] - b[
 check("the ground floor is unbroken", F(floor[2]) - F(floor[0]) > 30,
       f"x {F(floor[0]):.2f}..{F(floor[2]):.2f}, top y {F(floor[3]):.2f}")
 
-# A ladder standing one centimetre inside its own platform must not punch a hole in it.
-for i, (x, want) in enumerate(((-16.03, 0.95), (12.60, 0.95))):
-    plat = [b for b in solids_here()
-            if b[0] <= X(x) <= b[2] and abs(F(b[3]) - want) < 0.05]
-    check(f"ladder {i} keeps the platform it stands on", plat,
-          f"x {x:.2f}: {'solid' if plat else 'HOLE'}")
+# A ladder standing one centimetre inside its own platform must not punch a hole in it, and
+# the platform has to reach the whole foot: asked of the ladder's own footprint rather than a
+# probe guessed beside it, because a ladder whose foot overhangs its platform by a centimetre
+# is a ladder the fighter steps off into the air.
+for i, lad in enumerate(sorted(W["ladder"], key=lambda b: b[0])):
+    ends = []
+    for edge, x in (("foot left", F(lad[0]) + 0.01), ("foot right", F(lad[2]) - 0.01)):
+        under = [b for b in solids_here()
+                 if b[0] <= X(x) <= b[2] and F(b[3]) <= F(lad[1]) + 0.25
+                 and F(b[3]) > F(lad[1]) - 0.75]
+        if not under:
+            ends.append(f"{edge} (x {x:.2f})")
+    check(f"ladder {i} stands on a platform along its whole foot", not ends,
+          "solid under both ends" if not ends else "nothing under " + ", ".join(ends))
 
 # Nothing may roof the upper walkway: the handrail sits 0.64 m above it, a fighter is 0.91 m.
 roof = [b for b in solids_here() if 3.9 < F(b[1]) < 3.83 + BODY and F(b[2]) - F(b[0]) > 5]
@@ -227,8 +235,14 @@ for idx, lad in enumerate(LADDERS):
     caught = until(s, DN, lambda s: s.mode in ("ladder", "mount"), 120)
     check(f"ladder {idx}: pressing down on top of it steps onto the rungs", caught,
           f"mode {s.mode} at ({F(s.x):.2f}, {F(s.y):.2f})")
+    # Against the surface the ladder's foot stands on, not the bottom of its box: a ladder
+    # modelled a little INTO its platform has a box that ends below the floor, and a fighter
+    # who reaches that number has gone through it.
+    foot = T.ground_below(X(cx), lad[1] + X(0.3), X(3.0), W, X(SPAWNS[0][3]))
+    bottom = F(foot) if foot is not None else F(lad[1])
     check(f"ladder {idx}: carries a fighter back down",
-          caught and until(s, DN, lambda s: F(s.y) <= base + 0.1, 600), f"y {F(s.y):.2f}")
+          caught and until(s, DN, lambda s: F(s.y) <= bottom + 0.1, 600),
+          f"y {F(s.y):.2f} onto a surface at {bottom:.2f}")
     check(f"ladder {idx}: lets go at the bottom",
           until(s, DN, lambda s: s.mode == "ground", 120), f"mode {s.mode} y {F(s.y):.2f}")
 
