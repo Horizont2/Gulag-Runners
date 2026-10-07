@@ -26,7 +26,15 @@ namespace GulagRunners.Game
                  "Capacity on MatchState.")]
         public GroundItemView[] views;
 
-        [Tooltip("Z of the gameplay plane the loot sits on.")]
+        [Tooltip("Take the plane from the fighters rather than from the number below.\n\n" +
+                 "On, and it cannot go stale. This was a hand-typed zero while the fighters " +
+                 "stood at -2.51, so every item a chest coughed up was drawn two and a half " +
+                 "metres behind the person who could pick it up — and picking it up still " +
+                 "worked, because the simulation is flat, which is exactly the kind of wrong " +
+                 "that survives a playtest.")]
+        public bool planeFromFighters = true;
+
+        [Tooltip("Z of the gameplay plane the loot sits on, when it is not taken from them.")]
         public float planeZ;
 
         bool _warned;
@@ -57,6 +65,14 @@ namespace GulagRunners.Game
 
             GroundItem[] items = matchState.GroundItems;
 
+            if (planeFromFighters)
+                for (int p = 0; p < matchState.fighters.Count; p++)
+                    if (matchState.fighters[p] != null)
+                    {
+                        planeZ = matchState.fighters[p].planeZ;
+                        break;
+                    }
+
             if (items.Length > views.Length && !_warned)
             {
                 _warned = true;
@@ -64,6 +80,20 @@ namespace GulagRunners.Game
                                  $"only {views.Length} views, so loot in the slots past {views.Length} " +
                                  "will be invisible and still pickable. Add views, or lower " +
                                  "Ground Item Capacity on MatchState.", this);
+            }
+
+            // Which item, if any, the action button would swap for. docs/03 wants a
+            // contextual button that says what it would do BEFORE it is pressed, and there is
+            // no interface to say it in — so the item says it, by lifting out of the bob.
+            // Walking over something with a free slot just takes it, so the only case worth
+            // marking is the one that costs you what you are holding.
+            for (int p = 0; p < matchState.fighters.Count; p++)
+            {
+                PlayerController fighter = matchState.fighters[p];
+                if (fighter == null) continue;
+                int over = fighter.State.StandingOn;
+                if (over >= 0 && over < views.Length && views[over] != null)
+                    views[over].Offer(true);
             }
 
             for (int i = 0; i < views.Length; i++)

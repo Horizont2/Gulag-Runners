@@ -43,12 +43,36 @@ namespace GulagRunners.Game
         [Tooltip("Seconds of squash when it is taken, so a pickup is seen and not just heard.")]
         [Range(0f, 0.4f)] public float takePop = 0.18f;
 
+        [Header("Standing over it")]
+        [Tooltip("How much further it rides up while a fighter is stood over it with no room " +
+                 "to take it, in metres.\n\n" +
+                 "This is the contextual button of docs/03 with no button drawn: walking over " +
+                 "something with a free slot takes it and costs nothing, so the only case " +
+                 "worth saying anything about is the one where pressing the action key would " +
+                 "SWAP. The item itself says it, by lifting and brightening.")]
+        public float offeredRise = 0.09f;
+
+        [Tooltip("Extra glow while it is being offered, as a multiple.")]
+        [Range(1f, 4f)] public float offeredGlow = 1.8f;
+
+        [Tooltip("How quickly it rises and settles. 0 snaps.")]
+        [Range(0f, 0.4f)] public float offeredEase = 0.08f;
+
         MaterialPropertyBlock _block;
         ItemId _shown = ItemId.None;
         GameObject _shownRoot;
         float _takeTimer;
+        bool _offered;
+        float _offer;              // 0 to 1, eased
+        float _offerVelocity;
 
         public bool Visible { get; private set; }
+
+        /// <summary>
+        /// A fighter is stood over this and the action button would swap for it. Set every
+        /// frame by <see cref="LootView"/>; it decays on its own the frame nobody says so.
+        /// </summary>
+        public void Offer(bool offered) => _offered = offered;
 
         void Reset() => spinRoot = transform;
 
@@ -81,17 +105,25 @@ namespace GulagRunners.Game
             float t = Time.time * bobSpeed + phase * 0.7f;
             float bob = resting ? Mathf.Sin(t) * bobHeight : 0f;
 
-            transform.position = new Vector3(x, y + bob, planeZ);
+            float want = _offered && resting ? 1f : 0f;
+            _offer = offeredEase <= 0.001f
+                ? want
+                : Mathf.SmoothDamp(_offer, want, ref _offerVelocity, offeredEase);
+            _offered = false;                       // said again next frame, or it lapses
+
+            transform.position = new Vector3(x, y + bob + offeredRise * _offer, planeZ);
 
             Transform spin = spinRoot != null ? spinRoot : transform;
             if (resting) spin.localRotation = Quaternion.Euler(0f, (Time.time * spinSpeed + phase * 40f) % 360f, 0f);
 
             // A locked item is one you cannot take yet. Dimming it says so without a label.
             float lit = item.PickupLock > 0 ? 0.45f : 1f;
+            float offered = Mathf.Lerp(1f, offeredGlow, _offer);
             Renderer r = tintTarget != null
                 ? tintTarget
                 : (_shownRoot != null ? _shownRoot.GetComponentInChildren<Renderer>() : null);
-            ItemModels.Tint(r, ref _block, ItemModels.Tier(tierColours, item.Item) * lit, glow * lit);
+            ItemModels.Tint(r, ref _block, ItemModels.Tier(tierColours, item.Item) * lit,
+                            glow * lit * offered);
         }
 
         public void Hide()

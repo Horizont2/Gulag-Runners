@@ -61,8 +61,10 @@ namespace GulagRunners.Game
                  "look fine, or the tell means nothing when it matters.")]
         [Range(0f, 1f)] public float drainsBelow = 0.75f;
 
-        [Tooltip("What the body is tinted towards as the health runs out. Grey reads as spent; " +
-                 "pushing it red reads as bloodied. Leave it white to switch the drain off.")]
+        [Tooltip("What the body's own colour is MULTIPLIED by once the health is gone. It is a " +
+                 "filter, not a repaint: the blue fighter drains to a dark blue and the red one " +
+                 "to a dark red, so neither of them stops being who they are. White switches " +
+                 "the drain off.")]
         public Color drainedColour = new Color(0.62f, 0.52f, 0.52f);
 
         [Header("The moment it lands")]
@@ -98,8 +100,10 @@ namespace GulagRunners.Game
         public ParticleSystem deathBurst;
 
         MaterialPropertyBlock _block;
+        Color[] _baseColour;
         Color _flash;
         float _flashLeft;
+        bool _painted;
         bool[] _open;
         int _lastHealth = int.MinValue;
 
@@ -115,6 +119,8 @@ namespace GulagRunners.Game
             if (body == null || body.Length == 0)
                 body = (player != null ? player.gameObject : gameObject)
                     .GetComponentsInChildren<Renderer>(true);
+
+            RememberColours();
 
             _open = new bool[wounds != null ? wounds.Length : 0];
             CloseEveryWound();
@@ -155,6 +161,28 @@ namespace GulagRunners.Game
             Paint(Mathf.Clamp01(health / (float)max));
         }
 
+        /// <summary>
+        /// Each renderer's own colour, so the drain can darken it rather than replace it.
+        ///
+        /// Player one is blue and player two is red, and that is the first thing either of
+        /// them reads about the figure across the room. Painting a flat tint over the body
+        /// every frame turned them both white at full health, which is the bug this exists to
+        /// not have.
+        /// </summary>
+        void RememberColours()
+        {
+            _baseColour = new Color[body.Length];
+            for (int i = 0; i < body.Length; i++)
+            {
+                Material m = body[i] != null ? body[i].sharedMaterial : null;
+                _baseColour[i] =
+                    m == null ? Color.white
+                    : m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor")
+                    : m.HasProperty("_Color") ? m.GetColor("_Color")
+                    : Color.white;
+            }
+        }
+
         /// <summary>The tint for this frame: the drain, with whatever is left of a flash on top.</summary>
         void Paint(float health01)
         {
@@ -162,15 +190,35 @@ namespace GulagRunners.Game
                 ? 0f
                 : Mathf.Clamp01((drainsBelow - health01) / drainsBelow);
 
-            Color tint = Color.Lerp(Color.white, drainedColour, drained);
-
             float flash = flashSeconds <= 0.001f ? 0f : Mathf.Clamp01(_flashLeft / flashSeconds);
+
+            // Nothing to say this frame: hand the renderers back to their own materials
+            // outright rather than re-stating the colour they already had. A body at full
+            // health is then EXACTLY as it was authored, down to a second material on a
+            // second submesh that this could never have reproduced anyway.
+            if (drained <= 0.001f && flash <= 0.001f)
+            {
+                if (!_painted) return;
+                _painted = false;
+                for (int i = 0; i < body.Length; i++)
+                    if (body[i] != null) body[i].SetPropertyBlock(null);
+                return;
+            }
+
+            _painted = true;
             Color emission = _flash * flash;
+
+            if (_baseColour == null || _baseColour.Length != body.Length) RememberColours();
 
             for (int i = 0; i < body.Length; i++)
             {
                 Renderer r = body[i];
                 if (r == null) continue;
+
+                // A filter over its own colour, not a repaint: blue drains to a dark blue.
+                Color own = _baseColour[i];
+                Color tint = Color.Lerp(own, own * drainedColour, drained);
+
                 _block ??= new MaterialPropertyBlock();
                 r.GetPropertyBlock(_block);
                 _block.SetColor("_BaseColor", tint);

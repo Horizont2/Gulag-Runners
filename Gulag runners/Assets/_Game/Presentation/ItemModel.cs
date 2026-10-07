@@ -56,15 +56,28 @@ namespace GulagRunners.Game
             new Color(1.00f, 0.78f, 0.25f)
         };
 
-        /// <summary>Tints a renderer without instantiating a material for it.</summary>
+        /// <summary>
+        /// Puts the tier on a renderer without instantiating a material for it.
+        ///
+        /// The tier is a GLOW and nothing else — which is what ItemDef.Tier has always said it
+        /// was, and which this used not to do: it also wrote the colour into the albedo, so
+        /// every weapon came out a flat white, blue or gold blob instead of the model somebody
+        /// made. With real art in the game that is the difference between reading "a gold
+        /// item" and reading "a gold-coloured nothing".
+        ///
+        /// Pass tintAlbedo for a greybox stand-in that has no look of its own to keep.
+        /// </summary>
         public static void Tint(Renderer target, ref MaterialPropertyBlock block, Color colour,
-                                float emission)
+                                float emission, bool tintAlbedo = false)
         {
             if (target == null) return;
             block ??= new MaterialPropertyBlock();
             target.GetPropertyBlock(block);
-            block.SetColor("_BaseColor", colour);
-            block.SetColor("_Color", colour);
+            if (tintAlbedo)
+            {
+                block.SetColor("_BaseColor", colour);
+                block.SetColor("_Color", colour);
+            }
             block.SetColor("_EmissionColor", colour * emission);
             target.SetPropertyBlock(block);
         }
