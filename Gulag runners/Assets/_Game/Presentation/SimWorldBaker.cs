@@ -200,7 +200,15 @@ namespace GulagRunners.Game
                 foreach (SimCollider c in _markedBuffer)
                 {
                     markedSeen++;
-                    if (!c.isActiveAndEnabled) { markedSkipped++; continue; }
+
+                    // enabled && activeInHierarchy, NOT isActiveAndEnabled. The two are not
+                    // the same here: isActiveAndEnabled is false for a component Unity has
+                    // not activated yet, and this bake runs in Awake at execution order -100,
+                    // which is to say before anything else in the scene has been activated.
+                    // It read every marker in a hand-marked location as inactive and baked an
+                    // arena of two boxes, and both fighters fell through the world.
+                    if (!c.enabled || !c.gameObject.activeInHierarchy)
+                    { markedSkipped++; continue; }
                     handled.Add(c.gameObject.GetInstanceID());
                     if (c.kind == SimColliderKind.Ignore) { markedIgnored++; continue; }
 
@@ -226,7 +234,8 @@ namespace GulagRunners.Game
                 foreach (Chest chest in _chestBuffer)
                 {
                     chestsSeen++;
-                    if (!chest.isActiveAndEnabled) { chestsSkipped++; continue; }
+                    if (!chest.enabled || !chest.gameObject.activeInHierarchy)
+                    { chestsSkipped++; continue; }
                     handled.Add(chest.gameObject.GetInstanceID());
                     chests.Add(chest.ToDef());
                     _chestSources.Add(chest);
@@ -306,6 +315,14 @@ namespace GulagRunners.Game
                 $"({hatches} cut by ladders), " +
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
+
+            if (markedSeen > 0 && markedSkipped == markedSeen)
+                Debug.LogError(
+                    $"{name}: every one of the {markedSeen} SimColliders in this " +
+                    "scene was skipped as inactive, which is never a scene anybody " +
+                    "built on purpose. If they look active in the hierarchy then " +
+                    "the bake is asking at the wrong moment, not the scene being " +
+                    $"wrong.\n{LastReport}", this);
 
             if (bandTookEverything)
                 Debug.LogError(
