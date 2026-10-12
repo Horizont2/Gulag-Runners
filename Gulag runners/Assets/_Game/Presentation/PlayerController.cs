@@ -188,6 +188,17 @@ namespace GulagRunners.Game
         /// <summary>Raised on the tick this player dies.</summary>
         public event Action Died;
 
+        /// <summary>
+        /// This fighter was put somewhere, rather than having walked there: the start of a
+        /// round, a rematch, or a fall past killY.
+        ///
+        /// It exists for the camera. Everything that follows a fighter is smoothed, and
+        /// smoothing a teleport is a pan — so a rematch would open by sweeping the camera from
+        /// where the loser fell back to their cage, across the whole arena, which is precisely
+        /// the shot docs/01 is built on not giving anybody.
+        /// </summary>
+        public event Action Teleported;
+
         /// <summary>Feet height of the last ground stood on. The camera anchors to this.</summary>
         public float GroundedY { get; private set; }
 
@@ -354,6 +365,10 @@ namespace GulagRunners.Game
             GroundedY = position.Y.Raw / (float)Fix.RawOne;
 
             Render(1f);
+
+            // Last, with the body already drawn where it now is, so anything that reacts by
+            // reading this transform reads the new place rather than the old one.
+            Teleported?.Invoke();
         }
 
         void Update()

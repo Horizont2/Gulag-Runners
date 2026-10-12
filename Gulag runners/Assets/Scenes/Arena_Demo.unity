@@ -1429,6 +1429,7 @@ GameObject:
   - component: {fileID: 1900000135}
   - component: {fileID: 1900001150}
   - component: {fileID: 1900000850}
+  - component: {fileID: 1900000852}
   m_Layer: 0
   m_Name: Camera Player 1
   m_TagString: MainCamera
@@ -7694,6 +7695,7 @@ GameObject:
   - component: {fileID: 1900000139}
   - component: {fileID: 1900001151}
   - component: {fileID: 1900000851}
+  - component: {fileID: 1900000853}
   m_Layer: 0
   m_Name: Camera Player 2
   m_TagString: Untagged
@@ -7814,8 +7816,11 @@ MonoBehaviour:
   scavengeSeconds: 22
   sirenSeconds: 1.5
   huntSeconds: 50
-  closingSeconds: 45
+  closingSeconds: 65
+  suddenDeathSeconds: 10
+  restartSeconds: 5
   logOpenings: 1
+  logMatch: 1
 --- !u!1001 &1900000600
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -11255,6 +11260,26 @@ MonoBehaviour:
   jerkPush: 0.22
   jerkAt: 0.18
   jerkFor: 0.12
+--- !u!114 &1900000852
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c41d0b9a6e34f1d8b25c7a3f1904e6b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  matchState: {fileID: 0}
+  view: {fileID: 1900000135}
+  pushIn: 0.3
+  drop: -0.45
+  leanToFallen: 0.35
+  rollDegrees: 2.5
+  pushSeconds: 1.1
+  releaseSeconds: 0.8
 --- !u!114 &1900000851
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11277,3 +11302,23 @@ MonoBehaviour:
   jerkPush: 0.22
   jerkAt: 0.18
   jerkFor: 0.12
+--- !u!114 &1900000853
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000140}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c41d0b9a6e34f1d8b25c7a3f1904e6b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  matchState: {fileID: 0}
+  view: {fileID: 1900000139}
+  pushIn: 0.3
+  drop: -0.45
+  leanToFallen: 0.35
+  rollDegrees: 2.5
+  pushSeconds: 1.1
+  releaseSeconds: 0.8

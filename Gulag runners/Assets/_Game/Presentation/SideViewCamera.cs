@@ -314,16 +314,25 @@ namespace GulagRunners.Game
 
         void OnDisable()
         {
-            if (_subscribed != null) _subscribed.Landed -= OnLanded;
-            _subscribed = null;
+            Unsubscribe();
         }
 
         void Subscribe()
         {
             if (_subscribed == player) return;
-            if (_subscribed != null) _subscribed.Landed -= OnLanded;
+            Unsubscribe();
             _subscribed = player;
-            if (_subscribed != null) _subscribed.Landed += OnLanded;
+            if (_subscribed == null) return;
+            _subscribed.Landed += OnLanded;
+            _subscribed.Teleported += SnapToTarget;
+        }
+
+        void Unsubscribe()
+        {
+            if (_subscribed == null) return;
+            _subscribed.Landed -= OnLanded;
+            _subscribed.Teleported -= SnapToTarget;
+            _subscribed = null;
         }
 
         void OnLanded(float impactSpeed)

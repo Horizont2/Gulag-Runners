@@ -21,13 +21,21 @@ namespace GulagRunners.Sim
         /// <summary>One platform, and bare hands hurt.</summary>
         SuddenDeath = 5,
 
-        /// <summary>Somebody won.</summary>
+        /// <summary>
+        /// Somebody won. The result stands for a few seconds and then the next round deals:
+        /// docs/01 puts an "Again" button straight after a loss rather than a lobby.
+        /// </summary>
         Over = 6
     }
 
     /// <summary>
     /// How long each phase runs, in ticks. Straight off the table in docs/01, which is written
     /// in clock time; sixty of these is a second.
+    ///
+    /// The two numbers that are not rows in that table are the ones that make the match finite.
+    /// docs/01 bounds it at 2:00-2:30 and then hands the player an "Again" button, so sudden
+    /// death gets a length of its own and the result gets a length of its own, and the default
+    /// set adds up to exactly 2:30.
     /// </summary>
     public struct MatchConfig
     {
@@ -37,13 +45,30 @@ namespace GulagRunners.Sim
         public int HuntFrames;
         public int ClosingFrames;
 
+        /// <summary>
+        /// How long sudden death may run before the match is decided on health.
+        ///
+        /// docs/01 bounds a match at 2:00-2:30, so this is the last phase and it has to be
+        /// finite: without it the clock reaches sudden death and sits there, and a round where
+        /// neither fighter can close the distance never ends at all.
+        /// </summary>
+        public int SuddenDeathFrames;
+
+        /// <summary>
+        /// Ticks the result stands before the next round deals. 0 holds it forever, which is
+        /// what a build with a results screen in front of the rematch wants.
+        /// </summary>
+        public int RestartFrames;
+
         public static MatchConfig Default() => new MatchConfig
         {
-            CageFrames     = 180,    // 0:00-0:03  the doors
-            ScavengeFrames = 1320,   // 0:03-0:25  alone with the chests
-            SirenFrames    = 90,     // 0:25       one pulse, 1.5 s
-            HuntFrames     = 3000,   // 0:25-1:15  you know the direction
-            ClosingFrames  = 2700,   // 1:15-2:00  the rooms shut
+            CageFrames        = 180,    // 0:00-0:03  the doors
+            ScavengeFrames    = 1320,   // 0:03-0:25  alone with the chests
+            SirenFrames       = 90,     // 0:25       one pulse, 1.5 s
+            HuntFrames        = 3000 - 90,  // 0:25-1:15  you know the direction
+            ClosingFrames     = 3900,   // 1:15-2:20  the rooms shut, then the waiting
+            SuddenDeathFrames = 600,    // 2:20-2:30  the ceiling, and a decision either way
+            RestartFrames     = 300,    // 0:05       long enough to see what happened
         };
     }
 
@@ -62,18 +87,45 @@ namespace GulagRunners.Sim
         /// <summary>-1 while it is still anybody's, 0 or 1 for the winner, 2 for a draw.</summary>
         public int Winner;
 
+        /// <summary>
+        /// Which round this is, from 0. Carried across a restart, because it is the one thing
+        /// about a finished round that the next one inherits — everything else is dealt again.
+        /// </summary>
+        public int Round;
+
+        /// <summary>Ticks since the match ended. Presentation holds the result on it.</summary>
+        public int OverFrame;
+
         /// <summary>Output of the last tick, for presentation to react to exactly once.</summary>
         public bool PhaseChanged;
         public bool JustEnded;
 
-        public static MatchSimState Fresh() => new MatchSimState
+        /// <summary>
+        /// The result has stood long enough; deal the next round.
+        ///
+        /// Unlike the two above this is not a one-shot: it stays up every tick until whoever
+        /// owns the match actually restarts it. A one-shot would mean a frame that happened to
+        /// run no ticks, or a listener attached a frame late, loses the rematch and the match
+        /// sits on a corpse forever.
+        /// </summary>
+        public bool WantsRestart;
+
+        public static MatchSimState Fresh() => Fresh(0);
+
+        public static MatchSimState Fresh(int round) => new MatchSimState
         {
-            Frame = 0, Phase = MatchPhase.Cages, Winner = -1,
-            PhaseChanged = true, JustEnded = false
+            Frame = 0, Phase = MatchPhase.Cages, Winner = -1, Round = round,
+            OverFrame = 0, PhaseChanged = true, JustEnded = false, WantsRestart = false
         };
+
+        /// <summary>The same match, one round on. The clock is new; the count is not.</summary>
+        public MatchSimState NextRound() => Fresh(Round + 1);
 
         /// <summary>Can a fighter act yet. In the cage, no: the doors are still coming up.</summary>
         public bool InputAllowed => Phase != MatchPhase.Cages && Phase != MatchPhase.Over;
+
+        /// <summary>True once somebody has won. Winner says who.</summary>
+        public bool Finished => Phase == MatchPhase.Over;
 
         /// <summary>How far through the cage doors opening, 0 to 1. Presentation drives on it.</summary>
         public Fix CageProgress(in MatchConfig cfg) =>
@@ -81,6 +133,17 @@ namespace GulagRunners.Sim
                 ? Fix.One
                 : Fix.FromMilli(1000 * (Frame < cfg.CageFrames ? Frame : cfg.CageFrames)
                                 / cfg.CageFrames);
+
+        /// <summary>
+        /// How far through the result, 0 to 1, for a camera that holds on the end and then lets
+        /// go. 0 everywhere but the Over phase, so a caller can drive on it unconditionally.
+        /// </summary>
+        public Fix OverProgress(in MatchConfig cfg) =>
+            Phase != MatchPhase.Over || cfg.RestartFrames <= 0
+                ? Fix.Zero
+                : Fix.FromMilli(1000 * (OverFrame < cfg.RestartFrames
+                                            ? OverFrame : cfg.RestartFrames)
+                                / cfg.RestartFrames);
     }
 
     /// <summary>Advances the clock and decides when it has stopped mattering.</summary>
@@ -96,7 +159,14 @@ namespace GulagRunners.Sim
             s.PhaseChanged = false;
             s.JustEnded = false;
 
-            if (s.Phase == MatchPhase.Over) return;
+            // The result, held. The clock still runs here — it is what decides when the next
+            // round deals — but nothing about the fight can change any more.
+            if (s.Phase == MatchPhase.Over)
+            {
+                s.OverFrame++;
+                s.WantsRestart = cfg.RestartFrames > 0 && s.OverFrame >= cfg.RestartFrames;
+                return;
+            }
 
             // A death ends it wherever the clock had got to. Both at once is a draw, which is
             // rare and has to be decided rather than raced for.
@@ -105,16 +175,45 @@ namespace GulagRunners.Sim
                 bool a = fighters[0].Dead, b = fighters[1].Dead;
                 if (a || b)
                 {
-                    s.Winner = a && b ? 2 : a ? 1 : 0;
-                    Enter(ref s, MatchPhase.Over);
-                    s.JustEnded = true;
+                    End(ref s, a && b ? 2 : a ? 1 : 0);
                     return;
                 }
             }
 
             s.Frame++;
+
+            // Time ran out. docs/01 bounds the match, so sudden death cannot be the last word:
+            // the one left standing with more of their health is the one who won the fight that
+            // happened, and level pegging is the draw it looks like. Decided from the state
+            // rather than from who got there first, so both devices reach the same verdict.
+            if (cfg.SuddenDeathFrames > 0 && s.Frame >= TotalFrames(in cfg))
+            {
+                int winner = 2;
+                if (fighters != null && fighters.Length >= 2)
+                {
+                    int ha = fighters[0].Health, hb = fighters[1].Health;
+                    winner = ha == hb ? 2 : ha > hb ? 0 : 1;
+                }
+                End(ref s, winner);
+                return;
+            }
+
             MatchPhase want = PhaseAt(s.Frame, in cfg);
             if (want != s.Phase) Enter(ref s, want);
+        }
+
+        /// <summary>The tick the match is over by, come what may.</summary>
+        public static int TotalFrames(in MatchConfig cfg) =>
+            cfg.CageFrames + cfg.ScavengeFrames + cfg.SirenFrames + cfg.HuntFrames +
+            cfg.ClosingFrames + cfg.SuddenDeathFrames;
+
+        static void End(ref MatchSimState s, int winner)
+        {
+            s.Winner = winner;
+            s.OverFrame = 0;
+            s.WantsRestart = false;
+            Enter(ref s, MatchPhase.Over);
+            s.JustEnded = true;
         }
 
         /// <summary>Which phase a given tick falls in. Pure, so a test can ask it directly.</summary>
