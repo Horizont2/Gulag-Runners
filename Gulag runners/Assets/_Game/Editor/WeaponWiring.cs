@@ -43,6 +43,16 @@ namespace GulagRunners.GameEditor
             ("Shield",      ItemId.Shield),
         };
 
+        /// <summary>
+        /// How big a pack weapon is drawn, against the size it was modelled at.
+        ///
+        /// A weapon pack is authored for a human of about 1.8 m. This game's fighter is 0.91 m
+        /// — the model is scaled to a half and the simulation's body was tuned to match — so a
+        /// sword dropped in at its authored size is a sword twice as long as the person
+        /// holding it, and on the floor it looks like scenery rather than loot.
+        /// </summary>
+        const float PackScale = 0.5f;
+
         [MenuItem("Gulag Runners/Wire weapon models into the scene")]
         public static void Wire()
         {
@@ -72,6 +82,7 @@ namespace GulagRunners.GameEditor
             {
                 Transform under = view.spinRoot != null ? view.spinRoot : view.transform;
                 view.models = Build(prefabs, under, weaponsOnly: false);
+                if (view.fallbackModel == null) view.fallbackModel = MakeStandIn(under);
                 EditorUtility.SetDirty(view);
                 slots++;
             }
@@ -81,8 +92,8 @@ namespace GulagRunners.GameEditor
                       (missing.Count > 0
                           ? $" No prefab found for: {string.Join(", ", missing)}."
                           : "") +
-                      " Armour and the bandage have no models in this pack, so they still " +
-                      "drop and are still invisible on the floor.");
+                      " Armour and the bandage have no models in this pack, so they drop as " +
+                      "a stand-in cube rather than as nothing at all.");
         }
 
         [MenuItem("Gulag Runners/Remove wired weapon models")]
@@ -114,12 +125,31 @@ namespace GulagRunners.GameEditor
                 made.name = $"{item}{Made}";
                 made.transform.localPosition = Vector3.zero;
                 made.transform.localRotation = Quaternion.identity;
+                made.transform.localScale = prefab.transform.localScale * PackScale;
                 made.SetActive(false);
                 Undo.RegisterCreatedObjectUndo(made, "Wire weapon models");
 
                 list.Add(new ItemModel { item = item, root = made });
             }
             return list.ToArray();
+        }
+
+        /// <summary>
+        /// The stand-in for an item with no mesh. Armour and the bandage have none in this
+        /// pack, and they are a third of what the chests pay out: without this, a third of
+        /// every round lands on the floor invisible and reads as "that chest gave me nothing",
+        /// which is the worst lie available in a game about deciding what to spend time on.
+        /// </summary>
+        static GameObject MakeStandIn(Transform under)
+        {
+            GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = $"Stand-in{Made}";
+            cube.transform.SetParent(under, false);
+            cube.transform.localScale = Vector3.one * 0.18f;
+            Object.DestroyImmediate(cube.GetComponent<Collider>());   // loot is not geometry
+            cube.SetActive(false);
+            Undo.RegisterCreatedObjectUndo(cube, "Wire weapon models");
+            return cube;
         }
 
         static void ClearMade(Transform under)

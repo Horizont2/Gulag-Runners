@@ -132,6 +132,18 @@ namespace GulagRunners.Game
                  "readable without losing the sense that the character is facing the rungs.")]
         [Range(0f, 60f)] public float ladderViewAngle = 25f;
 
+        [Tooltip("Turn to the chest while prying at one, the way the climb turns to the rungs.\n\n" +
+                 "The simulation's facing is left or right and nothing else, so it can say " +
+                 "which SIDE of a chest you are on and never that you are facing it — and a " +
+                 "chest in this location sits a metre behind the lane the fight happens on. " +
+                 "Left to the simulation alone, a fighter forcing a crate stands side-on to it " +
+                 "working at thin air. This is the same answer the ladder already gets.")]
+        public bool faceChestWhenLooting = true;
+
+        [Tooltip("Degrees kept turned back towards the camera while working at a chest, so the " +
+                 "body still reads as a body rather than a back.")]
+        [Range(0f, 60f)] public float chestViewAngle = 30f;
+
         [Header("Safety")]
         [Tooltip("At spawn, seat the player on the first floor below instead of dropping them " +
                  "onto it. A spawn that begins with a fall reads as broken collision.")]
@@ -647,8 +659,38 @@ namespace GulagRunners.Game
                 return ModelYawOffset + ladderViewAngle * side;
             }
 
+            // Working at a chest: towards the chest, which is a real direction in three
+            // dimensions and not one the simulation's left-or-right facing can name.
+            if (faceChestWhenLooting && _state.OpeningChest >= 0 &&
+                ChestDirection(_state.OpeningChest, out Vector3 towards))
+            {
+                float yaw = Mathf.Atan2(towards.x, towards.z) * Mathf.Rad2Deg;
+                float side = facing >= 0 ? 1f : -1f;
+
+                // Turned back a little, so the silhouette is still a body and not a back.
+                return ModelYawOffset + Mathf.LerpAngle(yaw, yaw + 90f * side,
+                                                        chestViewAngle / 90f);
+            }
+
             float walkYaw = facing >= 0 ? 90f : -90f;    // +X or -X in world yaw
             return ModelYawOffset + walkYaw;
+        }
+
+        /// <summary>Which way the chest being opened lies, from the body. False if it is gone.</summary>
+        bool ChestDirection(int index, out Vector3 towards)
+        {
+            towards = Vector3.forward;
+
+            Chest[] sources = worldBaker != null ? worldBaker.ChestSources : null;
+            if (sources == null || index < 0 || index >= sources.Length) return false;
+            if (sources[index] == null) return false;
+
+            Vector3 at = sources[index].transform.position - transform.position;
+            at.y = 0f;
+            if (at.sqrMagnitude < 0.0001f) return false;
+
+            towards = at.normalized;
+            return true;
         }
 
         static Fix ToFix(float metres) => Fix.FromMilli(Mathf.RoundToInt(metres * 1000f));

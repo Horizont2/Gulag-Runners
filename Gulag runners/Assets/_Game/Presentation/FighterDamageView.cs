@@ -102,6 +102,8 @@ namespace GulagRunners.Game
         MaterialPropertyBlock _block;
         Color[] _baseColour;
         Color _flash;
+        Color _flashColour = Color.white;
+        float _flashStrength;
         float _flashLeft;
         bool _painted;
         bool[] _open;
@@ -219,6 +221,18 @@ namespace GulagRunners.Game
                 Color own = _baseColour[i];
                 Color tint = Color.Lerp(own, own * drainedColour, drained);
 
+                // The flash goes into the ALBEDO as well as the emission, and that is not
+                // belt and braces. A URP material only emits when its _EMISSION keyword is on,
+                // and a property block cannot turn a keyword on — so on a character whose
+                // material was authored without emission, writing _EmissionColor is writing to
+                // nothing, and a fighter being hit showed no sign of it whatever. Pushing the
+                // base colour towards the flash works on every material there is.
+                if (flash > 0.001f)
+                {
+                    float mix = Mathf.Clamp01(flash * Mathf.Min(1f, _flashStrength));
+                    tint = Color.Lerp(tint, _flashColour, mix);
+                }
+
                 _block ??= new MaterialPropertyBlock();
                 r.GetPropertyBlock(_block);
                 _block.SetColor("_BaseColor", tint);
@@ -279,6 +293,12 @@ namespace GulagRunners.Game
         void Flash(Color colour, int damage)
         {
             float strength = Mathf.Min(flashCeiling, Mathf.Max(0, damage) * flashPerDamage);
+
+            // A chip off a guard is a hint; a greataxe is unmistakable. Both have to be at
+            // least visible, though, or a light hit reads as no hit — so the albedo mix has a
+            // floor under it.
+            _flashColour = colour;
+            _flashStrength = Mathf.Max(0.45f, strength);
             _flash = colour * strength;
             _flashLeft = flashSeconds;
         }

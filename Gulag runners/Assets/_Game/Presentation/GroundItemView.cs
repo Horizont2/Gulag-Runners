@@ -21,6 +21,14 @@ namespace GulagRunners.Game
         [Header("Models (one per item this can show)")]
         public ItemModel[] models;
 
+        [Tooltip("Shown for an item that has no model in the list above.\n\n" +
+                 "Armour and the bandage have no mesh in the weapon pack, so without this a " +
+                 "third of what the chests pay out lands on the floor invisible — which reads " +
+                 "as \"that chest gave me nothing\" and is the worst possible lie for a game " +
+                 "whose whole scavenge phase is deciding what to spend time on. A stand-in " +
+                 "cube is not art; it is the truth until there is art.")]
+        public GameObject fallbackModel;
+
         [Header("Look")]
         [Tooltip("What bobs and turns. Leave empty to move this object.")]
         public Transform spinRoot;
@@ -84,6 +92,15 @@ namespace GulagRunners.Game
             if (_shown != item.Item)
             {
                 _shownRoot = ItemModels.Show(models, item.Item);
+
+                // Nothing authored for it: show the stand-in rather than nothing at all.
+                if (fallbackModel != null)
+                {
+                    bool need = _shownRoot == null && item.Item != ItemId.None;
+                    if (fallbackModel.activeSelf != need) fallbackModel.SetActive(need);
+                    if (need) _shownRoot = fallbackModel;
+                }
+
                 _shown = item.Item;
                 _block = null;
 
@@ -128,8 +145,9 @@ namespace GulagRunners.Game
 
         public void Hide()
         {
-            if (_takeTimer > 0f) return;             // let the pickup pop finish first
+            if (_takeTimer > 0f) return;             // let the pickup pop finish first, then it calls back
             ItemModels.Show(models, ItemId.None);
+            if (fallbackModel != null && fallbackModel.activeSelf) fallbackModel.SetActive(false);
             _shown = ItemId.None;
             _shownRoot = null;
             Visible = false;
@@ -138,6 +156,11 @@ namespace GulagRunners.Game
         /// <summary>Called when this slot's item was taken, so the pickup is seen.</summary>
         public void PlayTaken()
         {
+            // Not visible from this moment on, whatever the pop is still doing. LootView asks
+            // "was it there a frame ago" every frame, and while this said yes it re-armed the
+            // pop over and over — the timer never ran out and the item never left the floor.
+            Visible = false;
+
             if (takePop <= 0f) { Hide(); return; }
             _takeTimer = takePop;
         }

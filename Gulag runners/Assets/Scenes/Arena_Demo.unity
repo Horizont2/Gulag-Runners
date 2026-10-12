@@ -3077,6 +3077,8 @@ MonoBehaviour:
   spawnFacing: 1
   faceLadderWhenClimbing: 1
   ladderViewAngle: 25
+  faceChestWhenLooting: 1
+  chestViewAngle: 30
   snapToGroundOnSpawn: 1
   snapSearchDistance: 10
   killY: -25
@@ -3293,6 +3295,8 @@ MonoBehaviour:
   spawnFacing: -1
   faceLadderWhenClimbing: 1
   ladderViewAngle: 25
+  faceChestWhenLooting: 1
+  chestViewAngle: 30
   snapToGroundOnSpawn: 1
   snapSearchDistance: 10
   killY: -25
