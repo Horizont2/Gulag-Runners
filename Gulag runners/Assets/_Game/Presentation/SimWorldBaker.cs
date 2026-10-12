@@ -166,6 +166,11 @@ namespace GulagRunners.Game
         readonly List<Chest> _chestSources = new List<Chest>();
         readonly List<Rect> _gizmoChest = new List<Rect>();
         readonly List<float> _ladderDepth = new List<float>();
+        readonly List<ArenaGate> _gateBuffer = new List<ArenaGate>();
+        readonly List<ArenaGate> _gates = new List<ArenaGate>();
+        readonly List<List<Rect>> _gateRects = new List<List<Rect>>();
+        readonly List<List<Span>> _gateSpans = new List<List<Span>>();
+        readonly List<Rect> _gizmoGate = new List<Rect>();
 
         void Awake()
         {
@@ -212,15 +217,23 @@ namespace GulagRunners.Game
             _gizmoOneWay.Clear();
             _gizmoLadder.Clear();
             _gizmoChest.Clear();
+            _gizmoGate.Clear();
             _chestSources.Clear();
             _ladderDepth.Clear();
+
+            // The gates first, and sorted, because the sort IS the shut order: gate n is bit n
+            // of one word, and the clock spreads them across docs/01's shutter window in array
+            // order. Collected before anything is baked so that every box found afterwards
+            // already knows which gate, if any, it belongs to.
+            CollectGates();
+            List<Aabb> gateBoxes = new List<Aabb>();
 
             int roots = 0, slopes = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0, markedOffPlane = 0,
                 chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
             int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
                 skippedAlreadyMarked = 0, skippedInactive = 0, skippedChest = 0, skippedDepth = 0,
-                backdrop = 0;
+                backdrop = 0, gated = 0;
 
             HashSet<int> handled = new HashSet<int>();
 
@@ -275,7 +288,12 @@ namespace GulagRunners.Game
                     }
 
                     Span mz = new Span(ToFix(mb.min.z), ToFix(mb.max.z));
-                    int before = solids.Count;
+
+                    // A shutter is baked at the very end instead, so that nothing between here
+                    // and there — the hatch cutting especially — can shuffle the list the gate
+                    // numbers are parallel to.
+                    if (TakeForGate(c.gameObject, c.kind, in mb, mz)) { gated++; continue; }
+
                     if (c.kind == SimColliderKind.Solid &&
                         TrySlope(c.transform, c.GetComponent<Collider>(), solids))
                         slopes++;
@@ -346,6 +364,8 @@ namespace GulagRunners.Game
                     else { skippedLayer++; continue; }
 
                     Span cz = new Span(ToFix(cb.min.z), ToFix(cb.max.z));
+                    if (TakeForGate(col.gameObject, kind, in cb, cz)) { gated++; continue; }
+
                     if (kind == SimColliderKind.Solid && TrySlope(col.transform, col, solids))
                         slopes++;
                     else
@@ -375,8 +395,61 @@ namespace GulagRunners.Game
             if (solidZ.Count > solids.Count) solidZ.RemoveRange(solids.Count,
                                                                 solidZ.Count - solids.Count);
 
+            // The shutters go on last, after CutHatches has finished rewriting the solid list,
+            // and never through it: a ladder crossing a shutter is a level-authoring mistake,
+            // and cutting the shutter in half to make room for it would open the room the
+            // shutter exists to close.
+            GateDef[] gateDefs = new GateDef[_gates.Count];
+            List<int> gateOf = new List<int>(solids.Count + 8);
+            for (int i = 0; i < solids.Count; i++) gateOf.Add(-1);
+
+            for (int g = 0; g < _gates.Count; g++)
+            {
+                bool any = false;
+                Aabb box = default;
+                Span span = default;
+
+                for (int b = 0; b < _gateRects[g].Count; b++)
+                {
+                    Rect r = _gateRects[g][b];
+                    Aabb added = SimCollider.RectToAabb(r);
+
+                    solids.Add(added);
+                    solidZ.Add(_gateSpans[g][b]);
+                    gateOf.Add(g);
+                    _gizmoGate.Add(r);
+
+                    if (!any) { box = added; span = _gateSpans[g][b]; any = true; }
+                    else
+                    {
+                        box = Union(in box, in added);
+                        span = new Span(Fix.Min(span.Min, _gateSpans[g][b].Min),
+                                        Fix.Max(span.Max, _gateSpans[g][b].Max));
+                    }
+                }
+
+                gateDefs[g] = new GateDef
+                {
+                    Box = box,
+                    Span = any ? span : Span.Everywhere,
+                    Order = _gates[g].order,
+                    When = _gates[g].when,
+                    Toward = _gates[g].toward
+                };
+
+                _gates[g].Baked(g);
+
+                if (!any)
+                    Debug.LogWarning(
+                        $"{name}: the gate \"{_gates[g].name}\" baked no boxes, so it will shut " +
+                        "on nothing. It needs a SimCollider marked Solid, on itself or under " +
+                        "it, standing on the gameplay plane.", _gates[g]);
+            }
+
             World = new SimWorld
             {
+                Gates = gateDefs,
+                SolidGate = gateOf.ToArray(),
                 Solids = solids.ToArray(),
                 OneWay = oneWay.ToArray(),
                 Ladders = ladders.ToArray(),
@@ -400,6 +473,7 @@ namespace GulagRunners.Game
                 $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid " +
                 $"({hatches} cut by ladders), " +
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
+                $"{World.Gates.Length} gate ({gated} box(es)), " +
                 $"{slopes} slope(s) cut into steps, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
 
@@ -440,6 +514,81 @@ namespace GulagRunners.Game
         }
 
         static Fix ToFix(float metres) => Fix.FromMilli(Mathf.RoundToInt(metres * 1000f));
+
+        static Aabb Union(in Aabb a, in Aabb b) => new Aabb(
+            Fix.Min(a.MinX, b.MinX), Fix.Min(a.MinY, b.MinY),
+            Fix.Max(a.MaxX, b.MaxX), Fix.Max(a.MaxY, b.MaxY));
+
+        /// <summary>
+        /// Every gate in the scene, in the order they will shut.
+        ///
+        /// The sort is the schedule: the clock spreads the closing gates evenly across docs/01's
+        /// shutter window in array order, so this is where "outer rooms first" is decided. Name
+        /// breaks a tie, because two gates on the same order number must still come out in the
+        /// same order on both devices and the scene's own traversal order is not a promise.
+        /// </summary>
+        void CollectGates()
+        {
+            _gates.Clear();
+            _gateRects.Clear();
+            _gateSpans.Clear();
+
+            foreach (GameObject root in RootObjects())
+            {
+                root.GetComponentsInChildren(true, _gateBuffer);
+                foreach (ArenaGate g in _gateBuffer)
+                {
+                    if (g == null || !g.enabled || !g.gameObject.activeInHierarchy) continue;
+                    _gates.Add(g);
+                }
+            }
+
+            _gates.Sort((a, b) =>
+            {
+                int byWhen = ((byte)a.when).CompareTo((byte)b.when);
+                if (byWhen != 0) return byWhen;
+                int byOrder = a.order.CompareTo(b.order);
+                return byOrder != 0 ? byOrder : string.CompareOrdinal(a.name, b.name);
+            });
+
+            if (_gates.Count > MatchMotor.MaxGates)
+            {
+                Debug.LogWarning(
+                    $"{name}: {_gates.Count} gates in this scene and only {MatchMotor.MaxGates} " +
+                    "can be tracked, one bit each. The ones past that will never shut.", this);
+                _gates.RemoveRange(MatchMotor.MaxGates, _gates.Count - MatchMotor.MaxGates);
+            }
+
+            for (int i = 0; i < _gates.Count; i++)
+            {
+                _gateRects.Add(new List<Rect>());
+                _gateSpans.Add(new List<Span>());
+                _gates[i].Baked(-1);
+            }
+        }
+
+        /// <summary>
+        /// Is this box part of a gate? If it is, it is set aside for the end of the bake rather
+        /// than added to the arena now, and the caller skips it.
+        ///
+        /// Only solid boxes: a one-way platform or a ladder inside a shutter is not something
+        /// the closing phase has any meaning for, and silently making it gated would hide the
+        /// authoring mistake instead of leaving it visible.
+        /// </summary>
+        bool TakeForGate(GameObject owner, SimColliderKind kind, in Bounds box, Span z)
+        {
+            if (_gates.Count == 0 || kind != SimColliderKind.Solid) return false;
+
+            ArenaGate gate = owner.GetComponentInParent<ArenaGate>();
+            if (gate == null) return false;
+
+            int index = _gates.IndexOf(gate);
+            if (index < 0) return false;            // its own component is off
+
+            _gateRects[index].Add(new Rect(box.min.x, box.min.y, box.size.x, box.size.y));
+            _gateSpans[index].Add(z);
+            return true;
+        }
 
         /// <summary>Gives every box added since the last call the depth it was modelled at.</summary>
         static void Fill(List<Span> depths, int upTo, Span z)
@@ -659,6 +808,11 @@ namespace GulagRunners.Game
             Draw(_gizmoOneWay, new Color(1f, 0.85f, 0.2f, 0.8f));
             Draw(_gizmoLadder, new Color(0.4f, 1f, 0.4f, 0.8f));
             Draw(_gizmoChest, new Color(1f, 0.45f, 0.85f, 0.8f));
+
+            // The shutters in their own colour, because they are the boxes that are NOT in
+            // the way for most of the match: drawn like the rest, a gate reads as a wall the
+            // scavenge phase has to route around.
+            Draw(_gizmoGate, new Color(0.55f, 0.75f, 1f, 0.9f));
         }
 
         void Draw(List<Rect> rects, Color color)

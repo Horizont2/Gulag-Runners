@@ -111,6 +111,7 @@ namespace GulagRunners.Sim
             Fix nearestX = Fix.Zero;
             for (int i = 0; i < world.Solids.Length; i++)
             {
+                if (!world.SolidLive(i)) continue;           // a shutter that has not shut
                 Aabb solid = world.Solids[i];
                 if (solid.MaxX <= from || solid.MinX >= to) continue;
 
@@ -178,7 +179,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 if (!feet.Overlaps(in world.Solids[i])) continue;
-                if (!world.SolidSpan(i).Reaches(s.Depth, halfZ)) continue;
+                if (!world.SolidAt(i, s.Depth, halfZ)) continue;
                 if (found && world.Solids[i].MaxY <= top) continue;
 
                 top = world.Solids[i].MaxY;
@@ -858,6 +859,7 @@ namespace GulagRunners.Sim
             Fix top = Fix.Zero;
             for (int i = 0; i < world.Solids.Length; i++)
             {
+                if (!world.SolidLive(i)) continue;           // a shutter that has not shut
                 Aabb solid = world.Solids[i];
                 if (solid.MinX >= x + half || solid.MaxX <= x - half) continue;
                 if (ladder.MaxY < solid.MinY) continue;
@@ -1076,7 +1078,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
-                if (!world.SolidSpan(i).Reaches(s.Depth, halfZ)) continue;
+                if (!world.SolidAt(i, s.Depth, halfZ)) continue;
                 Aabb body = new Aabb(targetX - half, s.Position.Y,
                                      targetX + half, s.Position.Y + height);
                 if (!body.Overlaps(in solid)) continue;
@@ -1115,7 +1117,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
-                if (!world.SolidSpan(i).Reaches(s.Depth, halfZ)) continue;
+                if (!world.SolidAt(i, s.Depth, halfZ)) continue;
                 Aabb body = new Aabb(targetX - half, s.Position.Y,
                                      targetX + half, s.Position.Y + height);
                 if (!body.Overlaps(in solid)) continue;
@@ -1152,7 +1154,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
-                if (!world.SolidSpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
+                if (!world.SolidAt(i, s.Depth, cfg.BodyDepth / 2)) continue;
                 if (shaft >= 0 && InShaft(in solid, in world.Ladders[shaft])) continue;
                 Aabb body = new Aabb(s.Position.X - half, targetY, s.Position.X + half, targetY + height);
                 if (!body.Overlaps(in solid)) continue;
@@ -1254,7 +1256,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 if (!box.Overlaps(in world.Solids[i])) continue;
-                if (!world.SolidSpan(i).Reaches(depth, half)) continue;
+                if (!world.SolidAt(i, depth, half)) continue;
                 if (hasShaft && InShaft(in world.Solids[i], in world.Ladders[shaft])) continue;
                 return true;
             }
@@ -1294,7 +1296,7 @@ namespace GulagRunners.Sim
                 {
                     if (InShaft(in world.Solids[i], in world.Ladders[shaft])) continue;
                     if (feet.Overlaps(in world.Solids[i]) &&
-                        world.SolidSpan(i).Reaches(depth, halfZ)) return true;
+                        world.SolidAt(i, depth, halfZ)) return true;
                 }
             }
             else if (AnySolidOverlap(world, in feet, depth, in cfg)) return true;
@@ -1373,7 +1375,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
-                if (!world.SolidSpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
+                if (!world.SolidAt(i, s.Depth, cfg.BodyDepth / 2)) continue;
                 if (!body.Overlaps(in solid)) continue;
                 if (!inside || solid.MaxY > top) { top = solid.MaxY; stuckIn = solid; }
                 inside = true;
@@ -1416,7 +1418,7 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Solids.Length; i++)
             {
                 Aabb solid = world.Solids[i];
-                if (!world.SolidSpan(i).Reaches(depth, halfZ)) continue;
+                if (!world.SolidAt(i, depth, halfZ)) continue;
                 if (solid.MaxX <= feet.X - half || solid.MinX >= feet.X + half) continue;
                 if (solid.MaxY > feet.Y + Skin) continue;      // above the feet
                 if (solid.MaxY < lowest) continue;             // too far down

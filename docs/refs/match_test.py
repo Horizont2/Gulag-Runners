@@ -1,7 +1,8 @@
 """The match clock: when a fighter may move, when a round is over, and what comes after it."""
 import match_mirror as M
 from match_mirror import Match, step, phase_at, total_frames, DEFAULT, NAMES, CAGES, SCAVENGE, \
-    SIREN, HUNT, CLOSING, SUDDEN, OVER
+    SIREN, HUNT, CLOSING, SUDDEN, OVER, Gate, gate_shuts_at, gates_shut_at, shove, \
+    CLOSING_GATE, SUDDEN_GATE, MINUS_X, PLUS_X, MINUS_Y, PLUS_Y, phase_start
 import loot_mirror as L
 
 ok = True
@@ -191,6 +192,99 @@ check("and it keeps going round: four rounds off one match object", r.match.roun
 check("each one dealt differently", len({tuple(x) for x in r.rounds}) == len(r.rounds),
       f"{len(r.rounds)} deals, {len({tuple(x) for x in r.rounds})} distinct")
 
+print("\nThe rooms shut, one after another (docs/01)")
+
+
+def arena():
+    """Two full-height shutters standing in the gaps of the walkway, herding inwards."""
+    return [Gate(-7.48, -1.0, -7.18, 6.0, order=0, toward=PLUS_X),
+            Gate(3.62, -1.0, 3.92, 6.0, order=1, toward=MINUS_X)]
+
+
+gates = arena()
+due = [gate_shuts_at(i, gates, cfg) for i in range(len(gates))]
+for i, at in enumerate(due):
+    print(f"   gate {i}  {clock(at / 60.0)}")
+check("they shut inside the closing phase, not before it",
+      all(at > cfg["cage"] + cfg["scavenge"] + cfg["siren"] + cfg["hunt"] for at in due))
+check("one after another, evenly across the 45 s docs/01 gives the shutters",
+      due[1] - due[0] == cfg["shutter"] // 2, f"{(due[1] - due[0]) / 60:.1f} s apart")
+check("and the last one lands at 2:00, leaving only the middle",
+      abs(due[-1] / 60.0 - 120.0) < 0.05, clock(due[-1] / 60.0))
+
+m = Match()
+seen, masks = [], []
+for _ in range(total_frames(cfg) + 60):
+    step(m, cfg, gates=gates)
+    masks.append(m.gates_shut)
+    if m.gates_just_shut:
+        seen.append((m.frame, m.gates_just_shut))
+check("each gate announces itself exactly once", len(seen) == 2 and
+      all(bin(mask).count("1") == 1 for _, mask in seen), f"{len(seen)} announcements")
+check("on the tick it was due", [f for f, _ in seen] == due, f"{[f for f, _ in seen]} vs {due}")
+check("and the arena only ever closes, never springs back open", masks == sorted(masks))
+check("a shutter stays shut while the result is held",
+      m.finished and m.gates_shut == 0b11, f"mask {m.gates_shut:b}")
+
+ceiling = arena() + [Gate(-7.18, 2.6, 3.62, 3.5, when=SUDDEN_GATE, toward=MINUS_Y)]
+at = gate_shuts_at(2, ceiling, cfg)
+check("sudden death's ceiling comes down on its first tick, at 2:20",
+      abs(at / 60.0 - 140.0) < 0.05, clock(at / 60.0))
+check("and the shutters before it are unmoved by its being there",
+      [gate_shuts_at(i, ceiling, cfg) for i in (0, 1)] == due)
+
+print("\nNobody is sealed into a wing")
+
+
+def fighter(x, y=0.12, depth=0.0):
+    return dict(x=x, y=y, depth=depth, vx=3.0, vy=0.0, ladder=4, chest=2, stagger=0, shoved=0)
+
+
+gates = arena()
+stranded = fighter(-15.5)          # at the far left, by the cage, when the left gate slams
+inside = fighter(-2.0)             # already in the middle
+shove([stranded, inside], gates, 0b01)
+check("a fighter left behind the shutter is brought through", stranded["shoved"] == 1,
+      f"x -15.50 -> {stranded['x']:.2f}")
+check("to just clear of it, on the inner side",
+      abs(stranded["x"] - (gates[0].max_x + 0.2 + 0.01)) < 1e-9, f"x {stranded['x']:.3f}")
+check("staggered for it, not merely moved", stranded["stagger"] == 24)
+check("and let go of the ladder and the chest that are now behind a wall",
+      stranded["ladder"] == -1 and stranded["chest"] == -1)
+check("a fighter already in the middle is left where they stand",
+      inside["shoved"] == 0 and inside["x"] == -2.0)
+
+right = fighter(11.7)
+shove([right], gates, 0b10)
+check("the right shutter herds the other way",
+      abs(right["x"] - (gates[1].min_x - 0.2 - 0.01)) < 1e-9, f"x {right['x']:.3f}")
+
+lane = fighter(-15.5)
+lane["depth"] = 40.0               # a slice this shutter does not reach
+narrow = [Gate(-7.48, -1.0, -7.18, 6.0, order=0, toward=PLUS_X, span=(-3.0, 0.0))]
+shove([lane], narrow, 0b1)
+check("a shutter only herds bodies it would actually have blocked", lane["shoved"] == 0,
+      "a gate on a slice you cannot touch is one you could walk around")
+
+print("\nThe siren is a direction, not a tracker (docs/01)")
+m = Match()
+while m.phase != SIREN:
+    step(m, cfg, x=(-15.5, 11.7))
+check("the pulse points at the other fighter", m.siren_direction == 1,
+      f"{m.siren_direction:+d}")
+check("and each fighter is given its own side of it",
+      (m.siren_for(0), m.siren_for(1)) == (1, -1))
+for _ in range(cfg["siren"] + 600):
+    step(m, cfg, x=(11.7, -15.5))   # they swap ends afterwards
+check("it does not follow them: one pulse, taken once", m.siren_direction == 1,
+      "a direction read every tick would be a tracker")
+
+m = Match()
+while m.phase != SIREN:
+    step(m, cfg, x=(8.0, -4.0))
+check("and it reads the other way about when they are the other way about",
+      m.siren_direction == -1, f"{m.siren_direction:+d}")
+
 print("\nThe clock is the same on both devices")
 a, b = Match(), Match()
 for i in range(4000):
@@ -199,7 +293,14 @@ for i in range(4000):
 check("two clocks from the same table never disagree",
       (a.frame, a.phase) == (b.frame, b.phase), f"frame {a.frame}, {NAMES[a.phase]}")
 check("and the phase at a tick can be asked without stepping to it",
-      all(phase_at(f, cfg) == phase_at(f, cfg) for f in (0, 179, 180, 1500, 8000)))
+      [phase_at(f, cfg) for f in (0, 179, 180, 1499, 1500, 4499, 4500, 8399, 8400)] ==
+      [CAGES, CAGES, SCAVENGE, SCAVENGE, SIREN, HUNT, CLOSING, CLOSING, SUDDEN])
+check("and the first tick of a phase is the tick that phase starts on",
+      all(phase_at(phase_start(p, cfg), cfg) == p
+          for p in (CAGES, SCAVENGE, SIREN, HUNT, CLOSING, SUDDEN)) and
+      all(phase_at(phase_start(p, cfg) - 1, cfg) != p
+          for p in (SCAVENGE, SIREN, HUNT, CLOSING, SUDDEN)),
+      "which is what a view measures how far through a phase it is from")
 
 a, b = Match(), Match()
 for i in range(cfg["cage"] + 60):
@@ -215,5 +316,16 @@ for i in range(cfg["restart"] + 60):
         restarts.append(i)
 check("and they want the rematch on the same tick", not restarts,
       f"disagreed on {len(restarts)} tick(s)")
+
+ga, gb = arena(), arena()
+a, b = Match(), Match()
+drift = []
+for i in range(total_frames(cfg)):
+    step(a, cfg, gates=ga)
+    step(b, cfg, gates=gb)
+    if a.gates_shut != b.gates_shut:
+        drift.append(i)
+check("and two arenas shut on the same ticks, having never spoken", not drift,
+      f"disagreed on {len(drift)} tick(s); final mask {a.gates_shut:b}")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

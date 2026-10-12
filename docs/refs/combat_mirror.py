@@ -11,7 +11,7 @@ K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
          CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
          PARRY=12, STAGGER=48, DEATH=90, GUARD_DRAIN=48,
-         DESPERATE_HP=300, DESPERATE_DMG=1400,
+         DESPERATE_HP=300, DESPERATE_DMG=1400, SUDDEN_BARE=2000,
          FALL_SPEED=M.M(12500), FALL_PER_SPEED=8)
 
 NONE_P, WINDUP, ACTIVE, RECOVERY = 0, 1, 2, 3
@@ -208,7 +208,7 @@ def overlaps(a, b):
     return a[0] < b[2] and a[2] > b[0] and a[1] < b[3] and a[3] > b[1]
 
 
-def resolve(players):
+def resolve(players, sudden_death=False):
     for a, atk in enumerate(players):
         box = hitbox(atk)
         if box is None:
@@ -223,20 +223,29 @@ def resolve(players):
             if abs(atk.depth - vic.depth) > M.C["BODYZ"]:
                 continue
             atk.swing_spent = True
-            land(atk, vic)
+            land(atk, vic, sudden_death)
             break
 
 
-def land(atk, vic):
+def land(atk, vic, sudden_death=False):
     side = 1 if vic.x >= atk.x else -1
     heavy = atk.combo >= K["MAX_COMBO"] - 1
     dmg = max(1, weapon(atk)["dmg"])
     if heavy:
         dmg = scale(dmg, K["HEAVY_DMG"])
-    # Bare hands get desperate below 30% HP, and only bare hands.
-    if atk.inv.weapon in (NONE, FISTS) and \
-            atk.health * 1000 <= K["HP"] * K["DESPERATE_HP"]:
-        dmg = scale(dmg, K["DESPERATE_DMG"])
+
+    # Bare hands get desperate below 30% HP, and only bare hands. In sudden death they hurt
+    # anyway (docs/01), because the point of that last minute is that there is nowhere to go
+    # and no time to look for a weapon. The two do NOT multiply — the bigger one wins, or a
+    # punch from a fighter on their last tenth reads as a one-hit kill out of nowhere.
+    if atk.inv.weapon in (NONE, FISTS):
+        boost = 1000
+        if atk.health * 1000 <= K["HP"] * K["DESPERATE_HP"]:
+            boost = K["DESPERATE_DMG"]
+        if sudden_death and K["SUDDEN_BARE"] > boost:
+            boost = K["SUDDEN_BARE"]
+        if boost != 1000:
+            dmg = scale(dmg, boost)
 
     facing_it = vic.facing != side
     if vic.blocking and facing_it:

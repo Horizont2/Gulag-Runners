@@ -21,6 +21,7 @@ SIM_COLLIDER_GUID = "a92ea500d0103a36b3143c8a534b18b2"
 CHEST_GUID = "b133d746e1ad16c0613fc1ce415afb0c"
 PLAYER_GUID = "882fe3a922af38d6658c85cd54734955"
 BAKER_GUID = "dbc7640cd37666d57e8cc1de33f92772"
+GATE_GUID = "2d7a16f4c8b94e03a5f61d820c74b9e5"
 
 # Unity's built-in meshes, as (local centre, local half-extents). Cylinder and Capsule are TWO
 # units tall, which is the whole reason the bake may not assume a unit cube.
@@ -529,6 +530,17 @@ def cut_hatches(solids, ladders, margin, min_overlap):
     return solids, cut
 
 
+def _gate_of(sc, go):
+    """Which ArenaGate owns this box, by its gameobject id, or None."""
+    cur = sc.tr_of_go.get(go)
+    while cur in sc.transforms:
+        owner = sc.transforms[cur]['go']
+        if owner in sc.gos and sc.script(owner, GATE_GUID) is not None:
+            return owner
+        cur = sc.transforms[cur]['parent']
+    return None
+
+
 def bake(scene=None, report=False):
     sc = scene or Scene()
     baker = next((b for fid, (cls, b) in sc.docs.items()
@@ -553,6 +565,7 @@ def bake(scene=None, report=False):
     solidz, onewayz, ladderz, ladderlean = [], [], [], []
     ladderleanz = []
     culled = []
+    gates = {}
     slopes = 0
     step_m = _field(baker, 'slopeStep', float, 0.2)
     min_rise = _field(baker, 'slopeMinRise', float, 0.12)
@@ -595,6 +608,15 @@ def bake(scene=None, report=False):
                 culled.append(_aabb(*b))
             continue
         mz = (X(b[0][2]), X(b[1][2]))
+
+        # A shutter is not part of the arena until the closing phase reaches it, so it is set
+        # aside here and appended after the hatch cutting — which is what the baker does, and
+        # the reason the gate numbers can be an array parallel to the solid list at all.
+        gate = _gate_of(sc, go)
+        if gate is not None and kind == SOLID:
+            gates.setdefault(gate, []).append((_aabb(*b), mz))
+            continue
+
         cut = slope_steps(sc.corners(go), step_m, min_rise) if kind == SOLID else None
         if cut:
             slopes += 1
@@ -672,17 +694,44 @@ def bake(scene=None, report=False):
         solidz.append((X(-1000.0), X(1000.0)))
     del solidz[len(solids):]
 
+    # Now the shutters, on the end, in the order they will shut — which is the sort, because
+    # gate n is bit n of one word and the clock spreads them across the shutter window in
+    # array order (docs/01). Name breaks a tie, as in the baker.
+    gate_defs = []
+    solid_gate = [-1] * len(solids)
+    for owner in sorted(gates, key=lambda g: (_field(sc.script(g, GATE_GUID), 'when', int, 0),
+                                              _field(sc.script(g, GATE_GUID), 'order', int, 0),
+                                              sc.gos[g]['name'])):
+        body = sc.script(owner, GATE_GUID)
+        boxes = gates[owner]
+        index = len(gate_defs)
+        box = boxes[0][0]
+        span = boxes[0][1]
+        for b, z in boxes:
+            solids.append(b)
+            solidz.append(z)
+            solid_gate.append(index)
+            box = (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+            span = (min(span[0], z[0]), max(span[1], z[1]))
+        gate_defs.append(dict(name=sc.gos[owner]['name'], box=box, span=span,
+                              order=_field(body, 'order', int, 0),
+                              when=_field(body, 'when', int, 0),
+                              toward=_field(body, 'toward', int, 1),
+                              boxes=len(boxes)))
+
     if report:
         print(f"bake: plane z {plane_z} +-{thickness} -> {len(solids)} solid "
               f"({hatches} cut by ladders), {len(oneway)} one-way, {len(ladders)} ladder, "
-              f"{len(chests)} chest; {marked} marked ({ignored} ignored), "
+              f"{len(gate_defs)} gate, {len(chests)} chest; {marked} marked "
+              f"({ignored} ignored), "
               f"{off_plane} off the plane, {backdrop} backdrop, {triggers} trigger, "
               f"{on_player} on a fighter, {on_chest} on a chest, "
               f"{slopes} slope(s) cut into steps")
 
     return {"solid": solids, "oneway": oneway, "ladder": ladders, "chest": chests,
             "solidz": solidz, "onewayz": onewayz, "ladderz": ladderz,
-            "ladderlean": ladderlean, "ladderleanz": ladderleanz}
+            "ladderlean": ladderlean, "ladderleanz": ladderleanz,
+            "gate": gate_defs, "solidgate": solid_gate}
 
 
 def world(report=False):
@@ -695,9 +744,13 @@ def world(report=False):
     if sp:
         C["HOME"] = X(sp[0][3])
 
-    return {k: b[k] for k in ("solid", "oneway", "ladder",
-                              "solidz", "onewayz", "ladderz",
-                              "ladderlean", "ladderleanz")}
+    w = {k: b[k] for k in ("solid", "oneway", "ladder",
+                           "solidz", "onewayz", "ladderz",
+                           "ladderlean", "ladderleanz")}
+    w["solidgate"] = b["solidgate"]
+    w["gate"] = b["gate"]
+    w["gatesshut"] = 0
+    return w
 
 
 CAMERA_GUID = "b921a9be9303a1887f282de341a5ae31"
@@ -775,6 +828,13 @@ def spawns(scene=None):
 
 if __name__ == '__main__':
     W = bake(report=True)
+    print("\ngates:")
+    for i, g in enumerate(W["gate"]):
+        print(f"  {i} {g['name']:18s} order {g['order']} when {g['when']} "
+              f"toward {g['toward']}  X {g['box'][0]/65536:6.2f}..{g['box'][2]/65536:6.2f}  "
+              f"Y {g['box'][1]/65536:5.2f}..{g['box'][3]/65536:5.2f}  "
+              f"Z {g['span'][0]/65536:5.2f}..{g['span'][1]/65536:5.2f}")
+
     for name, boxes in (("solid", W["solid"]), ("ladder", W["ladder"])):
         print(f"\n{name}:")
         for b in sorted(boxes, key=lambda b: (b[1], b[0])):
@@ -783,4 +843,5 @@ if __name__ == '__main__':
     for box, kind, contents, name in W["chest"]:
         print(f"  {name:24s} kind={kind} contents={contents:2d}  "
               f"X {box[0]/65536:6.2f}..{box[2]/65536:6.2f}  Y {box[1]/65536:5.2f}..{box[3]/65536:5.2f}")
-    print("\nspawns:", [(round(x, 2), round(y, 2), f) for x, y, f in spawns()])
+    print("\nspawns:", [f"p{i + 1} ({x:.2f}, {y:.2f}, z {z:.2f}) facing {f:+d}"
+                        for i, (x, y, f, z) in enumerate(spawns())])

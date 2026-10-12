@@ -68,6 +68,12 @@ namespace GulagRunners.Game
                  "nowhere left to walk away to.")]
         public float closingSeconds = 65f;
 
+        [Tooltip("Seconds the steel shutters take, inside the closing phase. docs/01 gives " +
+                 "them 45 of that phase's 65: the outer rooms go one after another across " +
+                 "this window, evenly spaced, and what is left of the phase afterwards is " +
+                 "both fighters in the one room with nowhere to walk away to.")]
+        public float shutterSeconds = 45f;
+
         [Tooltip("Seconds of sudden death before the match is decided on health. docs/01 bounds " +
                  "a match at 2:00-2:30, so this is what stops a round where neither fighter " +
                  "will close the distance from running forever. The fighter with more health " +
@@ -224,13 +230,38 @@ namespace GulagRunners.Game
         /// </summary>
         public void AdvanceShared(PlayerController caller, SimWorld world)
         {
-            if (caller == null) return;
-            if (_tickOwner == null || !_tickOwner.isActiveAndEnabled) _tickOwner = caller;
-            if (_tickOwner != caller) return;
+            if (!Owns(caller)) return;
 
             LootMotor.StepGround(GroundItems, world, Drops);
             ResolveHits();
-            StepMatch();
+        }
+
+        /// <summary>
+        /// The front of the tick, before any fighter has moved.
+        ///
+        /// The clock runs here rather than at the end for one reason: docs/01's shutters are a
+        /// change to collision. A gate counted as shut only after the fighters have moved is a
+        /// gate they walk through on the tick it closes — and the fighter being shoved through
+        /// a doorway has to be put down before the motor steps them, not after, or they spend
+        /// a tick inside a wall.
+        ///
+        /// It also means the input lock and the phase now agree on which tick they are on.
+        /// </summary>
+        public void BeginTick(PlayerController caller, SimWorld world)
+        {
+            if (!Owns(caller)) return;
+            StepMatch(world);
+        }
+
+        /// <summary>
+        /// Whether this caller is the one driving the shared tick. The players own the only
+        /// tick loop there is, so the first to ask becomes the one that drives it (docs/06).
+        /// </summary>
+        bool Owns(PlayerController caller)
+        {
+            if (caller == null) return false;
+            if (_tickOwner == null || !_tickOwner.isActiveAndEnabled) _tickOwner = caller;
+            return _tickOwner == caller;
         }
 
         static int Ticks(float seconds) =>
@@ -258,6 +289,7 @@ namespace GulagRunners.Game
             ClosingFrames     = Ticks(closingSeconds),
             SuddenDeathFrames = Ticks(suddenDeathSeconds),
             RestartFrames     = Ticks(restartSeconds),
+            ShutterFrames     = Ticks(shutterSeconds),
         };
 
         /// <summary>
@@ -265,13 +297,27 @@ namespace GulagRunners.Game
         /// steps in. The phase has to arrive on the same tick on both devices, so it cannot be
         /// driven off a second clock of its own (docs/06).
         /// </summary>
-        void StepMatch()
+        void StepMatch(SimWorld world)
         {
             if (fighters.Count < 2 || fighters[0] == null || fighters[1] == null) return;
 
+            GateDef[] gates = world != null ? world.Gates : null;
             PlayerSimState[] states = { fighters[0].State, fighters[1].State };
             MatchConfig rules = MatchRules;
-            MatchMotor.Step(ref _match, in rules, states);
+            MatchMotor.Step(ref _match, in rules, states, gates);
+
+            // The arena, then the bodies in it. One word of state, copied onto the world the
+            // motor reads, so every collision query this tick already knows what is shut.
+            if (world != null) world.GatesShut = _match.GatesShut;
+
+            if (_match.GatesJustShut != 0)
+            {
+                GateMotor.Shove(states, gates, _match.GatesJustShut, fighters[0].Config);
+                for (int i = 0; i < states.Length; i++) fighters[i].OverwriteState(in states[i]);
+
+                if (logMatch)
+                    Debug.Log($"{name}: gate(s) shut — mask {_match.GatesShut:x}", this);
+            }
 
             if (_match.PhaseChanged)
             {
@@ -310,7 +356,10 @@ namespace GulagRunners.Game
                 _scratch[i] = fighters[i].State;
             }
 
-            CombatMotor.Resolve(_scratch, Combat, fighters[0].Config);
+            // docs/01: on the last platform, bare hands hit twice as hard. The fight has to be
+            // told which minute it is in; nothing else about it changes.
+            CombatMotor.Resolve(_scratch, Combat, fighters[0].Config,
+                                _match.Phase == MatchPhase.SuddenDeath);
 
             for (int i = 0; i < fighters.Count; i++) fighters[i].OverwriteState(in _scratch[i]);
         }

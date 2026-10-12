@@ -150,6 +150,15 @@ namespace GulagRunners.Sim
         /// <summary>Landing faster than this is a Loud landing.</summary>
         public Fix HardLandSpeed;
 
+        /// <summary>
+        /// How long a fighter is knocked about for by a closing gate (docs/01's shutters).
+        ///
+        /// Being put somewhere you did not walk to has to read as something that happened to
+        /// you rather than a teleport, and the window is what makes being shoved through a
+        /// doorway a risk instead of a free escape from whoever was chasing you through it.
+        /// </summary>
+        public int GateStaggerFrames;
+
         public static MoveConfig Default()
         {
             MoveConfig c;
@@ -211,6 +220,8 @@ namespace GulagRunners.Sim
             c.LoudSpeed       = Fix.FromMilli(2500);
             c.StepNoiseFrames = 18;  // a footstep every 0.3 s
             c.HardLandSpeed   = Fix.FromMilli(8000);
+
+            c.GateStaggerFrames = 24;  // 0.40 s: shoved, and briefly open for it
             return c;
         }
     }

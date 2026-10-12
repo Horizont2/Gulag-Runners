@@ -648,5 +648,79 @@ for kind, xs in sorted(by_kind.items()):
     check(f"tier {kind} chests are mirrored about the arena centre",
           abs(sum(xs) / 2 + 1.89) < 0.05, f"x {xs[0]:.2f} and {xs[1]:.2f}")
 
+# ---------------------------------------------------------------- the shutters (docs/01)
+print("\nThe last minute: only the central hall is left")
+import match_mirror as M
+
+GATES = W["gate"]
+check("the arena has shutters at all", len(GATES) >= 2, f"{len(GATES)} gate(s)")
+
+if len(GATES) >= 2:
+    closing = [g for g in GATES if g["when"] == M.CLOSING_GATE]
+    xs = sorted((F(g["box"][0]) + F(g["box"][2])) / 2 for g in closing)
+
+    # Mirrored about the same centre the chests are mirrored about, for the same reason: a
+    # closing phase that leaves one fighter more room than the other is a coin toss.
+    check("the shutters are mirrored about the arena centre",
+          abs(sum(xs) / len(xs) + 1.89) < 0.6, f"x {xs[0]:.2f} and {xs[1]:.2f}")
+
+    due = [M.gate_shuts_at(i, [M.Gate(F(g["box"][0]), F(g["box"][1]), F(g["box"][2]),
+                                      F(g["box"][3]), order=g["order"], when=g["when"],
+                                      toward=g["toward"]) for g in GATES], M.DEFAULT)
+           for i in range(len(GATES))]
+    check("the last of them lands at 2:00, where docs/01 says the middle is all that is left",
+          abs(due[-1] / 60.0 - 120.0) < 0.1, f"{due[-1] / 60.0:.1f} s")
+
+    # Tall enough not to be jumped. The highest floor a shutter crosses is what matters: a
+    # slab you can clear from the upper walkway closes nothing.
+    JUMP_REACH = 2.0
+    for g in closing:
+        gx = (F(g["box"][0]) + F(g["box"][2])) / 2
+        floors = [F(b[3]) for b in W["solid"]
+                  if F(b[0]) - 1.5 <= gx <= F(b[2]) + 1.5 and F(b[3]) < F(g["box"][3])]
+        highest = max(floors) if floors else 0.0
+        check(f"the shutter at x {gx:.2f} cannot be jumped from the highest floor it crosses",
+              F(g["box"][3]) - highest > JUMP_REACH,
+              f"top {F(g['box'][3]):.2f}, highest floor beside it {highest:.2f}")
+
+    # And with everything shut, the arena really is cut into three.
+    SHUT = dict(W)
+    SHUT["gatesshut"] = (1 << len(GATES)) - 1
+
+    inner_lo, inner_hi = xs[0], xs[1]
+    for idx, (sx, sy, _f, _z) in enumerate(SPAWNS):
+        s = fighter_at(sx, sy)
+        until(s, 0, lambda s: s.mode == "ground", 180)
+        inp = R if SPAWNS[1 - idx][0] > sx else L
+        for f in range(1200):
+            step(s, inp | (JMP if f % 20 == 0 else 0), SHUT)
+        got = F(s.x)
+        check(f"fighter {idx + 1} cannot walk out of their wing once the shutters are down",
+              (got < inner_lo + 0.6) if sx < inner_lo else (got > inner_hi - 0.6),
+              f"x {sx:.2f} -> {got:.2f}, shutters at {inner_lo:.2f} and {inner_hi:.2f}")
+
+    # Nobody is sealed in: the shove brings them through, and what it puts them on holds.
+    gates_m = [M.Gate(F(g["box"][0]), F(g["box"][1]), F(g["box"][2]), F(g["box"][3]),
+                      order=g["order"], when=g["when"], toward=g["toward"],
+                      span=(F(g["span"][0]), F(g["span"][1]))) for g in GATES]
+    brought = []
+    for idx, (sx, sy, _f, _z) in enumerate(SPAWNS):
+        body = dict(x=sx, y=sy, depth=SPAWNS[0][3], half_depth=F(T.C["BODYZ"]) / 2,
+                    vx=0.0, vy=0.0, ladder=-1, chest=-1, stagger=0, shoved=0)
+        M.shove([body], gates_m, (1 << len(GATES)) - 1)
+        check(f"fighter {idx + 1} is brought into the middle rather than sealed in a wing",
+              body["shoved"] >= 1 and inner_lo - 1 < body["x"] < inner_hi + 1,
+              f"x {sx:.2f} -> {body['x']:.2f}")
+        brought.append(body["x"])
+
+        s = fighter_at(body["x"], body["y"])
+        landed = until(s, 0, lambda s: s.mode == "ground", 400)
+        check(f"and has something to stand on where they land", landed,
+              f"y {body['y']:.2f} -> {F(s.y):.2f}" if landed else "fell out of the arena")
+
+    check("and the two of them end up in the same room, within reach of each other",
+          len(brought) == 2 and abs(brought[0] - brought[1]) < (inner_hi - inner_lo),
+          f"{brought[0]:.2f} and {brought[1]:.2f} in a room {inner_hi - inner_lo:.2f} m wide")
+
 print(f"\n{'ALL PASS' if ok else 'FAILURES ABOVE'}")
 raise SystemExit(0 if ok else 1)

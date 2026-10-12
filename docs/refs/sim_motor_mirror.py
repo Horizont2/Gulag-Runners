@@ -78,6 +78,31 @@ def reaches(sp, depth, half):
     return sp is None or (depth + half > sp[0] and depth - half < sp[1])
 
 
+def solid_live(w, i):
+    """Does this solid block anything yet.
+
+    A box belonging to one of docs/01's shutters is not there at all until the gate's bit goes
+    up. One bit per gate, a pure function of the frame, so nothing has to be reconciled.
+    """
+    gates = w.get("solidgate")
+    if not gates or i >= len(gates):
+        return True
+    g = gates[i]
+    return g < 0 or bool(w.get("gatesshut", 0) & (1 << g))
+
+
+def solid_at(w, i, depth, half):
+    """In the way of a body on this slice: there yet, and deep enough.
+
+    Every query goes through this rather than asking the span directly, so a gate that has not
+    shut is skipped by all of them at once. The other way about — a gate check bolted onto each
+    loop — the one loop somebody forgets is a shutter you can walk through.
+    """
+    if not solid_live(w, i):
+        return False
+    return depth is None or reaches(span(w, "solid", i), depth, half)
+
+
 def nearest_in(sp, depth, inset):
     room = (sp[1] - sp[0]) // 2
     inset = min(inset, room)
@@ -92,7 +117,7 @@ def any_solid(w, box, depth=None, shaft=-1):
     has_shaft = 0 <= shaft < len(w["ladder"])
     for i, sol in enumerate(w["solid"]):
         if not overlaps(box, sol): continue
-        if depth is not None and not reaches(span(w, "solid", i), depth, half): continue
+        if not solid_at(w, i, depth, half): continue
         if has_shaft and in_shaft(sol, w["ladder"][shaft]): continue
         return True
     return False
@@ -105,7 +130,7 @@ def support_under(x, y, fallthru, w, shaft=-1, depth=None):
     if shaft >= 0:
         if any(overlaps(feet, sol) for i, sol in enumerate(w["solid"])
                if not in_shaft(sol, w["ladder"][shaft])
-               and (depth is None or reaches(span(w, "solid", i), depth, halfz))): return True
+               and (solid_at(w, i, depth, halfz))): return True
     elif any_solid(w, feet, depth): return True
     if fallthru == 0:
         for i, p in enumerate(w["oneway"]):
@@ -143,7 +168,7 @@ def move_x(s, dx, w):
     best = None
     halfz = C["BODYZ"] // 2
     for i, sol in enumerate(w["solid"]):
-        if not reaches(span(w, "solid", i), s.depth, halfz): continue
+        if not solid_at(w, i, s.depth, halfz): continue
         b = (tx - half, s.y, tx + half, s.y + h)
         if not overlaps(b, sol): continue
         step = sol[3] - s.y
@@ -163,7 +188,7 @@ def move_x(s, dx, w):
         return
 
     for i, sol in enumerate(w["solid"]):
-        if not reaches(span(w, "solid", i), s.depth, halfz): continue
+        if not solid_at(w, i, s.depth, halfz): continue
         b = (tx - half, s.y, tx + half, s.y + h)
         if not overlaps(b, sol): continue
         tx = sol[0] - half - SKIN if dx > 0 else sol[2] + half + SKIN
@@ -177,7 +202,7 @@ def move_y(s, dy, w, shaft=-1):
     start = s.y
     ty = s.y + dy
     for i, sol in enumerate(w["solid"]):
-        if not reaches(span(w, "solid", i), s.depth, C["BODYZ"] // 2): continue
+        if not solid_at(w, i, s.depth, C["BODYZ"] // 2): continue
         # A ladder is its own shaft: everything it passes through is the hole it climbs.
         if shaft >= 0 and in_shaft(sol, w["ladder"][shaft]): continue
         b = (s.x - half, ty, s.x + half, ty + h)
@@ -251,6 +276,7 @@ def lane_ahead(s, w):
     lfrm, lto = s.x - half - C["LOOKAHEAD"], s.x + half + C["LOOKAHEAD"]
     best = None; near = 0
     for i, sol in enumerate(w["solid"]):
+        if not solid_live(w, i): continue          # a shutter that has not shut
         if sol[2] <= frm or sol[0] >= to: continue
         step_h = sol[3] - s.y
         if step_h <= 0 or step_h > limit: continue
@@ -299,7 +325,7 @@ def floor_lane(s, w):
     best = None; top = 0
     for i, sol in enumerate(w["solid"]):
         if not overlaps(feet, sol): continue
-        if not reaches(span(w, "solid", i), s.depth, halfz): continue
+        if not solid_at(w, i, s.depth, halfz): continue
         if best is not None and sol[3] <= top: continue
         top = sol[3]
         best = lane_on(span(w, "solid", i), s.depth)
@@ -590,6 +616,7 @@ def step_out(s, ladder, w):
     l = w["ladder"][ladder]; half = C["W"]//2
     top, lane = None, s.depth
     for i, sol in enumerate(w["solid"]):
+        if not solid_live(w, i): continue          # a shutter that has not shut
         if sol[0] >= s.x+half or sol[2] <= s.x-half: continue
         if l[3] < sol[1] or l[3] > sol[3] + C["LTOP"]: continue
         # The landing may be a lane behind the rungs — here it always is.
@@ -642,7 +669,7 @@ def ground_below(x, y, maxd, w, depth):
     halfz = C["BODYZ"]//2
     best = None
     for i, sol in enumerate(w["solid"]):
-        if not reaches(span(w, "solid", i), depth, halfz): continue
+        if not solid_at(w, i, depth, halfz): continue
         if sol[2] <= x-half or sol[0] >= x+half: continue
         if sol[3] > y + SKIN: continue
         if sol[3] < y - maxd: continue

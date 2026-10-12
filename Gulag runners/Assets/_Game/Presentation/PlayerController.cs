@@ -420,6 +420,13 @@ namespace GulagRunners.Game
                 }
             }
 
+            // The match's own clock first, before anything in the arena moves. docs/01's
+            // shutters change collision, and a gate counted as shut after the bodies have
+            // stepped is a gate they walk through on the tick it closes. It also puts the
+            // input lock and the phase on the same tick. Only the tick owner's call does
+            // anything; everyone else's returns.
+            if (matchState != null) matchState.BeginTick(this, _world);
+
             bool wasAirborne = _state.Mode == MoveMode.Airborne;
             float fallSpeed = -_state.Velocity.Y.Raw / (float)Fix.RawOne;
 

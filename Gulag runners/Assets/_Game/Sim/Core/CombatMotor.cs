@@ -273,7 +273,7 @@ namespace GulagRunners.Sim
         /// stepping the same states reach the same answer.
         /// </summary>
         public static void Resolve(PlayerSimState[] players, in CombatConfig cfg,
-                                   in MoveConfig move)
+                                   in MoveConfig move, bool suddenDeath = false)
         {
             if (players == null || players.Length < 2) return;
 
@@ -297,14 +297,14 @@ namespace GulagRunners.Sim
                         continue;
 
                     players[a].SwingSpent = true;
-                    Land(ref players[a], ref players[b], in cfg, in move);
+                    Land(ref players[a], ref players[b], in cfg, in move, suddenDeath);
                     break;                       // one swing, one victim
                 }
             }
         }
 
         static void Land(ref PlayerSimState attacker, ref PlayerSimState victim,
-                         in CombatConfig cfg, in MoveConfig move)
+                         in CombatConfig cfg, in MoveConfig move, bool suddenDeath)
         {
             int side = victim.Position.X >= attacker.Position.X ? 1 : -1;
             bool heavy = attacker.ComboIndex >= cfg.MaxCombo - 1;
@@ -316,11 +316,25 @@ namespace GulagRunners.Sim
 
             // Bare hands get desperate. Only bare hands, and only while losing: it makes the
             // fighter who dropped their weapon worth fearing without making unarmed a choice.
+            //
+            // In sudden death they hurt anyway (docs/01), because the whole point of that last
+            // minute is that there is nowhere to go and no time to look for a weapon. The two
+            // rules do not multiply — the bigger one wins. Stacked, a punch from a fighter on
+            // their last tenth of health would read as a one-hit kill arriving out of nowhere.
             bool bare = attacker.Inventory.Weapon == ItemId.None ||
                         attacker.Inventory.Weapon == ItemId.Fists;
-            if (bare && cfg.DesperationHealthPermille > 0 &&
-                attacker.Health * 1000 <= cfg.MaxHealth * cfg.DesperationHealthPermille)
-                damage = Scale(damage, cfg.DesperationDamagePermille);
+            if (bare)
+            {
+                int boost = 1000;
+                if (cfg.DesperationHealthPermille > 0 &&
+                    attacker.Health * 1000 <= cfg.MaxHealth * cfg.DesperationHealthPermille)
+                    boost = cfg.DesperationDamagePermille;
+
+                if (suddenDeath && cfg.SuddenDeathBarePermille > boost)
+                    boost = cfg.SuddenDeathBarePermille;
+
+                if (boost != 1000) damage = Scale(damage, boost);
+            }
 
             // A guard only works towards the blow. Being hit in the back while holding a shield
             // up is being hit in the back.

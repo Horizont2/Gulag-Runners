@@ -35,12 +35,12 @@ def fighter(x, facing=1, weapon=NONE, armour=NONE):
     return s
 
 
-def tick(players, inputs):
+def tick(players, inputs, sudden_death=False):
     """One match tick: everyone decides, everyone moves, then hits are resolved together."""
     for p, inp in zip(players, inputs):
         moved = combat_step(p, inp)
         step(p, moved, W)
-    resolve(players)
+    resolve(players, sudden_death)
 
 
 REACH = {FISTS: 0.65, CLUB: 0.9, SPEAR: 1.4}
@@ -360,7 +360,7 @@ tick([a], [0])
 check("a drop inside a storey is free", a.health == before, f"{before} -> {a.health} hp")
 
 print("\n10d. bare hands get desperate below 30% HP (docs/02)")
-def fist_damage(health):
+def fist_damage(health, sudden_death=False):
     """Bare hands reach 0.6 m, so the two have to stand closer than a weapon fight."""
     atk = fighter(-0.25, 1)
     vic = fighter(0.25, -1)
@@ -368,7 +368,7 @@ def fist_damage(health):
     for _ in range(200):
         atk.x, vic.x = X(-0.25), X(0.25)
         vic.stun = 0
-        tick([atk, vic], [ATTACK, 0])
+        tick([atk, vic], [ATTACK, 0], sudden_death)
         if vic.damage_taken:
             return vic.damage_taken
     return 0
@@ -379,6 +379,36 @@ check("a cornered fighter hits harder with nothing in their hands", hurt > full,
       f"{full} at full health, {hurt} at 25")
 check("and by the 40% docs/02 asks for", hurt == K.scale(full, CFG["DESPERATE_DMG"]),
       f"{full} -> {hurt}")
+
+print("\n10e. on the last platform, bare hands hit twice as hard (docs/01)")
+sudden = fist_damage(100, sudden_death=True)
+check("fists hurt in sudden death even at full health", sudden > full,
+      f"{full} -> {sudden}")
+check("by exactly the x2 docs/01 asks for",
+      sudden == K.scale(full, CFG["SUDDEN_BARE"]), f"{full} -> {sudden}")
+
+both = fist_damage(25, sudden_death=True)
+check("desperation and sudden death do not stack: the bigger one wins",
+      both == max(hurt, sudden),
+      f"{hurt} desperate, {sudden} in sudden death, {both} when both apply")
+
+armed = None
+for sd in (False, True):
+    atk = fighter(-0.45, 1, weapon=CLUB)
+    vic = fighter(0.45, -1)
+    got = 0
+    for _ in range(200):
+        atk.x, vic.x = X(-0.45), X(0.45)
+        vic.stun = 0
+        tick([atk, vic], [ATTACK, 0], sd)
+        if vic.damage_taken:
+            got = vic.damage_taken
+            break
+    if armed is None:
+        armed = got
+    else:
+        check("and a weapon is untouched by it, so sudden death favours nobody with one",
+              got == armed, f"{armed} with a club either way")
 
 print("\n11. the same inputs give the same frames")
 runs = []

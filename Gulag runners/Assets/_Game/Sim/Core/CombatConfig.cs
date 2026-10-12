@@ -77,6 +77,16 @@ namespace GulagRunners.Sim
         public int DesperationDamagePermille;
 
         /// <summary>
+        /// What bare hands do in sudden death, per mille. docs/01: "кулаки/безоружний удар
+        /// б'ють ×2" — on the one platform, with the ceiling down, the fighter who has lost or
+        /// spent their weapon is not out of the fight.
+        ///
+        /// It does not stack with desperation: the larger of the two applies. Two multipliers
+        /// on the same punch is a one-hit kill arriving from a rule nobody could see.
+        /// </summary>
+        public int SuddenDeathBarePermille;
+
+        /// <summary>
         /// Landing faster than this hurts, by FallDamagePerSpeed for every m/s over it.
         /// docs/02 counts a fall off a floor among the ways a fight ends. 12.5 m/s is the
         /// speed reached dropping about 2.8 m, so every drop inside a storey is free and the
@@ -119,6 +129,7 @@ namespace GulagRunners.Sim
 
             c.DesperationHealthPermille = 300;   // docs/02: bare hands below 30% HP
             c.DesperationDamagePermille = 1400;
+            c.SuddenDeathBarePermille   = 2000;  // docs/01: bare hands x2 on the last platform
 
             c.FallDamageSpeed = Fix.FromMilli(12500);
             c.FallDamagePerSpeed = 8;
