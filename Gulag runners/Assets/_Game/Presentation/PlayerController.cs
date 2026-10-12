@@ -408,6 +408,11 @@ namespace GulagRunners.Game
             bool wasAirborne = _state.Mode == MoveMode.Airborne;
             float fallSpeed = -_state.Velocity.Y.Raw / (float)Fix.RawOne;
 
+            // In the cage, nothing. The doors are still coming up, and a fighter who can walk
+            // through a closed door during the three seconds nobody is watching him is a
+            // fighter with a three second head start.
+            if (matchState != null && !matchState.Match.InputAllowed) input = InputFlags.None;
+
             // The fight decides what the body is allowed to do before it moves: a swing is a
             // commitment to where you are standing, and that is what makes reach matter.
             InputFlags moveInput = input;

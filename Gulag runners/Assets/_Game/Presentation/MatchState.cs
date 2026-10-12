@@ -45,6 +45,26 @@ namespace GulagRunners.Game
         [Header("The fight (docs/02)")]
         public CombatTuning combat = new CombatTuning();
 
+        [Header("The shape of a match (docs/01)")]
+        [Tooltip("Seconds in the cages before anyone can move. The doors come up over this.")]
+        public float cageSeconds = 3f;
+
+        [Tooltip("Seconds alone with the chests, not shown the other player. docs/01's whole " +
+                 "open question is whether this is tense or empty, and it is the first number " +
+                 "to reach for when the answer is empty.")]
+        public float scavengeSeconds = 22f;
+
+        [Tooltip("The radar pulse: a direction, not a position.")]
+        public float sirenSeconds = 1.5f;
+
+        [Tooltip("Seconds from the siren to the rooms starting to shut — the whole 0:25-1:15 " +
+                 "window of docs/01, siren included. The pulse is its opening beat, not a " +
+                 "phase in front of it, so it comes out of this rather than on top of it.")]
+        public float huntSeconds = 50f;
+
+        [Tooltip("Seconds of the outer rooms shutting, until only the middle is left.")]
+        public float closingSeconds = 45f;
+
         [Tooltip("The fighters, in a fixed order. Hits are resolved once for the whole match " +
                  "rather than once per player: a hit is a fact about two bodies, and two players " +
                  "each deciding their own would disagree about it.")]
@@ -60,6 +80,18 @@ namespace GulagRunners.Game
         public ChestConfig Config { get; private set; }
         public DropConfig Drops { get; private set; }
         public CombatConfig Combat { get; private set; }
+        public MatchConfig MatchRules { get; private set; }
+
+        /// <summary>Where the match has got to. Read it; only the tick moves it.</summary>
+        public MatchSimState Match => _match;
+
+        MatchSimState _match = MatchSimState.Fresh();
+
+        /// <summary>A phase began this tick. Raised once, not every frame.</summary>
+        public event System.Action<MatchPhase> PhaseBegan;
+
+        /// <summary>Somebody won: 0, 1, or 2 for a draw.</summary>
+        public event System.Action<int> Ended;
 
         PlayerSimState[] _scratch = System.Array.Empty<PlayerSimState>();
 
@@ -110,12 +142,27 @@ namespace GulagRunners.Game
             Config = chests.ToConfig();
             Drops = drops.ToConfig();
             Combat = combat.ToConfig();
+            MatchRules = new MatchConfig
+            {
+                CageFrames     = Ticks(cageSeconds),
+                ScavengeFrames = Ticks(scavengeSeconds),
+                SirenFrames    = Ticks(sirenSeconds),
+
+                // The siren is the OPENING of the hunt, not a phase in front of it: docs/01
+                // puts the pulse at 0:25 and the hunt at 0:25-1:15, so its second and a half
+                // comes out of the hunt's fifty rather than on top of them. Added instead of
+                // subtracted, every boundary after it lands late — which is what the clock did
+                // until a test counted the table out in minutes and seconds.
+                HuntFrames     = Mathf.Max(0, Ticks(huntSeconds) - Ticks(sirenSeconds)),
+                ClosingFrames  = Ticks(closingSeconds),
+            };
 
             if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
             SimWorld world = worldBaker != null ? worldBaker.World : null;
 
             int count = world != null ? world.Chests.Length : 0;
             ChestStates = ChestSimState.FreshSet(count);
+            _match = MatchSimState.Fresh();
 
             // Deal the round. docs/01's symmetric start and asymmetric result: both sides of
             // the arena have the same chests and different things in them, which is what makes
@@ -143,6 +190,27 @@ namespace GulagRunners.Game
 
             LootMotor.StepGround(GroundItems, world, Drops);
             ResolveHits();
+            StepMatch();
+        }
+
+        static int Ticks(float seconds) =>
+            Mathf.Max(0, Mathf.RoundToInt(seconds * PlayerMotor.TicksPerSecond));
+
+        /// <summary>
+        /// The match's own clock, once per tick, from inside the same loop everything else
+        /// steps in. The phase has to arrive on the same tick on both devices, so it cannot be
+        /// driven off a second clock of its own (docs/06).
+        /// </summary>
+        void StepMatch()
+        {
+            if (fighters.Count < 2 || fighters[0] == null || fighters[1] == null) return;
+
+            PlayerSimState[] states = { fighters[0].State, fighters[1].State };
+            MatchConfig rules = MatchRules;
+            MatchMotor.Step(ref _match, in rules, states);
+
+            if (_match.PhaseChanged) PhaseBegan?.Invoke(_match.Phase);
+            if (_match.JustEnded) Ended?.Invoke(_match.Winner);
         }
 
         /// <summary>
@@ -180,6 +248,20 @@ namespace GulagRunners.Game
             Config = chests.ToConfig();
             Drops = drops.ToConfig();
             Combat = combat.ToConfig();
+            MatchRules = new MatchConfig
+            {
+                CageFrames     = Ticks(cageSeconds),
+                ScavengeFrames = Ticks(scavengeSeconds),
+                SirenFrames    = Ticks(sirenSeconds),
+
+                // The siren is the OPENING of the hunt, not a phase in front of it: docs/01
+                // puts the pulse at 0:25 and the hunt at 0:25-1:15, so its second and a half
+                // comes out of the hunt's fifty rather than on top of them. Added instead of
+                // subtracted, every boundary after it lands late — which is what the clock did
+                // until a test counted the table out in minutes and seconds.
+                HuntFrames     = Mathf.Max(0, Ticks(huntSeconds) - Ticks(sirenSeconds)),
+                ClosingFrames  = Ticks(closingSeconds),
+            };
         }
 
         public void ReportOpened(int playerIndex, int chestIndex)

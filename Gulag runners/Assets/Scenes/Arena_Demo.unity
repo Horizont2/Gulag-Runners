@@ -718,6 +718,7 @@ GameObject:
   - component: {fileID: 330585547}
   - component: {fileID: 1900000135}
   - component: {fileID: 1900001150}
+  - component: {fileID: 1900000850}
   m_Layer: 0
   m_Name: Camera Player 1
   m_TagString: MainCamera
@@ -3623,6 +3624,7 @@ GameObject:
   - component: {fileID: 1900000138}
   - component: {fileID: 1900000139}
   - component: {fileID: 1900001151}
+  - component: {fileID: 1900000851}
   m_Layer: 0
   m_Name: Camera Player 2
   m_TagString: Untagged
@@ -3738,6 +3740,11 @@ MonoBehaviour:
   fighters:
   - {fileID: 1900000122}
   - {fileID: 1900000130}
+  cageSeconds: 3
+  scavengeSeconds: 22
+  sirenSeconds: 1.5
+  huntSeconds: 50
+  closingSeconds: 45
   logOpenings: 1
 --- !u!1001 &1900000600
 PrefabInstance:
@@ -6039,3 +6046,47 @@ MonoBehaviour:
   sparksOnBlock: {fileID: 0}
   particlesPerDamage: 3
   deathBurst: {fileID: 0}
+--- !u!114 &1900000850
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e8b15c0d7a2496fb3e09c742a5d1f68, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  matchState: {fileID: 0}
+  view: {fileID: 1900000135}
+  startDistance: 0.45
+  startHeight: -0.35
+  startLead: 0.5
+  holdUntil: 0.42
+  settledBy: 0.86
+  jerkPush: 0.22
+  jerkAt: 0.18
+  jerkFor: 0.12
+--- !u!114 &1900000851
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000140}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e8b15c0d7a2496fb3e09c742a5d1f68, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  matchState: {fileID: 0}
+  view: {fileID: 1900000139}
+  startDistance: 0.45
+  startHeight: -0.35
+  startLead: 0.5
+  holdUntil: 0.42
+  settledBy: 0.86
+  jerkPush: 0.22
+  jerkAt: 0.18
+  jerkFor: 0.12
