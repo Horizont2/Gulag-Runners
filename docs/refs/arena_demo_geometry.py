@@ -374,6 +374,42 @@ class Scene:
         p = _vec(body, 'm_LocalPosition', {'x': 0, 'y': 0, 'z': 0})
         return (p['x'], p['y'], p['z'])
 
+    def prefab_players(self):
+        """Fighters that are prefab instances: index, x, feet y, facing, z."""
+        found = []
+        for fid, (cls, body) in self.docs.items():
+            if cls != 1001:
+                continue
+
+            src_guid = re.search(r'm_SourcePrefab: \{fileID: \d+, guid: ([0-9a-f]{32})', body)
+            if src_guid is None:
+                continue
+            prefab = _prefab(src_guid.group(1))
+            if prefab is None or PLAYER_GUID not in prefab['text']:
+                continue
+
+            pos = {}
+            for axis in 'xyz':
+                m = re.search(r'propertyPath: m_LocalPosition\.' + axis
+                              + r'\n      value: ([-\d.eE+]+)', body)
+                pos[axis] = float(m.group(1)) if m else 0.0
+
+            # The controller's own settings live in the prefab unless this instance says
+            # otherwise, so an override wins and the asset is the fallback.
+            def setting(name, cast, default):
+                m = re.search(r'propertyPath: ' + name + r'\n      value: ([-\d.eE+]+)', body)
+                if m:
+                    return cast(float(m.group(1)))
+                pbody = re.search(r'guid: ' + PLAYER_GUID + r'[^\n]*\n(?:.*\n)*?',
+                                  prefab['text'])
+                return _field(prefab['text'], name, cast, default)
+
+            offset = setting('visualYOffset', float, 0.0)
+            found.append((setting('playerIndex', int, len(found)),
+                          pos['x'], pos['y'] - offset,
+                          setting('spawnFacing', int, 1), pos['z']))
+        return found
+
     def baker_field(self, name, cast=float, default=None):
         """One value off the scene's SimWorldBaker, so a test can measure against what the
         scene actually asks for rather than against a number copied into the test."""
@@ -711,9 +747,17 @@ def camera(scene=None):
 
 
 def spawns(scene=None):
-    """Where the two fighters' feet start, straight out of the scene."""
+    """Where the two fighters' feet start, straight out of the scene.
+
+    A fighter may be an object in the scene or an instance of a player prefab — Vlad made both
+    of them prefabs so the two stay in step — so this reads either. For an instance the
+    position is in the PrefabInstance's modification list and everything else is in the prefab
+    asset, overridden per instance where it differs; reading only the scene finds nothing at
+    all, which is how the whole arena test came to have no fighters in it.
+    """
     sc = scene or Scene()
     out = []
+
     for go in sorted(sc.gos):
         body = sc.script(go, PLAYER_GUID)
         if body is None:
@@ -724,6 +768,8 @@ def spawns(scene=None):
                     tr['pos']['x'], tr['pos']['y'] - offset,
                     _field(body, 'spawnFacing', int, 1),
                     tr['pos']['z']))
+
+    out += sc.prefab_players()
     return [s[1:] for s in sorted(out)]
 
 

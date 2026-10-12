@@ -87,6 +87,7 @@ def check(path, guids):
 
     # Transform parents and children, with prefab instances parented the way Unity does it.
     kids, father = {}, {}
+    listed_children = set(re.findall(r'^  - \{fileID: (\d+)\}$', src, re.M))
     for cls, fid, stripped, body in docs:
         if cls in ("4", "224") and not stripped:
             after = body.split("m_Children:", 1)
@@ -97,10 +98,15 @@ def check(path, guids):
             father[fid] = m.group(1) if m else "0"
         elif cls == "1001":
             m = re.search(r'm_TransformParent: \{fileID: (\d+)\}', body)
-            # The stripped transform of this instance is parented by the instance itself.
+            # Only the instance's ROOT transform is parented by m_TransformParent. An instance
+            # also carries a stripped transform for every nested object inside the prefab, and
+            # those are parented in the prefab, not here — reading them all as children of
+            # m_TransformParent is how six chests each reported a transform their container
+            # does not list.
             for cls2, fid2, stripped2, body2 in docs:
                 if (stripped2 and cls2 in ("4", "224")
-                        and f"m_PrefabInstance: {{fileID: {fid}}}" in body2):
+                        and f"m_PrefabInstance: {{fileID: {fid}}}" in body2
+                        and fid2 in listed_children):
                     father[fid2] = m.group(1) if m else "0"
     for t, cs in kids.items():
         for c in cs:
