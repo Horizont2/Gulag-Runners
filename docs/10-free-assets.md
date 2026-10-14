@@ -383,7 +383,7 @@ KayKit лишається найкращим вибором, **якщо** йти
 | Пак | Обсяг | Ліцензія / ціна |
 |---|---|---|
 | ⭐ [**Kenney Game Assets All-in-1**](https://kenney.itch.io/kenney-game-assets) | **60 000+** ассетів, 456 МБ: 3D, 2D, UI, звук, шрифти | **$19.95**, необмежені комерційні проєкти, **без атрибуції**. Нові паки власникам безкоштовно |
-| [Quaternius — усі паки](https://quaternius.com/) | 70+ паків, ~2 000 моделей сумарно | **CC0**. Безкоштовні «Standard» версії — підмножина платних «Source» |
+| [Quaternius — усі паки](https://quaternius.itch.io/) ([сайт](https://quaternius.com/)) | 70+ паків, ~2 000 моделей сумарно | **CC0**. Кожен пак — pay-what-you-want: «Standard» безкоштовно, «Pro» від $9.99, «Source» від $14.99 |
 
 **Kenney All-in-1 — це відповідь на «більше».** Platformer Kit, Castle Kit, Pirate Kit і
 Modular Cave Kit, які вже стоять у списках вище окремо, — усі в ньому. Тобто за $19.95 береться
@@ -395,23 +395,23 @@ Modular Cave Kit, які вже стоять у списках вище окре
 
 | Пак | Обсяг | Чому підходить |
 |---|---|---|
-| [Quaternius — Modular Sci-Fi MegaKit](https://quaternius.com/packs/modularscifi.html) | **190** безкоштовно (270+ у Source) | Модульний на сітці, CC0. Найбільший безкоштовний кіт, що знайшовся |
-| [Quaternius — Medieval Village MegaKit](https://quaternius.com/packs/medievalvillagemegakit.html) | **176** безкоштовно (300+ у Source) | Будівлі збираються по модулях → розріз збирається теж. CC0 |
-| [Sci-Fi Modular Environment Kit](https://assetstore.unity.com/) (Asset Store) | **490+** префабів, 97 FBX | Підлоги, стіни, двері й окремо **сходи** — повний набір під розріз. Платний, ціну не видно зі сніпета |
-| [Obstacle Course Kit](https://assetstore.unity.com/) | **470** префабів, 7 демо-рівнів | Перешкоди — це наш геймплей, не декор. Платний |
-| [Quaternius — Ultimate Platformer Pack](https://quaternius.com/packs/ultimateplatformer.html) | **100+** | Прямо під платформер збоку. CC0 |
+| ⭐ [Quaternius — Modular Sci-Fi MegaKit](https://quaternius.itch.io/modular-sci-fi-megakit) | **190** безкоштовно (270+ у Source) | Модульний на сітці, CC0. Standard 46 МБ безкоштовно, Pro від $9.99, Source 899 МБ від $14.99 (там уже готові Unity/Unreal/Godot-проєкти й колізії) |
+| [Quaternius — Medieval Village MegaKit](https://quaternius.itch.io/medieval-village-megakit) | **176** безкоштовно (300+ у Source) | Стіни, підлоги, **сходи**, дахи, усе по сітці → розріз збирається. CC0. Standard 153 МБ безкоштовно; Source від $14.99 містить **готовий Unity URP-проєкт** |
+| [Obstacle Course Kit](https://laplahce.itch.io/obstacle-course-kit) | **470** префабів, 7 демо-рівнів, 16 скриптів, 32 текстури | Перешкоди — це наш геймплей, а не декор. Усе модульне. За посиланням — інтерактивне демо; сторінку в Asset Store знайти не вдалось, ціну й URP звіряй там |
+| [Quaternius — Ultimate Platformer Pack](https://quaternius.itch.io/ultimate-platformer-pack) | **100+** | Прямо під платформер збоку: модульні платформи, анімований персонаж (18 анімацій), 4 вороги. Один zip 17 МБ, CC0, pay-what-you-want |
 
 ### Великі й безкоштовні в Asset Store
 
 | Пак | Що дає | Застереження |
 |---|---|---|
 | [**3D Free Modular Kit**](https://assetstore.unity.com/packages/3d/environments/3d-free-modular-kit-85732) (Barking Dog) | Модульні інтер'єри, **URP**, оновлено вересень 2026 | Кількість префабів у сніпеті не названа |
-| **CG Cookie — Sci-Fi Modular Level Kit** | Плитки підлоги, кути, стіни + **платформи й мости** — тобто саме відкритий каркас | Роздається поза Asset Store, перевір формат і ліцензію |
-| [Slavic Medieval Village Free](https://assetstore.unity.com/) (EmacEArt) | Модульні будівлі, безкоштовно | URP не підтверджено |
+| [**CG Cookie — Sci-Fi Modular Level Kit**](https://cgcookie.com/downloads/sci-fi-modular-level-kit) | Плитки підлоги, кути, стіни + **платформи й мости** — тобто саме відкритий каркас | Роздається поза Asset Store, перевір формат і ліцензію |
+| [Free Fantasy Medieval Houses and Props](https://emaceart.itch.io/free-fantasy-medieval-houses-and-props-pack) (EmacEArt) | Pay-what-you-want, усередині `EA03 Slavic Village_Free.unitypackage` | Це безкоштовний зріз. Повний [Slavic Medieval Village](https://assetstore.unity.com/packages/3d/environments/fantasy/slavic-medieval-village-town-interior-and-exterior-pack-environm-137794) коштує **$44** (зате **URP**, версія 1.7 від 12.01.2026) |
 
 ### Відпало, і чому
 
 - **Dark Fantasy Kit (Lite)** — лише 20 префабів і Unity 5.6–2018. Не «більше» й не наша версія
+- [**3D Modular Sci-Fi Environment Pack**](https://assetstore.unity.com/packages/3d/environments/sci-fi/3d-modular-sci-fi-environment-pack-57957) — **490+ префабів**, 97 FBX, 28 типів підлоги, 44 стін, 36 вікон, двері, **сходи**, колони. Найбільший поодинокий кіт, що знайшовся, і за складом ідеальний. Але: $25, версія 1.0 від **29.03.2016**, вихідний Unity **4.6** → URP там бути не може, усі матеріали доведеться перебирати руками. Якщо візьмешся — дивись сусідній [Sci-Fi Modular Environment](https://assetstore.unity.com/packages/3d/environments/sci-fi/sci-fi-modular-environment-257602) (257602), він молодший і заявляє Built-in + URP
 - **Sci-Fi Underground Lab** (PolyArt 3d) — модульний і URP, але платний і без видимої цифри складу
 - **RPG Stylized Fantasy Environment** — «200+ префабів, оптимізовано під URP», але трапився лише
   на сторонньому сайті-дзеркалі. Ліцензія не підтверджена → не брати, поки не знайдеться оригінал
