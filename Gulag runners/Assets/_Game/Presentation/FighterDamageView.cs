@@ -89,14 +89,16 @@ namespace GulagRunners.Game
                  "without it.")]
         public ParticleSystem bloodOnHit;
 
-        [Tooltip("Burst when the guard eats one. Sparks off a shield, not blood.")]
+        [Tooltip("Burst when the guard eats one. Sparks off a shield, not blood. Optional, " +
+                 "like the rest of the particles here: the flash carries the hit without it.")]
         public ParticleSystem sparksOnBlock;
 
         [Tooltip("Particles emitted per point of damage, so a big hit sprays and a chip does not.")]
         [Range(0, 20)] public int particlesPerDamage = 3;
 
         [Header("Death")]
-        [Tooltip("Played once, when the fighter goes down.")]
+        [Tooltip("Played once, when the fighter goes down. Optional — the death animation " +
+                 "and the drained colour say it without any particles at all.")]
         public ParticleSystem deathBurst;
 
         MaterialPropertyBlock _block;

@@ -51,7 +51,17 @@ namespace GulagRunners.GameEditor
         /// sword dropped in at its authored size is a sword twice as long as the person
         /// holding it, and on the floor it looks like scenery rather than loot.
         /// </summary>
-        const float PackScale = 0.5f;
+        /// <summary>
+        /// No scaling here any more.
+        ///
+        /// This used to be 0.5f — 0.91 over 1.8, the fighter's height over the height the pack
+        /// was authored for. It was a guess about one pack, and it reached the scene only if
+        /// somebody re-ran this tool after it was added, which is exactly what did not happen:
+        /// every weapon in Arena_Demo stayed at pack scale, a metre or two long on a fighter
+        /// under a metre tall. Sizing now happens where the models are used, measured from
+        /// each mesh against the item's own reach — see ItemModels.Fit.
+        /// </summary>
+        const float PackScale = 1f;
 
         [MenuItem("Gulag Runners/Wire weapon models into the scene")]
         public static void Wire()

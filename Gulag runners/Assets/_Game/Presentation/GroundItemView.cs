@@ -29,6 +29,26 @@ namespace GulagRunners.Game
                  "cube is not art; it is the truth until there is art.")]
         public GameObject fallbackModel;
 
+
+        [Header("Size")]
+        [Tooltip("How long a weapon is drawn, as a share of the reach it ADDS over bare " +
+                 "hands, in metres. 0 draws everything at the fallback length instead.\n\n" +
+                 "Weapon packs are authored for a 1.8 m human; this fighter is 0.91 m, so a " +
+                 "pack greataxe in his hand is longer than he is tall. Rather than guess one " +
+                 "number for one pack, each model's own mesh is measured and its longest axis " +
+                 "scaled to this. Taking the length from reach keeps the picture and the " +
+                 "hitbox agreeing: docs/02 makes reach the whole difference between two " +
+                 "weapons, and a spear drawn dagger-sized is that difference thrown away.")]
+        [Range(0f, 2f)] public float reachToLength = 1f;
+
+        [Tooltip("Shortest a weapon may be drawn, in metres. A dagger adds almost nothing to " +
+                 "bare reach, and a dagger you cannot see is not a weapon.")]
+        [Range(0f, 0.6f)] public float minLength = 0.18f;
+
+        [Tooltip("Longest axis, in metres, for anything with no reach of its own — armour, the " +
+                 "bandage, a stand-in cube.")]
+        [Range(0f, 2f)] public float fallbackLength = 0.3f;
+
         [Header("Look")]
         [Tooltip("What bobs and turns. Leave empty to move this object.")]
         public Transform spinRoot;
@@ -84,12 +104,33 @@ namespace GulagRunners.Game
 
         void Reset() => spinRoot = transform;
 
-        void Awake() => Hide();
+        void Awake()
+        {
+            // Sized once, before anything is shown. A weapon lying on the floor has to read at
+            // the same size as one in a hand, or picking it up changes what it is.
+            ItemModels.FitAll(models, reachToLength, minLength, fallbackLength);
+            if (fallbackModel != null)
+                ItemModels.Fit(fallbackModel, ItemId.None, 0f, minLength, fallbackLength);
+
+            Hide();
+        }
 
         /// <summary>Puts this view on an item. Phase keeps a row of them from bobbing in time.</summary>
         public void Show(in GroundItem item, float planeZ, int phase)
         {
-            if (_shown != item.Item)
+            // A slot can be re-filled while the pickup pop from the LAST item is still
+            // playing: the pool hands the same index straight back out. Left alone, the pop
+            // finishes, calls Hide, and switches off a model that is live — and because the
+            // item has not CHANGED, the branch below never runs again and that slot stays
+            // invisible for the rest of the match while still being pickable.
+            if (_takeTimer > 0f)
+            {
+                _takeTimer = 0f;
+                Transform popped = spinRoot != null ? spinRoot : transform;
+                popped.localScale = Vector3.one;
+            }
+
+            if (_shown != item.Item || _shownRoot == null)
             {
                 _shownRoot = ItemModels.Show(models, item.Item);
 
@@ -145,7 +186,7 @@ namespace GulagRunners.Game
 
         public void Hide()
         {
-            if (_takeTimer > 0f) return;             // let the pickup pop finish first, then it calls back
+            if (_takeTimer > 0f) return;             // the pop finishes first, then it calls back
             ItemModels.Show(models, ItemId.None);
             if (fallbackModel != null && fallbackModel.activeSelf) fallbackModel.SetActive(false);
             _shown = ItemId.None;

@@ -61,6 +61,14 @@ namespace GulagRunners.Game
                  "beacon, a dust emitter.")]
         public GameObject warning;
 
+        [Tooltip("Optional light on that beacon. It is pulsed rather than just switched on: a " +
+                 "lamp that comes on and sits there is scenery, and a lamp that beats is a " +
+                 "countdown. Its own intensity in the inspector is the brightest it gets.")]
+        public Light warnLight;
+
+        [Tooltip("Beats per second while the warning runs.")]
+        [Range(0.2f, 8f)] public float warnPulse = 2.4f;
+
         [Header("Sound")]
         [Tooltip("Played once as the warning begins, and once as the slab lands.")]
         public AudioSource warnSound;
@@ -70,6 +78,7 @@ namespace GulagRunners.Game
         bool _warned, _slammed;
         int _shutsAt = int.MaxValue;
         bool _scheduleKnown;
+        float _lightFull;
 
         void Reset()
         {
@@ -125,6 +134,14 @@ namespace GulagRunners.Game
             bool warnNow = (t > 0f && t < 1f) ||
                            (_scheduleKnown && m.Frame >= WarnFrame && m.Frame < _shutsAt);
             if (warning != null && warning.activeSelf != warnNow) warning.SetActive(warnNow);
+
+            if (warnLight != null)
+            {
+                if (_lightFull <= 0f) _lightFull = warnLight.intensity;
+                float beat = 0.5f + 0.5f * Mathf.Sin(Time.time * warnPulse * Mathf.PI * 2f);
+                warnLight.intensity = warnNow ? _lightFull * Mathf.Lerp(0.25f, 1f, beat) : 0f;
+                if (warnLight.enabled != warnNow) warnLight.enabled = warnNow;
+            }
 
             if (!_warned && warnNow) { _warned = true; Play(warnSound); }
             if (!_slammed && t >= 1f && _scheduleKnown) { _slammed = true; Play(slamSound); }

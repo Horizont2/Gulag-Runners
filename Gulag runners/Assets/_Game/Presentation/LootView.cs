@@ -23,7 +23,11 @@ namespace GulagRunners.Game
         public MatchState matchState;
 
         [Tooltip("One per slot of the loot pool, in order. Match this count to Ground Item " +
-                 "Capacity on MatchState.")]
+                 "Capacity on MatchState.\n\n" +
+                 "Optional: left empty it is filled from the children at load, in hierarchy " +
+                 "order, and a scene with no views in it is a scene with no loot drawn — the " +
+                 "movement sandbox of docs/11, say, where the pool still works and nothing " +
+                 "needs to be seen.")]
         public GroundItemView[] views;
 
         [Tooltip("Take the plane from the fighters rather than from the number below.\n\n" +

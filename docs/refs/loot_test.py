@@ -525,4 +525,45 @@ check("the same seed deals the same round", round_of(777) == round_of(777),
       " ".join(ITEMS[i]["name"] for i in round_of(777)))
 check("and a different seed does not", round_of(777) != round_of(778))
 
+# ---------------------------------------------------------------- how big it is drawn
+print("\nHow big a weapon is drawn (docs/02: reach is the difference)")
+import sim_motor_mirror as _M
+
+import loot_mirror as _L
+HEIGHT = _M.F(_M.C["H"])
+ARM = ITEMS[FISTS]["reach"] / 65536.0
+REACH_TO_LENGTH, MIN_LENGTH = 1.0, 0.18
+
+
+def drawn(item):
+    """What ItemModels.Fit scales a model's longest axis to, in metres."""
+    reach = ITEMS[item].get("reach", 0) / 65536.0
+    if reach <= ARM:
+        return 0.0
+    return max(MIN_LENGTH, (reach - ARM) * REACH_TO_LENGTH)
+
+
+weapons = [i for i in sorted(ITEMS) if drawn(i) > 0]
+for i in weapons:
+    print(f"   {ITEMS[i]['name']:14s} {drawn(i):4.2f} m   {100 * drawn(i) / HEIGHT:5.1f}% "
+          f"of the fighter")
+
+# A pack is authored for a 1.8 m human and this fighter is 0.91 m. Left alone, every weapon
+# in the arena was a metre or two long on a fighter under a metre tall, which is what sizing
+# off the model's own mesh is here to stop happening again.
+check("nothing is drawn longer than a fighter and a half",
+      all(drawn(i) < HEIGHT * 1.5 for i in weapons),
+      f"longest {max(drawn(i) for i in weapons):.2f} m against a {HEIGHT:.2f} m fighter")
+check("and nothing is too small to see",
+      all(drawn(i) >= MIN_LENGTH - 1e-9 for i in weapons),
+      f"shortest {min(drawn(i) for i in weapons):.2f} m")
+check("a spear is drawn longer than a sword, which is longer than a dagger",
+      drawn(_L.SPEAR) > drawn(_L.SWORD) > drawn(_L.DAGGER),
+      f"{drawn(_L.SPEAR):.2f} > {drawn(_L.SWORD):.2f} > {drawn(_L.DAGGER):.2f}")
+check("the order on screen is the order in the hitbox, for every pair",
+      all((ITEMS[a]["reach"] > ITEMS[b]["reach"]) == (drawn(a) > drawn(b))
+          for a in weapons for b in weapons
+          if drawn(a) != drawn(b) and ITEMS[a]["reach"] != ITEMS[b]["reach"]),
+      "a weapon that reaches further is never drawn shorter")
+
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

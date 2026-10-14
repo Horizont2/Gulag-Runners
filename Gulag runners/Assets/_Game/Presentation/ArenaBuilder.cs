@@ -72,9 +72,10 @@ namespace GulagRunners.Game
         public Material ladderMaterial;
 
         [Header("After building")]
-        [Tooltip("Border these to the arena once it is built.")]
+        [Tooltip("Border these to the arena once it is built. Optional: this is an editor " +
+                 "convenience for a greybox, and a hand-built location has neither.")]
         public SideViewCamera cameraToFit;
-        [Tooltip("Moved to the left spawn cage once the arena is built.")]
+        [Tooltip("Moved to the left spawn cage once the arena is built. Optional, as above.")]
         public Transform playerToPlace;
 
         public const string GeneratedRootName = "GeneratedArena";

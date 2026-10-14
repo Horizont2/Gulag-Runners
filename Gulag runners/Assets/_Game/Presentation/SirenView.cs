@@ -51,6 +51,15 @@ namespace GulagRunners.Game
                  "both fighters are wearing, so it is where the game's own signals belong.")]
         public Renderer collar;
 
+        [Tooltip("Bone the collar is carried on. It is glued there every frame rather than " +
+                 "parented, for the same reason the weapon socket is: a model swapped for " +
+                 "another rig keeps its own bone names, and a hand-parented child does not " +
+                 "survive that. Set Collar Bone to None to leave it wherever it is parented.")]
+        public HumanBodyBones collarBone = HumanBodyBones.Neck;
+
+        [Tooltip("Offset from that bone, in the bone's own space.")]
+        public Vector3 collarOffset = new Vector3(0f, 0.03f, 0.02f);
+
         [Tooltip("Colour and strength of the flash. Pushed to albedo as well as emission, " +
                  "because URP will not emit at all unless the material's own emission is on " +
                  "and a property block cannot switch that keyword.")]
@@ -63,9 +72,14 @@ namespace GulagRunners.Game
         [Range(1, 6)] public int collarBeats = 2;
 
         [Header("The camera")]
-        [Tooltip("Optional. The camera that follows this fighter: it leans the way the pulse " +
-                 "points, which is the same information again for a player who is watching " +
-                 "the arena rather than their own fighter.")]
+        [Tooltip("The camera that follows this fighter: it leans the way the pulse points, " +
+                 "which is the same information again for a player watching the arena rather " +
+                 "than their own fighter.\n\n" +
+                 "Leave empty and the camera already following this fighter is found at load. " +
+                 "That matters because this component lives on the player PREFAB and the " +
+                 "cameras live in the scene, and a prefab cannot hold a reference into a " +
+                 "scene — so a field that had to be filled by hand would be empty on every " +
+                 "instance, which is exactly the kind of silence nobody notices.")]
         public SideViewCamera view;
 
         [Tooltip("How far the camera leans, in metres.")]
@@ -79,6 +93,7 @@ namespace GulagRunners.Game
         static readonly int Emission = Shader.PropertyToID("_EmissionColor");
 
         MaterialPropertyBlock _block;
+        Transform _collarGlue;
         Color _collarOwn;
         bool _haveOwn;
         bool _sounded;
@@ -112,7 +127,30 @@ namespace GulagRunners.Game
                 _block = new MaterialPropertyBlock();
                 _collarOwn = OwnColour(collar);
                 _haveOwn = true;
+
+                Animator rig = GetComponentInChildren<Animator>();
+                if (rig != null && rig.isHuman && collarBone != HumanBodyBones.LastBone)
+                    _collarGlue = rig.GetBoneTransform(collarBone);
             }
+
+            if (view == null && player != null) view = CameraFollowing(player);
+        }
+
+        /// <summary>The camera in the scene that is already following this fighter.</summary>
+        static SideViewCamera CameraFollowing(PlayerController who)
+        {
+            foreach (SideViewCamera c in
+                     FindObjectsByType<SideViewCamera>(FindObjectsSortMode.None))
+                if (c.player == who) return c;
+            return null;
+        }
+
+        /// <summary>Keeps the collar on its bone. Same trick as the weapon socket.</summary>
+        void CarryCollar()
+        {
+            if (collar == null || _collarGlue == null) return;
+            collar.transform.position = _collarGlue.TransformPoint(collarOffset);
+            collar.transform.rotation = _collarGlue.rotation;
         }
 
         /// <summary>
@@ -153,6 +191,7 @@ namespace GulagRunners.Game
             if (m.Phase < MatchPhase.Siren) _sounded = false;
             if (!_sounded && on) { _sounded = true; Play(pulseSound); }
 
+            CarryCollar();
             Turn(side);
             Light(on ? Beat(in m) : 0f);
             Lean(side);

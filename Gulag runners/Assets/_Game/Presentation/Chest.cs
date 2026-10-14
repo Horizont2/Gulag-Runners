@@ -39,6 +39,8 @@ namespace GulagRunners.Game
                  "decision rather than a lottery.")]
         public bool tintByTier = true;
 
+        [Tooltip("What gets tinted. Leave empty to take the first renderer under this chest, " +
+                 "which is what a chest made of one model wants.")]
         public Renderer tintTarget;
 
         [Tooltip("Tier colours: none, white, blue, gold.")]

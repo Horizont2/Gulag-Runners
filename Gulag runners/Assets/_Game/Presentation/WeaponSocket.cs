@@ -36,7 +36,9 @@ namespace GulagRunners.Game
         public HumanBodyBones bone = HumanBodyBones.RightHand;
 
         [Tooltip("Use this transform instead, for a Generic rig or to hang from something the " +
-                 "avatar does not name. Wins over the humanoid bone when set.")]
+                 "avatar does not name. Wins over the humanoid bone when set.\n\n" +
+                 "Leave empty for a humanoid rig, which is every fighter in this project: the " +
+                 "bone above is found through the avatar.")]
         public Transform boneOverride;
 
         [Tooltip("Last resort when neither of the above finds anything: the first child whose " +

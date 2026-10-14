@@ -31,11 +31,34 @@ namespace GulagRunners.Game
                  "Drop a weapon pack's prefabs under the socket, list them here against the " +
                  "item each one is, and that is the whole wiring. An item with no model here " +
                  "simply shows nothing, so a half-filled list is a half-dressed fighter rather " +
-                 "than an error.")]
+                 "than an error. Optional altogether: an empty list is a scene that is not " +
+                 "about loot — the movement sandbox of docs/11, say.")]
         public ItemModel[] weapons;
 
-        [Tooltip("Armour models, parented to the body.")]
+        [Tooltip("Armour models, parented to the body. Optional: the weapon pack this project " +
+                 "ships with has no armour meshes, so this is empty until there is art, and " +
+                 "armour reads through the stat line rather than the silhouette until then.")]
         public ItemModel[] armour;
+
+
+        [Header("Size")]
+        [Tooltip("How long a weapon is drawn, as a share of the reach it ADDS over bare " +
+                 "hands, in metres. 0 draws everything at the fallback length instead.\n\n" +
+                 "Weapon packs are authored for a 1.8 m human; this fighter is 0.91 m, so a " +
+                 "pack greataxe in his hand is longer than he is tall. Rather than guess one " +
+                 "number for one pack, each model's own mesh is measured and its longest axis " +
+                 "scaled to this. Taking the length from reach keeps the picture and the " +
+                 "hitbox agreeing: docs/02 makes reach the whole difference between two " +
+                 "weapons, and a spear drawn dagger-sized is that difference thrown away.")]
+        [Range(0f, 2f)] public float reachToLength = 1f;
+
+        [Tooltip("Shortest a weapon may be drawn, in metres. A dagger adds almost nothing to " +
+                 "bare reach, and a dagger you cannot see is not a weapon.")]
+        [Range(0f, 0.6f)] public float minLength = 0.18f;
+
+        [Tooltip("Longest axis, in metres, for anything with no reach of its own — armour, the " +
+                 "bandage, a stand-in cube.")]
+        [Range(0f, 2f)] public float fallbackLength = 0.3f;
 
         [Header("Tier")]
         public Color[] tierColours = ItemModels.DefaultPalette();
@@ -72,6 +95,11 @@ namespace GulagRunners.Game
             if (socket != null && weapons != null)
                 foreach (ItemModel m in weapons)
                     if (m != null && m.root != null) socket.Adopt(m.root.transform);
+
+            // Sized before anything is shown, and once: the fit multiplies the model's own
+            // scale, so running it twice would halve the weapon again.
+            ItemModels.FitAll(weapons, reachToLength, minLength, fallbackLength);
+            ItemModels.FitAll(armour, 0f, minLength, fallbackLength);
 
             ItemModels.Show(weapons, ItemId.None);
             ItemModels.Show(armour, ItemId.None);
