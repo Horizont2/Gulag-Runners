@@ -722,5 +722,63 @@ if len(GATES) >= 2:
           len(brought) == 2 and abs(brought[0] - brought[1]) < (inner_hi - inner_lo),
           f"{brought[0]:.2f} and {brought[1]:.2f} in a room {inner_hi - inner_lo:.2f} m wide")
 
+# ---------------------------------------------------------------- the opening shot
+print("\nThe opening shot has the cage in it")
+import math
+
+
+def _inv_rotate(q, v):
+    """World offset into camera space. The shot is composed by hand, so it can be composed
+    wrong by hand — and the way THAT fails is the cage sitting off the edge of the frame,
+    which is exactly what happened and took three rounds of screenshots to find."""
+    ux, uy, uz, s = -q["x"], -q["y"], -q["z"], q.get("w", 1.0)
+    d1 = ux * v[0] + uy * v[1] + uz * v[2]
+    d2 = ux * ux + uy * uy + uz * uz
+    c = (uy * v[2] - uz * v[1], uz * v[0] - ux * v[2], ux * v[1] - uy * v[0])
+    return tuple(2 * d1 * u + (s * s - d2) * vv + 2 * s * cc
+                 for u, vv, cc in zip((ux, uy, uz), v, c))
+
+
+SHOTS = G.opening_shots()
+check("both cameras open from a shot somebody placed", len(SHOTS) == 2, f"{len(SHOTS)} shot(s)")
+
+CAGES = sorted(G.cage_grilles(), key=lambda g: g["x"])
+check("and there is a cage for each of them", len(CAGES) == 2, f"{len(CAGES)} cage(s)")
+
+for (name, pos, rot, rect), spawn in zip(SHOTS, sorted(SPAWNS)):
+    width, height, fov = rect
+    # 1080p, split the way this scene splits it: each view is wide and short.
+    aspect = (1920 * width) / (1080 * height)
+    tv = math.tan(math.radians(fov / 2))
+    th = tv * aspect
+    cage = min(CAGES, key=lambda c: abs(c["x"] - spawn[0]))
+
+    def at(p):
+        v = _inv_rotate(rot, (p[0] - pos["x"], p[1] - pos["y"], p[2] - pos["z"]))
+        if v[2] <= 0.05:
+            return None
+        return (v[0] / (v[2] * th), v[1] / (v[2] * tv), v[2])
+
+    bl = at((cage["x"] - cage["span"], cage["floor"], cage["z"]))
+    br = at((cage["x"] + cage["span"], cage["floor"], cage["z"]))
+    feet = at((spawn[0], spawn[1], spawn[3]))
+    head = at((spawn[0], spawn[1] + BODY, spawn[3]))
+
+    got = [p for p in (bl, br, feet, head) if p is not None]
+    check(f"{name}: nothing in the shot is behind the camera", len(got) == 4)
+    if len(got) != 4:
+        continue
+
+    check(f"{name}: the fighter is in frame, head and feet",
+          abs(feet[0]) <= 1 and abs(head[0]) <= 1 and -1 <= feet[1] and head[1] <= 1,
+          f"feet ({feet[0]:+.2f}, {feet[1]:+.2f}) head ({head[0]:+.2f}, {head[1]:+.2f})")
+    check(f"{name}: and standing BEHIND the bars rather than beside them",
+          min(bl[0], br[0]) < feet[0] < max(bl[0], br[0]),
+          f"bars {min(bl[0], br[0]):+.2f}..{max(bl[0], br[0]):+.2f}, fighter {feet[0]:+.2f}")
+    check(f"{name}: the bars fill the frame rather than sitting in the middle of it",
+          abs(br[0] - bl[0]) > 0.9, f"{abs(br[0] - bl[0]) * 100:.0f}% of the width")
+    check(f"{name}: and nothing is so close it would clip",
+          min(p[2] for p in got) > 0.6, f"nearest {min(p[2] for p in got):.2f} m")
+
 print(f"\n{'ALL PASS' if ok else 'FAILURES ABOVE'}")
 raise SystemExit(0 if ok else 1)

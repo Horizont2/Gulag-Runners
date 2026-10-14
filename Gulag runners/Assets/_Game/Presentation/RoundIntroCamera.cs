@@ -35,6 +35,17 @@ namespace GulagRunners.Game
         [Tooltip("The camera this moves. Leave empty to use the one on this object.")]
         public SideViewCamera view;
 
+        [Tooltip("Where the round opens from, placed by hand in the scene.\n\n" +
+                 "This is the whole shot. With it set, the camera STARTS at this transform — " +
+                 "position and rotation both — and is blended to the playing framing across " +
+                 "the cage phase, which gives an arc with real parallax rather than a dolly " +
+                 "in and out along one line. Without it the component falls back to offsetting " +
+                 "the playing framing, which is what it used to do and which reads as exactly " +
+                 "what it is: a zoom.\n\n" +
+                 "Compose it like a photograph: low, close, the bars across the frame, the " +
+                 "fighter behind them, and no arena in shot at all.")]
+        public Transform openingShot;
+
         [Header("The opening shot")]
         [Tooltip("How much closer the camera starts, as a share of its playing distance. " +
                  "0.45 means it opens at a little under half the distance: the door fills the " +
@@ -61,6 +72,14 @@ namespace GulagRunners.Game
         [Tooltip("And is back to the playing framing by here. Leaving a margin before the " +
                  "fighters can move means the first frame they control is a settled one.")]
         [Range(0.2f, 1f)] public float settledBy = 0.86f;
+
+        [Header("Held, not static")]
+        [Tooltip("How much the opening frame drifts while it is held, in metres. Tiny. A frame " +
+                 "that is perfectly still reads as a render; one that breathes reads as a " +
+                 "camera somebody is holding.")]
+        [Range(0f, 0.12f)] public float sway = 0.035f;
+
+        [Range(0.05f, 1.5f)] public float swaySpeed = 0.45f;
 
         [Header("The push on the jerk")]
         [Tooltip("A short shove towards the door as it is first tried, in metres. Not a shake " +
@@ -117,27 +136,45 @@ namespace GulagRunners.Game
 
             Transform cam = view.transform;
             Vector3 at = cam.position;
+            Quaternion facing_ = cam.rotation;
 
-            // Towards what the camera is looking at: closer along its own forward, which keeps
-            // the pitch and the plane the camera already worked out.
-            Vector3 toward = cam.forward;
-            float distance = Vector3.Distance(at, FocusPoint(at, toward));
+            if (openingShot != null)
+            {
+                // The authored shot, blended out. Rotation as well as position, which is the
+                // whole difference: moving along one line is a zoom, and turning while you
+                // move is a camera going somewhere.
+                at = Vector3.Lerp(at, openingShot.position, close);
+                facing_ = Quaternion.Slerp(facing_, openingShot.rotation, close);
+            }
+            else
+            {
+                Vector3 toward = cam.forward;
+                float distance = Vector3.Distance(at, FocusPoint(at, toward));
+                at += toward * (distance * (1f - startDistance) * close);
+                at += Vector3.up * (startHeight * close);
+                int facing = view.player != null ? view.player.State.Facing : 1;
+                at += new Vector3(startLead * facing * close, 0f, 0f);
+            }
 
-            at += toward * (distance * (1f - startDistance) * close);
-            at += Vector3.up * (startHeight * close);
-
-            // Lead towards the door, which is whichever way the fighter is facing.
-            int facing = view.player != null ? view.player.State.Facing : 1;
-            at += cam.right * 0f + new Vector3(startLead * facing * close, 0f, 0f);
+            // Breathing, while the shot is held. Perlin rather than a sine, so it never
+            // repeats on a beat you can hear.
+            if (sway > 0f && close > 0.001f)
+            {
+                float w = Time.time * swaySpeed;
+                at += (facing_ * new Vector3(Mathf.PerlinNoise(w, 0.3f) * 2f - 1f,
+                                             Mathf.PerlinNoise(0.7f, w) * 2f - 1f, 0f))
+                      * (sway * close);
+            }
 
             // And the shoves, out and back, on the two beats the door is tried. The second is
             // the harder one: by then whoever is out there has taken the weight once and is
             // committing to it, and the camera flinching twice is what says somebody is DOING
             // this rather than a mechanism running its cycle.
-            at += toward * (jerkPush * Shove(t, jerkAt));
-            at += toward * (jerkPush * 1.3f * Shove(t, jerkAt2));
+            Vector3 push = facing_ * Vector3.forward;
+            at += push * (jerkPush * Shove(t, jerkAt) * close);
+            at += push * (jerkPush * 1.3f * Shove(t, jerkAt2) * close);
 
-            cam.position = at;
+            cam.SetPositionAndRotation(at, facing_);
         }
 
         /// <summary>

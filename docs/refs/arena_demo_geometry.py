@@ -753,6 +753,68 @@ def world(report=False):
     return w
 
 
+INTRO_CAMERA_GUID = "4e8b15c0d7a2496fb3e09c742a5d1f68"
+
+
+
+def opening_shots(scene=None):
+    """Each round-intro camera's authored opening shot, as (position, rotation, viewport).
+
+    The shot is composed by hand in the scene, which means it can be composed WRONG by hand
+    in the scene — and the way that fails is the cage being off the edge of the frame, which
+    is exactly what happened and took three rounds to find. So it is measured.
+    """
+    sc = scene or Scene()
+    out = []
+    for go in sorted(sc.gos):
+        body = sc.script(go, INTRO_CAMERA_GUID)
+        if body is None:
+            continue
+        shot = re.search(r'openingShot: \{fileID: (\d+)\}', body)
+        if not shot or shot.group(1) == "0":
+            continue
+        tr = sc.transforms.get(int(shot.group(1)))
+        if tr is None:
+            continue
+        cam_tr = sc.transforms[sc.tr_of_go[go]]
+        rect = None
+        for c in sc.gos[go]['comps']:
+            cls, b = sc.docs.get(c, (0, ''))
+            if cls == 20:
+                r = re.search(r'm_NormalizedViewPortRect:\n(?:.*\n){0,2}?\s*serializedVersion: 2'
+                              r'\n\s*x: ([-\d.]+)\n\s*y: ([-\d.]+)\n\s*width: ([-\d.]+)'
+                              r'\n\s*height: ([-\d.]+)', b)
+                fov = re.search(r'field of view: ([\d.]+)', b)
+                if r:
+                    rect = (float(r.group(3)), float(r.group(4)),
+                            float(fov.group(1)) if fov else 30.0)
+        out.append((sc.gos[go]['name'], tr['pos'], tr['rot'], rect))
+    return out
+
+
+CAGE_DOOR_GUID = "9c4a0db75e1f4e3380c2a6f91b4d7e05"
+
+
+def cage_grilles(scene=None):
+    """Each cage's lifting grille, as the box the camera has to have in shot."""
+    sc = scene or Scene()
+    out = []
+    for go in sorted(sc.gos):
+        body = sc.script(go, CAGE_DOOR_GUID)
+        if body is None:
+            continue
+        tr = sc.transforms[sc.tr_of_go[go]]
+        door = re.search(r'door: \{fileID: (\d+)\}', body)
+        bars = sc.transforms.get(int(door.group(1))) if door else None
+        widest = 0.0
+        for t in sc.transforms.values():
+            if bars is not None and t['parent'] == int(door.group(1)):
+                widest = max(widest, abs(t['pos']['x']))
+        out.append(dict(x=tr['pos']['x'], z=tr['pos']['z'], floor=tr['pos']['y'],
+                        span=widest))
+    return out
+
+
 CAMERA_GUID = "b921a9be9303a1887f282de341a5ae31"
 
 
