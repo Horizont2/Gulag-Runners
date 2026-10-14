@@ -427,3 +427,67 @@ Modular Cave Kit, які вже стоять у списках вище окре
 
 > І метр усе ще перший. Ці паки теж авторські під людину 1.8 м, а наш боєць — 0.91 м. Поки
 > це не вирішено, будь-який купленим пак доведеться масштабувати наосліп.
+
+---
+
+## Серйозніше за лоу-полі
+
+Попередні списки — кіти з плоскими кольорами (Kenney, Quaternius, KayKit). Тут те саме питання,
+але PBR: метал з іржею, бетон із патьоками, нормалмапи. Критерій структури лишається той самий,
+але додаються два нові.
+
+**Бюджет.** Серйозні паки везуть текстури 2K–4K і на порядок більше трикутників. Для мобілки це
+зазвичай вирок — **але не для нашої камери**. Вона зафіксована збоку на відомій відстані, тобто:
+геометрію видно завжди з тих самих ракурсів, світло печеться наперед, усе за бойовою площиною —
+декор без колайдерів (у нас для цього вже є `Depth` і `Span`), а текстури ріжуться до 1024 прямо
+на імпорті. Серйозний пак тут обійдеться дешевше, ніж у звичайній 3D-грі.
+
+**Метр стає критичним.** Лоу-полі прощає масштаб, PBR — ні. У реалістичному паку двері 2.1 м,
+поручні 1.1 м, сходинка 0.17 м — усе під людину 1.8 м. Наш боєць 0.91 м поруч із ними читатиметься
+як дитина, і це буде видно одразу. **Перед покупкою серйозного пака метр треба закрити.**
+
+### Рівень 1 — каркас, прямо під нашу камеру
+
+| Пак | Що дає | Стан |
+|---|---|---|
+| ⭐ [**Modular Industrial Catwalk**](https://assetstore.unity.com/packages/slug/287148) | **24 модулі**: прямі, повороти, хрести, Т-подібні, **сходи, драбини, рампи**, кожен у варіанті з поручнями і без | **URP**, Unity 2021.3.8f1, і єдиний у цьому розділі, який у себе на сторінці пише **«optimized for VR and mobile»**. Платний апгрейд безкоштовного [287064](https://assetstore.unity.com/packages/3d/props/industrial/modular-industrial-catwalk-kit-free-287064) |
+| [Modular Scaffolding Pack](https://assetstore.unity.com/packages/slug/157986) | 23 модулі риштування по сітці, PBR | **$14.99**, але матеріали **Built-in** → конвертувати в URP |
+| [Scaffolding Kit](https://assetstore.unity.com/packages/3d/props/industrial/scaffolding-kit-117715) | PBR metallic/roughness, повний набір мап | **$45**, останній реліз 2019, URP не заявлено |
+
+### Рівень 2 — повні локації
+
+| Пак | Обсяг | Стан |
+|---|---|---|
+| ⭐ [**Old Industry**](https://assetstore.unity.com/packages/3d/environments/old-industry-212485) | **450+ унікальних префабів**, сталеливарний завод. Модульні, «easy to snap on grid» | **URP + HDRP**. Найбільший серйозний пак, що знайшовся. Ціни зі сніпета не видно |
+| ⭐ [**Modular Abandoned Factory**](https://assetstore.unity.com/packages/slug/315386) | **135 префабів**: стіни, підлоги, стелі, колони, двері, **сходи, поручні** + машини, крани, уламки | **URP**, Unity **6000.0.42f1** (найсвіжіша сумісність у списку), HDRP ні. **~$33** замість $66. Текстури 2048 |
+| [Factory/Warehouse Interior Modular Pack](https://assetstore.unity.com/packages/slug/224512) (Cybernetic Walrus) | 90 мешів / 89 префабів; є [бандл з екстер'єром](https://assetstore.unity.com/packages/3d/props/factory-interior-factory-exterior-bundle-260331) на 236 | Усередині окремі unitypackage під Standard, URP і HDRP — тобто конвертувати не треба |
+| [Modular Sewer Pack](https://assetstore.unity.com/packages/3d/environments/modular-sewer-pack-277454) | **300+ моделей** зі снапінгом, 42 текстури 2K | **URP**. Колектор у розрізі — це тунель, видно наскрізь |
+| [Modular Abandoned Shelter](https://assetstore.unity.com/packages/3d/environments/industrial/modular-abandoned-shelter-311075) | Модулі підземного бункера | Built-in + **URP** + HDRP, але скріни зняті в HDRP → у URP виглядатиме інакше |
+
+### Якщо лишаємось у темі «Сектора» — тюрма
+
+| Пак | Обсяг | Стан |
+|---|---|---|
+| ⭐ [**Prison Modular Pack**](https://assetstore.unity.com/packages/3d/environments/prison-modular-pack-206713) | 41 меш/префаб, 17 текстур **4K** | **Built-in + URP + HDRP**, **$18.99**. Найдешевший чистий URP тут |
+| [Prison — Big Building, Characters and Props](https://assetstore.unity.com/packages/3d/environments/industrial/prison-big-building-characters-and-props-152316) | Триповерхова будівля: камери, допитна, інші кімнати, **+ персонажі й пропи** | **За замовчуванням усе вже налаштовано під URP**, HDRP ні |
+| [Prison Cell — Interior and Props](https://assetstore.unity.com/packages/3d/props/interior/prison-cell-interior-and-props-144752) | 3 кімнати + пропи | URP, але видавець сам попереджає про рожеву сцену → перемкнути рендер |
+| [Prison Interior Vol1](https://assetstore.unity.com/packages/3d/environments/urban/prison-interior-vol1-88726) · [Vol2](https://assetstore.unity.com/packages/3d/environments/urban/prison-interior-vol2-106888) | Модульні, PBR metallic/roughness | **$19.99** кожен, **URP не заявлено** |
+
+### Безкоштовного серйозного практично нема
+
+Прогнав окремий пошук — жодного безкоштовного PBR-модульного паку під URP не знайшлось.
+Найближче: [Abandoned Factory Environment](https://assetstore.unity.com/packages/3d/environments/industrial/abandoned-factory-environment-83392) (83392)
+має **Free Lite** версію, але в примітках пише Built-in. Тобто серйозний вигляд тут коштує грошей,
+і це нормальна ціна питання: $19–33 за локацію.
+
+### Що брати з серйозного
+
+1. **Modular Abandoned Factory** (~$33) як базу — найсвіжіша URP-сумісність (Unity 6000.0.42f1),
+   і в складі одразу сходи й поручні, тобто наш поміст збирається з коробки.
+2. **Modular Industrial Catwalk** (287148) на каркас — єдиний, хто заявляє мобільну оптимізацію,
+   і він лягає прямо на наші три містки на y 3.59.
+3. **Old Industry** (450+ префабів) — якщо хочеться запас на кілька арен, а не на одну.
+4. **Prison Modular Pack** ($18.99) — якщо локація має читатись саме як тюрма.
+
+> Сторінки я відкрити не можу (`assetstore.unity.com` із сесії не резолвиться), тож ціни, версії
+> Unity та URP у таблицях — зі сніпетів пошуку. Звіряй на сторінці перед покупкою.
