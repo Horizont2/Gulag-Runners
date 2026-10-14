@@ -433,7 +433,28 @@ namespace GulagRunners.Game
             // In the cage, nothing. The doors are still coming up, and a fighter who can walk
             // through a closed door during the three seconds nobody is watching him is a
             // fighter with a three second head start.
-            if (matchState != null && !matchState.Match.InputAllowed) input = InputFlags.None;
+            if (matchState != null && !matchState.Match.InputAllowed)
+            {
+                input = InputFlags.None;
+
+                // A clock that is not running locks the input forever and says nothing about
+                // it, which is indistinguishable from a game that is simply broken. So it
+                // says something: the lock is legitimate only while the clock is MOVING.
+                if (matchState.Match.Frame == _lockedAt) _lockedTicks++;
+                else { _lockedAt = matchState.Match.Frame; _lockedTicks = 0; }
+
+                if (_lockedTicks == StallTicks)
+                    Debug.LogError(
+                        $"{name}: input has been locked for {StallTicks / PlayerMotor.TicksPerSecond} s " +
+                        $"and the match clock has not moved off tick {_lockedAt} " +
+                        $"({matchState.Match.Phase}). Nobody can move until it does — check " +
+                        "the Fighters list on MatchState, and the Console above for why it " +
+                        "could not step.", this);
+            }
+            else
+            {
+                _lockedTicks = 0;
+            }
 
             // The fight decides what the body is allowed to do before it moves: a swing is a
             // commitment to where you are standing, and that is what makes reach matter.
@@ -484,6 +505,12 @@ namespace GulagRunners.Game
                 SpawnAt(_spawnPoint, _state.Facing);
             }
         }
+
+        /// <summary>Two seconds of a stalled clock. The cage phase is three.</summary>
+        const int StallTicks = 2 * PlayerMotor.TicksPerSecond;
+
+        int _lockedTicks;
+        int _lockedAt = -1;
 
         float _depth;
         float _depthVelocity;

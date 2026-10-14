@@ -39,7 +39,7 @@ namespace GulagRunners.Game
         [Tooltip("How much closer the camera starts, as a share of its playing distance. " +
                  "0.45 means it opens at a little under half the distance: the door fills the " +
                  "frame and there is no arena in the shot to give anything away.")]
-        [Range(0.2f, 1f)] public float startDistance = 0.45f;
+        [Range(0.2f, 1f)] public float startDistance = 0.32f;
 
         [Tooltip("How much higher or lower it starts, in metres. A touch low makes the door " +
                  "look like something being lifted over you.")]
@@ -52,7 +52,7 @@ namespace GulagRunners.Game
         [Header("The beats")]
         [Tooltip("The camera holds the close shot until here, as a share of the cage phase. " +
                  "It should outlast the door's first jerk, so the jerk happens in close-up.")]
-        [Range(0f, 0.9f)] public float holdUntil = 0.42f;
+        [Range(0f, 0.9f)] public float holdUntil = 0.52f;
 
         [Tooltip("And is back to the playing framing by here. Leaving a margin before the " +
                  "fighters can move means the first frame they control is a settled one.")]
@@ -63,12 +63,17 @@ namespace GulagRunners.Game
                  "— a shake on a phone reads as a dropped frame. This is one move.")]
         [Range(0f, 0.6f)] public float jerkPush = 0.22f;
 
-        [Tooltip("When the shove happens, as a share of the cage phase. Match it to the door's " +
-                 "Wait Until.")]
-        [Range(0f, 0.9f)] public float jerkAt = 0.18f;
+        [Tooltip("When the first shove happens, as a share of the cage phase. Match it to the " +
+                 "door's Wait Until.")]
+        [Range(0f, 0.9f)] public float jerkAt = 0.14f;
 
-        [Tooltip("How long the shove takes to go out and come back, as a share of the phase.")]
-        [Range(0.02f, 0.4f)] public float jerkFor = 0.12f;
+        [Tooltip("And the second, which should land on the door's Hold Until — the moment " +
+                 "whoever is lifting it gets a grip and tries again. The camera has to answer " +
+                 "both pulls or the second one reads as the door doing it by itself.")]
+        [Range(0f, 0.95f)] public float jerkAt2 = 0.4f;
+
+        [Tooltip("How long a shove takes to go out and come back, as a share of the phase.")]
+        [Range(0.02f, 0.4f)] public float jerkFor = 0.1f;
 
         void Reset()
         {
@@ -112,10 +117,12 @@ namespace GulagRunners.Game
             int facing = view.player != null ? view.player.State.Facing : 1;
             at += cam.right * 0f + new Vector3(startLead * facing * close, 0f, 0f);
 
-            // And the shove, out and back, on the beat the door is first tried.
-            float k = Mathf.InverseLerp(jerkAt, jerkAt + jerkFor, t);
-            if (k > 0f && k < 1f)
-                at += toward * (jerkPush * Mathf.Sin(k * Mathf.PI));
+            // And the shoves, out and back, on the two beats the door is tried. The second is
+            // the harder one: by then whoever is out there has taken the weight once and is
+            // committing to it, and the camera flinching twice is what says somebody is DOING
+            // this rather than a mechanism running its cycle.
+            at += toward * (jerkPush * Shove(t, jerkAt));
+            at += toward * (jerkPush * 1.3f * Shove(t, jerkAt2));
 
             cam.position = at;
         }
@@ -132,6 +139,13 @@ namespace GulagRunners.Game
 
             Vector3 body = p.transform.position;
             return new Vector3(body.x, body.y, body.z);
+        }
+
+        /// <summary>One shove, out and back, measured from the beat it starts on.</summary>
+        float Shove(float t, float at)
+        {
+            float k = Mathf.InverseLerp(at, at + jerkFor, t);
+            return k > 0f && k < 1f ? Mathf.Sin(k * Mathf.PI) : 0f;
         }
 
         static float Smooth(float k)

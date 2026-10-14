@@ -125,6 +125,7 @@ namespace GulagRunners.Game
         PlayerSimState[] _scratch = System.Array.Empty<PlayerSimState>();
 
         PlayerController _tickOwner;
+        bool _warnedNoFighters;
 
         void Awake()
         {
@@ -299,7 +300,27 @@ namespace GulagRunners.Game
         /// </summary>
         void StepMatch(SimWorld world)
         {
-            if (fighters.Count < 2 || fighters[0] == null || fighters[1] == null) return;
+            if (fighters.Count < 2 || fighters[0] == null || fighters[1] == null)
+            {
+                // Said out loud, because the way this fails is silence. Without both fighters
+                // the clock cannot step; without the clock the cage phase never ends; and
+                // while it is the cage phase nobody may move. The symptom is a game that
+                // accepts no input at all, and nothing anywhere says why.
+                if (!_warnedNoFighters)
+                {
+                    _warnedNoFighters = true;
+                    int live = 0;
+                    for (int i = 0; i < fighters.Count; i++) if (fighters[i] != null) live++;
+                    Debug.LogError(
+                        $"{name}: Fighters needs both players and has {live} of " +
+                        $"{fighters.Count}. The match clock cannot step without them, so the " +
+                        "cage phase never ends and NOBODY CAN MOVE. Drag both fighters into " +
+                        "the Fighters list on this component.", this);
+                }
+                return;
+            }
+
+            _warnedNoFighters = false;
 
             GateDef[] gates = world != null ? world.Gates : null;
             PlayerSimState[] states = { fighters[0].State, fighters[1].State };
