@@ -50,11 +50,16 @@ namespace GulagRunners.Game
                  "scaled to this. Taking the length from reach keeps the picture and the " +
                  "hitbox agreeing: docs/02 makes reach the whole difference between two " +
                  "weapons, and a spear drawn dagger-sized is that difference thrown away.")]
-        [Range(0f, 2f)] public float reachToLength = 1f;
+        [Range(0f, 3f)] public float reachToLength = 1.35f;
 
         [Tooltip("Shortest a weapon may be drawn, in metres. A dagger adds almost nothing to " +
                  "bare reach, and a dagger you cannot see is not a weapon.")]
-        [Range(0f, 0.6f)] public float minLength = 0.18f;
+        [Range(0f, 0.6f)] public float minLength = 0.28f;
+
+        [Tooltip("Longest a weapon may be drawn, in metres. The map from reach to length is " +
+                 "linear, which over-rewards the two polearms: left uncapped a scythe comes " +
+                 "out nearly twice the fighter's height.")]
+        [Range(0f, 3f)] public float maxLength = 1.3f;
 
         [Tooltip("Longest axis, in metres, for anything with no reach of its own — armour, the " +
                  "bandage, a stand-in cube.")]
@@ -98,8 +103,8 @@ namespace GulagRunners.Game
 
             // Sized before anything is shown, and once: the fit multiplies the model's own
             // scale, so running it twice would halve the weapon again.
-            ItemModels.FitAll(weapons, reachToLength, minLength, fallbackLength);
-            ItemModels.FitAll(armour, 0f, minLength, fallbackLength);
+            ItemModels.FitAll(weapons, reachToLength, minLength, maxLength, fallbackLength);
+            ItemModels.FitAll(armour, 0f, minLength, maxLength, fallbackLength);
 
             ItemModels.Show(weapons, ItemId.None);
             ItemModels.Show(armour, ItemId.None);

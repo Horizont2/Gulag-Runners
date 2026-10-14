@@ -66,7 +66,7 @@ namespace GulagRunners.Game
         /// models is switched off when this runs and an inactive renderer has no bounds.
         /// </summary>
         public static void Fit(GameObject root, ItemId item, float reachToLength,
-                               float minLength, float fallback)
+                               float minLength, float maxLength, float fallback)
         {
             if (root == null) return;
 
@@ -76,8 +76,11 @@ namespace GulagRunners.Game
                 Fix reach = ItemTable.Get(item).Reach;
                 Fix arm = ItemTable.Get(ItemId.Fists).Reach;
                 if (reach.Raw > arm.Raw)
-                    want = Mathf.Max(minLength,
-                                     (reach - arm).Raw / (float)Fix.RawOne * reachToLength);
+                {
+                    want = (reach - arm).Raw / (float)Fix.RawOne * reachToLength;
+                    want = Mathf.Max(minLength, want);
+                    if (maxLength > 0f) want = Mathf.Min(maxLength, want);
+                }
             }
             if (want <= 0f) return;
 
@@ -134,12 +137,12 @@ namespace GulagRunners.Game
 
         /// <summary>Sizes every model in a set, once. Call it from Awake.</summary>
         public static void FitAll(ItemModel[] models, float reachToLength, float minLength,
-                                  float fallback)
+                                  float maxLength, float fallback)
         {
             if (models == null) return;
             foreach (ItemModel m in models)
                 if (m != null && m.root != null)
-                    Fit(m.root, m.item, reachToLength, minLength, fallback);
+                    Fit(m.root, m.item, reachToLength, minLength, maxLength, fallback);
         }
 
         /// <summary>Tier colour, clamped to whatever palette the view was given.</summary>

@@ -45,9 +45,13 @@ namespace GulagRunners.Game
                  "look like something being lifted over you.")]
         public float startHeight = -0.35f;
 
-        [Tooltip("How far along the fighter's own facing the shot starts, in metres — towards " +
-                 "the door rather than square at the body.")]
-        public float startLead = 0.5f;
+        [Tooltip("How far along the fighter's own facing the shot starts, in metres.\n\n" +
+                 "Zero, and deliberately. This led the shot towards the door back when the " +
+                 "door was a slab at the side of the cage; the cage is now a grille standing " +
+                 "AROUND the fighter, so leading along their facing points the camera out at " +
+                 "the empty arena and pushes the bars off the edge of a shot this tight. " +
+                 "Negative pulls the frame back into the cage.")]
+        public float startLead;
 
         [Header("The beats")]
         [Tooltip("The camera holds the close shot until here, as a share of the cage phase. " +
@@ -75,6 +79,10 @@ namespace GulagRunners.Game
         [Tooltip("How long a shove takes to go out and come back, as a share of the phase.")]
         [Range(0.02f, 0.4f)] public float jerkFor = 0.1f;
 
+        [Tooltip("How far past the playing framing the pull-back carries before settling, as " +
+                 "a share of the opening distance.")]
+        [Range(0f, 0.4f)] public float release = 0.12f;
+
         void Reset()
         {
             view = GetComponent<SideViewCamera>();
@@ -98,8 +106,13 @@ namespace GulagRunners.Game
 
             float t = m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne;
 
-            // 1 while the close shot holds, easing to 0 by the time the doors are up.
-            float close = 1f - Smooth(Mathf.InverseLerp(holdUntil, settledBy, t));
+            // 1 while the close shot holds, easing to 0 by the time the doors are up — and
+            // overshooting a little past the end, so the camera is RELEASED rather than
+            // parked. A shot that arrives exactly on its mark reads as a camera; one that
+            // goes a hair too far and comes back reads as somebody letting go of a breath.
+            float k = Mathf.InverseLerp(holdUntil, settledBy, t);
+            float close = 1f - Smooth(k);
+            if (k > 0f && k < 1.6f) close -= release * Mathf.Sin(Mathf.Clamp01(k / 1.6f) * Mathf.PI);
             if (close <= 0.001f && jerkPush <= 0f) return;
 
             Transform cam = view.transform;

@@ -9457,7 +9457,7 @@ MonoBehaviour:
   - {fileID: 1900001121}
   - {fileID: 1900001124}
   - {fileID: 1900001127}
-  masterVolume: 1
+  masterVolume: 0
   muffledVolume: 0.8
   muffledPitch: 0.85
   manager: {fileID: 1900001102}
@@ -11414,7 +11414,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900004000}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: c58a316d2fb0498e8a7c41d905e3b267, type: 3}
@@ -11511,7 +11511,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900004000}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: d93b047ac6e1452fb28d5301af74c6e8, type: 3}
@@ -11965,7 +11965,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900004030}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: c58a316d2fb0498e8a7c41d905e3b267, type: 3}
@@ -12062,7 +12062,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900004030}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: d93b047ac6e1452fb28d5301af74c6e8, type: 3}
@@ -12534,7 +12534,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900005000}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: a41f2c7b05e84d6a9318bf7250c4e1d3, type: 3}
@@ -12631,7 +12631,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900005000}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: b72d905ef1a3487cb45e08d6271fa9c4, type: 3}
@@ -13989,7 +13989,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900006000}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: a41f2c7b05e84d6a9318bf7250c4e1d3, type: 3}
@@ -14086,7 +14086,7 @@ AudioSource:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900006000}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: b72d905ef1a3487cb45e08d6271fa9c4, type: 3}
@@ -15403,13 +15403,14 @@ MonoBehaviour:
   view: {fileID: 1900000135}
   startDistance: 0.32
   startHeight: -0.3
-  startLead: 0.55
+  startLead: 0
   holdUntil: 0.52
   settledBy: 0.9
   jerkPush: 0.26
   jerkAt: 0.14
   jerkAt2: 0.4
   jerkFor: 0.1
+  release: 0.12
 --- !u!114 &1900000852
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15446,13 +15447,14 @@ MonoBehaviour:
   view: {fileID: 1900000139}
   startDistance: 0.32
   startHeight: -0.3
-  startLead: 0.55
+  startLead: 0
   holdUntil: 0.52
   settledBy: 0.9
   jerkPush: 0.26
   jerkAt: 0.14
   jerkAt2: 0.4
   jerkFor: 0.1
+  release: 0.12
 --- !u!114 &1900000853
 MonoBehaviour:
   m_ObjectHideFlags: 0

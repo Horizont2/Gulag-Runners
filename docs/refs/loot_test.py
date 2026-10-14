@@ -532,7 +532,7 @@ import sim_motor_mirror as _M
 import loot_mirror as _L
 HEIGHT = _M.F(_M.C["H"])
 ARM = ITEMS[FISTS]["reach"] / 65536.0
-REACH_TO_LENGTH, MIN_LENGTH = 1.0, 0.18
+REACH_TO_LENGTH, MIN_LENGTH, MAX_LENGTH = 1.35, 0.28, 1.3
 
 
 def drawn(item):
@@ -540,7 +540,7 @@ def drawn(item):
     reach = ITEMS[item].get("reach", 0) / 65536.0
     if reach <= ARM:
         return 0.0
-    return max(MIN_LENGTH, (reach - ARM) * REACH_TO_LENGTH)
+    return min(MAX_LENGTH, max(MIN_LENGTH, (reach - ARM) * REACH_TO_LENGTH))
 
 
 weapons = [i for i in sorted(ITEMS) if drawn(i) > 0]
@@ -565,5 +565,8 @@ check("the order on screen is the order in the hitbox, for every pair",
           for a in weapons for b in weapons
           if drawn(a) != drawn(b) and ITEMS[a]["reach"] != ITEMS[b]["reach"]),
       "a weapon that reaches further is never drawn shorter")
+check("and a weapon is big enough to read at all",
+      min(drawn(i) for i in weapons) / HEIGHT > 0.28,
+      f"shortest is {100 * min(drawn(i) for i in weapons) / HEIGHT:.0f}% of the fighter")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

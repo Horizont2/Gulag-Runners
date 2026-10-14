@@ -4412,7 +4412,7 @@ MonoBehaviour:
   - {fileID: 1900001121}
   - {fileID: 1900001124}
   - {fileID: 1900001127}
-  masterVolume: 1
+  masterVolume: 0
   muffledVolume: 0.8
   muffledPitch: 0.85
   manager: {fileID: 1900001102}
