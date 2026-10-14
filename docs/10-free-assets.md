@@ -309,3 +309,59 @@ CC0 означає: комерційно можна, атрибуція не п�
 клітки; і docs/10 вище вже обрав KayKit як базу стилю, тож персонажі, зброя й ліс потім
 збігаються. Безкоштовне з Asset Store — тільки добирати те, чого в базі бракує.
 
+---
+
+## Ширше за підземелля: критерій — структура, а не тема
+
+Перший список був про підземелля, бо це тема docs/01. Це була помилка кадру. Для **розрізу
+збоку** вирішує не тема, а **структура**: що краще, то менше в локації закритих коробок і то
+більше відкритих каркасів, які видно наскрізь.
+
+> Кімната з розрізу вимагає прибрати ближню стіну. **Містку, риштуванню чи платформі не треба
+> робити нічого** — вони вже такі.
+
+І окремо: наша арена **вже й є містки** — три відрізки помосту на y 3.59 з драбинами. Тобто
+індустріальний каркас лягає на неї один в один, і в тему «Сектора» влучає навіть точніше, ніж
+фентезійне підземелля.
+
+### Рівень 1 — зроблено рівно під таку камеру
+
+| Пак | Чому саме це | Перевірено |
+|---|---|---|
+| ⭐ [**Modular Industrial Catwalk Kit [Free]**](https://assetstore.unity.com/packages/3d/props/industrial/modular-industrial-catwalk-kit-free-287064) | Містки, поручні, опори — **відкрита сталь, яку видно наскрізь**. Шматки стикуються, і **всі на одному матеріалі** — тобто один дроколл, що для мобілки золото | Безкоштовний, **URP**, Unity 2021.3.8f1, останній реліз 09.06.2024 |
+| ⭐ [**Kenney — Platformer Kit**](https://kenney-assets.itch.io/platformer-kit) | **140+** моделей, і пак прямо називається «environment and objects for platformer games»; ранні версії віддавали навіть **sideview-рендери**. Блоки, плити, перешкоди | CC0, OBJ/FBX/glTF. Драбини в списку не названо — звірити |
+
+### Рівень 2 — модульні кіти, з яких розріз збирається (не ставиш ближню стіну)
+
+| Пак | Що дає |
+|---|---|
+| [KayKit — Dungeon Remastered](https://kaylousberg.itch.io/kaykit-dungeon-remastered) | стіни, підлоги, сходи, двері + **ґратчасті двері камер** = наші клітки. CC0 |
+| [Kenney — Castle Kit](https://kenney-assets.itch.io/castle-kit) | 70+: стіни, вежі, брами, облогові машини. CC0, модульний |
+| [Kenney — Pirate Kit](https://opengameart.org/content/pirate-kit) | 70+, **кораблі**: розріз галеона — це класичний бічний рівень, палуби одна над одною. CC0 |
+| [Kenney — Modular Cave Kit](https://opengameart.org/content/modular-cave-kit) · [Quaternius Modular Dungeon](https://quaternius.itch.io/lowpoly-modular-dungeon-pack) | 40 і 45+ модульних сегментів. CC0 |
+
+### Рівень 3 — обстановка, не структура
+
+| Пак | Що дає |
+|---|---|
+| [Low-poly Industrial Pack](https://assetstore.unity.com/packages/3d/props/low-poly-industrial-pack-397642) | ящики (наші скрині), труби, бочки, цистерни. Безкоштовний, **URP**, Unity 2022.3.12 |
+| [Low Poly Factory Machine Pack Demo](https://assetstore.unity.com/packages/3d/props/industrial/low-poly-factory-machine-pack-demo-272637) | станки, конвеєри. Безкоштовний, URP |
+
+### Відпало, і чому
+
+- **Modular Sci-Fi Interior Pack — Lite** — свіжий (серпень 2026) і безкоштовний, але **тільки
+  Built-in, URP не підтримано**
+- **Modular Sci-Fi Corridor** (MagixBox) — безкоштовний, але 2019 рік і URP не підтверджено
+- **Free Unity low poly sci-fi corridors** (Delthor, itch) — у коментарях пишуть, що моделі
+  вантажаться сірими без кольору
+- **Ultimate Low Poly Dungeon** — Built-in only
+
+### Що брати
+
+**Містки + індустріальна обстановка.** `Modular Industrial Catwalk Kit` на структуру (він лягає
+просто на наш поміст), `Low-poly Industrial Pack` на обстановку, `Kenney Platformer Kit` на блоки
+й перешкоди. Усі безкоштовні, усі URP або CC0.
+
+KayKit лишається найкращим вибором, **якщо** йти в кам'яне підземелля — ради ґратчастих камер.
+Але під «Сектор» і під нашу камеру індустріальний каркас точніший.
+
