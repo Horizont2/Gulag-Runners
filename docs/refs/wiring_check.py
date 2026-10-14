@@ -143,8 +143,14 @@ def fields_of(src, whole):
         # every optional slot in the project read as a missing assignment.
         head += decl
 
-        element = re.sub(r'(\[\]|List<|>)', '', kind)
-        is_list = kind.endswith("[]") or kind.startswith("List<")
+        # List<T> is written out in full in places — System.Collections.Generic.List<Player
+        # Controller> — so the element type is what is INSIDE the angle brackets, not whatever
+        # survives stripping them. Read the other way about, MatchState.fighters came out as a
+        # type nobody recognised and the one list the whole match depends on went unchecked.
+        inside = re.search(r'<([\w.]+)>', kind)
+        element = (inside.group(1) if inside else kind).replace("[]", "")
+        element = element.rsplit(".", 1)[-1]
+        is_list = kind.endswith("[]") or "List<" in kind
         is_ref = element in REF_TYPES or element in LIST_IS_CONTENT or _looks_like_ours(element)
         if not is_ref:
             continue
@@ -252,6 +258,8 @@ def main():
                 if info["list"]:
                     m = re.search(r'\n  ' + field + r': (\[\]|\n)', tail)
                     empty = bool(m)
+                    if not m and not re.search(r'\n  ' + field + r':', tail):
+                        empty = True       # never written down: an empty list, same as above
                 else:
                     m = re.search(r'\n  ' + field + r': \{fileID: (-?\d+)', tail)
                     empty = bool(m) and m.group(1) == "0"
