@@ -34,7 +34,7 @@ check("the phases arrive in the order docs/01 writes them",
       [n for _, n in edges] == ["scavenge", "siren", "hunt", "closing", "sudden death", "over"])
 check("the cages last three seconds", abs(edges[0][0] - 3.0) < 0.02, f"{edges[0][0]:.2f} s")
 check("the siren is at 0:25", abs(edges[1][0] - 25.0) < 0.05, f"{edges[1][0]:.2f} s")
-check("the rooms start shutting at 1:15", abs(edges[3][0] - 75.0) < 0.05, f"{edges[3][0]:.2f} s")
+check("the rooms start shutting at 1:00", abs(edges[3][0] - 60.0) < 0.05, f"{edges[3][0]:.2f} s")
 check("the ceiling comes down at 2:20", abs(edges[4][0] - 140.0) < 0.1, f"{edges[4][0]:.2f} s")
 check("and docs/01's 2:30 is a wall, not a guideline",
       abs(edges[5][0] - 150.0) < 0.1, f"{edges[5][0]:.2f} s")
@@ -293,7 +293,7 @@ for i in range(4000):
 check("two clocks from the same table never disagree",
       (a.frame, a.phase) == (b.frame, b.phase), f"frame {a.frame}, {NAMES[a.phase]}")
 check("and the phase at a tick can be asked without stepping to it",
-      [phase_at(f, cfg) for f in (0, 179, 180, 1499, 1500, 4499, 4500, 8399, 8400)] ==
+      [phase_at(f, cfg) for f in (0, 179, 180, 1499, 1500, 3599, 3600, 8399, 8400)] ==
       [CAGES, CAGES, SCAVENGE, SCAVENGE, SIREN, HUNT, CLOSING, CLOSING, SUDDEN])
 check("and the first tick of a phase is the tick that phase starts on",
       all(phase_at(phase_start(p, cfg), cfg) == p

@@ -73,11 +73,11 @@ namespace GulagRunners.Sim
             CageFrames        = 180,    // 0:00-0:03  the doors
             ScavengeFrames    = 1320,   // 0:03-0:25  alone with the chests
             SirenFrames       = 90,     // 0:25       one pulse, 1.5 s
-            HuntFrames        = 3000 - 90,  // 0:25-1:15  you know the direction
-            ClosingFrames     = 3900,   // 1:15-2:20  the rooms shut, then the waiting
+            HuntFrames        = 2010,   // 0:26-1:00  you know the direction
+            ClosingFrames     = 4800,   // 1:00-2:20  the rooms shut, then the waiting
             SuddenDeathFrames = 600,    // 2:20-2:30  the ceiling, and a decision either way
             RestartFrames     = 300,    // 0:05       long enough to see what happened
-            ShutterFrames     = 2700,   // 1:15-2:00  the rooms, one after another
+            ShutterFrames     = 3600,   // 1:00-2:00  the rooms, one after another
         };
     }
 

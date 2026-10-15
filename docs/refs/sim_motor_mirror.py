@@ -20,6 +20,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
          BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
+         LSTANDOFF=M(400),
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
@@ -253,7 +254,9 @@ def update_depth(s, w):
         # At this height, not just anywhere on the ladder: one propped against a walkway leans
         # away from the camera as it rises, and holding one depth pushes the body through the
         # rungs near one end of it.
-        want = ladder_depth_at(w, s.ladder, s.y, s.depth, inset)
+        # ...and in FRONT of them: a body centred on the rung line is a body the ladder
+        # passes through.
+        want = ladder_depth_at(w, s.ladder, s.y, s.depth, inset) - C["LSTANDOFF"]
     elif s.mode != "ground":
         return
     else:

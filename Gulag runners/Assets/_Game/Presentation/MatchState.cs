@@ -57,22 +57,28 @@ namespace GulagRunners.Game
         [Tooltip("The radar pulse: a direction, not a position.")]
         public float sirenSeconds = 1.5f;
 
-        [Tooltip("Seconds from the siren to the rooms starting to shut — the whole 0:25-1:15 " +
-                 "window of docs/01, siren included. The pulse is its opening beat, not a " +
-                 "phase in front of it, so it comes out of this rather than on top of it.")]
-        public float huntSeconds = 50f;
+        [Tooltip("Seconds from the siren to the rooms starting to shut — the 0:25-1:00 " +
+                 "window, siren included. The pulse is its opening beat, not a phase in front " +
+                 "of it, so it comes out of this rather than on top of it.\n\n" +
+                 "docs/01 writes this window as 0:25-1:15. It is shorter here on purpose: at " +
+                 "75 s the walls started moving so late that the middle of the match was a " +
+                 "fighter walking an arena nothing was happening in. The closing phase got the " +
+                 "difference, so the match is the same length and the pressure starts sooner.")]
+        public float huntSeconds = 35f;
 
         [Tooltip("Seconds from the rooms starting to shut to the ceiling coming down — the " +
-                 "whole 1:15-2:20 window of docs/01. The shutters themselves take the first " +
-                 "forty-five of it; the rest is both fighters already in the one room with " +
-                 "nowhere left to walk away to.")]
-        public float closingSeconds = 65f;
+                 "1:00-2:20 window. The shutters themselves take the first sixty of it, so " +
+                 "they still finish at 2:00; the rest is both fighters already in the one room " +
+                 "with nowhere left to walk away to.")]
+        public float closingSeconds = 80f;
 
-        [Tooltip("Seconds the steel shutters take, inside the closing phase. docs/01 gives " +
-                 "them 45 of that phase's 65: the outer rooms go one after another across " +
-                 "this window, evenly spaced, and what is left of the phase afterwards is " +
-                 "both fighters in the one room with nowhere to walk away to.")]
-        public float shutterSeconds = 45f;
+        [Tooltip("Seconds the steel shutters take, inside the closing phase: the outer rooms " +
+                 "go one after another across this window, evenly spaced, and what is left of " +
+                 "the phase afterwards is both fighters in the one room with nowhere to walk " +
+                 "away to.\n\n" +
+                 "Sixty of the phase's eighty, so the last room shuts at 2:00 exactly as " +
+                 "docs/01 has it — the window starts earlier, it does not end later.")]
+        public float shutterSeconds = 60f;
 
         [Tooltip("Seconds of sudden death before the match is decided on health. docs/01 bounds " +
                  "a match at 2:00-2:30, so this is what stops a round where neither fighter " +

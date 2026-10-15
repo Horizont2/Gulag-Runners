@@ -60,7 +60,10 @@ namespace GulagRunners.Sim
                 // The rungs at this height, not just anywhere on the ladder: one propped
                 // against a walkway leans away from the camera as it rises, and holding one
                 // depth the whole way up pushes the body through the rungs at one end of it.
-                want = world.LadderDepthAt(s.LadderIndex, s.Position.Y, s.Depth, inset);
+                // ...and in front of them, not through them: the rung line is where the
+                // ladder is, and a body centred on it is a body the ladder passes through.
+                want = world.LadderDepthAt(s.LadderIndex, s.Position.Y, s.Depth, inset)
+                     - cfg.LadderStandOff;
             else if (s.Mode != MoveMode.Grounded)
                 return;                                   // mid-air you keep the slice you left
             else if (!TryLaneAhead(ref s, world, in cfg, out want) &&

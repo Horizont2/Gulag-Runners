@@ -102,6 +102,32 @@ namespace GulagRunners.Game
                  "inverts every ceiling check that depends on it.")]
         public float crouchHeight = 1.1f;
 
+        [Header("Depth (docs/02: the arena is 3D, the fight is not)")]
+        [Tooltip("How much of the level's DEPTH the body occupies, in metres. Never moved " +
+                 "through — it only decides which slice of the location the body is on, and " +
+                 "therefore which boxes are in its way.")]
+        public float bodyDepth = 0.6f;
+
+        [Tooltip("How fast the body slides between slices, in m/s. 0 snaps, which reads as a " +
+                 "teleport sideways whenever a ramp starts at another depth.")]
+        public float depthSnapSpeed = 4f;
+
+        [Tooltip("How far ahead to look for the next thing worth standing on, in metres. The " +
+                 "body walks onto the slice of whatever it is about to climb, which is what " +
+                 "lets one floor hold a ramp at one depth and a crate stair at another.")]
+        public float laneLookahead = 1.2f;
+
+        [Tooltip("The furthest the body will shift in depth to meet something, in metres. " +
+                 "Without a limit a fighter is pulled onto the slice of anything they could " +
+                 "step on — the wall at the back included — and walks out of the fight.")]
+        public float laneReach = 2f;
+
+        [Tooltip("How far in FRONT of a ladder's rungs the body stands while climbing, in " +
+                 "metres. 0 centres the body on the rung line, so from the camera the ladder " +
+                 "goes through the fighter's chest. Half the body's depth plus half a " +
+                 "ladder's thickness puts the back of the body on the front of the rungs.")]
+        public float ladderStandOff = 0.4f;
+
         [Header("Ledge assist")]
         [Tooltip("Steps this low are climbed instead of blocking you.")]
         public float stepUpHeight = 0.3f;
@@ -160,6 +186,11 @@ namespace GulagRunners.Game
             c.BodyWidth = M(bodyWidth);
             c.BodyHeight = M(bodyHeight);
             c.CrouchHeight = M(Mathf.Min(crouchHeight, bodyHeight * 0.75f));
+            c.BodyDepth = M(bodyDepth);
+            c.DepthSnapSpeed = M(depthSnapSpeed);
+            c.LaneLookahead = M(laneLookahead);
+            c.LaneReach = M(laneReach);
+            c.LadderStandOff = M(ladderStandOff);
             c.StepUpHeight = M(stepUpHeight);
             c.ClamberHeight = M(clamberHeight);
             c.ClamberSpeedPermille = Mathf.RoundToInt(Mathf.Clamp01(clamberSpeed) * 1000f);

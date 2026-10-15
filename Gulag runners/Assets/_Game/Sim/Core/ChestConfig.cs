@@ -44,34 +44,21 @@ namespace GulagRunners.Sim
         {
             ChestConfig c;
 
-            // 1.2 s by hand, 0.6 s with a club. Cheap either way, on purpose.
-            c.Crate = new ChestKindConfig
+            // 2.5 s by hand, 1.25 s with a club, and the same for all three kinds: the chest
+            // kind decides the loot tier, not the price of getting at it. docs/03 priced them
+            // apart, and that pricing comes back when the kinds are placed deliberately rather
+            // than scattered — see the note in ChestTuning.
+            ChestKindConfig same = new ChestKindConfig
             {
-                BareFrames = 72,
-                BareNoise = NoiseLevel.Quiet,
-                ToolNoise = NoiseLevel.Quiet,
-                ToolWear = 1
-            };
-
-            // 5 s by hand, 2.5 s with a club, and loud: this is the first real "time against
-            // safety" bet of the match.
-            c.Locker = new ChestKindConfig
-            {
-                BareFrames = 300,
+                BareFrames = 150,
                 BareNoise = NoiseLevel.Medium,
                 ToolNoise = NoiseLevel.Loud,
                 ToolWear = 2
             };
 
-            // Six seconds by force, straight from docs/03, and loud however you do it. Three
-            // durability is a third of a spear, which is the "~35% of the weapon" the doc asks for.
-            c.Safe = new ChestKindConfig
-            {
-                BareFrames = 360,
-                BareNoise = NoiseLevel.Loud,
-                ToolNoise = NoiseLevel.Loud,
-                ToolWear = 3
-            };
+            c.Crate = same;
+            c.Locker = same;
+            c.Safe = same;
 
             c.DecayMultiplier = 2;
             c.NoiseFrames = 20;

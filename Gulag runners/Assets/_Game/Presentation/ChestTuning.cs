@@ -35,34 +35,39 @@ namespace GulagRunners.Game
     [Serializable]
     public class ChestTuning
     {
-        [Tooltip("Quick and quiet, T1. It exists so that nobody is still bare-handed at 0:10.")]
+        // One opening cost for all three kinds.
+        //
+        // docs/03 priced them apart — 1.2 s quiet for a crate, 6 s loud for a safe — so that
+        // the chest kind asked "how much will you tell the other player about yourself for
+        // this". That question only works once the kinds are placed deliberately, with the
+        // rich ones somewhere exposed; scattered evenly, as they are now, a six-second safe is
+        // not a bet, it is a toll. So the kind decides the LOOT TIER and nothing else, and the
+        // trade comes back with the placement. Changing one of these three rows is how.
+        [Tooltip("Tier odds 80/20/0 across T1/T2/T3. Same cost to open as every other kind.")]
         public ChestKindTuning crate = new ChestKindTuning
         {
-            bareSeconds = 1.2f,
-            bareNoise = NoiseLevel.Quiet,
-            toolNoise = NoiseLevel.Quiet,
-            toolWear = 1
-        };
-
-        [Tooltip("Slow, loud, and you stand in the open while it runs: the first real bet of " +
-                 "the match.")]
-        public ChestKindTuning locker = new ChestKindTuning
-        {
-            bareSeconds = 5f,
+            bareSeconds = 2.5f,
             bareNoise = NoiseLevel.Medium,
             toolNoise = NoiseLevel.Loud,
             toolWear = 2
         };
 
-        [Tooltip("Six seconds by force, straight from docs/03, and loud however you do it. " +
-                 "Three durability is a third of a spear — the '~35% of the weapon' the doc asks " +
-                 "for. The quiet way in is the puzzle, which is docs/04 and not built yet.")]
+        [Tooltip("Tier odds 35/55/10. Same cost to open as every other kind.")]
+        public ChestKindTuning locker = new ChestKindTuning
+        {
+            bareSeconds = 2.5f,
+            bareNoise = NoiseLevel.Medium,
+            toolNoise = NoiseLevel.Loud,
+            toolWear = 2
+        };
+
+        [Tooltip("Tier odds 5/45/50 — half the time gold. Same cost to open as every other kind.")]
         public ChestKindTuning safe = new ChestKindTuning
         {
-            bareSeconds = 6f,
-            bareNoise = NoiseLevel.Loud,
+            bareSeconds = 2.5f,
+            bareNoise = NoiseLevel.Medium,
             toolNoise = NoiseLevel.Loud,
-            toolWear = 3
+            toolWear = 2
         };
 
         [Tooltip("How many times faster progress drains after letting go. Draining rather than " +

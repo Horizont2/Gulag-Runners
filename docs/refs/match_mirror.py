@@ -21,8 +21,8 @@ NAMES = {CAGES: "cages", SCAVENGE: "scavenge", SIREN: "siren", HUNT: "hunt",
 # numbers that are not rows in docs/01's table are the ones that make the match finite — sudden
 # death has to end, and the result has to hand over to the next round. The set adds to 2:30,
 # which is where docs/01 bounds a match.
-DEFAULT = dict(cage=180, scavenge=1320, siren=90, hunt=3000 - 90, closing=3900,
-               sudden=600, restart=300, shutter=2700)
+DEFAULT = dict(cage=180, scavenge=1320, siren=90, hunt=2010, closing=4800,
+               sudden=600, restart=300, shutter=3600)
 
 MAX_GATES = 32
 

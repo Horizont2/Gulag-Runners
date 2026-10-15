@@ -123,6 +123,21 @@ namespace GulagRunners.Sim
         /// wall at the back of the building, and walks out of the fight into the scenery.
         /// </summary>
         public Fix LaneReach;
+
+        /// <summary>
+        /// How far IN FRONT of a ladder's rungs the body stands while climbing, in metres.
+        ///
+        /// Without it the body's centre goes onto the rung line, which means half a body of
+        /// depth is behind the rungs: from the camera the fighter climbs with the ladder
+        /// through their chest. A real climb is in front of the thing being climbed, so the
+        /// depth it aims for is the rung line minus this.
+        ///
+        /// Half the body's own depth plus half a ladder's thickness is the figure that puts
+        /// the back of the body on the front of the rungs. Smaller Z is towards the camera
+        /// (docs/02: the fight is the front slice of the location), so this subtracts.
+        /// </summary>
+        public Fix LadderStandOff;
+
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
@@ -207,6 +222,7 @@ namespace GulagRunners.Sim
             c.DepthSnapSpeed = Fix.FromMilli(4000);
             c.LaneLookahead  = Fix.FromMilli(1200);
             c.LaneReach      = Fix.FromMilli(2000);
+            c.LadderStandOff = Fix.FromMilli(400);
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 

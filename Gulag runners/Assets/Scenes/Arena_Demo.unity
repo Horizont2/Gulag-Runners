@@ -10614,20 +10614,20 @@ MonoBehaviour:
   worldBaker: {fileID: 1900000117}
   chests:
     crate:
-      bareSeconds: 1.2
-      bareNoise: 1
-      toolNoise: 1
-      toolWear: 1
+      bareSeconds: 2.5
+      bareNoise: 2
+      toolNoise: 3
+      toolWear: 2
     locker:
-      bareSeconds: 5
+      bareSeconds: 2.5
       bareNoise: 2
       toolNoise: 3
       toolWear: 2
     safe:
-      bareSeconds: 6
-      bareNoise: 3
+      bareSeconds: 2.5
+      bareNoise: 2
       toolNoise: 3
-      toolWear: 3
+      toolWear: 2
     decayMultiplier: 2
     noiseInterval: 0.33
   drops:
@@ -10671,9 +10671,9 @@ MonoBehaviour:
   cageSeconds: 3
   scavengeSeconds: 22
   sirenSeconds: 1.5
-  huntSeconds: 50
-  closingSeconds: 65
-  shutterSeconds: 45
+  huntSeconds: 35
+  closingSeconds: 80
+  shutterSeconds: 60
   suddenDeathSeconds: 10
   restartSeconds: 5
   fighters:
@@ -10707,7 +10707,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1541552742287974, guid: 8198c47ba65c7ce4e3a4557f1166056b, type: 3}
       propertyPath: contents
-      value: 2
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10745,7 +10745,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1491755031287024, guid: 6d24153a60e1f22d90e8a8d1ff2cb34a, type: 3}
       propertyPath: contents
-      value: 5
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10783,7 +10783,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1898356438231054, guid: 7950a085b551a2e0a6e57ce0c7591ee3, type: 3}
       propertyPath: contents
-      value: 8
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10821,7 +10821,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1541552742287974, guid: 8198c47ba65c7ce4e3a4557f1166056b, type: 3}
       propertyPath: contents
-      value: 20
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10859,7 +10859,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1898356438231054, guid: 7950a085b551a2e0a6e57ce0c7591ee3, type: 3}
       propertyPath: contents
-      value: 22
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10897,7 +10897,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1491755031287024, guid: 6d24153a60e1f22d90e8a8d1ff2cb34a, type: 3}
       propertyPath: contents
-      value: 21
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
