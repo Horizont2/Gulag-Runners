@@ -10612,6 +10612,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   worldBaker: {fileID: 1900000117}
+  itemLibrary: {fileID: 0}
   chests:
     crate:
       bareSeconds: 2.5
@@ -17463,7 +17464,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5461329368802995934, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -2.988
+      value: -3.16
       objectReference: {fileID: 0}
     - target: {fileID: 5461329368802995934, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
       propertyPath: m_LocalRotation.w
@@ -17516,7 +17517,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3022287978760347011, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -2.988
+      value: -3.16
       objectReference: {fileID: 0}
     - target: {fileID: 3022287978760347011, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       propertyPath: m_LocalRotation.w
