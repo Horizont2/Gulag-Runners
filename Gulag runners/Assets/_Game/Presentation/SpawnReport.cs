@@ -50,6 +50,7 @@ namespace GulagRunners.Game
 
             Ground(sb, world, in cfg, position, z, searchDistance);
             Stuck(sb, world, in cfg, in body, z, halfZ);
+            Floors(sb, world, z, halfZ);
             Ladders(sb, world, in cfg, in body, z);
 
             return sb.ToString();
@@ -147,6 +148,64 @@ namespace GulagRunners.Game
                       "step is refused and the fighter is put back. If this box is the ground " +
                       "slab the floor below was dug into, the slab still fills that space: " +
                       "either hollow it, or mark the part in the way Ignore.\n");
+        }
+
+        /// <summary>
+        /// Which of the arena's floors this lane can actually stand on.
+        ///
+        /// The fault this exists for does not show up at the spawn and does not show up in
+        /// the scene view: a lane that works where the fighter starts and misses, by
+        /// centimetres, the slab they will walk onto two seconds later. A floor the body
+        /// cannot reach in depth is a floor they fall straight through, and from the side it
+        /// looks exactly like a floor.
+        ///
+        /// Floors are grouped by their top height, because an arena is built out of dozens of
+        /// boxes and what a player thinks of as "the ground floor" is all of them at once.
+        /// </summary>
+        static void Floors(StringBuilder sb, SimWorld world, Fix z, Fix halfZ)
+        {
+            sb.Append("\n  FLOORS ON THIS LANE\n");
+
+            // Distinct tops, nearest centimetre, biggest first. No allocation worth avoiding
+            // here: this runs from a context menu, not from a tick.
+            System.Collections.Generic.SortedDictionary<int, int[]> levels =
+                new System.Collections.Generic.SortedDictionary<int, int[]>();
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;
+                Aabb s = world.Solids[i];
+                if (s.MaxX - s.MinX < Fix.FromMilli(500)) continue;   // trim, not floor
+
+                int key = s.MaxY.ToMilli() / 10;
+                if (!levels.TryGetValue(key, out int[] count)) levels[key] = count = new int[2];
+                count[0]++;
+                if (world.SolidSpan(i).Reaches(z, halfZ)) count[1]++;
+            }
+
+            if (levels.Count == 0)
+            {
+                sb.Append("    No floor wide enough to walk on anywhere in this world.\n");
+                return;
+            }
+
+            int unreachable = 0;
+            foreach (System.Collections.Generic.KeyValuePair<int, int[]> level in levels)
+            {
+                float y = level.Key / 100f;
+                int all = level.Value[0], live = level.Value[1];
+                if (live == 0) unreachable++;
+
+                sb.Append($"    y {y,6:0.00}  {all} box(es), {live} reachable  ");
+                sb.Append(live == all ? "ok\n"
+                        : live > 0 ? "PARTLY out of lane\n"
+                                   : "OUT OF LANE — the body falls through this floor\n");
+            }
+
+            if (unreachable > 0)
+                sb.Append($"    -> {unreachable} level(s) cannot be stood on from this lane. " +
+                          "Either the fighter's plane or those slabs is a few centimetres out; " +
+                          "compare the slab's z span against the body's, printed at the top.\n");
         }
 
         /// <summary>Every ladder in reach, and for the ones that are not, why not.</summary>

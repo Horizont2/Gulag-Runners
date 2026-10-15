@@ -274,9 +274,6 @@ def lane_ahead(s, w):
     limit = max(C["CLAMBER"], C["STEP"])
     frm = s.x + half if s.facing > 0 else s.x - half - C["LOOKAHEAD"]
     to = s.x + half + C["LOOKAHEAD"] if s.facing > 0 else s.x - half
-    # Ladders are looked for on BOTH sides: which way you face when you reach for one is
-    # not information.
-    lfrm, lto = s.x - half - C["LOOKAHEAD"], s.x + half + C["LOOKAHEAD"]
     best = None; near = 0
     for i, sol in enumerate(w["solid"]):
         if not solid_live(w, i): continue          # a shutter that has not shut
@@ -292,19 +289,9 @@ def lane_ahead(s, w):
         if abs(want - s.depth) > C["LANEREACH"]: continue
         near = gap
         best = want
-    # A ladder counts as somewhere you are going too: this location's ladders stand a metre
-    # in front of the floor they rise from.
-    for i, l in enumerate(w["ladder"]):
-        if l[2] <= lfrm or l[0] >= lto: continue
-        if l[3] <= s.y or l[1] > s.y + C["H"]: continue
-        gap = max(0, l[0] - (s.x + half) if s.facing > 0 else (s.x - half) - l[2])
-        if best is not None and gap >= near: continue
-        # A ladder is never "home": you stand where its rungs are, and the climb-out
-        # carries you back to the floor's slice at the top.
-        want = nearest_in(span(w, "ladder", i), s.depth, C["BODYZ"] // 2)
-        if abs(want - s.depth) > C["LANEREACH"]: continue
-        near = gap
-        best = want
+    # Ladders deliberately do NOT steer the lane: the grab only asks that the rungs be
+    # within the lane reach, and the mount sets the depth itself. Steering only ever moved
+    # a fighter who had not asked to move.
     return best
 
 
@@ -503,12 +490,14 @@ def frames_for(dist):
 def ladder_under_feet(s, w):
     """The ladder a standing body is on top of: it reaches the feet from below and runs
     under them. This is how you get onto a ladder that has no hatch beside it."""
-    half = C["W"]//2; reach = C["H"]//2
+    half = C["W"]//2; reach = C["H"]//2; lip = C["STEP"]
     for i, l in enumerate(w["ladder"]):
         if lane_for(span(w, "ladder", i), s.depth) is None: continue
         if l[0] >= s.x+half or l[2] <= s.x-half: continue
         drop = s.y - l[3]
-        if drop < -SKIN or drop > reach: continue
+        # A free step of slack upwards: a ladder modelled 2 cm proud of its landing is still
+        # the ladder you are standing on, and with no slack it could not be climbed down.
+        if drop < -lip or drop > reach: continue
         return i
     return -1
 
@@ -520,9 +509,16 @@ def try_mount(s, wy, w):
     i = ladder_at(s, w)
     # Standing on top of a ladder whose rungs start just under the feet: stepping over the
     # edge IS the way down when there is no hatch beside it.
+    # Judged on where the ladder's HEAD is, not on which search found it: a ladder the reach
+    # search had already picked could never be one you were standing on, so a ladder modelled
+    # 2 cm proud of its landing was found by that search and then refused for having floor
+    # underneath, while the flush one beside it missed the search and worked.
     stepping_on = False
-    if i < 0 and wy < 0 and s.mode == "ground":
-        i = ladder_under_feet(s, w); stepping_on = i >= 0
+    if wy < 0 and s.mode == "ground":
+        if i < 0:
+            i = ladder_under_feet(s, w); stepping_on = i >= 0
+        else:
+            stepping_on = w["ladder"][i][3] <= s.y + C["STEP"]
     if i < 0: return False
     box = w["ladder"][i]
     centre = ladder_centre(w, i, s.y)

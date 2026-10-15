@@ -105,11 +105,6 @@ namespace GulagRunners.Sim
             Fix from = s.Facing > 0 ? s.Position.X + half : s.Position.X - half - cfg.LaneLookahead;
             Fix to = s.Facing > 0 ? s.Position.X + half + cfg.LaneLookahead : s.Position.X - half;
 
-            // Ladders are looked for on BOTH sides: you face a ladder to climb it, and which
-            // way you happen to be facing when you reach for one is not information.
-            Fix ladderFrom = s.Position.X - half - cfg.LaneLookahead;
-            Fix ladderTo = s.Position.X + half + cfg.LaneLookahead;
-
             bool found = false;
             Fix nearestX = Fix.Zero;
             for (int i = 0; i < world.Solids.Length; i++)
@@ -138,32 +133,19 @@ namespace GulagRunners.Sim
                 found = true;
             }
 
-            // A ladder counts as somewhere you are going too, and it has to: this location's
-            // ladders stand a metre in front of the floor they rise from, so a fighter who
-            // could not walk onto their slice could never reach one at all.
-            for (int i = 0; i < world.Ladders.Length; i++)
-            {
-                Aabb l = world.Ladders[i];
-                if (l.MaxX <= ladderFrom || l.MinX >= ladderTo) continue;
-                if (l.MaxY <= s.Position.Y || l.MinY > s.Position.Y + cfg.BodyHeight) continue;
-
-                // Unlike a wall, a ladder you are ALREADY standing at is exactly where you
-                // are going: clamped to zero rather than skipped, or pressing up in front of
-                // one does nothing at all, because the lane never comes to meet it.
-                Fix gap = s.Facing > 0 ? l.MinX - (s.Position.X + half)
-                                       : (s.Position.X - half) - l.MaxX;
-                if (gap < Fix.Zero) gap = Fix.Zero;
-                if (found && gap >= nearestX) continue;
-
-                // A ladder is never "home": you stand where its rungs are, and the
-                // climb-out carries you back to the floor's slice at the top.
-                Fix want = world.LadderSpan(i).Nearest(s.Depth, cfg.BodyDepth / 2);
-                if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
-
-                nearestX = gap;
-                lane = want;
-                found = true;
-            }
+            // Ladders deliberately do NOT steer the lane.
+            //
+            // They used to, and the reasoning looked sound: this location's ladders stand a
+            // metre in front of the floor they rise from, so the body was walked onto their
+            // slice in order to be able to reach them. But reaching them never needed it —
+            // the grab only asks that the rungs be within the lane REACH, not that the body
+            // already stand on them, and the mount sets the depth itself. All the steering
+            // bought was movement nobody asked for: a fighter placed half a metre from a
+            // ladder slid a third of a metre towards it before the match began, and one
+            // walking past two of them slid between their slices the whole way.
+            //
+            // So the lane follows the floor, which is a thing you are standing on, and the
+            // rungs are taken at the moment you take them.
             return found;
         }
 
@@ -489,11 +471,28 @@ namespace GulagRunners.Sim
             // Standing on top of a ladder whose rungs start just under the feet. A ladder with
             // no hatch beside it is the whole level here, and without this the only ones you
             // could ever climb down are the ones with a hole to drop into first.
+            //
+            // Judged on where the ladder's HEAD is, not on which search found it. It used to
+            // be the second: a ladder the reach search had already picked could never be one
+            // you were standing on, so whether stepping over the top worked came down to
+            // whether the body's box happened to touch the ladder's box. Two ladders in this
+            // arena, one modelled 2 cm proud of its landing and one flush with it: the flush
+            // one missed the reach search by a hair and worked, the proud one was found by it
+            // and was then refused for having floor underneath — "the left ladder does not
+            // let you down", with nothing in the level to explain it.
             bool steppingOn = false;
-            if (ladder < 0 && wishY < 0 && s.Mode == MoveMode.Grounded)
+            if (wishY < 0 && s.Mode == MoveMode.Grounded)
             {
-                ladder = LadderUnderFeet(ref s, world, in cfg);
-                steppingOn = ladder >= 0;
+                if (ladder < 0)
+                {
+                    ladder = LadderUnderFeet(ref s, world, in cfg);
+                    steppingOn = ladder >= 0;
+                }
+                else
+                {
+                    steppingOn = world.Ladders[ladder].MaxY
+                                 <= s.Position.Y + cfg.StepUpHeight;
+                }
             }
             if (ladder < 0) return false;
 
@@ -753,11 +752,22 @@ namespace GulagRunners.Sim
         /// <summary>
         /// The ladder a standing body is on top of: one that reaches the feet from below and
         /// runs under them. This is how you get onto a ladder that has no hatch beside it.
+        ///
+        /// "Under them" allows a free step of slack UPWARDS as well as half a body downwards,
+        /// and that slack is the whole difference between a ladder that works and one that
+        /// does not. A ladder is modelled flush with its landing only by luck: this arena has
+        /// one whose top sits 2 cm above the floor and one whose top is level with it, and
+        /// with no slack the first could not be climbed down at all while the second could —
+        /// which is exactly how it was reported, as "the left ladder does not work". Two
+        /// centimetres is not a decision anybody made, so it must not decide anything. The
+        /// allowance is the free step, because a lip you could walk up is a lip you can step
+        /// onto.
         /// </summary>
         static int LadderUnderFeet(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
         {
             Fix half = cfg.BodyWidth / 2;
             Fix reach = cfg.BodyHeight / 2;
+            Fix lip = cfg.StepUpHeight;
 
             for (int i = 0; i < world.Ladders.Length; i++)
             {
@@ -766,7 +776,7 @@ namespace GulagRunners.Sim
                 if (l.MinX >= s.Position.X + half || l.MaxX <= s.Position.X - half) continue;
 
                 Fix drop = s.Position.Y - l.MaxY;
-                if (drop < Fix.Zero - Skin || drop > reach) continue;
+                if (drop < Fix.Zero - lip || drop > reach) continue;
                 return i;
             }
             return -1;
