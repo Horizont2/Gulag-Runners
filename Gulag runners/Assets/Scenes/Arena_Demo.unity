@@ -12599,7 +12599,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
-  kind: 0
+  kind: 3
 --- !u!1 &1900003000
 GameObject:
   m_ObjectHideFlags: 0
