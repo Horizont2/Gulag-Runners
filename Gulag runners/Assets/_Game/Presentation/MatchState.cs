@@ -26,6 +26,14 @@ namespace GulagRunners.Game
                  "in the scene.")]
         public SimWorldBaker worldBaker;
 
+        [Tooltip("Optional. The item data files; leave empty to use the table compiled into " +
+                 "ItemTable.cs, which is what the game read before any of these existed.\n\n" +
+                 "Applied once in Awake, before the first tick. Both devices must hold the " +
+                 "same library or they will disagree about what a sword does (docs/06) — the " +
+                 "same rule any data file follows, and the reason this is one asset rather " +
+                 "than a list assembled per scene.")]
+        public ItemLibrary itemLibrary;
+
         [Header("Chest tuning (docs/03)")]
         public ChestTuning chests = new ChestTuning();
 
@@ -136,6 +144,15 @@ namespace GulagRunners.Game
         void Awake()
         {
             Instance = this;
+
+            // Before anything reads a weapon: the loot deal below asks the table what exists,
+            // and the views ask it how long a sword is.
+            if (itemLibrary != null)
+            {
+                int applied = itemLibrary.Apply();
+                if (logMatch) Debug.Log($"{name}: item library applied, {applied} item(s).", this);
+            }
+
             Config = chests.ToConfig();
             ResetRound();
         }

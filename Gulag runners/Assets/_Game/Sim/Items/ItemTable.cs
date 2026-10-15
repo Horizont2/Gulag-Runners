@@ -19,6 +19,36 @@ namespace GulagRunners.Sim
     {
         static readonly ItemDef[] Items = Build();
 
+        /// <summary>
+        /// Replaces one item's numbers with authored ones.
+        ///
+        /// The table above stays the source of truth for what EXISTS and what the game falls
+        /// back to; this is how a data file edited in the inspector reaches the simulation.
+        /// Nothing in the tick calls it — it runs once at load, from
+        /// <see cref="GulagRunners.Game.ItemLibrary"/>, before the first frame.
+        ///
+        /// The determinism rule it must not break (docs/06): both devices have to apply the
+        /// SAME overrides. That is a question about what is in the build, not about this
+        /// method, and it is the same question any data file asks. A device running an older
+        /// library desynchronises exactly as it would with an older scene.
+        /// </summary>
+        public static void Apply(in ItemDef def)
+        {
+            int i = (int)def.Id;
+            if (i <= 0 || i >= Items.Length) return;
+
+            ItemDef kept = def;
+            kept.Id = def.Id;                            // an asset may not rename an item
+            Items[i] = kept;
+        }
+
+        /// <summary>Back to the table in this file. For tests, and for a library removed.</summary>
+        public static void Reset()
+        {
+            ItemDef[] fresh = Build();
+            for (int i = 0; i < Items.Length; i++) Items[i] = fresh[i];
+        }
+
         public static ItemDef Get(ItemId id)
         {
             int i = (int)id;

@@ -88,6 +88,23 @@ namespace GulagRunners.Game
                  "as a warning.")]
         public bool poseAttackByPhase = true;
 
+        [Tooltip("Where in the attack clip the weapon actually connects, as a fraction of the " +
+                 "clip.\n\n" +
+                 "Posing only reads as a swing if the clip's own contact frame is the frame " +
+                 "the hitbox goes live on. These were fixed at 0.40 and 0.60, which is right " +
+                 "for a clip that winds up for its first four tenths — and wrong for every " +
+                 "pack clip that does not. Wrong by a tenth is a fighter still drawing back " +
+                 "while the hit lands, then snapping forward afterwards, which is exactly " +
+                 "what a swing must never look like.\n\n" +
+                 "Scrub the attack clip in the Animation window, find the frame the weapon is " +
+                 "at the target, and put that fraction here.")]
+        [Range(0f, 1f)] public float attackContactStart = 0.4f;
+
+        [Tooltip("The end of the contact window, as a fraction of the clip. The stretch " +
+                 "between it and Attack Contact Start is the clip's active frames; everything " +
+                 "before is the wind-up and everything after is the follow-through.")]
+        [Range(0f, 1f)] public float attackContactEnd = 0.6f;
+
         [Tooltip("Taking a hit. Held for the hitstun the simulation gives, so a heavier hit " +
                  "visibly costs more.")]
         public string hitState = "Hit";
@@ -372,16 +389,29 @@ namespace GulagRunners.Game
         /// shares a swing reads with: the wind-up the first two fifths, the active window a
         /// fifth, the recovery the rest.
         /// </summary>
-        static float SwingProgress(in PlayerSimState s)
+        /// <summary>
+        /// How far through the attack CLIP the swing is, given how far through the swing the
+        /// simulation is.
+        ///
+        /// The three phases are stretched onto the clip around its own contact window, so the
+        /// frame the hitbox goes live on is the frame the weapon is drawn at the target. The
+        /// window is a pair of inspector fields rather than the 0.40/0.60 it used to be,
+        /// because where a clip connects is a property of that clip and this project has
+        /// already changed character twice.
+        /// </summary>
+        float SwingProgress(in PlayerSimState s)
         {
             int total = Mathf.Max(1, s.AttackPhaseFrames);
             float within = Mathf.Clamp01(1f - s.AttackTimer / (float)total);
 
+            float hit = Mathf.Clamp01(attackContactStart);
+            float done = Mathf.Clamp(attackContactEnd, hit, 1f);
+
             switch (s.Attack)
             {
-                case AttackPhase.Windup: return within * 0.4f;
-                case AttackPhase.Active: return 0.4f + within * 0.2f;
-                default: return 0.6f + within * 0.4f;
+                case AttackPhase.Windup: return within * hit;
+                case AttackPhase.Active: return hit + within * (done - hit);
+                default: return done + within * (1f - done);
             }
         }
 

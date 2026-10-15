@@ -108,6 +108,16 @@ namespace GulagRunners.Game
                  "two of them face each other.")]
         public int spawnFacing = 1;
 
+        [Tooltip("Where this fighter starts. Empty means wherever this object happens to sit " +
+                 "when the scene loads.\n\n" +
+                 "Worth filling in, because those are not the same thing. The fighter's own " +
+                 "transform is written every frame of play, and whatever it was left at when " +
+                 "play stopped is the new spawn — so moving the fight to another floor means " +
+                 "dragging the character itself, and a stray drag in the scene view is a " +
+                 "silent change to where the round begins. A marker is a thing you can see, " +
+                 "snap to the floor, and leave alone.")]
+        public Transform spawnPoint;
+
         [Tooltip("Turn to face the ladder while climbing instead of staying side-on. The climb " +
                  "clips are authored with the character facing the rungs, so played side-on they " +
                  "read as someone climbing sideways through thin air.")]
@@ -293,7 +303,7 @@ namespace GulagRunners.Game
                 visualRoot.localPosition = Vector3.zero;
             }
 
-            Vector3 p = transform.position;
+            Vector3 p = SpawnFeet();
             if (depthFromScene) planeZ = p.z;
 
             // Now that the plane is known, and not before: the simulation needs it to bring a
@@ -301,7 +311,7 @@ namespace GulagRunners.Game
             // object's own Z, which the config built at the top of Awake could not have seen.
             ApplyTuning();
             _depth = planeZ;
-            _spawnPoint = new Vector2(p.x, p.y - visualYOffset);
+            _spawnPoint = new Vector2(p.x, p.y);
             SpawnAt(_spawnPoint, spawnFacing);
         }
 
@@ -692,8 +702,8 @@ namespace GulagRunners.Game
                 world = worldBaker != null ? (worldBaker.World ?? worldBaker.Bake()) : null;
                 config = tuning.ToConfig();
 
-                Vector3 p = transform.position;
-                feet = new Vector2(p.x, p.y - visualYOffset);
+                Vector3 p = SpawnFeet();
+                feet = new Vector2(p.x, p.y);
                 depth = depthFromScene ? p.z : planeZ;
             }
 
@@ -795,6 +805,22 @@ namespace GulagRunners.Game
         static Vector2 ToVector(FixVec2 v) =>
             new Vector2(v.X.Raw / (float)Fix.RawOne, v.Y.Raw / (float)Fix.RawOne);
 
+        /// <summary>
+        /// Where the round begins, in FEET: the marker if there is one, this object otherwise.
+        ///
+        /// The offset is the whole reason this is one method rather than three copies. A
+        /// marker is dropped on the floor, so it already is the feet; this object is the
+        /// fighter, drawn from its middle, so its own position is a body's worth above them.
+        /// Getting that wrong puts the fighter a metre into the floor or a metre above it,
+        /// and the spawn-time ground snap then hides which.
+        /// </summary>
+        Vector3 SpawnFeet()
+        {
+            Vector3 p = spawnPoint != null ? spawnPoint.position : transform.position;
+            if (spawnPoint == null) p.y -= visualYOffset;
+            return p;
+        }
+
         void OnDrawGizmosSelected()
         {
             if (!drawBody) return;
@@ -802,7 +828,7 @@ namespace GulagRunners.Game
             float h = Application.isPlaying && _state.Crouching ? tuning.crouchHeight : tuning.bodyHeight;
             Vector3 feet = Application.isPlaying
                 ? new Vector3(FeetPosition.x, FeetPosition.y, planeZ)
-                : new Vector3(transform.position.x, transform.position.y - visualYOffset, planeZ);
+                : new Vector3(SpawnFeet().x, SpawnFeet().y, planeZ);
 
             // The simulated body: this box, and nothing about the mesh, is what collides.
             Gizmos.color = new Color(1f, 0.4f, 0.2f, 0.9f);
