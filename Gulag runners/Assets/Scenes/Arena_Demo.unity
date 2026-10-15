@@ -10324,7 +10324,7 @@ MonoBehaviour:
   visibleWorldHeight: 10
   fieldOfView: 30
   pitchDegrees: 4
-  planeZ: -1.4
+  planeZ: -2.99
   depthFromPlayer: 1
   scaleFramingToViewport: 1
   aimHeightBodies: 0.6
@@ -10349,8 +10349,8 @@ MonoBehaviour:
   maxZoom: 1.1
   zoomSmoothTime: 0.3
   useBorders: 1
-  bordersMin: {x: -17.7, y: -5}
-  bordersMax: {x: 13.92, y: 5.5}
+  bordersMin: {x: -18.12, y: -2.6}
+  bordersMax: {x: 14.34, y: 6.2}
   centreWhenSmallerThanView: 1
   landingTrauma: 0.25
   shakeAmplitude: 0.25
@@ -10498,7 +10498,7 @@ MonoBehaviour:
   visibleWorldHeight: 10
   fieldOfView: 30
   pitchDegrees: 4
-  planeZ: -1.4
+  planeZ: -2.99
   depthFromPlayer: 1
   scaleFramingToViewport: 1
   aimHeightBodies: 0.6
@@ -10523,8 +10523,8 @@ MonoBehaviour:
   maxZoom: 1.1
   zoomSmoothTime: 0.3
   useBorders: 1
-  bordersMin: {x: -17.7, y: -0.5}
-  bordersMax: {x: 13.92, y: 5.5}
+  bordersMin: {x: -18.12, y: -2.6}
+  bordersMax: {x: 14.34, y: 6.2}
   centreWhenSmallerThanView: 1
   landingTrauma: 0.25
   shakeAmplitude: 0.25
@@ -10968,7 +10968,7 @@ MonoBehaviour:
   - {fileID: 1900000752}
   - {fileID: 1900000762}
   planeFromFighters: 1
-  planeZ: -2.51
+  planeZ: -2.99
 --- !u!1001 &1900000710
 PrefabInstance:
   m_ObjectHideFlags: 0
