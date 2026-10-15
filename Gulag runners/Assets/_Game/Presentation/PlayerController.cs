@@ -661,6 +661,49 @@ namespace GulagRunners.Game
         public void Respawn() => SpawnAt(_spawnPoint, spawnFacing);
 
         /// <summary>
+        /// Says why this fighter cannot stand, walk or climb where the scene puts them.
+        ///
+        /// Right-click the component header and pick it. In play mode it reports where the
+        /// fighter actually is; out of play mode it bakes the scene first and reports the
+        /// spawn the transform describes, which is the one that matters when a spawn has just
+        /// been moved to another floor.
+        ///
+        /// It exists because the three ways this goes wrong — standing inside a solid, standing
+        /// over a floor that is off the lane, and reaching for a ladder that baked as a wall —
+        /// look identical in the scene view and identical to each other in play.
+        /// </summary>
+        [ContextMenu("Explain this spawn")]
+        public void ExplainSpawn()
+        {
+            SimWorld world = _world;
+            MoveConfig config = _config;
+            Vector2 feet;
+            float depth;
+
+            if (Application.isPlaying && world != null)
+            {
+                feet = new Vector2(_state.Position.X.ToMilli() / 1000f,
+                                   _state.Position.Y.ToMilli() / 1000f);
+                depth = _state.Depth.ToMilli() / 1000f;
+            }
+            else
+            {
+                if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
+                world = worldBaker != null ? (worldBaker.World ?? worldBaker.Bake()) : null;
+                config = tuning.ToConfig();
+
+                Vector3 p = transform.position;
+                feet = new Vector2(p.x, p.y - visualYOffset);
+                depth = depthFromScene ? p.z : planeZ;
+            }
+
+            Debug.Log(SpawnReport.Explain(name, world, in config, feet, depth,
+                                          snapSearchDistance) +
+                      (worldBaker != null ? "\n  BAKE\n    " + worldBaker.LastReport : ""),
+                      this);
+        }
+
+        /// <summary>
         /// Yaw correction for a model that does not look along +Z. Everything else is expressed
         /// as a world direction and then offset by this, so there is one place that knows which
         /// way a given character faces.

@@ -799,6 +799,98 @@ namespace GulagRunners.Game
             }
         }
 
+        /// <summary>Name fragments that mean somebody modelled a ladder. Lower case.</summary>
+        static readonly string[] LadderWords =
+            { "ladder", "rung", "драбин", "лестниц", "сходин" };
+
+        /// <summary>
+        /// What the scene MEANT versus what the bake made of it.
+        ///
+        /// Right-click the component header and pick it. One mistake accounts for most of the
+        /// ladders in this project that turned out not to be ladders: a plain collider is a
+        /// ladder only through a SimCollider set to Ladder, or through a layer in Ladder
+        /// Layers — and with neither, Solid Layers catches it and it bakes as a WALL. On
+        /// screen that is a ladder the fighter ignores and walks into, which is two separate
+        /// bug reports for one cause.
+        ///
+        /// So this does not re-derive anything: it bakes, then reads the names back, and says
+        /// where the name and the kind disagree.
+        /// </summary>
+        [ContextMenu("Audit the bake")]
+        public void AuditBake()
+        {
+            Bake();
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.Append(name).Append(" — bake audit\n");
+            sb.Append("  ").Append(LastReport).Append('\n');
+
+            bool anyLadderLayer = ladderLayers.value != 0;
+            sb.Append($"\n  Ladder Layers is {(anyLadderLayer ? "set" : "EMPTY")}, so a ladder " +
+                      (anyLadderLayer
+                          ? "can come from either a SimCollider or its layer.\n"
+                          : "can ONLY come from a SimCollider set to Ladder.\n"));
+
+            List<string> wrong = new List<string>();
+            List<string> right = new List<string>();
+            int unmarked = 0;
+
+            foreach (GameObject root in RootObjects())
+            {
+                root.GetComponentsInChildren(true, _colliderBuffer);
+                foreach (Collider col in _colliderBuffer)
+                {
+                    if (col == null) continue;
+
+                    SimCollider marker = col.GetComponent<SimCollider>();
+                    if (marker == null) unmarked++;
+                    if (!LooksLikeLadder(col.name)) continue;
+
+                    bool byMarker = marker != null && marker.kind == SimColliderKind.Ladder;
+                    bool byLayer = (ladderLayers.value & (1 << col.gameObject.layer)) != 0;
+
+                    if (byMarker || byLayer) right.Add(col.name);
+                    else wrong.Add($"{Path(col.transform)} — " +
+                                   (marker == null
+                                       ? "no SimCollider"
+                                       : $"SimCollider is {marker.kind}") +
+                                   $", layer {LayerMask.LayerToName(col.gameObject.layer)}");
+                }
+            }
+
+            sb.Append($"\n  {unmarked} collider(s) carry no SimCollider and bake by layer alone.\n");
+
+            if (wrong.Count == 0)
+                sb.Append($"\n  Nothing named like a ladder bakes as anything else. " +
+                          $"({right.Count} named ladder, {World.Ladders.Length} baked ladder.)\n");
+            else
+            {
+                sb.Append($"\n  {wrong.Count} object(s) NAMED like a ladder do not bake as one:\n");
+                foreach (string w in wrong) sb.Append("    ").Append(w).Append('\n');
+                sb.Append("  -> each of these is a solid wall in the simulation. Add a " +
+                          "SimCollider and set Kind = Ladder, or put them on a layer listed " +
+                          "in Ladder Layers.\n");
+            }
+
+            Debug.Log(sb.ToString(), this);
+        }
+
+        static bool LooksLikeLadder(string objectName)
+        {
+            string lower = objectName.ToLowerInvariant();
+            foreach (string word in LadderWords)
+                if (lower.Contains(word)) return true;
+            return false;
+        }
+
+        /// <summary>Hierarchy path, so a report names which of five "Ladder" objects it means.</summary>
+        static string Path(Transform t)
+        {
+            string path = t.name;
+            for (Transform p = t.parent; p != null; p = p.parent) path = p.name + "/" + path;
+            return path;
+        }
+
         void OnDrawGizmosSelected()
         {
             if (!drawBakedBoxes) return;

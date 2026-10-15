@@ -707,7 +707,15 @@ namespace GulagRunners.Sim
         /// LaneReach bounds it, so this is a step back onto the next floor, never a teleport
         /// into the scenery behind it.
         /// </summary>
-        static bool LaneFor(Span span, Fix depth, in MoveConfig cfg, out Fix lane)
+        /// <summary>
+        /// Can a body standing at this depth reach into that span, and at what depth would it
+        /// be standing if it did.
+        ///
+        /// Public because it is the one question a depth bug ever turns out to be, and a
+        /// diagnostic that asks it a second way is a diagnostic that can disagree with the
+        /// motor. Presentation calls exactly this.
+        /// </summary>
+        public static bool LaneFor(Span span, Fix depth, in MoveConfig cfg, out Fix lane)
         {
             Fix half = cfg.BodyDepth / 2;
             if (span.Reaches(depth, half)) { lane = depth; return true; }
