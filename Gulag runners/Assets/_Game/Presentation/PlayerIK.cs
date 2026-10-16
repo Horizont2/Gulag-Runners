@@ -185,7 +185,8 @@ namespace GulagRunners.Game
 
             if (onLadder) Grip(in s, world);
             else if (onLedge) Ledge(in s);
-            else if (!_gripping)
+            else if (_gripping) Release();
+            else
             {
                 Clear(AvatarIKGoal.LeftHand);
                 Clear(AvatarIKGoal.RightHand);
@@ -284,6 +285,23 @@ namespace GulagRunners.Game
             _animator.SetIKRotation(AvatarIKGoal.LeftHand, grip);
             _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, w);
             _animator.SetIKRotation(AvatarIKGoal.RightHand, grip);
+        }
+
+        /// <summary>
+        /// Letting go: the same targets, at the weight the blend has got down to.
+        ///
+        /// Mecanim keeps an IK goal's weight until it is told otherwise, so the frames
+        /// between stepping off the rungs and the blend reaching zero used to apply nothing
+        /// at all — which is not a fade, it is full strength held on a stale rung and then
+        /// dropped in one frame. The hands snapped at the end of every single climb, and the
+        /// blend that was supposed to prevent it was doing nothing but counting down.
+        /// </summary>
+        void Release()
+        {
+            Set(AvatarIKGoal.LeftHand, _leftHand, gripWeight * _ladderBlend);
+            Set(AvatarIKGoal.RightHand, _rightHand, gripWeight * _ladderBlend);
+            Set(AvatarIKGoal.LeftFoot, _leftFoot, footGripWeight * _ladderBlend);
+            Set(AvatarIKGoal.RightFoot, _rightFoot, footGripWeight * _ladderBlend);
         }
 
         /// <summary>

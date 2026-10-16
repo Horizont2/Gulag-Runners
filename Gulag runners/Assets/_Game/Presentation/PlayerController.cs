@@ -47,6 +47,14 @@ namespace GulagRunners.Game
         [Tooltip("Transform that carries the mesh. Leave empty to move this object directly.")]
         public Transform visualRoot;
 
+        [Tooltip("Distance from the visual root's own origin DOWN to the model's soles, in " +
+                 "metres of the model's own scale.\n\n" +
+                 "0 for an imported character, which hangs from its root by the feet. Only a " +
+                 "model authored around its hips needs anything else, and the body gizmo " +
+                 "draws the model's measured top and bottom so the right number is readable " +
+                 "rather than guessed at.")]
+        public float modelSoleOffset;
+
         [Header("Tuning")]
         public MovementTuning tuning = new MovementTuning();
 
@@ -289,19 +297,21 @@ namespace GulagRunners.Game
             // at once.
             //
             // visualYOffset is the one knob for this, and it is on the controller, where the
-            // simulation can see it: use it for a model that hangs from its root by the
-            // middle rather than by the feet.
-            if (visualRoot != transform &&
-                visualRoot.localPosition.sqrMagnitude > 0.000001f)
-            {
-                Vector3 lp = visualRoot.localPosition;
-                Debug.LogWarning(
-                    $"{name}: the visual root sits ({lp.x:0.00}, {lp.y:0.00}, {lp.z:0.00}) " +
-                    "away from the body the simulation moves, so the fighter would be drawn " +
-                    "somewhere he is not. Zeroed. Move the fighter itself, and use Visual Y " +
-                    "Offset for a model that hangs by its middle.", this);
-                visualRoot.localPosition = Vector3.zero;
-            }
+            // simulation can see it.
+            //
+            // SIDEWAYS and in DEPTH, nothing: there is no honest reason for a model to stand
+            // beside the body that collides for it.
+            //
+            // VERTICALLY is the opposite case, and zeroing it was a bug of mine that cost
+            // this scene a fortnight of "the player hangs in the air". This object is drawn
+            // from its middle — visualYOffset is the distance down to the feet — while an
+            // imported character hangs from its root by the soles, so the model MUST sit
+            // visualYOffset below its parent or it floats by exactly that much. Both players
+            // had the right number keyed in by hand (-1.73 and -1.20 of local, under a 0.5
+            // scale) and Awake threw both away on every play, lifting one fighter 0.87 m and
+            // the other 0.59 m off his own feet. So it is computed here instead of asked for:
+            // two numbers that have to cancel are two numbers that eventually will not.
+            PlaceVisualRoot();
 
             Vector3 p = SpawnFeet();
             if (depthFromScene) planeZ = p.z;
@@ -670,7 +680,17 @@ namespace GulagRunners.Game
             float b = _state.Depth.ToMilli() / 1000f;
             float want = Mathf.Lerp(a, b, alpha);
 
-            if (depthSmoothTime <= 0.001f) { _depth = want; return _depth; }
+            // On a ladder, not even that. The rungs are in the SIMULATION's frame -- the IK
+            // reaches for the world positions the motor collides against -- so a body drawn
+            // a smoothing lag behind the motor is a body whose hands have to stretch to
+            // reach a ladder it is supposedly holding. The simulation already bounds how
+            // fast depth may change, so there is nothing here left to smooth.
+            if (depthSmoothTime <= 0.001f || _state.LadderIndex >= 0)
+            {
+                _depth = want;
+                _depthVelocity = 0f;
+                return _depth;
+            }
 
             _depth = Mathf.SmoothDamp(_depth, want, ref _depthVelocity, depthSmoothTime,
                                       Mathf.Infinity, Time.deltaTime);
@@ -879,6 +899,58 @@ namespace GulagRunners.Game
 
         static Vector2 ToVector(FixVec2 v) =>
             new Vector2(v.X.Raw / (float)Fix.RawOne, v.Y.Raw / (float)Fix.RawOne);
+
+        /// <summary>
+        /// Hangs the model off this object so its soles land on the simulated feet.
+        ///
+        /// Three frames of reference meet on one transform and all three are easy to get
+        /// wrong by hand, which is why none of them is asked for twice:
+        ///
+        ///   * the SIMULATION tracks the feet, and writes them to this object's position
+        ///     plus <see cref="visualYOffset"/>, because what is drawn here — the greybox
+        ///     capsule — is drawn from its middle;
+        ///   * the MODEL hangs from the visual root by its soles, or by whatever
+        ///     <see cref="modelSoleOffset"/> says instead;
+        ///   * and the visual root's own LOCAL space is this object's, which is scaled: a
+        ///     fighter half the authored size needs twice the local offset for the same
+        ///     metre of world, and that factor is where a hand-keyed number goes wrong.
+        ///
+        /// So the offset is computed from the three and written in, and a number that was
+        /// already there and disagreed is reported rather than silently replaced — it is
+        /// usually the right answer to a question asked of the wrong scale.
+        /// </summary>
+        void PlaceVisualRoot()
+        {
+            if (visualRoot == null || visualRoot == transform) return;
+
+            // Into the parent's local space. A zero scale would divide by nothing, and is a
+            // mistake of its own kind; leave the model where it is and say so.
+            Vector3 scale = transform.localScale;
+            if (Mathf.Abs(scale.y) < 0.0001f)
+            {
+                Debug.LogWarning(
+                    $"{name}: this object's Y scale is {scale.y:0.###}, so the model cannot be " +
+                    "hung off it. Left where it was.", this);
+                return;
+            }
+
+            float want = (modelSoleOffset - visualYOffset) / scale.y;
+            Vector3 lp = visualRoot.localPosition;
+
+            if (Mathf.Abs(lp.x) > 0.001f || Mathf.Abs(lp.z) > 0.001f)
+                Debug.LogWarning(
+                    $"{name}: the model stands ({lp.x:0.00}, {lp.z:0.00}) to the side of the " +
+                    "body that collides for it, so the fighter would be drawn somewhere he is " +
+                    "not. Flattened. Move the fighter itself, not its mesh.", this);
+
+            if (Mathf.Abs(lp.y - want) > 0.01f)
+                Debug.Log(
+                    $"{name}: the model hung at {lp.y:0.00} of local and its soles belong at " +
+                    $"{want:0.00} — Visual Y Offset {visualYOffset:0.00} m over a scale of " +
+                    $"{scale.y:0.###}. Using {want:0.00}.", this);
+
+            visualRoot.localPosition = new Vector3(0f, want, 0f);
+        }
 
         /// <summary>
         /// Where the round begins, in FEET: the marker if there is one, this object otherwise.
