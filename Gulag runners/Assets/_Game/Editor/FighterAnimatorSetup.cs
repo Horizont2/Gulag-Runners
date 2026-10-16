@@ -48,20 +48,17 @@ namespace GulagRunners.GameEditor
         /// </summary>
         static readonly (string state, string clip)[] Body =
         {
-            ("Idle",              "1Hand_Up_Stand_Idle_A_2"),
-            ("Walk",              "1Hand_Up_Walk_A_F_InPlace"),
-            ("Run",               "1Hand_Up_Run_A_F_InPlace"),
-
-            // The two the aim/travel split exists to draw: travelling one way with the blade
-            // pointed the other. Authored backwards, not played in reverse -- the weight goes
-            // the wrong way in reverse and the arms lead instead of trail.
-            ("Walk Back",         "1Hand_Up_Walk_A_B_InPlace"),
-            ("Run Back",          "1Hand_Up_Run_A_B_InPlace"),
-
-            ("Run Fast",          "1Hand_Up_Sprint_A_F_InPlace"),
-            ("Jumping Up",        "1Hand_Up_Jump_B_InPlace"),
-            ("Sitting",           "1Hand_Up_Crouch_Idle_1"),
-            ("Crouch Walk",       "1Hand_Up_Crouch_F_InPlace"),
+            // UNARMED, and that is the whole point of this half of the table. The pack's
+            // movement set is called One Hand Up and is exactly that -- a blade up and a
+            // body leaned into it -- and putting it on a fighter carrying nothing is a
+            // raised arm with nothing in it and a stoop nobody asked for. It was reported
+            // twice as both of those things, and this table was the cause of it.
+            ("Idle",              "Idle"),
+            ("Walk",              "Walk"),
+            ("Run",               "Run"),
+            ("Run Fast",          "Run Fast"),
+            ("Jumping Up",        "Jumping Up"),
+            ("Sitting",           "Sitting"),
 
             // The seven the climb needs. Six of them have never existed in this project.
             ("Ladder Idle",       "Ladder_Idle"),
@@ -82,6 +79,27 @@ namespace GulagRunners.GameEditor
         /// because a planted blow is hips and shoulders and a masked one over an idle loop
         /// is a man waving his arms.
         /// </summary>
+        /// <summary>
+        /// The same moves with a weapon in hand, where One Hand Up is not a fault but the
+        /// right answer: a fighter carrying a warhammer SHOULD lead with it.
+        ///
+        /// The backward pair lives here because the pack only has backward clips in this
+        /// set. Authored backwards, not played in reverse: in reverse the weight goes the
+        /// wrong way and the arms lead instead of trail.
+        /// </summary>
+        static readonly (string state, string clip)[] Armed =
+        {
+            ("Idle Armed",        "1Hand_Up_Stand_Idle_A_2"),
+            ("Walk Armed",        "1Hand_Up_Walk_A_F_InPlace"),
+            ("Run Armed",         "1Hand_Up_Run_A_F_InPlace"),
+            ("Walk Back",         "1Hand_Up_Walk_A_B_InPlace"),
+            ("Run Back",          "1Hand_Up_Run_A_B_InPlace"),
+            ("Sprint Armed",      "1Hand_Up_Sprint_A_F_InPlace"),
+            ("Jump Armed",        "1Hand_Up_Jump_B_InPlace"),
+            ("Crouch Idle Armed", "1Hand_Up_Crouch_Idle_1"),
+            ("Crouch Walk",       "1Hand_Up_Crouch_F_InPlace"),
+        };
+
         static readonly (string state, string clip)[] Fight =
         {
             ("Attack",     "1Hand_Up_Attack_A_1_InPlace"),
@@ -92,7 +110,20 @@ namespace GulagRunners.GameEditor
         };
 
         [MenuItem("Tools/Gulag Runners/Build fighter animator")]
-        public static void Build()
+        public static void Build() => Build(false);
+
+        /// <summary>
+        /// The same, but the table wins over a clip that is already in a state.
+        ///
+        /// Separate, and not the default, because a hand-made controller is somebody's
+        /// work. It is here for the one case the plain build cannot fix: a state whose
+        /// clip is from the WRONG SET — an unarmed idle holding a weapon-ready pose — which
+        /// the plain build can only report.
+        /// </summary>
+        [MenuItem("Tools/Gulag Runners/Build fighter animator (replace clips)")]
+        public static void Rebuild() => Build(true);
+
+        static void Build(bool replace)
         {
             if (!AssetDatabase.IsValidFolder(Folder))
             {
@@ -133,9 +164,11 @@ namespace GulagRunners.GameEditor
             }
 
             // Only what is not already there, and never a clip over one somebody chose.
-            int added = Fill(controller, 0, Body, clips, missing) +
-                        Fill(controller, 0, Fight, clips, missing) +
-                        Fill(controller, upper, Fight, clips, missing);
+            var wrong = new List<string>();
+            int added = Fill(controller, 0, Body, clips, missing, wrong, replace) +
+                        Fill(controller, 0, Armed, clips, missing, wrong, replace) +
+                        Fill(controller, 0, Fight, clips, missing, wrong, replace) +
+                        Fill(controller, upper, Fight, clips, missing, wrong, replace);
 
             // Weight 0 on the fight layer: PlayerAnimator drives it, and a layer left at 1
             // is a fighter permanently mid-swing.
@@ -168,6 +201,14 @@ namespace GulagRunners.GameEditor
                                  "hand.");
             else
                 Debug.Log(made);
+
+            if (wrong.Count > 0)
+                Debug.LogWarning(
+                    $"{wrong.Count} state(s) hold a clip this table does not expect, and " +
+                    "were left alone:\n  " + string.Join("\n  ", wrong) +
+                    "\nIf those are deliberate, ignore this. If the locomotion is wearing " +
+                    "the One Hand Up set while unarmed — a raised arm with nothing in it, a " +
+                    "forward stoop — run Build fighter animator (replace clips).");
         }
 
         static int IndexOf(AnimatorController controller, string layer)
@@ -185,15 +226,41 @@ namespace GulagRunners.GameEditor
         /// </summary>
         static int Fill(AnimatorController controller, int layer,
                         (string state, string clip)[] table,
-                        Dictionary<string, AnimationClip> clips, List<string> missing)
+                        Dictionary<string, AnimationClip> clips, List<string> missing,
+                        List<string> wrong, bool replace)
         {
             if (layer < 0 || layer >= controller.layers.Length) return 0;
             AnimatorStateMachine machine = controller.layers[layer].stateMachine;
+            string layerName = controller.layers[layer].name;
             int added = 0;
 
             foreach ((string state, string clip) in table)
             {
-                if (Has(machine, state)) continue;
+                AnimatorState had = Find(machine, state);
+                if (had != null)
+                {
+                    string have = had.motion != null ? had.motion.name : "(empty)";
+                    if (have == clip) continue;
+
+                    if (replace && clips.TryGetValue(clip, out AnimationClip want))
+                    {
+                        had.motion = want;
+                        EditorUtility.SetDirty(had);
+                        added++;
+                        continue;
+                    }
+
+                    if (had.motion == null && clips.TryGetValue(clip, out AnimationClip fill))
+                    {
+                        had.motion = fill;              // empty is not a choice, it is a gap
+                        EditorUtility.SetDirty(had);
+                        added++;
+                        continue;
+                    }
+
+                    wrong.Add($"{layerName}/{state}: has {have}, table says {clip}");
+                    continue;
+                }
 
                 AnimatorState s = machine.AddState(state);
 
@@ -212,11 +279,11 @@ namespace GulagRunners.GameEditor
             return added;
         }
 
-        static bool Has(AnimatorStateMachine machine, string state)
+        static AnimatorState Find(AnimatorStateMachine machine, string state)
         {
             foreach (ChildAnimatorState c in machine.states)
-                if (c.state != null && c.state.name == state) return true;
-            return false;
+                if (c.state != null && c.state.name == state) return c.state;
+            return null;
         }
 
         /// <summary>

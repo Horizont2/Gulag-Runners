@@ -36,6 +36,32 @@ namespace GulagRunners.Game
         public string walkBackState = "Walk Back";
         [Tooltip("Running backwards. Empty falls back to the forward run.")]
         public string runBackState = "Run Back";
+
+        [Header("…and the same, with a weapon in hand")]
+        [Tooltip("Carry the weapon while moving: a second set of locomotion states, used " +
+                 "whenever the fighter is holding something.\n\n" +
+                 "The pack's movement set is called One Hand Up, and that is exactly what " +
+                 "it is: a blade up and a body leaned into it. On a man holding a warhammer " +
+                 "that is right and it is most of what makes him read as dangerous. On a " +
+                 "man holding NOTHING it is a raised arm with nothing in it and a stoop " +
+                 "nobody asked for, which is how it was reported.\n\n" +
+                 "So the stance follows the loadout rather than the clip set: bare hands " +
+                 "get the neutral clips, a weapon gets these. Leave one empty and the " +
+                 "unarmed state above is used for both, which is what happens today.")]
+        public bool stanceFromWeapon = true;
+
+        public string armedIdleState = "Idle Armed";
+        public string armedWalkState = "Walk Armed";
+        public string armedRunState = "Run Armed";
+        [Tooltip("Backwards with a weapon. The pack only HAS backward clips in the armed " +
+                 "set, so these two are the real ones and the unarmed pair above fall back " +
+                 "to walking forwards.")]
+        public string armedWalkBackState = "Walk Back";
+        public string armedRunBackState = "Run Back";
+        public string armedCrouchIdleState = "Crouch Idle Armed";
+        public string armedCrouchMoveState = "Crouch Walk";
+        public string armedAirState = "Jump Armed";
+        public string armedDodgeState = "Sprint Armed";
         [Tooltip("The dodge dash. There is no sprint: the game has one ground speed.")]
         public string dodgeState = "Run Fast";
         [Tooltip("In the air, rising or falling.")]        public string airState = "Jumping Up";
@@ -176,10 +202,21 @@ namespace GulagRunners.Game
         public bool poseJumpByVelocity = true;
 
         [Header("Ladder transitions")]
-        [Tooltip("The ladder start and end clips are long one-shots — one of them runs two and a " +
-                 "half seconds. The grab and the climb-out they illustrate take a quarter of a " +
-                 "second, so they are played faster than authored or only their opening frames " +
-                 "would ever be seen.")]
+        [Tooltip("Drive the grab and the climb-out as a POSE across the move they " +
+                 "illustrate, instead of playing them at a fixed speed.\n\n" +
+                 "The same idea as Pose Attack By Phase, for the same reason. These four " +
+                 "clips are long one-shots — stepping backwards onto a ladder runs 1.25 s " +
+                 "and hauling out of one 0.83 s — while the scripted move they illustrate " +
+                 "is 10 to 30 ticks, which is 0.17 s to 0.50 s and DIFFERENT EVERY TIME, " +
+                 "because it is worked out from how far the body actually has to travel. " +
+                 "No fixed playback speed can match a length that changes: whatever is " +
+                 "typed below, the clip either runs out early and holds its last frame or " +
+                 "is cut off part way and snaps. Both of those are the jerk.\n\n" +
+                 "Posed, the clip starts on its first frame when the move starts and lands " +
+                 "on its last frame as the body arrives, whatever either of them is long.")]
+        public bool poseLadderByProgress = true;
+
+        [Tooltip("Playback speed for those clips with the above OFF.")]
         [Range(0.5f, 4f)] public float ladderActionPlayback = 2f;
 
         [Tooltip("How long the step-off clip is held after letting go of the foot of a ladder, " +
@@ -379,6 +416,32 @@ namespace GulagRunners.Game
         }
 
         /// <summary>
+        /// The same move, in the stance the loadout calls for.
+        ///
+        /// The pack's movement set is called One Hand Up and is exactly that: a blade up
+        /// and a body leaned into it. On a man carrying a warhammer it is right and it is
+        /// most of what makes him read as dangerous. On a man carrying nothing it is a
+        /// raised arm with nothing in it and a stoop nobody asked for — which is how it
+        /// was reported, twice, and the answer is not to pick one of the two clip sets but
+        /// to let the loadout say which.
+        ///
+        /// An empty armed name falls back to the unarmed state, so a half-filled set is
+        /// the behaviour there has always been rather than a missing clip.
+        /// </summary>
+        string Stance(in PlayerSimState s, string unarmed, string armed)
+        {
+            if (!stanceFromWeapon || string.IsNullOrEmpty(armed)) return unarmed;
+            return Armed(in s) ? armed : unarmed;
+        }
+
+        /// <summary>
+        /// Is there anything in the hand? Fists are not a weapon for this purpose: the
+        /// whole point of the stance is the thing being held.
+        /// </summary>
+        static bool Armed(in PlayerSimState s) =>
+            s.Inventory.Weapon != ItemId.None && s.Inventory.Weapon != ItemId.Fists;
+
+        /// <summary>
         /// Is the body travelling against the way it is aimed?
         ///
         /// Asked of the SIMULATION's two signs and not of the velocity, because the velocity
@@ -472,16 +535,16 @@ namespace GulagRunners.Game
 
                 case MoveMode.Dodging:
                     playback = maxPlaybackSpeed;
-                    return dodgeState;
+                    return Stance(in s, dodgeState, armedDodgeState);
 
                 case MoveMode.Mantling:
-                    playback = ladderActionPlayback;
-                    fade = ScriptedFade(in s);
+                    if (poseLadderByProgress) { scrub = ScriptProgress(in s); playback = 0f; }
+                    else { playback = ladderActionPlayback; fade = ScriptedFade(in s); }
                     return mantleState;
 
                 case MoveMode.Mounting:
-                    playback = ladderActionPlayback;
-                    fade = ScriptedFade(in s);
+                    if (poseLadderByProgress) { scrub = ScriptProgress(in s); playback = 0f; }
+                    else { playback = ladderActionPlayback; fade = ScriptedFade(in s); }
                     return s.ScriptDir >= 0 ? mountUpState : mountDownState;
 
                 case MoveMode.Airborne:
@@ -493,7 +556,7 @@ namespace GulagRunners.Game
                         scrub = Mathf.Clamp01(Mathf.InverseLerp(top, bottom, vy));
                         playback = 0f;
                     }
-                    return airState;
+                    return Stance(in s, airState, armedAirState);
 
                 default:
                     // Just stepped off the bottom of a ladder and not moving yet: finish the
@@ -506,9 +569,10 @@ namespace GulagRunners.Game
 
                     if (s.Crouching)
                     {
-                        if (speed <= idleThreshold) return crouchIdleState;
+                        if (speed <= idleThreshold)
+                            return Stance(in s, crouchIdleState, armedCrouchIdleState);
                         playback = Scale(speed, referenceWalkSpeed);
-                        return crouchMoveState;
+                        return Stance(in s, crouchMoveState, armedCrouchMoveState);
                     }
 
                     // A raised guard is a pose, and it has to be one the opponent can read:
@@ -525,7 +589,8 @@ namespace GulagRunners.Game
                         }
                     }
 
-                    if (speed <= idleThreshold) return idleState;
+                    if (speed <= idleThreshold)
+                        return Stance(in s, idleState, armedIdleState);
 
                     // Going one way with the blade pointed the other is running BACKWARDS,
                     // and there is a clip for it. This is the picture the aim/travel split
@@ -533,26 +598,26 @@ namespace GulagRunners.Game
                     // guard away from the man he is backing away from.
                     if (Backwards(in s))
                     {
-                        if (speed >= runThreshold && !string.IsNullOrEmpty(runBackState))
+                        string back = speed >= runThreshold
+                            ? Stance(in s, runBackState, armedRunBackState)
+                            : Stance(in s, walkBackState, armedWalkBackState);
+
+                        if (!string.IsNullOrEmpty(back))
                         {
-                            playback = Scale(speed, referenceRunSpeed);
-                            return runBackState;
-                        }
-                        if (!string.IsNullOrEmpty(walkBackState))
-                        {
-                            playback = Scale(speed, referenceWalkSpeed);
-                            return walkBackState;
+                            playback = Scale(speed, speed >= runThreshold
+                                ? referenceRunSpeed : referenceWalkSpeed);
+                            return back;
                         }
                     }
 
                     if (speed >= runThreshold)
                     {
                         playback = Scale(speed, referenceRunSpeed);
-                        return runState;
+                        return Stance(in s, runState, armedRunState);
                     }
 
                     playback = Scale(speed, referenceWalkSpeed);
-                    return walkState;
+                    return Stance(in s, walkState, armedWalkState);
             }
         }
 
@@ -609,6 +674,20 @@ namespace GulagRunners.Game
 
         float Scale(float speed, float reference) =>
             reference <= 0.01f ? 1f : Mathf.Clamp(speed / reference, minPlaybackSpeed, maxPlaybackSpeed);
+
+        /// <summary>
+        /// How far through a scripted move the body is, 0 to 1.
+        ///
+        /// The simulation counts it down in ticks and knows exactly how many it will take,
+        /// which is the only honest clock for the clip: the move's length is computed from
+        /// the distance the body has to cover, so it is a different number on every ladder
+        /// and at every height.
+        /// </summary>
+        static float ScriptProgress(in PlayerSimState s)
+        {
+            if (s.ScriptFrames <= 0) return 0f;
+            return Mathf.Clamp01(1f - s.ScriptTimer / (float)s.ScriptFrames);
+        }
 
         /// <summary>
         /// A cross-fade short enough that a scripted move actually reaches its own clip. Fading for

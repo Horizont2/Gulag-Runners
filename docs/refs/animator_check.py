@@ -63,18 +63,62 @@ def by_guid():
     return out
 
 
+# States the game HOLDS for as long as the simulation says, named by the field that
+# carries them so a rename cannot quietly drop one out of the check. A clip in one of
+# these with Loop Time unticked plays once and then freezes on its last frame, which is
+# reported as "the animation plays one frame and ends" -- and was, for the climb: three
+# of the pack's ladder clips shipped with loopTime 0.
+#
+# Everything else is a one-shot or is POSED frame by frame (the jump, the attacks, the
+# ladder transitions), and looping those would be wrong.
+MUST_LOOP = (
+    "idleState walkState runState walkBackState runBackState dodgeState "
+    "crouchIdleState crouchMoveState climbUpState climbDownState climbIdleState "
+    "blockIdleState blockMoveState searchState "
+    "armedIdleState armedWalkState armedRunState armedWalkBackState armedRunBackState "
+    "armedCrouchIdleState armedCrouchMoveState armedDodgeState"
+).split()
+
+
 def controller_states(path):
-    """State names in a .controller, which are the m_Name of its AnimatorState documents."""
+    """Every state in a .controller: its name, and the clip in it."""
     text = read(path)
-    names = []
-    for m in re.finditer(r"^--- !u!(\d+) &-?\d+.*$", text, re.M):
-        if int(m.group(1)) != 1102:            # AnimatorState
+    heads = [(m.start(), m.end(), int(m.group(1)))
+             for m in re.finditer(r"^--- !u!(\d+) &-?\d+.*$", text, re.M)]
+    out = {}
+    for i, (start, after, cls) in enumerate(heads):
+        if cls != 1102:                        # AnimatorState
             continue
-        tail = text[m.end():m.end() + 2000]
-        n = re.search(r"^[ \t]*m_Name:[ \t]*(.*)$", tail, re.M)
-        if n:
-            names.append(n.group(1).strip())
-    return names
+        stop = heads[i + 1][0] if i + 1 < len(heads) else len(text)
+        body = text[after:stop]
+        n = re.search(r"^[ \t]*m_Name:[ \t]*(.*)$", body, re.M)
+        if not n:
+            continue
+        g = re.search(r"m_Motion: \{fileID: -?\d+(?:, guid: ([0-9a-f]+))?", body)
+        out[n.group(1).strip()] = g.group(1) if g and g.group(1) else None
+    return out
+
+
+def loops(clip_path):
+    """Is Loop Time ticked? None when it cannot be told.
+
+    Two homes for the same flag: a .anim asset keeps it as m_LoopTime in its own clip
+    settings, while a clip living inside an .fbx keeps it in the importer, which is the
+    .meta beside the model. Reading only the first finds a clip that loops and misses the
+    one actually in the controller."""
+    if clip_path is None or not os.path.exists(clip_path):
+        return None
+    if clip_path.endswith(".anim"):
+        m = re.search(r"m_LoopTime: (\d)", read(clip_path))
+        return m.group(1) == "1" if m else None
+
+    meta = clip_path + ".meta"
+    if not os.path.exists(meta):
+        return None
+    body = read(meta)
+    m = re.search(r"clipAnimations:(.*?)\n  [a-zA-Z]", body, re.S)
+    m = re.search(r"loopTime: (\d)", m.group(1) if m else body)
+    return m.group(1) == "1" if m else None
 
 
 def main():
@@ -127,9 +171,9 @@ def main():
             problems += 1
             continue
 
-        have = set()
+        have = {}
         for path in controllers:
-            have |= set(controller_states(path))
+            have.update(controller_states(path))
 
         missing = sorted(s for s in wanted if s not in have)
         shown = ", ".join(os.path.basename(p) for p in sorted(controllers))
@@ -140,6 +184,22 @@ def main():
             near = [h for h in have if h.replace("_", " ").lower() == state.lower()]
             hint = f"  (the controller spells it \"{near[0]}\")" if near else ""
             print(f"      PROBLEM - no state \"{state}\" ({wanted[state]}){hint}")
+
+        # And the flag that decides whether a held state is an animation or a frozen frame.
+        for state, field in sorted(wanted.items()):
+            if field not in MUST_LOOP or state not in have:
+                continue
+            clip = assets.get(have[state])
+            looping = loops(clip)
+            if looping is None:
+                print(f"      note - \"{state}\" ({field}): no clip, or its loop flag "
+                      f"could not be read")
+                continue
+            if not looping:
+                problems += 1
+                print(f"      PROBLEM - \"{state}\" ({field}) holds "
+                      f"{os.path.basename(clip)} with Loop Time OFF, so it plays once and "
+                      f"freezes on its last frame")
 
     if checked == 0:
         print("animator_check: no PlayerAnimator in the scene — nothing checked.")
