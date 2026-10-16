@@ -105,7 +105,43 @@ namespace GulagRunners.Game
             float longest = Mathf.Max(local.size.x, Mathf.Max(local.size.y, local.size.z));
             if (longest <= 0.0001f) return;
 
-            root.transform.localScale *= want / longest;
+            // Out of the PARENT's scale, because the length wanted is in world metres and
+            // the scale set here is local.
+            //
+            // This is why weapons were small specifically in the hand. The fighter object
+            // is scaled to 0.5, the model hangs off a hand bone beneath it, and a local
+            // scale that made the model 0.32 m of its parent's space made it 0.16 m of the
+            // world -- half of every length this function had just worked out, and only
+            // for the models that are held. The same weapon lying on the floor, under an
+            // unscaled view, came out right, so the two disagreed by exactly the fighter's
+            // own scale and picking one up halved it.
+            root.transform.localScale *= want / (longest * ParentScale(root.transform));
+        }
+
+        /// <summary>
+        /// The scale of everything ABOVE a transform, as one number.
+        ///
+        /// Taken as lossy over local rather than walked up the hierarchy, so it is right
+        /// however deep the thing is parented and whatever the bones in between do. A
+        /// component at or near zero is a scale nothing can be fitted against, so it
+        /// contributes 1 rather than an infinity.
+        /// </summary>
+        static float ParentScale(Transform t)
+        {
+            Vector3 lossy = t.lossyScale, local = t.localScale;
+            float sum = 0f;
+            int counted = 0;
+
+            for (int i = 0; i < 3; i++)
+            {
+                if (Mathf.Abs(local[i]) < 0.0001f) continue;
+                float above = Mathf.Abs(lossy[i] / local[i]);
+                if (above < 0.0001f) continue;
+                sum += above;
+                counted++;
+            }
+
+            return counted == 0 ? 1f : sum / counted;
         }
 
         /// <summary>

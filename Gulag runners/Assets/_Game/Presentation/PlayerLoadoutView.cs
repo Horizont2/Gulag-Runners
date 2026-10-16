@@ -113,8 +113,25 @@ namespace GulagRunners.Game
                 foreach (ItemModel m in weapons)
                     if (m != null && m.root != null) socket.Adopt(m.root.transform);
 
-            // Sized before anything is shown, and once: the fit multiplies the model's own
-            // scale, so running it twice would halve the weapon again.
+            ItemModels.Show(weapons, ItemId.None);
+            ItemModels.Show(armour, ItemId.None);
+        }
+
+        /// <summary>
+        /// Sized once, and in Start rather than Awake.
+        ///
+        /// The socket parents itself to a hand bone in its own OnEnable, and the order of
+        /// that against another component's Awake is not defined. Fitted first, a model is
+        /// measured while it is still hanging off this object instead of off the hand, and
+        /// the parent scale the fit divides out is then the wrong one -- which is a weapon
+        /// that comes out half size or double, depending on which component woke first.
+        /// By Start every Awake and OnEnable in the scene has run.
+        ///
+        /// Once, because the fit MULTIPLIES the model's own scale: running it twice halves
+        /// the weapon again.
+        /// </summary>
+        void Start()
+        {
             // Proportional to the fighter, not a number in metres: the one decision this
             // project has not taken yet is what a metre is, and a hard-coded haft would
             // have to be found and changed again on the day it does.
@@ -123,9 +140,6 @@ namespace GulagRunners.Game
             ItemModels.FitAll(weapons, reachToLength, minLength, maxLength, fallbackLength,
                               haft);
             ItemModels.FitAll(armour, 0f, minLength, maxLength, fallbackLength);
-
-            ItemModels.Show(weapons, ItemId.None);
-            ItemModels.Show(armour, ItemId.None);
         }
 
         void LateUpdate()

@@ -1014,6 +1014,23 @@ namespace GulagRunners.Sim
                 if (!LaneFor(world.SolidSpan(i), s.Depth, in cfg, out Fix candidate)) continue;
                 if (found && solid.MaxY <= top) continue;
 
+                // And it must be the lane a body STANDING there is held on, not merely one
+                // it can reach. These are two different rules and they disagreed on every
+                // ladder in this arena: LaneFor answers "the nearest part of that floor to
+                // where you are now", which off a ladder is its front edge, while the floor
+                // underfoot holds a standing body on the gameplay plane whenever the floor
+                // reaches it. So the climb-out finished, the body came to rest, and then
+                // UpdateDepth pulled it 0.41 to 0.49 m backwards at the full lane speed of
+                // 4 m/s -- a half-metre lurch at the landing, measured on all four ladders,
+                // eight times faster than the climb-out that had just ended.
+                //
+                // Promising the standing lane costs nothing when the two agree and removes
+                // the lurch when they do not. If the standing lane is out of reach from the
+                // rungs, the reachable one stands: a climb-out that happens with a small
+                // correction beats one that does not happen.
+                Fix settled = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
+                if (Fix.Abs(settled - s.Depth) <= cfg.LaneReach) candidate = settled;
+
                 // Climbing out has to end standing, not wedged under the next floor up, and the
                 // whole footprint has to be on it. Both judged on the slice it would land on,
                 // and both now only rule THIS candidate out: the old version took the highest

@@ -104,6 +104,39 @@ for i, l in enumerate(W["ladder"]):
 
 check("and that section actually ran", tested > 0, f"{tested} ladder(s) reach a floor")
 
+print("\nA climb-out lands on the lane it will be HELD on")
+# Two rules decide a depth and they used to disagree on every ladder here. lane_for answers
+# "the nearest part of that floor to where you are now", which off a ladder is its front
+# edge; the floor underfoot holds a standing body on the gameplay plane whenever the floor
+# reaches it. So the climb-out finished, the body came to rest, and update_depth then pulled
+# it back at the full lane speed of 4 m/s -- 0.41 to 0.49 m, eight times faster than the
+# climb-out that had just ended, which is what "the landing is jerky" was.
+import sim_motor_mirror as _M
+for i in range(len(W["ladder"])):
+    l = W["ladder"][i]
+    sp = _M.span(W, "ladder", i)
+    s = S(centre(i), F(l[1]) + 0.3)
+    s.depth = (sp[0] + sp[1]) // 2 - (sp[1] - sp[0]) // 2 - C["LSTANDOFF"]
+    until(s, 0, lambda s: s.mode in ("ground", "air"), 240)
+
+    landed = None
+    for _ in range(1200):
+        was = s.mode
+        step(s, UP, W)
+        if was == "mantle" and s.mode != "mantle":
+            landed = F(s.depth)
+            break
+
+    if landed is None:
+        print(f"  ....  ladder {i} never climbs out from below, nothing to measure")
+        continue
+
+    until(s, 0, lambda s: False, 120)          # two seconds of standing still
+    drift = abs(F(s.depth) - landed)
+    check(f"ladder {i}: the body does not slide after the climb-out",
+          drift < 0.01, f"landed {landed:+.3f}, settled {F(s.depth):+.3f}, "
+                        f"drift {drift:.3f} m")
+
 print("\nThe whole building, up and back down")
 for n, (sx, sy, facing, sz) in enumerate(SPAWNS, 1):
     low, high = (0, 2) if n == 1 else (1, 3)

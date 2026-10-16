@@ -724,6 +724,14 @@ def step_out(s, ladder, w):
         # The landing may be a lane behind the rungs — here it always is.
         cand = lane_for(span(w, "solid", i), s.depth)
         if cand is None: continue
+        # And the lane a body STANDING there is held on, not merely one it can reach.
+        # Two different rules, and they disagreed on every ladder here: lane_for answers
+        # "nearest part of that floor to where you are", which off a ladder is its front
+        # edge, while floor_lane holds a standing body on the gameplay plane whenever the
+        # floor reaches it. The climb-out finished, the body stopped, and update_depth then
+        # pulled it 0.41-0.49 m back at the full 4 m/s -- the lurch at the landing.
+        settled = lane_on(span(w, "solid", i), s.depth)
+        if abs(settled - s.depth) <= C["LANEREACH"]: cand = settled
         if top is not None and sol[3] <= top: continue
         # Both checks only rule THIS candidate out: taking the highest floor and giving up if it
         # did not work let one awkward box over a ladder's head cancel the climb-out.

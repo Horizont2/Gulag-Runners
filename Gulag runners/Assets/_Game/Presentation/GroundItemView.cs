@@ -39,7 +39,12 @@ namespace GulagRunners.Game
                  "scaled to this. Taking the length from reach keeps the picture and the " +
                  "hitbox agreeing: docs/02 makes reach the whole difference between two " +
                  "weapons, and a spear drawn dagger-sized is that difference thrown away.")]
-        [Range(0f, 3f)] public float reachToLength = 1.35f;
+        [Range(0f, 3f)] public float reachToLength = 0.73f;
+
+        [Tooltip("The grip and head every weapon has before it has any reach at all, in " +
+                 "metres. Must match the fighter's own Base Of Body times its height, or a " +
+                 "weapon changes size when it is picked up.")]
+        [Range(0f, 0.8f)] public float baseLength = 0.246f;
 
         [Tooltip("Shortest a weapon may be drawn, in metres. A dagger adds almost nothing to " +
                  "bare reach, and a dagger you cannot see is not a weapon.")]
@@ -50,13 +55,36 @@ namespace GulagRunners.Game
                  "out nearly twice the fighter's height.")]
         [Range(0f, 3f)] public float maxLength = 1.3f;
 
-        [Tooltip("Longest axis, in metres, for anything with no reach of its own — armour, the " +
-                 "bandage, a stand-in cube.")]
-        [Range(0f, 2f)] public float fallbackLength = 0.3f;
+        [Tooltip("Longest axis, in metres, for anything with no reach of its own — armour, " +
+                 "the bandage, a stand-in cube.\n\n" +
+                 "A suit of armour on the floor is the thing a player decides about from " +
+                 "across the room, and at 0.30 m beside a 0.91 m fighter it was a third of " +
+                 "him and read as a scrap. Half his height is a garment.")]
+        [Range(0f, 2f)] public float fallbackLength = 0.45f;
 
         [Header("Look")]
         [Tooltip("What bobs and turns. Leave empty to move this object.")]
         public Transform spinRoot;
+
+        [Tooltip("Optional. A light the rarity colours and pulses, so a find reads from " +
+                 "across the arena rather than only once you are standing over it.\n\n" +
+                 "A light and not just emission, for two reasons. Emission through a " +
+                 "MaterialPropertyBlock does nothing AT ALL unless the material has its " +
+                 "Emission tick box on — a block can set a property but cannot enable a " +
+                 "shader keyword, and the weapon pack's material ships with emission " +
+                 "compiled out, so every tier colour this view has ever written went " +
+                 "nowhere. And even switched on, a 30 cm object glowing faintly is not " +
+                 "something anybody notices from the other end of a room. A light is.\n\n" +
+                 "Tools > Gulag Runners > Light up the loot adds one and switches the " +
+                 "materials' emission on.")]
+        public Light rarityLight;
+
+        [Tooltip("Brightness of that light for a COMMON find. Rare and legendary are " +
+                 "multiples of it, decided by the rarity rather than typed again here.")]
+        [Range(0f, 8f)] public float lightStrength = 0.9f;
+
+        [Tooltip("How far it reaches, in metres, for a common find.")]
+        [Range(0.2f, 8f)] public float lightRange = 1.6f;
 
         [Tooltip("Renderer tinted by tier. Leave empty to take the first one under the model.")]
         public Renderer tintTarget;
@@ -111,13 +139,25 @@ namespace GulagRunners.Game
 
         void Awake()
         {
-            // Sized once, before anything is shown. A weapon lying on the floor has to read at
-            // the same size as one in a hand, or picking it up changes what it is.
-            ItemModels.FitAll(models, reachToLength, minLength, maxLength, fallbackLength);
-            if (fallbackModel != null)
-                ItemModels.Fit(fallbackModel, ItemId.None, 0f, minLength, maxLength, fallbackLength);
-
             Hide();
+        }
+
+        /// <summary>
+        /// Sized once, and in Start for the same reason the fighter's loadout is: by then
+        /// every Awake and OnEnable has run, so the parent scale the fit divides out is the
+        /// one this model will actually hang under.
+        ///
+        /// A weapon lying on the floor has to read at the same size as one in a hand, or
+        /// picking it up changes what it is — which is exactly what happened while the hand
+        /// divided out the fighter's 0.5 and the floor did not.
+        /// </summary>
+        void Start()
+        {
+            ItemModels.FitAll(models, reachToLength, minLength, maxLength, fallbackLength,
+                              baseLength);
+            if (fallbackModel != null)
+                ItemModels.Fit(fallbackModel, ItemId.None, 0f, minLength, maxLength,
+                               fallbackLength);
         }
 
         /// <summary>Puts this view on an item. Phase keeps a row of them from bobbing in time.</summary>
@@ -190,6 +230,16 @@ namespace GulagRunners.Game
             Color colour = ItemModels.RarityGlow(tierColours, item.Item, beat, glow,
                                                  out float rarity);
             ItemModels.Tint(r, ref _block, colour * lit, rarity * lit * offered);
+
+            if (rarityLight != null)
+            {
+                // Off the same number the emission uses, so the lamp and the model cannot
+                // come to disagree about what this item is worth.
+                float strength = rarity / Mathf.Max(0.0001f, glow);
+                rarityLight.color = colour;
+                rarityLight.intensity = lightStrength * strength * lit * offered;
+                rarityLight.range = lightRange * Mathf.Sqrt(Mathf.Max(0.01f, strength));
+            }
         }
 
         public void Hide()
@@ -199,6 +249,8 @@ namespace GulagRunners.Game
             if (fallbackModel != null && fallbackModel.activeSelf) fallbackModel.SetActive(false);
             _shown = ItemId.None;
             _shownRoot = null;
+            if (rarityLight != null) rarityLight.intensity = 0f;   // or an empty slot burns
+            if (rarityLight != null) rarityLight.intensity = 0f;   // or an empty slot burns
             Visible = false;
         }
 
