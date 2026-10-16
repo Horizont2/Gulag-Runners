@@ -39,11 +39,31 @@ namespace GulagRunners.Game
                  "matters: without it a retargeted climb clip holds a ladder that is not there.")]
         public bool gripLadder = true;
 
-        [Tooltip("Distance between rungs, in metres. The hands step up ONE rung at a time " +
-                 "rather than sliding, which is what makes a climb read as a climb; this is " +
-                 "the size of that step.\\n\\n" +
-                 "It does not have to match the art exactly — it has to be close enough that " +
-                 "a hand lands on a rung rather than between two.")]
+        [Tooltip("Let the CLIP climb and only correct it onto the ladder.\n\n" +
+                 "This is the difference between IK that helps an animation and IK that " +
+                 "replaces one. Placing all four limbs on a rung grid puts them exactly " +
+                 "where they belong and takes the climb with it: hands and feet are the " +
+                 "whole of a climb pose, and pinned to the world they hold still while the " +
+                 "body rises — which looks precisely like one frame of the clip playing on " +
+                 "a loop, and was reported as exactly that.\n\n" +
+                 "So with this on, the hand's HEIGHT is the clip's own, every frame, and " +
+                 "only the two things the clip cannot know are corrected: how far the " +
+                 "ladder is from the camera, and where its rails are. The hand-over-hand " +
+                 "rhythm is the animator's, the ladder is the level's, and neither has to " +
+                 "know about the other.\n\n" +
+                 "Off falls back to the rung grid below, which is worth having when a " +
+                 "character has no climb clip at all.")]
+        public bool followClip = true;
+
+        [Tooltip("How far out along the rungs a hand may be corrected, as a share of the " +
+                 "ladder's width. The rails are at its edges, so half is the rail itself.")]
+        [Range(0.1f, 0.6f)] public float railLimit = 0.45f;
+
+        [Tooltip("Distance between rungs, in metres. Used only with Follow Clip OFF: the " +
+                 "hands then step up ONE rung at a time rather than sliding, which is what " +
+                 "makes a climb read as a climb without a clip to read it from.\n\n" +
+                 "It does not have to match the art exactly — it has to be close enough " +
+                 "that a hand lands on a rung rather than between two.")]
         [Range(0.08f, 0.6f)] public float rungSpacing = 0.22f;
 
         [Tooltip("Where the hands reach, as a share of body height above the feet. The two " +
@@ -214,6 +234,8 @@ namespace GulagRunners.Game
         /// </summary>
         void Grip(in PlayerSimState s, SimWorld world)
         {
+            if (followClip) { Correct(in s, world); return; }
+
             int i = s.LadderIndex;
             Aabb box = world.Ladders[i];
 
@@ -302,6 +324,54 @@ namespace GulagRunners.Game
             Set(AvatarIKGoal.RightHand, _rightHand, gripWeight * _ladderBlend);
             Set(AvatarIKGoal.LeftFoot, _leftFoot, footGripWeight * _ladderBlend);
             Set(AvatarIKGoal.RightFoot, _rightFoot, footGripWeight * _ladderBlend);
+        }
+
+        /// <summary>
+        /// The clip climbs; this only moves its hands and feet ONTO the ladder.
+        ///
+        /// Each limb is read back out of the animator — <see cref="Animator.GetIKPosition"/>
+        /// on an IK pass returns where the clip has just put it — and only two of its three
+        /// numbers are touched. The height is left exactly as the animator wrote it, so the
+        /// reach, the pause and the push of a climb all survive intact. The depth is pulled
+        /// onto the rung line, which is the fault IK was added for and the one no amount of
+        /// tuning the body's distance could fix. And X is held inside the rails, which costs
+        /// nothing on an upright ladder and keeps a hand on a leaning one.
+        ///
+        /// No smoothing, and none needed: the clip is already smooth and the correction is
+        /// a near-constant offset, so there is nothing here that can step.
+        /// </summary>
+        void Correct(in PlayerSimState s, SimWorld world)
+        {
+            int i = s.LadderIndex;
+            float width = M(world.Ladders[i].MaxX - world.Ladders[i].MinX);
+            Fix depth = s.Depth;
+            float limit = Mathf.Max(0.01f, width * railLimit);
+
+            Vector3 Onto(AvatarIKGoal goal)
+            {
+                Vector3 at = _animator.GetIKPosition(goal);
+                Fix y = F(at.y);
+
+                float centre = M(world.LadderCentreAt(i, y));
+                float rungs = M(world.LadderDepthAt(i, y, depth, Fix.Zero));
+
+                return new Vector3(Mathf.Clamp(at.x, centre - limit, centre + limit),
+                                   at.y, rungs);
+            }
+
+            _leftHand = Onto(AvatarIKGoal.LeftHand);
+            _rightHand = Onto(AvatarIKGoal.RightHand);
+            _leftFoot = Onto(AvatarIKGoal.LeftFoot);
+            _rightFoot = Onto(AvatarIKGoal.RightFoot);
+
+            Set(AvatarIKGoal.LeftHand, _leftHand, gripWeight * _ladderBlend);
+            Set(AvatarIKGoal.RightHand, _rightHand, gripWeight * _ladderBlend);
+            Set(AvatarIKGoal.LeftFoot, _leftFoot, footGripWeight * _ladderBlend);
+            Set(AvatarIKGoal.RightFoot, _rightFoot, footGripWeight * _ladderBlend);
+
+            // The springs belong to the rung grid; coming back to it must not spring from
+            // wherever the clip happened to leave a limb.
+            _held = false;
         }
 
         /// <summary>

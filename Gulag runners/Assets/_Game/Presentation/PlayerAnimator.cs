@@ -196,6 +196,18 @@ namespace GulagRunners.Game
         [Range(0.1f, 1f)] public float minPlaybackSpeed = 0.4f;
         [Range(1f, 3f)] public float maxPlaybackSpeed = 1.8f;
 
+        [Header("Debug")]
+        [Tooltip("What is actually on screen, written every frame while playing.\n\n" +
+                 "Here because the commonest animation fault in this project is not a bad " +
+                 "clip but the WRONG clip, and from the outside those look identical. If a " +
+                 "pose looks wrong, read the name off here and the hunt is over before it " +
+                 "starts.")]
+        public string nowPlaying;
+
+        [Tooltip("And on the fight layer, with its weight. Empty means the whole body is " +
+                 "playing what is above.")]
+        public string nowOnArms;
+
         int _currentHash;
         int _upperHash;
         float _upperWeight;
@@ -261,6 +273,11 @@ namespace GulagRunners.Game
             Play(state, playback, scrub, fade);
 
             Arms(split ? arms : null, armScrub);
+
+            nowPlaying = state;
+            nowOnArms = split && _upperWeight > 0.001f
+                ? $"{arms}  ({_upperWeight:0.00})"
+                : "";
         }
 
         /// <summary>
