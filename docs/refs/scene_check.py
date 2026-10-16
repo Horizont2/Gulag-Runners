@@ -65,9 +65,17 @@ def check(path, guids):
         print(f"  {rel}: note - guid {g} is outside Assets (a package, or built-in)")
 
     # Components and their GameObjects have to agree, both ways.
-    owns, owner = {}, {}
+    #
+    # A STRIPPED GameObject counts as present. It is how a scene refers to an object that
+    # lives inside a prefab, and a component added to a prefab's child in the scene -- the
+    # IK and the armour on each fighter's model are exactly that -- is owned by one. Its
+    # component list lives in the prefab, so there is nothing here to cross-check it
+    # against, but calling it absent reports four healthy components as broken.
+    owns, owner, in_prefab = {}, {}, set()
     for cls, fid, stripped, body in docs:
         if stripped:
+            if cls == "1":
+                in_prefab.add(fid)
             continue
         if cls == "1":
             owns[fid] = set(re.findall(r'- component: \{fileID: (\d+)\}', body))
@@ -76,6 +84,8 @@ def check(path, guids):
             if m:
                 owner[fid] = m.group(1)
     for comp, go in owner.items():
+        if go in in_prefab:
+            continue              # its component list is the prefab's, not this file's
         if go not in owns:
             bad.append(f"component {comp} is owned by {go}, which is not a GameObject here")
         elif comp not in owns[go]:
