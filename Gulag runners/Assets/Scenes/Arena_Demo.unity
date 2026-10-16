@@ -242,6 +242,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.PlayerIK
   player: {fileID: 1900000130}
   gripLadder: 1
+  followClip: 1
+  railLimit: 0.45
   rungSpacing: 0.22
   highHand: 1.05
   lowHand: 0.82
@@ -8566,6 +8568,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.PlayerIK
   player: {fileID: 1900000122}
   gripLadder: 1
+  followClip: 1
+  railLimit: 0.45
   rungSpacing: 0.22
   highHand: 1.05
   lowHand: 0.82
@@ -18416,6 +18420,24 @@ MonoBehaviour:
   - {fileID: 603475885}
   - {fileID: 2036804243}
   logChanges: 0
+--- !u!114 &1900001155
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 282630684}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a96a27f0eefc27e7b188c1594a03a03d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.FighterBrain
+  takeOver: 0
+  skill: 1
+  self: {fileID: 1900000122}
+  target: {fileID: 0}
+  tuningFromSkill: 1
+  pressing: 
 --- !u!114 &1900002001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23577,6 +23599,24 @@ MonoBehaviour:
   - {fileID: 454727242}
   - {fileID: 1605199839}
   logChanges: 0
+--- !u!114 &1976578579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1976578567}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a96a27f0eefc27e7b188c1594a03a03d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.FighterBrain
+  takeOver: 1
+  skill: 1
+  self: {fileID: 1900000130}
+  target: {fileID: 0}
+  tuningFromSkill: 1
+  pressing: 
 --- !u!1001 &1987037729
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -24985,6 +25025,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 562406978992994357, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1976578578}
+    - targetCorrespondingSourceObject: {fileID: 562406978992994357, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1976578579}
     - targetCorrespondingSourceObject: {fileID: 4708675116766100728, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8519457}
@@ -25059,6 +25102,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5480937427733612651, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1900001154}
+    - targetCorrespondingSourceObject: {fileID: 5480937427733612651, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1900001155}
     - targetCorrespondingSourceObject: {fileID: 6009296746703928373, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       insertIndex: -1
       addedObject: {fileID: 943041558}
