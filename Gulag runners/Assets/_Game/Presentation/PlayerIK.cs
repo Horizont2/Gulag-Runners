@@ -68,6 +68,14 @@ namespace GulagRunners.Game
         [Range(0f, 0.5f)] public float footSpread = 0.18f;
         [Range(0f, 0.6f)] public float lowFoot = 0.05f;
 
+        [Tooltip("How long a hand takes to reach the next rung, in seconds.\n\n" +
+                 "The whole difference between a climb and a stutter. A hand snapped straight " +
+                 "onto its rung is a hand that teleports 22 cm nine times a second, and " +
+                 "because the arms dominate the pose the entire body then reads as frozen " +
+                 "with a jerk in it — which looks exactly like one frame of the clip playing " +
+                 "on a loop. Reaching takes time; this is how long.")]
+        [Range(0.02f, 0.5f)] public float reachSeconds = 0.13f;
+
         [Tooltip("How hard the hands are pinned. 1 is exactly on the rung, which can " +
                  "straighten an arm that the clip had bent; a little under keeps the pose.")]
         [Range(0f, 1f)] public float gripWeight = 0.9f;
@@ -125,6 +133,11 @@ namespace GulagRunners.Game
         Vector3 _leftHand, _rightHand, _leftFoot, _rightFoot, _lookAt;
         bool _gripping;
 
+        // Where each limb is on its way to, and how fast — one spring per limb, so a hand
+        // that has just let go of a rung travels to the next one instead of appearing there.
+        Vector3 _leftHandV, _rightHandV, _leftFootV, _rightFootV;
+        bool _held;
+
         void Awake()
         {
             _animator = GetComponent<Animator>();
@@ -163,6 +176,8 @@ namespace GulagRunners.Game
                             s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length;
             bool onLedge = gripLedge && !onLadder &&
                            s.Mode == MoveMode.Mantling && s.ScriptForward;
+
+            if (!onLadder) _held = false;
 
             _ladderBlend = Mathf.MoveTowards(_ladderBlend,
                                              onLadder || onLedge ? 1f : 0f, step);
@@ -227,10 +242,32 @@ namespace GulagRunners.Game
                 return new Vector3(x, rung, z);
             }
 
-            _leftHand = On(feet + height * highHand, -handSpread);
-            _rightHand = On(feet + height * lowHand, handSpread);
-            _leftFoot = On(feet + height * lowFoot, -footSpread);
-            _rightFoot = On(feet + height * lowFoot + spacing, footSpread);
+            Vector3 wantLeftHand = On(feet + height * highHand, -handSpread);
+            Vector3 wantRightHand = On(feet + height * lowHand, handSpread);
+            Vector3 wantLeftFoot = On(feet + height * lowFoot, -footSpread);
+            Vector3 wantRightFoot = On(feet + height * lowFoot + spacing, footSpread);
+
+            // First frame on the ladder: start AT the rungs rather than springing to them
+            // from wherever the limbs happened to be when the grab began.
+            if (!_held)
+            {
+                _leftHand = wantLeftHand; _rightHand = wantRightHand;
+                _leftFoot = wantLeftFoot; _rightFoot = wantRightFoot;
+                _leftHandV = _rightHandV = _leftFootV = _rightFootV = Vector3.zero;
+                _held = true;
+            }
+
+            float reach = Mathf.Max(0.02f, reachSeconds);
+            float dt = Time.deltaTime;
+
+            _leftHand = Vector3.SmoothDamp(_leftHand, wantLeftHand, ref _leftHandV, reach,
+                                           Mathf.Infinity, dt);
+            _rightHand = Vector3.SmoothDamp(_rightHand, wantRightHand, ref _rightHandV, reach,
+                                            Mathf.Infinity, dt);
+            _leftFoot = Vector3.SmoothDamp(_leftFoot, wantLeftFoot, ref _leftFootV, reach,
+                                           Mathf.Infinity, dt);
+            _rightFoot = Vector3.SmoothDamp(_rightFoot, wantRightFoot, ref _rightFootV, reach,
+                                            Mathf.Infinity, dt);
 
             Set(AvatarIKGoal.LeftHand, _leftHand, gripWeight * _ladderBlend);
             Set(AvatarIKGoal.RightHand, _rightHand, gripWeight * _ladderBlend);
