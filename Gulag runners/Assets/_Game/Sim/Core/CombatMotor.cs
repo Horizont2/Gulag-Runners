@@ -95,7 +95,7 @@ namespace GulagRunners.Sim
 
             if (!s.Blocking && !s.Swinging) TryStartSwing(ref s, input, in cfg);
 
-            s.SpeedPermille = s.Blocking ? (short)cfg.BlockSpeedPermille : (short)0;
+            s.SpeedPermille = SpeedCap(in s, in cfg);
             return MaskInput(in s, input, wantsDodge, in cfg);
         }
 
@@ -201,12 +201,35 @@ namespace GulagRunners.Sim
         /// What the movement motor is allowed to see. Committing to a swing means committing to
         /// where you are standing, which is what makes reach and spacing matter at all.
         /// </summary>
+        /// <summary>
+        /// How fast the body may travel this tick, in thousandths of the run speed.
+        ///
+        /// Zero means no cap at all, which is what the motor reads as "unrestricted" — so
+        /// every branch here either names a number or names zero deliberately.
+        /// </summary>
+        static short SpeedCap(in PlayerSimState s, in CombatConfig cfg)
+        {
+            if (s.Blocking) return (short)cfg.BlockSpeedPermille;
+
+            switch (s.Attack)
+            {
+                case AttackPhase.Windup:   return (short)cfg.WindupSpeedPermille;
+                case AttackPhase.Active:   return (short)cfg.ActiveSpeedPermille;
+                case AttackPhase.Recovery: return (short)cfg.RecoverySpeedPermille;
+                default:                   return 0;
+            }
+        }
+
         static InputFlags MaskInput(in PlayerSimState s, InputFlags input, bool wantsDodge,
                                     in CombatConfig cfg)
         {
+            // A swing keeps the COMMITMENT and gives back the WALKING. Jump and dodge still
+            // go: a swing you can cancel by rolling out of it is a swing with no risk in it,
+            // and risk is the only reason to respect one. Left and right stay, slowed by
+            // phase through SpeedPermille — a fighter rooted to the spot for every attack
+            // turns every exchange into two people taking turns standing still.
             if (s.Swinging)
-                return input & ~(InputFlags.Left | InputFlags.Right | InputFlags.Jump |
-                                 InputFlags.Dodge);
+                return input & ~(InputFlags.Jump | InputFlags.Dodge);
 
             if (s.Blocking)
                 return input & ~(InputFlags.Jump | InputFlags.Dodge);

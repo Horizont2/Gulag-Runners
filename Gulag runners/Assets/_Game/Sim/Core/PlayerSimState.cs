@@ -36,8 +36,33 @@ namespace GulagRunners.Sim
         public FixVec2 Velocity;
 
         public MoveMode Mode;
-        /// <summary>+1 facing right, -1 facing left. Drives the visual flip and, later, attacks.</summary>
+        /// <summary>
+        /// +1 right, -1 left: which way the fighter AIMS. The hitbox extends this way, the
+        /// guard only stops what comes at it from this way, and the model is turned this way.
+        ///
+        /// It is not the same thing as which way he is going. A fighter can back off along
+        /// one axis while keeping his blade on the other — see <see cref="Travel"/> — and
+        /// pretending otherwise is what makes a side-view fight read as two people queueing.
+        /// </summary>
         public sbyte Facing;
+
+        /// <summary>
+        /// +1 right, -1 left: which way the body last MOVED, which is a different question.
+        ///
+        /// The level reads this and not the aim: what is in the way is what is in front of
+        /// where you are going. Presentation reads both — travel against aim is the sign of
+        /// the locomotion, and a fighter whose feet and blade disagree is running backwards.
+        /// </summary>
+        public sbyte Travel;
+
+        /// <summary>
+        /// Frames left of an aim the player asked for, after the swipe that asked for it.
+        ///
+        /// Without it the aim would last exactly one tick: a swipe is a single frame of
+        /// input and the stick is held for hundreds, so movement would take the facing back
+        /// before the windup finished and the blow would land the way the feet were going.
+        /// </summary>
+        public int AimLockTimer;
         public bool Crouching;
         public bool JumpHeld;
 
@@ -211,6 +236,7 @@ namespace GulagRunners.Sim
             s.Velocity = FixVec2.Zero;
             s.Mode = MoveMode.Airborne;
             s.Facing = facing == 0 ? (sbyte)1 : facing;
+            s.Travel = s.Facing;
             s.LadderIndex = -1;
             s.OpeningChest = -1;
             s.OpenedChest = -1;

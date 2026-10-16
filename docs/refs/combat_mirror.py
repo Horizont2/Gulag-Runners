@@ -10,6 +10,7 @@ K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          HEAVY_DMG=1700, HEAVY_TIME=1500, STUN_PER_DMG=1, MAX_STUN=26,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
          CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
+         WINDUP_SPEED=620, ACTIVE_SPEED=180, RECOVERY_SPEED=400,
          HIT_STOP=3, BLOCK_STOP=2, PARRY_STOP=7,
          PARRY=12, STAGGER=48, DEATH=90, GUARD_DRAIN=48,
          DESPERATE_HP=300, DESPERATE_DMG=1400, SUDDEN_BARE=2000,
@@ -122,7 +123,7 @@ def combat_step(s, inp):
     if not s.blocking and not swinging(s):
         start_swing(s, inp)
 
-    s.speed_permille = K["BLOCK_SPEED"] if s.blocking else 0
+    s.speed_permille = speed_cap(s)
     return mask(s, inp, wants_dodge)
 
 
@@ -164,10 +165,23 @@ def advance(s):
             s.combo, s.combo_t = 0, 0
 
 
+def speed_cap(s):
+    """CombatMotor.SpeedCap: how fast the body may travel, in thousandths of the run speed.
+    Zero is the motor's "no cap", so every branch names a number or names zero on purpose."""
+    if s.blocking: return K["BLOCK_SPEED"]
+    if s.attack == WINDUP: return K["WINDUP_SPEED"]
+    if s.attack == ACTIVE: return K["ACTIVE_SPEED"]
+    if s.attack == RECOVERY: return K["RECOVERY_SPEED"]
+    return 0
+
+
 def mask(s, inp, wants_dodge=False):
     from sim_motor_mirror import L, R, JMP
+    # A swing keeps the COMMITMENT and gives back the WALKING: jump and dodge still go, left
+    # and right stay and are slowed by phase through speed_permille instead. A fighter rooted
+    # for every attack turns every exchange into two people taking turns standing still.
     if swinging(s):
-        return inp & ~(L | R | JMP | DOD)
+        return inp & ~(JMP | DOD)
     if s.blocking:
         return inp & ~(JMP | DOD)
     # Only the press read as a dodge reaches the motor as one.

@@ -19,6 +19,14 @@ namespace GulagRunners.Game
         [Tooltip("Optional. See Stick.")]
         public VirtualButton attackButton;
 
+        [Tooltip("Optional. The attack thumb: a flick that both swings and AIMS.\n\n" +
+                 "This is the control the aim/travel split was built for. A button can only " +
+                 "say \"attack\", and then the blade can only go where the feet are going; a " +
+                 "flick says which way, so a fighter can back off and keep the other one " +
+                 "off at the same time. Both can be wired at once — the button is then an " +
+                 "unaimed swing, which is what a tap on the area does anyway.")]
+        public SwipeArea swipeArea;
+
         [Tooltip("Optional. See Stick.")]
         public VirtualButton jumpButton;
 
@@ -48,6 +56,16 @@ namespace GulagRunners.Game
             if (dodgeButton != null && dodgeButton.Pressed) flags |= InputFlags.Dodge;
             if (actionButton != null && actionButton.Pressed) flags |= InputFlags.Action;
             if (attackButton != null && attackButton.Pressed) flags |= InputFlags.Attack;
+
+            // Taken rather than read: a swipe is an event and this is polled once a tick, so
+            // the area hands it over once and forgets it. The swing itself is latched by the
+            // combat motor, which is why one tick of Attack is enough to start a whole one.
+            if (swipeArea != null && swipeArea.Take(out int aim))
+            {
+                flags |= InputFlags.Attack;
+                if (aim > 0) flags |= InputFlags.AimRight;
+                else if (aim < 0) flags |= InputFlags.AimLeft;
+            }
 
             return flags;
         }

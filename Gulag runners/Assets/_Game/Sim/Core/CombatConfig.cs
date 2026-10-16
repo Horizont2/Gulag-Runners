@@ -67,6 +67,24 @@ namespace GulagRunners.Sim
         public int BlockSpeedPermille;
 
         /// <summary>
+        /// Movement speed through the three phases of a swing, in thousandths of the run
+        /// speed. 1000 is full speed; 0 is rooted.
+        ///
+        /// A swing used to take the movement keys away outright, and a fighter who stops
+        /// dead to attack is a fighter who cannot attack while he is going anywhere — every
+        /// exchange becomes two people standing still taking turns. But a strike with no
+        /// weight behind it is worse than one that is slow, so the phases differ and the
+        /// difference is the whole feel of the thing: you gather while still moving, you
+        /// plant for the blow itself, and you are slow to get going again afterwards.
+        ///
+        /// The commitment is kept where it belongs — a swing still cannot be cancelled with
+        /// a jump or a dodge. It is the walking that is given back, not the escape.
+        /// </summary>
+        public int WindupSpeedPermille;
+        public int ActiveSpeedPermille;
+        public int RecoverySpeedPermille;
+
+        /// <summary>
         /// Frames after raising the guard during which a hit is PARRIED instead of blocked: no
         /// damage at all, and the attacker is staggered. The one window in the game that rewards
         /// reading the other player rather than reacting to them.
@@ -141,6 +159,10 @@ namespace GulagRunners.Sim
             c.BlockStaminaCost = 1;        // one of the three charges docs/02 gives a fighter
             c.GuardBreakFrames = 42;       // 0.7 s wide open
             c.BlockSpeedPermille = 420;
+
+            c.WindupSpeedPermille = 620;   // gathering: you may still close or back off
+            c.ActiveSpeedPermille = 180;   // the blow itself; a crawl, not a stop
+            c.RecoverySpeedPermille = 400; // heavy on your feet again
 
             c.ParryFrames = 12;            // 0.20 s, straight from docs/02
             c.GuardDrainFrames = 48;       // a charge every 0.8 s, so a full pool holds 3.2 s

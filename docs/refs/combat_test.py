@@ -25,13 +25,13 @@ def fighter(x, facing=1, weapon=NONE, armour=NONE):
     if armour != NONE:
         s.inv.equip(armour)
     init(s)
-    s.facing = facing
+    s.facing = s.travel = facing
     for _ in range(180):
         tick([s], [0])
         if s.mode == "ground":
             break
     init(s)
-    s.facing = facing
+    s.facing = s.travel = facing
     return s
 
 
@@ -255,14 +255,28 @@ for _ in range(20):                               # and it ends
     tick([s], [ATTACK])
 check("once it ends, the body answers again", s.attack != K.NONE_P or s.swing_started)
 
-print("\n9. a swing roots you: that is what makes spacing a decision")
+print("\n9. a swing slows you: that is what makes spacing a decision")
+# It used to ROOT you, and a fighter who stops dead to attack cannot attack while he is
+# going anywhere -- every exchange becomes two people standing still taking turns. So the
+# walking is given back and the commitment is kept: slower than running, and no escaping.
 s = fighter(0, 1, SPEAR)
 tick([s], [ATTACK])
 before = F(s.x)
 for _ in range(20):
     tick([s], [R | ATTACK])
-check("holding right during a swing moves nobody", abs(F(s.x) - before) < 0.05,
-      f"{F(s.x)-before:+.3f} m")
+moved = F(s.x) - before
+free = F(M.C["RUN"]) * 20 / 60.0
+check("holding right during a swing still moves you", moved > 0.1, f"{moved:+.3f} m")
+check("but slower than running does", moved < free * 0.75,
+      f"{moved:.3f} m against {free:.3f} m of running")
+
+# And the commitment itself, which is the half that must NOT be given back.
+s = fighter(0, 1, SPEAR)
+tick([s], [ATTACK])
+for _ in range(20):
+    tick([s], [R | ATTACK | JMP | DOD])
+check("and a swing cannot be cancelled with a jump or a dodge",
+      s.attack != K.NONE_P and s.mode != "dodge", f"phase {s.attack}, mode {s.mode}")
 
 print("\n10. death")
 a = fighter(-0.45, 1, SPEAR)
@@ -489,5 +503,116 @@ for t in range(600):
     worst = max(worst, a2.hitstop, v2.hitstop)
 check("two fighters trading never freeze longer than one parry",
       worst <= K["PARRY_STOP"], f"worst {worst} frame(s)")
+
+print("\n14. aiming one way while going the other")
+# The feature, in one sentence: the left thumb says where the body goes and the right thumb
+# says where the blade goes, and they are allowed to disagree. A fighter who can only strike
+# the way he is walking cannot retreat and cannot cover a retreat, so every exchange is a
+# straight line and the only decision in it is when to walk forward.
+# K is the config dict by this point in the file, not the module, so the phases come in
+# by name rather than through it.
+from sim_motor_mirror import AIM_L, AIM_R
+from combat_mirror import NONE_P, ACTIVE
+
+# First, that nothing which does NOT swipe behaves any differently. Every other test in
+# this file and the eight suites beside it depend on this.
+s = fighter(0, 1)
+for _ in range(30):
+    tick([s], [L])
+check("with no swipe the aim is still just the feet", s.facing == -1 and s.travel == -1,
+      f"aim {s.facing:+d} travel {s.travel:+d}")
+
+# Running LEFT, striking RIGHT.
+s = fighter(0, 1, CLUB)
+start = F(s.x)
+tick([s], [L | ATTACK | AIM_R])
+check("a swipe aims against the feet", s.facing == 1 and s.travel == -1,
+      f"aim {s.facing:+d} travel {s.travel:+d}")
+
+aimed_all_swing = True
+live = None
+for t in range(40):
+    tick([s], [L | ATTACK | AIM_R])
+    if s.attack != NONE_P and s.facing != 1:
+        aimed_all_swing = False
+    if s.attack == ACTIVE and live is None:
+        live = hitbox(s)
+
+check("and keeps the aim for the whole swing", aimed_all_swing, f"aim {s.facing:+d}")
+check("while the body actually travels the other way", F(s.x) - start < -0.1,
+      f"{F(s.x) - start:+.3f} m")
+
+# The hitbox is the thing that has to agree, because it is the only one the other player
+# can feel. An aim that reads right and swings left is worse than no feature.
+check("the blow goes where it was aimed, not where the feet went",
+      live is not None and F(live[2]) > F(s.x),
+      "no live frame" if live is None else
+      f"hitbox to {F(live[2]):+.2f}, body at {F(s.x):+.2f}")
+
+# A retreating fighter keeps the other one off: the whole point.
+a = fighter(0.0, 1, CLUB)
+b = fighter(0.7, -1)
+a.travel = 1
+landed = False
+for t in range(120):
+    tick([a, b], [L | ATTACK | AIM_R, 0])
+    b.x = X(0.7)                      # hold the spacing: this measures the aim, not the chase
+    landed |= b.was_hit
+check("a fighter backing away still lands what he aimed behind him", landed,
+      f"health {b.health}")
+
+# Letting go: the aim must come back to the feet, or a fighter who swiped once would never
+# turn round again.
+s = fighter(0, 1, CLUB)
+tick([s], [L | ATTACK | AIM_R])
+for _ in range(240):
+    tick([s], [L])
+check("and the feet take the aim back once the swipe is let go", s.facing == -1,
+      f"aim {s.facing:+d} after {M.C['AIMLOCK']} locked frames")
+
+# The aim has to survive until the blow lands, for the SLOWEST weapon in the game, with the
+# movement stick held the other way the whole time. Two things keep it alive -- the lock the
+# swipe buys, and the swing itself -- and this does not care which: it asks the only question
+# the player can feel. A warhammer's heavy windup is 51 frames, twice the lock, so a lock
+# that quietly did all the work would fail here.
+WEAPON = 1
+slowest = max(ITEMS, key=lambda i: (ITEMS[i].get("frames") or 0)
+              if ITEMS[i].get("kind") == WEAPON else 0)
+s = fighter(0, 1, slowest)
+aimed, live_at = True, None
+for t in range(240):
+    tick([s], [L | ATTACK | AIM_R])
+    if s.attack != NONE_P and s.facing != 1:
+        aimed = False
+    if s.attack == ACTIVE and live_at is None:
+        live_at = t
+check(f"the aim survives to the blow with the slowest weapon ({ITEMS[slowest]['name']})",
+      aimed and live_at is not None,
+      f"live on frame {live_at}, {ITEMS[slowest]['frames']} of base windup")
+
+# And the lock on its own covers a swipe that asks for nothing else: turning to face without
+# attacking is a real input, and one frame of it cannot hold against a held stick.
+s = fighter(0, 1, CLUB)
+tick([s], [L | AIM_R])
+held = 0
+for _ in range(240):
+    tick([s], [L])
+    if s.facing == 1:
+        held += 1
+    else:
+        break
+check("and a bare swipe holds the aim for the frames it bought",
+      held >= M.C["AIMLOCK"] - 1, f"{held} frame(s) of {M.C['AIMLOCK']}")
+
+# And the guard faces the AIM, which is what makes backing away a real choice rather than a
+# free one: turn the blade round and your shield goes with it.
+a = fighter(-0.45, 1, CLUB)
+v = fighter(0.45, -1, NONE, CHAINMAIL)
+blocked = False
+for t in range(120):
+    tick([a, v], [ATTACK, DOD | AIM_L])
+    a.x, v.x = X(-0.45), X(0.45)
+    blocked |= v.was_blocked
+check("a guard covers the way the fighter aims", blocked, f"health {v.health}")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

@@ -20,17 +20,20 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
          BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
-         LSTANDOFF=M(80),
+         LSTANDOFF=M(80), AIMLOCK=24,
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
 L, R, UP, DN, JMP, DOD, ACTION, ATTACK = 1, 2, 4, 8, 16, 32, 64, 128
+# The ninth and tenth bits: where the blow is aimed, which is not where the feet go.
+AIM_L, AIM_R = 256, 512
 
 class S:
     def __init__(s, x, y):
         s.x, s.y = X(x), X(y)
         s.vx = s.vy = 0
-        s.mode = "air"; s.facing = 1; s.crouch = False; s.jump_held = False
+        s.mode = "air"; s.facing = 1; s.travel = 1; s.aim_lock = 0
+        s.crouch = False; s.jump_held = False
         s.coyote = s.buf = s.dodge = s.dodge_rec = s.fallthru = s.stepn = 0
         s.ladder_cd = 0
         s.hitstop = 0
@@ -343,12 +346,36 @@ def update_depth(s, w):
     s.depth = move_towards(s.depth, want, mul(C["DEPTHSPD"], DT))
 
 
+def aim(s, inp, wx):
+    """PlayerMotor.Aim: which way he is going, and which way the blade goes.
+
+    Travel is the stick. The aim is the swipe, and a swipe wins outright and buys itself
+    enough frames to cover the swing it is asking for -- one frame of input cannot hold a
+    facing against a stick held for hundreds. While that clock runs, or while a swing is
+    live, the feet may not take the aim back; that case IS the feature. Otherwise the aim
+    follows the feet, which is all it ever did, which is why nothing that does not swipe
+    behaves any differently."""
+    if wx: s.travel = wx
+
+    ax = (1 if inp & AIM_R else 0) - (1 if inp & AIM_L else 0)
+    if ax:
+        s.facing = ax
+        s.aim_lock = C["AIMLOCK"]
+        return
+
+    if s.aim_lock > 0: s.aim_lock -= 1
+    # PlayerSimState.Swinging: any phase but None, and None is 0.
+    if s.aim_lock > 0 or getattr(s, "attack", 0): return
+
+    if wx: s.facing = wx
+
+
 def lane_ahead(s, w):
     if C["LOOKAHEAD"] <= 0: return None
     half = C["W"] // 2
     limit = max(C["CLAMBER"], C["STEP"])
-    frm = s.x + half if s.facing > 0 else s.x - half - C["LOOKAHEAD"]
-    to = s.x + half + C["LOOKAHEAD"] if s.facing > 0 else s.x - half
+    frm = s.x + half if s.travel > 0 else s.x - half - C["LOOKAHEAD"]
+    to = s.x + half + C["LOOKAHEAD"] if s.travel > 0 else s.x - half
     best = None; near = 0
     for i, sol in enumerate(w["solid"]):
         if not solid_live(w, i): continue          # a shutter that has not shut
@@ -357,7 +384,7 @@ def lane_ahead(s, w):
         if step_h <= 0 or step_h > limit: continue
         # Strictly ahead: a box whose X already surrounds the body is not somewhere it is
         # going, and the wall at the back runs the length of the arena.
-        gap = sol[0] - (s.x + half) if s.facing > 0 else (s.x - half) - sol[2]
+        gap = sol[0] - (s.x + half) if s.travel > 0 else (s.x - half) - sol[2]
         if gap < 0: continue
         if best is not None and gap >= near: continue
         want = lane_on(span(w, "solid", i), s.depth)
@@ -412,7 +439,7 @@ def step_flat(s, inp, w):
     jh = bool(inp & JMP)
     if jh and not s.jump_held: s.buf = C["BUF"]
     s.jump_held = jh
-    if wx: s.facing = wx
+    aim(s, inp, wx)
 
     if s.mode in ("mantle", "mount"):
         return step_scripted(s, w)
@@ -427,7 +454,8 @@ def step_flat(s, inp, w):
     # invulnerability on it.
     if (inp & DOD) and s.dodge_rec == 0 and s.mode == "ground" and s.stam >= C["DCOST"]:
         s.stam -= C["DCOST"]; s.mode = "dodge"; s.dodge = C["DF"]; s.crouch = False; s.ladder = -1
-        d = wx or s.facing; s.facing = d; s.vx = C["DODGE"] * d; s.vy = 0; s.noise = 2
+        d = wx or s.travel or s.facing
+        s.travel = d; s.vx = C["DODGE"] * d; s.vy = 0; s.noise = 2
         move_x(s, mul(s.vx, DT), w); s.dodge -= 1
         return
 
@@ -719,11 +747,12 @@ def start_scripted(s, landing, side, to_depth=None):
     s.script_dir = 1 if side>=0 else -1
     s.mode="mantle"; s.ladder=-1
     s.vx=s.vy=0; s.facing = 1 if side>=0 else -1
+    s.travel = s.facing; s.aim_lock = 0
 
 def try_mantle(s, prefer, ladder, w):
     up = step_out(s, ladder, w)
     if up is not None:
-        start_scripted(s, up, s.facing, up[2]); return True
+        start_scripted(s, up, s.travel, up[2]); return True
     r=find_landing(s,1,w); l=find_landing(s,-1,w)
     if r is None and l is None: return False
     if prefer>0 and r: side=1

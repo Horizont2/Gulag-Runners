@@ -3,12 +3,20 @@ using System;
 namespace GulagRunners.Sim
 {
     /// <summary>
-    /// One tick of player intent, packed into a single byte.
-    /// docs/06-tech-and-netcode.md budgets exactly this: 1 byte per tick per player, so
-    /// 60 Hz of input plus redundancy stays around 2 KB/s even on mobile data.
+    /// One tick of player intent, packed into two bytes.
+    ///
+    /// It was one byte, and docs/06-tech-and-netcode.md budgeted exactly that: 60 Hz plus
+    /// redundancy is about 2 KB/s on mobile data. WHERE A FIGHTER AIMS cost the ninth bit.
+    /// A side-view fighter has two thumbs doing two independent things — the left one says
+    /// which way the body travels, the right one which way the blade goes — and once those
+    /// can disagree there is no eighth bit left to say so. Two bytes is 4 KB/s, which is the
+    /// honest price and still a rounding error on any connection the game can be played on.
+    ///
+    /// The aim bits are OPTIONAL, which is what makes this cost nothing anywhere else: no
+    /// aim bit means the aim follows the travel, exactly as it did when there were eight.
     /// </summary>
     [Flags]
-    public enum InputFlags : byte
+    public enum InputFlags : ushort
     {
         None   = 0,
         Left   = 1 << 0,
@@ -23,7 +31,18 @@ namespace GulagRunners.Sim
         /// </summary>
         Dodge  = 1 << 5,
         Action = 1 << 6,   // pick up, open a chest, grab
-        Attack = 1 << 7
+        Attack = 1 << 7,
+
+        /// <summary>
+        /// Aim the blow this way, whichever way the body is travelling.
+        ///
+        /// This is the swipe, not the stick. Holding left and striking right is a fighter
+        /// backing away while he keeps the other one off, and it is most of what separates
+        /// a fight from two people taking turns walking into each other. Neither bit set
+        /// means what it has always meant: the blow goes where the body is going.
+        /// </summary>
+        AimLeft  = 1 << 8,
+        AimRight = 1 << 9
     }
 
     public static class InputFlagsExtensions
@@ -36,6 +55,18 @@ namespace GulagRunners.Sim
             int x = 0;
             if (f.Has(InputFlags.Left)) x -= 1;
             if (f.Has(InputFlags.Right)) x += 1;
+            return x;
+        }
+
+        /// <summary>
+        /// -1, 0 or +1: which way the blow is aimed, or 0 for "wherever the body is going".
+        /// Both at once cancels out, the same way the movement bits do.
+        /// </summary>
+        public static int AimX(this InputFlags f)
+        {
+            int x = 0;
+            if (f.Has(InputFlags.AimLeft)) x -= 1;
+            if (f.Has(InputFlags.AimRight)) x += 1;
             return x;
         }
 

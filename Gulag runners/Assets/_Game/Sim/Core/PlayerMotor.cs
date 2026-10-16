@@ -167,6 +167,45 @@ namespace GulagRunners.Sim
                 : span.Nearest(depth, halfZ);
         }
 
+        /// <summary>
+        /// Which way the fighter aims, and which way he is going — two answers, one tick.
+        ///
+        /// TRAVEL is simple and has not changed: you are going the way you are pushing.
+        ///
+        /// AIM is the new one, and the order of the three cases is the whole design:
+        ///
+        ///   * a swipe wins outright, and starts a clock. One frame of input cannot hold a
+        ///     facing against a stick that is held for hundreds, so the swipe buys itself
+        ///     enough frames to cover the swing it is asking for.
+        ///   * while that clock runs, OR while a swing is live, movement may not take the
+        ///     aim back. This is the case the feature exists for: holding left and striking
+        ///     right has to still be striking right by the time the blow lands, or the
+        ///     player is being lied to.
+        ///   * otherwise the aim follows the feet, which is what it did when there was only
+        ///     one of these and is why nothing that does not swipe behaves any differently.
+        ///
+        /// A swing keeps its own aim alive past the clock on purpose: a long weapon's windup
+        /// can outlast the lock, and a blade that turns round half way through a swing is
+        /// worse than one that cannot turn at all.
+        /// </summary>
+        static void Aim(ref PlayerSimState s, InputFlags input, int wishX, in MoveConfig cfg)
+        {
+            if (wishX != 0) s.Travel = (sbyte)wishX;
+
+            int aimX = input.AimX();
+            if (aimX != 0)
+            {
+                s.Facing = (sbyte)aimX;
+                s.AimLockTimer = cfg.AimLockFrames;
+                return;
+            }
+
+            if (s.AimLockTimer > 0) s.AimLockTimer--;
+            if (s.AimLockTimer > 0 || s.Swinging) return;
+
+            if (wishX != 0) s.Facing = (sbyte)wishX;
+        }
+
         /// <summary>The slice of the nearest thing ahead that is low enough to climb onto.</summary>
         static bool TryLaneAhead(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
                                  out Fix lane)
@@ -177,8 +216,10 @@ namespace GulagRunners.Sim
             Fix half = cfg.BodyWidth / 2;
             Fix limit = cfg.ClamberHeight > cfg.StepUpHeight ? cfg.ClamberHeight
                                                              : cfg.StepUpHeight;
-            Fix from = s.Facing > 0 ? s.Position.X + half : s.Position.X - half - cfg.LaneLookahead;
-            Fix to = s.Facing > 0 ? s.Position.X + half + cfg.LaneLookahead : s.Position.X - half;
+            // Travel, not aim: a fighter backing away with his blade the other way is still
+            // backing INTO whatever is behind him, and it is that step he has to find.
+            Fix from = s.Travel > 0 ? s.Position.X + half : s.Position.X - half - cfg.LaneLookahead;
+            Fix to = s.Travel > 0 ? s.Position.X + half + cfg.LaneLookahead : s.Position.X - half;
 
             bool found = false;
             Fix nearestX = Fix.Zero;
@@ -195,7 +236,7 @@ namespace GulagRunners.Sim
                 // the body is going — and the wall at the back of a building runs the length
                 // of the arena, so measured by its near edge it is ahead of everything and
                 // would win every time.
-                Fix gap = s.Facing > 0 ? solid.MinX - (s.Position.X + half)
+                Fix gap = s.Travel > 0 ? solid.MinX - (s.Position.X + half)
                                        : (s.Position.X - half) - solid.MaxX;
                 if (gap < Fix.Zero) continue;
                 if (found && gap >= nearestX) continue;
@@ -263,7 +304,7 @@ namespace GulagRunners.Sim
             if (jumpHeldNow && !s.JumpHeld) s.JumpBufferTimer = cfg.JumpBufferFrames;
             s.JumpHeld = jumpHeldNow;
 
-            if (wishX != 0) s.Facing = (sbyte)wishX;
+            Aim(ref s, input, wishX, in cfg);
 
             // Both scripted moves — the grab at the bottom of a ladder and the climb-out at the
             // top — run before anything else, because while one is playing the body is being
@@ -499,8 +540,12 @@ namespace GulagRunners.Sim
             s.Crouching = false;
             s.LadderIndex = -1;
 
-            int dir = wishX != 0 ? wishX : s.Facing;
-            s.Facing = (sbyte)dir;
+            // A dodge with no direction goes the way the body was already going — not the
+            // way the blade points. Rolling backwards out of your own swing is a dodge
+            // backwards, and it must not turn you round on the way.
+            int dir = wishX != 0 ? wishX : s.Travel;
+            if (dir == 0) dir = s.Facing;
+            s.Travel = (sbyte)dir;
             s.Velocity = new FixVec2(cfg.DodgeSpeed * dir, Fix.Zero);
             s.Noise = NoiseLevel.Medium;
             return true;
@@ -873,7 +918,7 @@ namespace GulagRunners.Sim
             if (TryStepOut(ref s, ladderIndex, world, in cfg, out FixVec2 landUp,
                            out Fix laneUp))
             {
-                StartScripted(ref s, landUp, s.Facing, laneUp, in cfg);
+                StartScripted(ref s, landUp, s.Travel, laneUp, in cfg);
                 return true;
             }
 
@@ -931,7 +976,11 @@ namespace GulagRunners.Sim
             s.Mode = MoveMode.Mantling;
             s.LadderIndex = -1;
             s.Velocity = FixVec2.Zero;
+            // Both: a climb-out is not a fight, and a fighter hauling himself onto a walkway
+            // looks where he is going.
             s.Facing = (sbyte)(side >= 0 ? 1 : -1);
+            s.Travel = s.Facing;
+            s.AimLockTimer = 0;
             s.Noise = NoiseLevel.Quiet;
         }
 

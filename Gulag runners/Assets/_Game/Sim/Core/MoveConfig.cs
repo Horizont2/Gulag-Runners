@@ -142,6 +142,18 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix LadderStandOff;
 
+        /// <summary>
+        /// Frames a deliberate aim outlives the swipe that asked for it.
+        ///
+        /// A swipe is one frame of input; the movement stick is held for hundreds. With no
+        /// lock the aim would be taken back by the feet before the windup finished, and a
+        /// blow asked for in one direction would land in the other — which is the bug that
+        /// makes the whole feature feel broken rather than absent. Long enough to cover a
+        /// windup and the swing it starts, and no longer: an aim that outlives its swing is
+        /// a fighter who will not turn round.
+        /// </summary>
+        public int AimLockFrames;
+
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
@@ -227,6 +239,7 @@ namespace GulagRunners.Sim
             c.LaneLookahead  = Fix.FromMilli(1200);
             c.LaneReach      = Fix.FromMilli(2000);
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
+            c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 
