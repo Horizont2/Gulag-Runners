@@ -197,7 +197,7 @@ def move_x(s, dx, w):
         s.vx = 0
 
     for i in range(len(w.get("walls", ()))):
-        if w["walls"][i][2]: continue              # a ceiling blocks vertically, not sideways
+        if w["walls"][i][1] in (MINUS_Y, PLUS_Y): continue   # a ceiling blocks vertically
         if not wall_reaches(w, i, s.depth): continue
         wall = wall_at(w, i)
         b = (tx - half, s.y, tx + half, s.y + h)
@@ -207,19 +207,28 @@ def move_x(s, dx, w):
 
     s.x = tx
 
+# Which way a wall's inner face advances. Mirrors GateToward.
+MINUS_X, PLUS_X, MINUS_Y, PLUS_Y = 0, 1, 2, 3
+
+
 def wall_at(w, i):
-    """Where wall i stands at the world's current closeness. Mirrors SimWorld.WallAt."""
-    box, travel, vertical, _span = w["walls"][i]
-    # Authored SHUT, so open is the box MINUS the travel. Plus, and the two walls start on
-    # each other's side of the arena.
-    back = mul(travel, w.get("wallprogress", 0)) - travel
-    if vertical:
-        return (box[0], box[1] + back, box[2], box[3] + back)
-    return (box[0] + back, box[1], box[2] + back, box[3])
+    """The wall at the world's current closeness. Mirrors SimWorld.WallDef.At.
+
+    It GROWS from the arena's edge rather than sliding across it: at nothing it has no
+    thickness, at full close it is the whole box. Nothing ever opens up behind it."""
+    box, grows, _span = w["walls"][i]
+    p = w.get("wallprogress", 0)
+    width = box[2] - box[0]
+    height = box[3] - box[1]
+
+    if grows == PLUS_X:  return (box[0], box[1], box[0] + mul(width, p), box[3])
+    if grows == MINUS_X: return (box[2] - mul(width, p), box[1], box[2], box[3])
+    if grows == MINUS_Y: return (box[0], box[3] - mul(height, p), box[2], box[3])
+    return (box[0], box[1], box[2], box[1] + mul(height, p))
 
 
 def wall_reaches(w, i, depth):
-    return reaches(w["walls"][i][3], depth, C["BODYZ"] // 2)
+    return reaches(w["walls"][i][2], depth, C["BODYZ"] // 2)
 
 
 def shove_from_walls(s, w):
@@ -234,16 +243,21 @@ def shove_from_walls(s, w):
         if not overlaps(body, wall):
             continue
 
-        _box, travel, vertical, _span = w["walls"][i]
-        if vertical:
-            s.y = wall[1] - h - SKIN
-            if s.vy > 0: s.vy = 0
-        elif travel > 0:
+        # Out the way the wall is growing, never out of the nearest face: the nearest face
+        # can be the one it has already eaten past.
+        grows = w["walls"][i][1]
+        if grows == PLUS_X:
             s.x = wall[2] + half + SKIN
             if s.vx < 0: s.vx = 0
-        else:
+        elif grows == MINUS_X:
             s.x = wall[0] - half - SKIN
             if s.vx > 0: s.vx = 0
+        elif grows == MINUS_Y:
+            s.y = wall[1] - h - SKIN
+            if s.vy > 0: s.vy = 0
+        else:
+            s.y = wall[3] + SKIN
+            if s.vy < 0: s.vy = 0
 
 
 def move_y(s, dy, w, shaft=-1):

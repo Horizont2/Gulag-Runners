@@ -107,51 +107,55 @@ namespace GulagRunners.Sim
     }
 
     /// <summary>
-    /// A wall that closes the arena by moving, rather than by appearing.
+    /// A wall that closes the arena by GROWING into it.
     ///
-    /// The shutters above are boxes that switch on. That is right for a steel slab dropping
-    /// into a doorway and wrong for the thing docs/01 actually describes: the arena getting
-    /// SMALLER. Built out of switching boxes, a closing arena is a row of plates, and a
-    /// fighter reads each one as "a wall appeared" rather than as the space running out —
-    /// and no number of thinner plates fixes that, it only makes the steps smaller.
+    /// Three attempts to get this right, and each failure taught the same lesson a different
+    /// way. Plates that switch on carve the room into cells. Thinner plates do the same thing
+    /// in smaller steps. A solid wall that slides in reads better than both and still leaves
+    /// dead ground behind it — the eye sees a slab travelling across a floor, with a gap
+    /// opening up behind, and reads the gap as the level ending.
     ///
-    /// So a wall is one box whose POSITION is a pure function of the frame. That keeps every
-    /// promise the baked arena makes: nothing is allocated, nothing is mutated during a tick,
-    /// and two devices given the same frame compute the same wall to the millimetre (docs/06).
-    /// The art reads the same function, so the picture cannot drift from the collision.
+    /// What the arena closing actually looks like is the far end being eaten. So the wall is
+    /// anchored at the arena's edge and its INNER FACE advances: at nothing it has no
+    /// thickness at all, at full close it fills everything out to the edge of the last room.
+    /// There is never a gap behind it, because behind it is the edge of the world.
+    ///
+    /// Still one box whose shape is a pure function of the frame, so nothing is allocated,
+    /// nothing is mutated inside a tick, and two devices on the same frame compute the same
+    /// wall to the millimetre (docs/06).
     /// </summary>
     public struct WallDef
     {
-        /// <summary>Where it ends up: the box at full close.</summary>
+        /// <summary>The box at full close: from the arena's edge to the last room's face.</summary>
         public Aabb Box;
 
         /// <summary>How deep it reaches. A wall one lane deep is a wall you step behind.</summary>
         public Span Span;
 
         /// <summary>
-        /// How far it travels to get there, signed, along its axis. The open position is the
-        /// closed one minus this, so a wall authored where it should END needs only this one
-        /// number to say where it starts.
+        /// Which way the inner face advances — and therefore which way a body caught by it
+        /// is pushed. The anchored side is the opposite one: a wall growing towards +X is
+        /// anchored at its own MinX, which is the arena's left edge.
         /// </summary>
-        public Fix Travel;
+        public GateToward Grows;
 
-        /// <summary>False travels along X — a side wall. True along Y — a ceiling.</summary>
-        public bool Vertical;
-
-        /// <summary>
-        /// Where it stands at a given closeness, 0 open and 1 shut.
-        ///
-        /// The box is authored SHUT, so open is the box minus the travel: a wall that moves
-        /// +12 m to arrive started 12 m to the left of where it now is. Written the other way
-        /// about — plus the travel at zero — the two walls begin on each other's side of the
-        /// arena, which is not a subtle failure but is an easy one to type.
-        /// </summary>
+        /// <summary>The wall at a given closeness, 0 nothing and 1 the whole box.</summary>
         public Aabb At(Fix progress)
         {
-            Fix back = Travel * progress - Travel;
-            return Vertical
-                ? new Aabb(Box.MinX, Box.MinY + back, Box.MaxX, Box.MaxY + back)
-                : new Aabb(Box.MinX + back, Box.MinY, Box.MaxX + back, Box.MaxY);
+            Fix width = Box.MaxX - Box.MinX;
+            Fix height = Box.MaxY - Box.MinY;
+
+            switch (Grows)
+            {
+                case GateToward.PlusX:
+                    return new Aabb(Box.MinX, Box.MinY, Box.MinX + width * progress, Box.MaxY);
+                case GateToward.MinusX:
+                    return new Aabb(Box.MaxX - width * progress, Box.MinY, Box.MaxX, Box.MaxY);
+                case GateToward.MinusY:
+                    return new Aabb(Box.MinX, Box.MaxY - height * progress, Box.MaxX, Box.MaxY);
+                default:
+                    return new Aabb(Box.MinX, Box.MinY, Box.MaxX, Box.MinY + height * progress);
+            }
         }
     }
 

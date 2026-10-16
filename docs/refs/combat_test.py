@@ -420,7 +420,34 @@ for _ in range(2):
     runs.append((a.x, a.y, a.health, a.stagger, b.x, b.y, b.health, b.stam))
 check("bit-identical replay", runs[0] == runs[1], f"{runs[0]}")
 
-print("\n12. hit stop: the weight of a blow")
+print("\n12. point-blank: two fighters standing on the same spot")
+# They do not collide with each other, only with the level, so this is a position the game
+# reaches often — and for a long time nothing landed in it from either side.
+for gap in (0.0, 0.05, 0.15, 0.30):
+    atk = fighter(0.0, 1, CLUB)
+    vic = fighter(gap, -1)
+    landed = 0
+    for t in range(240):
+        atk.x, vic.x = X(0.0), X(gap)      # held together, as a shove would hold them
+        tick([atk, vic], [ATTACK, 0])
+        if vic.was_hit:
+            landed += 1
+    check(f"a swing lands with {gap * 100:.0f} cm between the centres", landed > 0,
+          f"{landed} hit(s) in four seconds")
+
+# And it still must not reach behind.
+atk = fighter(0.0, 1, CLUB)
+vic = fighter(-0.9, -1)
+behind = 0
+for t in range(240):
+    atk.x, vic.x = X(0.0), X(-0.9)
+    tick([atk, vic], [ATTACK, 0])
+    if vic.was_hit:
+        behind += 1
+check("and never reaches behind the attacker", behind == 0,
+      f"{behind} hit(s) on somebody 0.9 m the wrong way")
+
+print("\n13. hit stop: the weight of a blow")
 from combat_mirror import K
 
 # A clean hit freezes BOTH of them, for the configured frames, and nothing moves while it does.

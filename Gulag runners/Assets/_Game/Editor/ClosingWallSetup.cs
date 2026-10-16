@@ -20,9 +20,9 @@ namespace GulagRunners.GameEditor
     ///
     /// What makes it read, beyond the arithmetic:
     ///
-    ///   The walls are THICK. A thin slab sliding in leaves the dead ground behind it in
-    ///   shot, and the eye reads that as the level ending rather than as a wall. Four metres
-    ///   of it fills the frame behind, so what you see is wall.
+    ///   They GROW from the arena's edge rather than sliding across it. A slab that slides
+    ///   leaves a gap opening up behind it, and the eye reads that gap as the level ending.
+    ///   Anchored at the edge there is nothing behind it to see.
     ///
     ///   They are placed by their INNER FACE. That face is the edge of the last room, which
     ///   is the number that decides how the match finishes — so it is the one worth being
@@ -40,9 +40,6 @@ namespace GulagRunners.GameEditor
 
         /// <summary>What is left in the middle, as a share of the arena's half-width.</summary>
         const float InnerShare = 0.25f;
-
-        /// <summary>How thick each wall is, in metres. Enough to fill the frame behind it.</summary>
-        const float Thickness = 4f;
 
         const float Overshoot = 0.6f;        // past the top and bottom of the arena
         const float DepthMargin = 0.3f;      // past the front and back of the level
@@ -106,15 +103,14 @@ namespace GulagRunners.GameEditor
                 // Measured off the walkway it takes away, not the bottom of the arena: taken
                 // from the bottom it lands below the floor it is meant to leave standing.
                 float stop = TopFloorIn(world, centre - inner, centre + inner, maxY - 0.5f) - 1.2f;
+                float top = high;
 
-                Wall(root, "Ceiling", true,
-                     new Vector3(centre, stop + Thickness * 0.5f, depthCentre),
-                     new Vector3(inner * 2f, Thickness, depth),
-                     // From above the arena, down to rest on that height.
-                     (high + Thickness) - (stop + Thickness * 0.5f));
+                Wall(root, "Ceiling", GateToward.MinusY,
+                     new Vector3(centre, (stop + top) * 0.5f, depthCentre),
+                     new Vector3(inner * 2f, top - stop, depth));
 
                 Debug.Log($"Ceiling over x {centre - inner:0.00}..{centre + inner:0.00}, " +
-                          $"coming to rest at y {stop:0.00}.\n" +
+                          $"growing down from y {top:0.00} to rest at {stop:0.00}.\n" +
                           "It leaves the ground floor its headroom and takes the walkway out " +
                           "of play. Delete the side walls if you want only this.", baker);
             }
@@ -122,24 +118,26 @@ namespace GulagRunners.GameEditor
             {
                 for (int side = -1; side <= 1; side += 2)
                 {
-                    // Placed by the inner face: the edge of the last room.
+                    // The finished wall: everything from the arena's edge to the face of the
+                    // last room. At the start of the match it has no thickness at all, and
+                    // it eats inwards from the edge — so there is never a gap behind it.
+                    float edge = centre + half * side;
                     float face = centre + inner * side;
-                    float boxCentre = face + Thickness * 0.5f * side;
 
-                    Wall(root, side < 0 ? "Wall Left" : "Wall Right", false,
-                         new Vector3(boxCentre, (low + high) * 0.5f, depthCentre),
-                         new Vector3(Thickness, high - low, depth),
-                         (half - inner) * -side);
+                    Wall(root, side < 0 ? "Wall Left" : "Wall Right",
+                         side < 0 ? GateToward.PlusX : GateToward.MinusX,
+                         new Vector3((edge + face) * 0.5f, (low + high) * 0.5f, depthCentre),
+                         new Vector3(Mathf.Abs(face - edge), high - low, depth));
                 }
 
                 Debug.Log(
                     $"Two walls. Arena x {minX:0.00}..{maxX:0.00} (centre {centre:0.00}); " +
-                    $"they start at the edges and finish {inner * 2f:0.0} m apart, which is " +
-                    "about one screen.\n" +
-                    "They move every tick across the shutter window, collision and art from " +
-                    "the same number. Give them the art they deserve; the box is only the " +
-                    "shape. A scrape of dust where they meet the floor is the cheapest thing " +
-                    "that will make them feel heavy.", baker);
+                    $"each grows {half - inner:0.1f} m inwards from its own edge and they " +
+                    $"finish {inner * 2f:0.0} m apart, which is about one screen.\n" +
+                    "They grow rather than slide, so nothing opens up behind them. Collision " +
+                    "and art come from the same number every tick. A scrape of dust along " +
+                    "the advancing face is the cheapest thing that will make them feel heavy.",
+                    baker);
             }
 
             baker.Bake();
@@ -147,8 +145,8 @@ namespace GulagRunners.GameEditor
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(baker.gameObject.scene);
         }
 
-        static void Wall(Transform root, string name, bool vertical,
-                         Vector3 centre, Vector3 size, float travel)
+        static void Wall(Transform root, string name, GateToward grows,
+                         Vector3 centre, Vector3 size)
         {
             Transform found = root.Find(name);
             GameObject go;
@@ -175,8 +173,7 @@ namespace GulagRunners.GameEditor
             if (wall == null) wall = Undo.AddComponent<ClosingWall>(go);
 
             Undo.RecordObject(wall, "Build closing walls");
-            wall.vertical = vertical;
-            wall.travel = travel;
+            wall.grows = grows;
         }
 
         static Transform Root(UnityEngine.SceneManagement.Scene scene)

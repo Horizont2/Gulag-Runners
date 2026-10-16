@@ -44,6 +44,15 @@ namespace GulagRunners.Game
                  "lag reads as weight; none reads as a slider.")]
         [Range(0f, 0.5f)] public float lidSmoothTime = 0.08f;
 
+        [Tooltip("Hold every part of the chest where it was built and let only the turning " +
+                 "animate.\n\n" +
+                 "This clip moves positions as well as rotations, and the pose it is left in " +
+                 "has the chest off the ground — so an opened chest hangs in the air, and on " +
+                 "a long pry it visibly drifts. A chest opens by TURNING; nothing about it " +
+                 "should travel. Turn this off if a chest ever needs a part that genuinely " +
+                 "slides, such as a drawer.")]
+        public bool pinPositions = true;
+
         int _index = -1;
         float _shown;
         float _shownVelocity;
@@ -67,6 +76,7 @@ namespace GulagRunners.Game
                 // on its own, and it must keep doing so off camera: with two cameras each showing
                 // one player, culling would freeze every chest on the other half of the screen.
                 animator.applyRootMotion = false;
+                RememberPositions();
                 animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
                 animator.speed = 0f;
             }
@@ -95,9 +105,42 @@ namespace GulagRunners.Game
             return -1;
         }
 
+        Transform[] _parts;
+        Vector3[] _builtAt;
+
+        /// <summary>
+        /// Where every part of the chest was before the animator ever ran.
+        ///
+        /// Taken in Awake, which is the only moment it is still true: one frame of play and
+        /// the pose has already moved things.
+        /// </summary>
+        void RememberPositions()
+        {
+            if (_parts != null || animator == null) return;
+
+            _parts = animator.GetComponentsInChildren<Transform>(true);
+            _builtAt = new Vector3[_parts.Length];
+            for (int i = 0; i < _parts.Length; i++) _builtAt[i] = _parts[i].localPosition;
+        }
+
+        /// <summary>
+        /// Puts every part back where it was built, after the animator has had its say.
+        ///
+        /// LateUpdate and not Update: the Animator evaluates between the two, so a position
+        /// written in Update is overwritten by the pose before anything is drawn.
+        /// </summary>
+        void LateUpdate()
+        {
+            if (!pinPositions || _parts == null) return;
+
+            for (int i = 0; i < _parts.Length; i++)
+                if (_parts[i] != null) _parts[i].localPosition = _builtAt[i];
+        }
+
         void Update()
         {
             if (animator == null || matchState == null) return;
+            RememberPositions();
 
             if (_index < 0)
             {

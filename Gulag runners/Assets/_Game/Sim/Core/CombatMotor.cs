@@ -262,8 +262,23 @@ namespace GulagRunners.Sim
             Fix half = move.BodyWidth / 2;
             Fix height = s.Crouching ? move.CrouchHeight : move.BodyHeight;
 
-            Fix front = s.Facing >= 0 ? s.Position.X + half : s.Position.X - half - weapon.Reach;
-            Fix back = s.Facing >= 0 ? s.Position.X + half + weapon.Reach : s.Position.X - half;
+            // The OUTER edge is a body's width plus the weapon's reach, so reach is still
+            // measured from the front of the body and a long weapon is long in the one way a
+            // player can see. The inner edge is the attacker's own centre.
+            //
+            // It used to be the front face, and that is a miss at point-blank range. Two
+            // fighters do not collide with each other — only with the level — so they can
+            // and do stand on the same spot, and then the victim's whole box lies behind a
+            // hitbox that starts at the attacker's front. Nothing lands, from either of
+            // them, for as long as they are pressed together: "standing right up against
+            // each other, no damage goes through". Starting at the centre cannot reach
+            // behind the attacker and cannot miss something they are standing inside.
+            Fix near = s.Position.X;
+            Fix far = s.Facing >= 0 ? s.Position.X + half + weapon.Reach
+                                    : s.Position.X - half - weapon.Reach;
+
+            Fix front = s.Facing >= 0 ? near : far;
+            Fix back = s.Facing >= 0 ? far : near;
 
             // Chest high, not full height: a swing that connects with an ankle is a swing nobody
             // can read.

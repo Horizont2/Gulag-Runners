@@ -196,10 +196,13 @@ def hitbox(s):
     w = weapon(s)
     half = C["W"] // 2
     h = C["CH"] if s.crouch else C["H"]
+    # The inner edge is the attacker's own centre, not their front face. Fighters do not
+    # collide with each other, so they stand on the same spot, and a box starting at the
+    # front then lies entirely past the victim: nothing lands at point-blank range.
     if s.facing >= 0:
-        lo, hi = s.x + half, s.x + half + w["reach"]
+        lo, hi = s.x, s.x + half + w["reach"]
     else:
-        lo, hi = s.x - half - w["reach"], s.x - half
+        lo, hi = s.x - half - w["reach"], s.x
     return (lo, s.y + h // 4, hi, s.y + h)
 
 

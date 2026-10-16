@@ -76,22 +76,27 @@ namespace GulagRunners.Sim
                                      s.Position.X + half, s.Position.Y + height);
                 if (!body.Overlaps(in wall)) continue;
 
-                if (world.Walls[i].Vertical)
+                // Out the way the wall is growing, always. Out of the NEAREST face would
+                // sometimes post a fighter back into the ground the wall has already eaten,
+                // which ends the match in a room with nobody in it.
+                switch (world.Walls[i].Grows)
                 {
-                    // A ceiling coming down puts you under it, never on top.
-                    s.Position.Y = wall.MinY - height - Skin;
-                    if (s.Velocity.Y > Fix.Zero) s.Velocity.Y = Fix.Zero;
-                }
-                else if (world.Walls[i].Travel > Fix.Zero)
-                {
-                    // Travelling towards +X, so it came from the left and herds right.
-                    s.Position.X = wall.MaxX + half + Skin;
-                    if (s.Velocity.X < Fix.Zero) s.Velocity.X = Fix.Zero;
-                }
-                else
-                {
-                    s.Position.X = wall.MinX - half - Skin;
-                    if (s.Velocity.X > Fix.Zero) s.Velocity.X = Fix.Zero;
+                    case GateToward.PlusX:
+                        s.Position.X = wall.MaxX + half + Skin;
+                        if (s.Velocity.X < Fix.Zero) s.Velocity.X = Fix.Zero;
+                        break;
+                    case GateToward.MinusX:
+                        s.Position.X = wall.MinX - half - Skin;
+                        if (s.Velocity.X > Fix.Zero) s.Velocity.X = Fix.Zero;
+                        break;
+                    case GateToward.MinusY:
+                        s.Position.Y = wall.MinY - height - Skin;
+                        if (s.Velocity.Y > Fix.Zero) s.Velocity.Y = Fix.Zero;
+                        break;
+                    default:
+                        s.Position.Y = wall.MaxY + Skin;
+                        if (s.Velocity.Y < Fix.Zero) s.Velocity.Y = Fix.Zero;
+                        break;
                 }
             }
         }
@@ -1220,7 +1225,8 @@ namespace GulagRunners.Sim
             // The closing walls, which are not in the baked list because they move.
             for (int i = 0; i < world.Walls.Length; i++)
             {
-                if (world.Walls[i].Vertical) continue;
+                GateToward grows = world.Walls[i].Grows;
+                if (grows == GateToward.MinusY || grows == GateToward.PlusY) continue;
                 if (!world.WallReaches(i, s.Depth, halfZ)) continue;
 
                 Aabb wall = world.WallAt(i);

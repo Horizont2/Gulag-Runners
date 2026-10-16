@@ -315,8 +315,20 @@ namespace GulagRunners.Game
             SpawnAt(_spawnPoint, spawnFacing);
         }
 
-        void SpawnAt(Vector2 feet, int facing)
+        /// <summary>
+        /// Puts the fighter down somewhere.
+        ///
+        /// <paramref name="keepLoadout"/> is the difference between a new round and a
+        /// rescue. A round deals fresh: no weapon, no armour, full health, which is docs/01's
+        /// symmetric start. Being fished out from under the world is not that — it is the
+        /// game apologising for a hole in the floor — and taking everything the player had
+        /// found as the price makes a bug into a punishment.
+        /// </summary>
+        void SpawnAt(Vector2 feet, int facing, bool keepLoadout = false)
         {
+            Inventory carried = _state.Inventory;
+            short health = _state.Health;
+
             FixVec2 position = new FixVec2(ToFix(feet.x), ToFix(feet.y));
 
             // The slice comes first, because the seating below is only meaningful on one. The
@@ -335,6 +347,12 @@ namespace GulagRunners.Game
 
             _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
             _state.Depth = depth;
+
+            if (keepLoadout)
+            {
+                _state.Inventory = carried;
+                if (health > 0) _state.Health = health;
+            }
 
             // Never start inside the level. One box marked solid that should not have been —
             // the wall behind a location, say — lands across the floor, the fighter spawns in
@@ -511,8 +529,9 @@ namespace GulagRunners.Game
 
             if (_state.Position.Y.Raw < ToFix(killY).Raw)
             {
-                Debug.LogWarning($"{name}: fell past killY, returning to the spawn point.", this);
-                SpawnAt(_spawnPoint, _state.Facing);
+                Debug.LogWarning($"{name}: fell past killY, returning to the spawn point " +
+                                 "with what they were carrying.", this);
+                SpawnAt(_spawnPoint, _state.Facing, keepLoadout: true);
             }
         }
 

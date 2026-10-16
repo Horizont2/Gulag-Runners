@@ -23,24 +23,24 @@ SPAN = (X(-5.0), X(5.0))          # deep enough for any lane in these tests
 FLOOR = (X(-30.0), X(-1.0), X(30.0), X(0.0))
 
 
-def world(progress, inner=4.0, edge=16.0, thick=4.0):
-    """Two walls finishing `inner` either side of nought, starting at the arena's edges."""
+def world(progress, inner=4.0, edge=16.0):
+    """Two walls finishing `inner` either side of nought, growing from the arena's edges."""
     left_face, right_face = -inner, inner
     return {
         "solid": [FLOOR], "solidz": [SPAN], "solidgate": [-1], "gate": [], "gatesshut": 0,
         "oneway": [], "onewayz": [], "ladder": [], "ladderz": [],
         "ladderlean": [], "ladderleanz": [],
+        # Each wall is the FINISHED box: from the arena's edge to the last room's face. It
+        # grows into that box from the edge, so nothing opens up behind it.
         "walls": [
-            ((X(left_face - thick), X(-4.0), X(left_face), X(8.0)),
-             X(edge - inner), False, SPAN),
-            ((X(right_face), X(-4.0), X(right_face + thick), X(8.0)),
-             X(-(edge - inner)), False, SPAN),
+            ((X(-edge), X(-4.0), X(left_face), X(8.0)), M.PLUS_X, SPAN),
+            ((X(right_face), X(-4.0), X(edge), X(8.0)), M.MINUS_X, SPAN),
         ],
         "wallprogress": X(progress),
     }
 
 
-print("A wall open is a wall out of the way")
+print("A wall at nothing has no thickness at all")
 w = world(0.0)
 s = S(-12.0, 0.1)
 s.depth = 0
