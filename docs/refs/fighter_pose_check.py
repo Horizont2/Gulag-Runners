@@ -32,7 +32,7 @@ TOLERANCE = 0.01
 def documents(text):
     """Every YAML document in a scene, by its anchor: {fileID: (classId, body)}."""
     heads = [(m.start(), m.end(), int(m.group(1)), m.group(2))
-             for m in re.finditer(r"^--- !u!(\d+) &(\d+).*$", text, re.M)]
+             for m in re.finditer(r"^--- !u!(\d+) &(-?\d+).*$", text, re.M)]
     out = {}
     for i, (start, after, cls, fid) in enumerate(heads):
         stop = heads[i + 1][0] if i + 1 < len(heads) else len(text)
@@ -41,7 +41,7 @@ def documents(text):
 
 
 def field(body, key, default=None):
-    m = re.search(rf"^\s*{key}:\s*(.*)$", body, re.M)
+    m = re.search(rf"^[ \\t]*{key}:[ \\t]*(.*)$", body, re.M)
     return m.group(1).strip() if m else default
 
 

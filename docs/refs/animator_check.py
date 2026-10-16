@@ -1,0 +1,182 @@
+"""Does the Animator Controller have the states the fighter asks for?
+
+Animator.Play on a state that does not exist does NOTHING. Not an error, not a fallback --
+the animator keeps whatever was last played, so the character holds one frame. From the
+outside that is indistinguishable from a broken clip, and in this project it was reported as
+one: "the ladder animation plays a single frame for the whole climb". It was hunted through
+the IK and through the simulation, both of which measured clean, and the cause was that the
+controller in play was the free Stickman pack's nine states while PlayerAnimator asks for
+twenty-odd. Six of the seven ladder states had never existed. The seventh exists spelled
+Ladder_Up while the component asks for Ladder Up, and a hash is a hash.
+
+So the two lists are compared here, outside Unity, where nothing has to be played to find out.
+
+Run: python3 animator_check.py"""
+import os
+import re
+import sys
+
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+ASSETS = os.path.join(ROOT, "Gulag runners", "Assets")
+SCENE = os.path.join(ASSETS, "Scenes", "SetupScene.unity")
+
+# Fields on PlayerAnimator that name a state. Everything else on it is a number or a flag.
+# Read off the component rather than listed by hand: a new state field would otherwise be
+# added and never checked, which is how this class of fault returns.
+STATE_FIELD = re.compile(r"public string (\w*[Ss]tate)\b")
+ARRAY_FIELD = re.compile(r"public string\[\] (\w+)")
+
+
+def read(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
+def documents(text):
+    heads = [(m.start(), m.end(), int(m.group(1)), m.group(2))
+             for m in re.finditer(r"^--- !u!(\d+) &(-?\d+).*$", text, re.M)]
+    out = {}
+    for i, (start, after, cls, fid) in enumerate(heads):
+        stop = heads[i + 1][0] if i + 1 < len(heads) else len(text)
+        out[fid] = (cls, text[after:stop])
+    return out
+
+
+def guid_of(asset_path):
+    meta = asset_path + ".meta"
+    if not os.path.exists(meta):
+        return None
+    m = re.search(r"guid: ([0-9a-f]+)", read(meta))
+    return m.group(1) if m else None
+
+
+def by_guid():
+    """Every asset in the project, by guid."""
+    out = {}
+    for base, _, files in os.walk(ASSETS):
+        for f in files:
+            if not f.endswith(".meta"):
+                continue
+            m = re.search(r"guid: ([0-9a-f]+)", read(os.path.join(base, f)))
+            if m:
+                out[m.group(1)] = os.path.join(base, f[:-5])
+    return out
+
+
+def controller_states(path):
+    """State names in a .controller, which are the m_Name of its AnimatorState documents."""
+    text = read(path)
+    names = []
+    for m in re.finditer(r"^--- !u!(\d+) &-?\d+.*$", text, re.M):
+        if int(m.group(1)) != 1102:            # AnimatorState
+            continue
+        tail = text[m.end():m.end() + 2000]
+        n = re.search(r"^[ \t]*m_Name:[ \t]*(.*)$", tail, re.M)
+        if n:
+            names.append(n.group(1).strip())
+    return names
+
+
+def main():
+    assets = by_guid()
+    animator_cs = os.path.join(ASSETS, "_Game", "Presentation", "PlayerAnimator.cs")
+    source = read(animator_cs)
+    fields = set(STATE_FIELD.findall(source)) | set(ARRAY_FIELD.findall(source))
+
+    guid = guid_of(animator_cs)
+    scene = read(SCENE)
+    docs = documents(scene)
+
+    # Every PlayerAnimator in the scene, and the states it asks for. A field absent from the
+    # YAML was added to the component after the scene was last saved, so Unity will give it
+    # the C# default -- which is what the player will actually see, so that is what is read.
+    defaults = dict(re.findall(r'public string (\w*[Ss]tate)\s*=\s*"([^"]*)"', source))
+    combo = re.search(r'public string\[\] attackCombo\s*=\s*\{([^}]*)\}', source)
+    combo_default = re.findall(r'"([^"]*)"', combo.group(1)) if combo else []
+
+    problems, checked = 0, 0
+
+    for fid, (cls, body) in sorted(docs.items()):
+        if cls != 114 or f"guid: {guid}" not in body:
+            continue
+        checked += 1
+
+        go = re.search(r"m_GameObject: \{fileID: (\d+)\}", body)
+        owner = docs.get(go.group(1), (None, ""))[1] if go else ""
+        name = (re.search(r"^[ \t]*m_Name:[ \t]*(.*)$", owner, re.M) or
+                re.match(r"(?!x)x", "")) and re.search(r"^[ \t]*m_Name:[ \t]*(.*)$", owner, re.M)
+        name = name.group(1).strip() if name else "?"
+
+        # Which controller this fighter actually plays. The model is a prefab instance, so
+        # its Animator lives in the prefab and the scene only overrides pieces of it.
+        wanted = {}
+        for field in sorted(fields):
+            if field == "attackCombo":
+                for i, state in enumerate(combo_default):
+                    if state:
+                        wanted[state] = f"attackCombo[{i}]"
+                continue
+            m = re.search(rf"^[ \\t]*{field}:[ \\t]*(.*)$", body, re.M)
+            state = m.group(1).strip() if m else defaults.get(field, "")
+            if state:
+                wanted[state] = field
+
+        controllers = find_controllers(docs, assets)
+        if not controllers:
+            print(f"  {name}: no Animator Controller found on this fighter's model.")
+            problems += 1
+            continue
+
+        have = set()
+        for path in controllers:
+            have |= set(controller_states(path))
+
+        missing = sorted(s for s in wanted if s not in have)
+        shown = ", ".join(os.path.basename(p) for p in sorted(controllers))
+        print(f"  {name}: {len(wanted)} state(s) asked for, {len(have)} in {shown}")
+
+        for state in missing:
+            problems += 1
+            near = [h for h in have if h.replace("_", " ").lower() == state.lower()]
+            hint = f"  (the controller spells it \"{near[0]}\")" if near else ""
+            print(f"      PROBLEM - no state \"{state}\" ({wanted[state]}){hint}")
+
+    if checked == 0:
+        print("animator_check: no PlayerAnimator in the scene — nothing checked.")
+        return 1
+
+    print(f"animator_check: {checked} fighter(s), {problems} problem(s)")
+    return 1 if problems else 0
+
+
+def find_controllers(docs, assets):
+    """Every Animator Controller referenced anywhere in the scene's prefab instances or
+    Animator components. Narrow enough to be useful and wide enough not to miss the one in
+    play: a fighter's model is a prefab, and the controller is set inside it."""
+    found = set()
+    for fid, (cls, body) in docs.items():
+        for m in re.finditer(r"m_Controller: \{fileID: \d+, guid: ([0-9a-f]+)", body):
+            path = assets.get(m.group(1))
+            if path and path.endswith(".controller"):
+                found.add(path)
+
+    # And through the prefabs the scene instantiates.
+    for fid, (cls, body) in docs.items():
+        if cls != 1001:
+            continue
+        m = re.search(r"m_SourcePrefab: \{fileID: \d+, guid: ([0-9a-f]+)", body)
+        if not m:
+            continue
+        prefab = assets.get(m.group(1))
+        if not prefab or not prefab.endswith(".prefab"):
+            continue
+        for c in re.finditer(r"m_Controller: \{fileID: \d+, guid: ([0-9a-f]+)",
+                             read(prefab)):
+            path = assets.get(c.group(1))
+            if path and path.endswith(".controller"):
+                found.add(path)
+    return found
+
+
+if __name__ == "__main__":
+    sys.exit(main())
