@@ -125,16 +125,20 @@ namespace GulagRunners.Sim
         public Fix LaneReach;
 
         /// <summary>
-        /// How far IN FRONT of a ladder's rungs the body stands while climbing, in metres.
+        /// How far the body's centre sits in front of a ladder's NEAR FACE while climbing,
+        /// in metres. Smaller Z is towards the camera (docs/02).
         ///
-        /// Without it the body's centre goes onto the rung line, which means half a body of
-        /// depth is behind the rungs: from the camera the fighter climbs with the ladder
-        /// through their chest. A real climb is in front of the thing being climbed, so the
-        /// depth it aims for is the rung line minus this.
+        /// Half the thickness of the character's MODEL, and nothing else. The first version
+        /// of this took half of <see cref="BodyDepth"/> instead, which looked like the same
+        /// quantity and is not: body depth is how deep a slice of the LEVEL the body occupies
+        /// — a lane width, 0.6 m — while the fighter who has to touch the rungs is a stick
+        /// figure a hand's breadth thick. Measured on the arena's own ladder, that put the
+        /// body 33 cm off the rungs, hanging in mid-air beside a ladder it was supposedly
+        /// holding.
         ///
-        /// Half the body's own depth plus half a ladder's thickness is the figure that puts
-        /// the back of the body on the front of the rungs. Smaller Z is towards the camera
-        /// (docs/02: the fight is the front slice of the location), so this subtracts.
+        /// The ladder's own thickness is not in here either. It is read per ladder from the
+        /// baked span, because a modelled ladder and a drawn-on one are not the same depth
+        /// and neither is a guess worth keeping in a config.
         /// </summary>
         public Fix LadderStandOff;
 
@@ -222,7 +226,7 @@ namespace GulagRunners.Sim
             c.DepthSnapSpeed = Fix.FromMilli(4000);
             c.LaneLookahead  = Fix.FromMilli(1200);
             c.LaneReach      = Fix.FromMilli(2000);
-            c.LadderStandOff = Fix.FromMilli(400);
+            c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 

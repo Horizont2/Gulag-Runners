@@ -7,41 +7,57 @@ using GulagRunners.Sim;
 namespace GulagRunners.GameEditor
 {
     /// <summary>
-    /// Builds the closing phase: the steel shutters of docs/01 and docs/18.
+    /// Builds the closing phase: the walls of docs/01 and docs/18 coming in.
     ///
-    /// The clock has announced the rooms closing at 1:00 for a while now and nothing has
-    /// closed, because the arena has no gates in it. Everything else is already there — the
-    /// bake tags a gate's boxes, the match clock decides which bits are up, the motor skips a
-    /// solid whose gate has not shut, and GateView drops the slab — so this is placement, and
+    /// The clock has announced the rooms closing at 1:00 for a while and nothing has closed,
+    /// because the arena has no gates in it. Everything else is already there — the bake tags
+    /// a gate's boxes, the match clock decides which bits are up, the motor skips a solid
+    /// whose gate has not shut, and GateView slides the slab — so this is placement, and
     /// placement is arithmetic.
     ///
-    /// The plan comes out of the arena's own width rather than out of typed coordinates:
-    /// three pairs of vertical shutters, each pair closer to the middle than the last,
-    /// alternating left and right so the squeeze is felt from both sides, and a ceiling over
-    /// what is left for sudden death. The last room comes out one screen wide, which is the
-    /// state docs/01 is aiming at — two fighters, one room, nowhere to walk away to.
+    /// The arena NARROWS; it is not shut in pieces. Three big plates dropping across it is a
+    /// different feeling altogether: it carves the room into cells, and a fighter reads it as
+    /// "a wall appeared" rather than as the space running out. So each side is one wall built
+    /// out of many segments, and the segments go live from the outside in — the wall's inner
+    /// face advances towards the middle a step at a time, and each step slides in from behind
+    /// the last. Sixteen steps across the shutter window is one every few seconds, which the
+    /// eye joins up into a wall that is creeping.
     ///
-    /// Three things make a shutter work rather than merely exist, and all three are easy to
-    /// miss by hand:
+    /// The plan comes out of the arena's own width rather than typed coordinates, and the two
+    /// sides alternate so the squeeze is felt from both.
     ///
-    ///   It has to seal every storey, because a shutter a fighter can climb round herds
-    ///   nobody. These run from under the basement floor to over the top walkway.
+    /// Three things make a wall work rather than merely exist, and all three are easy to miss
+    /// by hand:
+    ///
+    ///   It has to seal every storey, because a wall a fighter can climb round herds nobody.
+    ///   These run from under the basement floor to over the top walkway.
     ///
     ///   It has to cover every DEPTH lane, because the fight is a flat lane through a 3D set
-    ///   and a shutter one lane deep is a shutter you step behind.
+    ///   and a wall one lane deep is a wall you step behind.
     ///
-    ///   It has to herd INWARDS. A shutter that only becomes solid can seal somebody into an
-    ///   outer wing with nobody to fight, and the match then ends on the clock in two empty
-    ///   rooms. Each one points at the middle.
+    ///   It has to herd INWARDS. A segment that only becomes solid can seal somebody into the
+    ///   outer dark with nobody to fight, and the match then ends on the clock in two empty
+    ///   rooms. Every one of them points at the middle.
     ///
-    /// Re-running it moves the shutters it made before instead of adding more.
+    /// Re-running it moves the walls it made before instead of adding more.
     /// </summary>
     public static class ShutterSetup
     {
         const string RootName = "Shutters";
 
-        /// <summary>How far from the middle each pair stands, as a share of the half-width.</summary>
-        static readonly float[] Rings = { 0.71f, 0.46f, 0.25f };
+        /// <summary>
+        /// How many steps each side takes coming in. More steps is a smoother creep and one
+        /// gate each: the clock can track 32 in all, and the ceiling wants one of them.
+        /// </summary>
+        const int StepsPerSide = 8;
+
+        /// <summary>
+        /// What is left in the middle, as a share of the arena's half-width.
+        ///
+        /// A quarter leaves about eight metres here, which is one screen: both fighters in
+        /// frame with nowhere to walk away to, which is the state docs/01 is aiming at.
+        /// </summary>
+        const float InnerShare = 0.25f;
 
         const float Thickness = 0.4f;        // in x
         const float Overshoot = 0.6f;        // past the top and bottom of the arena, in y
@@ -107,26 +123,34 @@ namespace GulagRunners.GameEditor
                 $"y {minY:0.00}..{maxY:0.00}, z {minZ:0.00}..{maxZ:0.00}"
             };
 
+            // Each side walks in from its own edge, a step at a time, and the two sides
+            // alternate so neither player feels singled out.
+            float inner = half * InnerShare;
+            float step = (half - inner) / StepsPerSide;
             int order = 0;
-            for (int ring = 0; ring < Rings.Length; ring++)
-            {
-                float offset = half * Rings[ring];
 
-                // Left first, then right, so the shutters alternate sides as they come in.
+            for (int i = 0; i < StepsPerSide; i++)
+            {
                 for (int side = -1; side <= 1; side += 2)
                 {
-                    float x = centre + offset * side;
+                    // Segment i of this side: contiguous with the one before it, so what the
+                    // eye sees is one wall getting longer rather than a row of plates.
+                    float outerFace = centre + (half - i * step) * side;
+                    float innerFace = centre + (half - (i + 1) * step) * side;
+                    float x = (outerFace + innerFace) * 0.5f;
 
-                    // Caught outside it, you are brought towards the middle.
                     GateToward toward = side < 0 ? GateToward.PlusX : GateToward.MinusX;
 
-                    Shutter(root, $"Shutter {order}", GateWhen.Closing, order, toward,
+                    Shutter(root, $"Wall {(side < 0 ? "L" : "R")}{i}", GateWhen.Closing, order,
+                            toward,
                             new Vector3(x, (low + high) * 0.5f, depthCentre),
-                            new Vector3(Thickness, high - low, depth));
+                            new Vector3(step + Thickness, high - low, depth),
+                            // In from outside, from behind the segment before it.
+                            new Vector3(-(step + Thickness + 0.2f) * side, 0f, 0f));
 
-                    report.Add($"  closing {order}: x {x:0.00}, " +
-                               $"y {low:0.00}..{high:0.00}, herds " +
-                               (side < 0 ? "right" : "left"));
+                    if (i == 0 || i == StepsPerSide - 1)
+                        report.Add($"  {(side < 0 ? "left " : "right")} step {i}: " +
+                                   $"face reaches x {innerFace:0.00}");
                     order++;
                 }
             }
@@ -134,7 +158,6 @@ namespace GulagRunners.GameEditor
             // Sudden death: the ceiling of what is left. docs/01 wants both fighters on ONE
             // platform, so this fills the room from just under its top walkway upwards and
             // shoves anybody standing up there down out of it.
-            float inner = half * Rings[Rings.Length - 1];
             float roomLeft = centre - inner, roomRight = centre + inner;
 
             // Measured off the walkway it is meant to take away, not off the bottom of the
@@ -148,7 +171,8 @@ namespace GulagRunners.GameEditor
             Shutter(root, "Ceiling", GateWhen.SuddenDeath, 0, GateToward.MinusY,
                     new Vector3((roomLeft + roomRight) * 0.5f,
                                 (ceilingBottom + high) * 0.5f, depthCentre),
-                    new Vector3(roomRight - roomLeft, high - ceilingBottom, depth));
+                    new Vector3(roomRight - roomLeft, high - ceilingBottom, depth),
+                    new Vector3(0f, high - ceilingBottom + 1f, 0f));
 
             report.Add($"  sudden death: ceiling over x {roomLeft:0.00}..{roomRight:0.00} " +
                        $"from y {ceilingBottom:0.00} up, herds down");
@@ -161,9 +185,9 @@ namespace GulagRunners.GameEditor
             Debug.Log($"{order + 1} shutter(s) built and the arena re-baked.\n" +
                       string.Join("\n", report) + "\n" +
                       baker.LastReport + "\n" +
-                      "Each one is a plain box under \"" + RootName + "\": give it the art it " +
-                      "deserves, and check no ladder or chest sits inside one — the bake " +
-                      "treats that as an authoring mistake and says so.", baker);
+                      "Each segment is a plain box under \"" + RootName + "\": give the two " +
+                      "walls the art they deserve, and check no ladder or chest sits inside " +
+                      "one — the bake treats that as an authoring mistake and says so.", baker);
         }
 
         /// <summary>
@@ -200,7 +224,7 @@ namespace GulagRunners.GameEditor
 
         /// <summary>One shutter: the gate, the box that bakes, and the view that drops it.</summary>
         static void Shutter(Transform root, string name, GateWhen when, int order,
-                            GateToward toward, Vector3 centre, Vector3 size)
+                            GateToward toward, Vector3 centre, Vector3 size, Vector3 from)
         {
             Transform found = root.Find(name);
             GameObject go;
@@ -239,9 +263,14 @@ namespace GulagRunners.GameEditor
             Undo.RecordObject(view, "Build shutters");
             view.gate = gate;
 
-            // It waits above where it lands, by its own height, so that it is out of sight
-            // until it drops rather than hanging in the room with a hole in it.
-            view.from = new Vector3(0f, size.y + 1f, 0f);
+            // Where it waits. A side segment waits just outside the wall it is about to
+            // extend, so it slides in along the wall's own line; the ceiling waits above.
+            view.from = from;
+
+            // Slower than a slamming shutter and heavier: this is machinery pushing a wall
+            // in, not a plate dropping, and the two read completely differently.
+            view.slideSeconds = when == GateWhen.Closing ? 1.1f : 0.6f;
+            view.weight = 0.9f;
         }
 
         static float Metres(Fix v) => v.ToMilli() / 1000f;

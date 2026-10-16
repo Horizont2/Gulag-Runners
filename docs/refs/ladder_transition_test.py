@@ -220,10 +220,12 @@ for _ in range(400):
     if climbed < 12:
         continue
     worstX = max(worstX, abs(F(s.x) - line_at(F(s.y), 0.2, 0.8)))
-    # The body stands a stand-off IN FRONT of the rung line, never on it: centred on the
-    # line, half a body of depth is behind the rungs and the ladder draws through the chest.
-    worstZ = max(worstZ,
-                 abs(F(s.depth) - (line_at(F(s.y), -2.0, -1.0) - F(C["LSTANDOFF"]))))
+    # The body stands just in front of the ladder's NEAR FACE: on the rung line it would be
+    # half a body deep inside the rungs, and a stand-off measured off the line instead of the
+    # face left it hanging a third of a metre out in the air.
+    sp = M.span(LEAN, "ladder", s.ladder)
+    face = line_at(F(s.y), -2.0, -1.0) - F((sp[1] - sp[0]) // 2)
+    worstZ = max(worstZ, abs(F(s.depth) - (face - F(C["LSTANDOFF"]))))
 check("the climb stays on the leaning ladder's own line in x", climbed and worstX < 0.05,
       f"worst {worstX * 100:.1f} cm off it")
 check("and follows it in depth as well, a stand-off in front of the rungs", climbed and worstZ < 0.05,
