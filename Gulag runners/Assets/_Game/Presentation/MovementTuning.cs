@@ -122,11 +122,14 @@ namespace GulagRunners.Game
                  "step on — the wall at the back included — and walks out of the fight.")]
         public float laneReach = 2f;
 
-        [Tooltip("How far in FRONT of a ladder's rungs the body stands while climbing, in " +
-                 "metres. 0 centres the body on the rung line, so from the camera the ladder " +
-                 "goes through the fighter's chest. Half the body's depth plus half a " +
-                 "ladder's thickness puts the back of the body on the front of the rungs.")]
-        public float ladderStandOff = 0.4f;
+        [Tooltip("How far the body's centre sits in front of a ladder's near face while " +
+                 "climbing, in metres.\n\n" +
+                 "Half the thickness of the CHARACTER MODEL, and nothing else — the ladder's " +
+                 "own thickness is read off the ladder. Do not reach for Body Depth here: " +
+                 "that is a lane width (how deep a slice of the level the body occupies), " +
+                 "and using half of it left this fighter hanging 33 cm off the rungs. If the " +
+                 "model is thicker, raise this; if it clips into the ladder, lower it.")]
+        [Range(0f, 0.6f)] public float ladderStandOff = 0.08f;
 
         [Header("Ledge assist")]
         [Tooltip("Steps this low are climbed instead of blocking you.")]

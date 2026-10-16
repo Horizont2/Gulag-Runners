@@ -69,13 +69,21 @@ namespace GulagRunners.Sim
             Fix want;
 
             if (s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length)
+            {
                 // The rungs at this height, not just anywhere on the ladder: one propped
                 // against a walkway leans away from the camera as it rises, and holding one
                 // depth the whole way up pushes the body through the rungs at one end of it.
-                // ...and in front of them, not through them: the rung line is where the
-                // ladder is, and a body centred on it is a body the ladder passes through.
+                //
+                // And in FRONT of them, measured off the ladder's near face rather than its
+                // centre line, so the stand-off is only ever the character's own thickness.
+                // A thick ladder and a thin one then hold the body at the same visible
+                // distance, which is the thing an eye actually checks.
+                Span rungs = world.LadderSpan(s.LadderIndex);
+                Fix halfLadder = (rungs.Max - rungs.Min) / 2;
+
                 want = world.LadderDepthAt(s.LadderIndex, s.Position.Y, s.Depth, inset)
-                     - cfg.LadderStandOff;
+                     - halfLadder - cfg.LadderStandOff;
+            }
             else if (s.Mode != MoveMode.Grounded)
                 return;                                   // mid-air you keep the slice you left
             else if (!TryLaneAhead(ref s, world, in cfg, out want) &&
