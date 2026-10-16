@@ -20,7 +20,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
          BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
-         LSTANDOFF=M(80), AIMLOCK=24,
+         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=26,
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
@@ -750,7 +750,15 @@ def start_scripted(s, landing, side, to_depth=None):
     s.script_forward = abs(landing[0] - s.x) <= C["LTOP"]
     span_x = abs(s.script_to[0]-s.x)*10//7  # noqa: the tuple is (x, y) from here on
     span_y = abs(s.script_to[1]-s.y)*3//2
-    frames = frames_for(max(span_x, span_y)) or C["SMINF"]
+    # DEPTH counts. Every ladder here stands in front of the floor it serves with its head
+    # flush to it, so a climb-out raises the body ~4 cm and moves it ~45 cm backwards. Timed
+    # on x and y alone that is 4 cm of travel, which lands on the ten-frame minimum: a sixth
+    # of a second for 0.45 m, faster than a run, with an 0.83 s haul clip crammed into it.
+    span_z = abs(s.script_to_depth - s.script_from_depth)*3//2
+    frames = frames_for(max(span_z, span_x, span_y)) or C["SMINF"]
+    # And a haul is not a step: the minimum it shared with the reach onto a ladder is too
+    # short to read as one.
+    frames = max(frames, C["MANTLE_MINF"])
     s.script_frames=frames; s.script_t=frames
     s.script_dir = 1 if side>=0 else -1
     s.mode="mantle"; s.ladder=-1

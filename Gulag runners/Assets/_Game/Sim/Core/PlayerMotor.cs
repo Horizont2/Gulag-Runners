@@ -967,8 +967,24 @@ namespace GulagRunners.Sim
             // one sized.
             Fix spanX = Fix.Abs(s.ScriptTo.X - s.ScriptFrom.X) * 10 / 7;
             Fix spanY = Fix.Abs(s.ScriptTo.Y - s.ScriptFrom.Y) * 3 / 2;
-            int frames = FramesFor(Fix.Max(spanX, spanY), in cfg);
+
+            // DEPTH counts, and leaving it out was most of why the climb-out looked wrong.
+            // Every ladder in this arena stands in front of the floor it serves with its head
+            // flush to it, so the climb-out raises the body about four centimetres and moves
+            // it nearly half a metre backwards onto the floor. Timed on X and Y alone that is
+            // four centimetres of travel, which lands on the ten-frame minimum — a sixth of a
+            // second to cover 0.45 m, which is 2.7 m/s, faster than a run, with an 0.83 s
+            // haul animation crammed into it. It reads as a flicker and a cut, which is what
+            // "the climb-out is jerky and switches to something else" is.
+            Fix spanZ = Fix.Abs(s.ScriptToDepth - s.ScriptFromDepth) * 3 / 2;
+
+            int frames = FramesFor(Fix.Max(spanZ, Fix.Max(spanX, spanY)), in cfg);
             if (frames <= 0) frames = cfg.ScriptMinFrames;
+
+            // And a haul is not a step. The minimum is shared with the reach onto a ladder,
+            // which really is quick; climbing OUT of one is a whole-body move and reads as a
+            // mistake when it is over before the clip has started.
+            if (frames < cfg.MantleMinFrames) frames = cfg.MantleMinFrames;
 
             s.ScriptFrames = frames;
             s.ScriptTimer = frames;

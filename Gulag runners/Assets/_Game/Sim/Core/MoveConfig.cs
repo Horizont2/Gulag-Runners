@@ -154,6 +154,19 @@ namespace GulagRunners.Sim
         /// </summary>
         public int AimLockFrames;
 
+        /// <summary>
+        /// The shortest a CLIMB-OUT may be, in frames, whatever its distance.
+        ///
+        /// Separate from ScriptMinFrames, which the two moves used to share. Reaching for a
+        /// ladder is genuinely quick and ten frames suits it. Hauling yourself onto a floor
+        /// is a whole-body move with a whole-body animation, and in this arena it covers
+        /// almost no height at all — the ladders' heads are flush with the floors they
+        /// serve — so by distance it came out at the minimum and was over in a sixth of a
+        /// second. An 0.83 s clip played in 0.17 s is not a fast climb-out, it is a flicker
+        /// followed by a cut.
+        /// </summary>
+        public int MantleMinFrames;
+
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
@@ -240,6 +253,7 @@ namespace GulagRunners.Sim
             c.LaneReach      = Fix.FromMilli(2000);
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
             c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
+            c.MantleMinFrames = 26;                  // 0.43 s: long enough to read as a haul
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 

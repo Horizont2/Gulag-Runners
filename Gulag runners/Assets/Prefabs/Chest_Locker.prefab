@@ -74,10 +74,10 @@ MonoBehaviour:
   tintByTier: 1
   tintTarget: {fileID: 0}
   tierColours:
-  - {r: 0.55, g: 0.55, b: 0.58, a: 1}
-  - {r: 0.9, g: 0.9, b: 0.92, a: 1}
-  - {r: 0.35, g: 0.62, b: 1, a: 1}
-  - {r: 1, g: 0.78, b: 0.25, a: 1}
+  - {r: 0.4, g: 0.42, b: 0.45, a: 1}
+  - {r: 0.25, g: 0.9, b: 0.35, a: 1}
+  - {r: 0.2, g: 0.55, b: 1, a: 1}
+  - {r: 0.7, g: 0.25, b: 1, a: 1}
 --- !u!114 &1491755031287025
 MonoBehaviour:
   m_ObjectHideFlags: 0

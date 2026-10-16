@@ -102,47 +102,34 @@ namespace GulagRunners.Game
 
             if (!LocalBounds(root, out Bounds local)) return;
 
-            float longest = Mathf.Max(local.size.x, Mathf.Max(local.size.y, local.size.z));
-            if (longest <= 0.0001f) return;
+            if (local.size.sqrMagnitude <= 0.0000001f) return;
 
-            // Out of the PARENT's scale, because the length wanted is in world metres and
-            // the scale set here is local.
+            // In WORLD metres, which means through the root's own scale AND everything
+            // above it. Two separate faults lived in not doing this.
             //
-            // This is why weapons were small specifically in the hand. The fighter object
-            // is scaled to 0.5, the model hangs off a hand bone beneath it, and a local
-            // scale that made the model 0.32 m of its parent's space made it 0.16 m of the
-            // world -- half of every length this function had just worked out, and only
-            // for the models that are held. The same weapon lying on the floor, under an
-            // unscaled view, came out right, so the two disagreed by exactly the fighter's
-            // own scale and picking one up halved it.
-            root.transform.localScale *= want / (longest * ParentScale(root.transform));
+            // Weapons were small in the HAND because the fighter object is scaled to 0.5
+            // and the model hangs off a hand bone beneath it: a local scale that made the
+            // model 0.32 m of its parent's space made it 0.16 m of the world. The same
+            // weapon on the floor, under an unscaled view, came out right, so picking one
+            // up halved it.
+            //
+            // And ARMOUR on the floor shrank, because the greybox models carry their whole
+            // shape in the ROOT's own scale -- Chainmail is a unit cube at (0.34, 0.26,
+            // 0.20). Measured in the root's frame that cube is 1 x 1 x 1, so "longest" was
+            // 1, and multiplying the local scale by want/1 threw the author's proportions
+            // away and replaced them with a uniform shrink to 45% of what was drawn.
+            //
+            // The root's lossy scale answers both at once: it is the size the model is
+            // ACTUALLY drawn at, whatever carries it.
+            Vector3 world = Vector3.Scale(local.size, Abs(root.transform.lossyScale));
+            float drawn = Mathf.Max(world.x, Mathf.Max(world.y, world.z));
+            if (drawn <= 0.0001f) return;
+
+            root.transform.localScale *= want / drawn;
         }
 
-        /// <summary>
-        /// The scale of everything ABOVE a transform, as one number.
-        ///
-        /// Taken as lossy over local rather than walked up the hierarchy, so it is right
-        /// however deep the thing is parented and whatever the bones in between do. A
-        /// component at or near zero is a scale nothing can be fitted against, so it
-        /// contributes 1 rather than an infinity.
-        /// </summary>
-        static float ParentScale(Transform t)
-        {
-            Vector3 lossy = t.lossyScale, local = t.localScale;
-            float sum = 0f;
-            int counted = 0;
-
-            for (int i = 0; i < 3; i++)
-            {
-                if (Mathf.Abs(local[i]) < 0.0001f) continue;
-                float above = Mathf.Abs(lossy[i] / local[i]);
-                if (above < 0.0001f) continue;
-                sum += above;
-                counted++;
-            }
-
-            return counted == 0 ? 1f : sum / counted;
-        }
+        static Vector3 Abs(Vector3 v) =>
+            new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
 
         /// <summary>
         /// The model's extent in its own root's space, from the meshes rather than from the
@@ -257,13 +244,28 @@ namespace GulagRunners.Game
             return Tier(palette, item);
         }
 
-        /// <summary>The project's tier palette: none, white, blue, gold (docs/03).</summary>
+        /// <summary>
+        /// The rarity ramp, by tier: nothing, common, rare, legendary.
+        ///
+        /// SATURATED on purpose, and that is the whole of why it was coming out white.
+        /// These colours are multiplied by an emission of up to 2.6 and the result is
+        /// tone-mapped, so every channel that was already near 1 clips to 1 and the hue
+        /// goes with it. Common used to be (0.90, 0.90, 0.92) — a colour whose hue IS
+        /// white, before any multiplier touches it — and rare at (0.35, 0.62, 1.00) still
+        /// had two channels over 1 by the time it was lit, which is pale blue heading for
+        /// white. A glow only keeps its colour if the channels it is NOT made of stay near
+        /// zero, so the ramp is green, blue and violet with their other channels low.
+        ///
+        /// Green, blue, violet rather than white, blue, gold: three hues nobody confuses at
+        /// a glance on a phone, in the order every player already knows, and none of them
+        /// the colour of the arena's own cold green-grey fog.
+        /// </summary>
         public static Color[] DefaultPalette() => new[]
         {
-            new Color(0.55f, 0.55f, 0.58f),
-            new Color(0.90f, 0.90f, 0.92f),
-            new Color(0.35f, 0.62f, 1.00f),
-            new Color(1.00f, 0.78f, 0.25f)
+            new Color(0.40f, 0.42f, 0.45f),      // nothing in the slot: grey, barely lit
+            new Color(0.25f, 0.90f, 0.35f),      // common    — green
+            new Color(0.20f, 0.55f, 1.00f),      // rare      — blue
+            new Color(0.70f, 0.25f, 1.00f)       // legendary — violet
         };
 
         /// <summary>

@@ -233,4 +233,48 @@ check("and follows it in depth as well, a stand-off in front of the rungs", clim
 check("and it still gets to the top", F(s.y) > 2.7 or s.mode in ("ground", "mantle"),
       f"y {F(s.y):.2f} mode {s.mode}")
 
+print("\nA climb-out is long enough for the clip that illustrates it")
+# Ladder_Up_End_InPlace is 50 frames -- 0.83 s of a whole-body haul. The move used to be
+# timed on X and Y alone, and every ladder in Arena_Demo has its head FLUSH with the floor
+# it serves, so a climb-out raises the body about four centimetres and moves it nearly half
+# a metre backwards in depth. Four centimetres of travel landed on the ten-frame minimum:
+# 0.17 s, into which an 0.83 s clip plays at five times speed and is then cut off. That is
+# not a fast climb-out, it is a flicker followed by a switch -- which is how it was
+# reported, twice.
+import arena_demo_geometry as _G
+import sim_motor_mirror as _MM
+
+CLIP = 50 / 60.0                      # the pack's climb-out clip, in seconds
+AW = _G.world()
+
+measured = 0
+for i in range(len(AW["ladder"])):
+    l = AW["ladder"][i]
+    sp = _MM.span(AW, "ladder", i)
+    s = S(F((l[0] + l[2]) // 2), F(l[1]) + 0.3)
+    s.depth = (sp[0] + sp[1]) // 2 - (sp[1] - sp[0]) // 2 - C["LSTANDOFF"]
+    for _ in range(240):
+        step(s, 0, AW)
+        if s.mode in ("ground", "air"):
+            break
+
+    ticks = 0
+    for _ in range(1200):
+        was = s.mode
+        step(s, UP, AW)
+        if s.mode == "mantle":
+            ticks += 1
+        if was == "mantle" and s.mode != "mantle":
+            break
+
+    if ticks == 0:
+        continue
+    measured += 1
+    seconds = ticks / 60.0
+    check(f"ladder {i}: the climb-out is not over before the clip has started",
+          CLIP / seconds <= 2.5,
+          f"{ticks} tick(s) = {seconds:.2f} s, a {CLIP:.2f} s clip at {CLIP / seconds:.1f}x")
+
+check("and that section actually ran", measured > 0, f"{measured} climb-out(s)")
+
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))
