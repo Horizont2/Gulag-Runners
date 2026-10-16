@@ -4,27 +4,28 @@ using GulagRunners.Sim;
 
 namespace GulagRunners.Game
 {
-    /// <summary>One armour item, as the set of body parts the fighter wears for it.</summary>
+    /// <summary>One armour item, as the set of pieces the fighter wears for it.</summary>
     [Serializable]
     public class ArmourSet
     {
         [Tooltip("The item this set is worn for. None is what the fighter wears with an empty " +
-                 "armour slot — bare arms and legs, no plate: the silhouette that says " +
-                 "\"nothing found yet\".")]
+                 "armour slot — the silhouette that says \"nothing found yet\".")]
         public ItemId item = ItemId.None;
 
-        [Tooltip("The parts. Any left empty simply show nothing, so a half-filled set is a " +
-                 "half-dressed fighter rather than an error.")]
-        public GameObject head;
-        public GameObject chest;
-        public GameObject arms;
-        public GameObject belt;
-        public GameObject legs;
-        public GameObject feet;
+        [Tooltip("Everything worn for this item, already in the scene and switched off.\n\n" +
+                 "A flat list rather than one slot per body part, because the parts come in " +
+                 "pairs: two bracers, two greaves, two boots. Any entry left empty simply " +
+                 "shows nothing, so a half-filled set is a half-dressed fighter rather than " +
+                 "an error.")]
+        public GameObject[] pieces = Array.Empty<GameObject>();
 
-        public bool Has(GameObject go) =>
-            go != null && (go == head || go == chest || go == arms ||
-                           go == belt || go == legs || go == feet);
+        public bool Has(GameObject go)
+        {
+            if (go == null || pieces == null) return false;
+            for (int i = 0; i < pieces.Length; i++)
+                if (pieces[i] == go) return true;
+            return false;
+        }
     }
 
     /// <summary>
@@ -35,10 +36,17 @@ namespace GulagRunners.Game
     /// knowing the other player is in plate changes whether you take the exchange at all. A
     /// number in a stat line cannot do that. A silhouette can.
     ///
-    /// Nothing is instantiated and nothing is re-parented. A modular character ships every
-    /// part already skinned to the one skeleton and switched off; this turns the right six on.
-    /// That is also why the parts must not be SCALED here the way weapon models are: a skinned
-    /// mesh follows its bones, and scaling the renderer leaves the mesh behind.
+    /// Nothing is instantiated at runtime. Every piece the fighter can ever wear is already
+    /// parented to a bone, scaled, and switched off; this turns the right ones on. That is the
+    /// same rule the weapon models follow, and it is the only arrangement in which a designer
+    /// can see the whole wardrobe in the inspector.
+    ///
+    /// Rigid pieces on bones rather than skinned meshes, deliberately. A modular pack's
+    /// skinned armour is bound to that pack's own skeleton and modelled around that pack's own
+    /// body; re-bound to another character it attaches in the right places and still carries
+    /// the wrong proportions. The fighter in this game is a stick figure, so a plate chest
+    /// skinned for a muscular humanoid would hang in the air around it. A bolted-on piece, on
+    /// the other hand, is exactly what armour is.
     ///
     /// <see cref="PlayerLoadoutView.armour"/> is the older, single-model path, for a pack that
     /// hands out one mesh per armour. Fill one or the other, not both.
