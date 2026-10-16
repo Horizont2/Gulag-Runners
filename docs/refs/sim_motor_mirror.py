@@ -195,7 +195,56 @@ def move_x(s, dx, w):
         if not overlaps(b, sol): continue
         tx = sol[0] - half - SKIN if dx > 0 else sol[2] + half + SKIN
         s.vx = 0
+
+    for i in range(len(w.get("walls", ()))):
+        if w["walls"][i][2]: continue              # a ceiling blocks vertically, not sideways
+        if not wall_reaches(w, i, s.depth): continue
+        wall = wall_at(w, i)
+        b = (tx - half, s.y, tx + half, s.y + h)
+        if not overlaps(b, wall): continue
+        tx = wall[0] - half - SKIN if dx > 0 else wall[2] + half + SKIN
+        s.vx = 0
+
     s.x = tx
+
+def wall_at(w, i):
+    """Where wall i stands at the world's current closeness. Mirrors SimWorld.WallAt."""
+    box, travel, vertical, _span = w["walls"][i]
+    # Authored SHUT, so open is the box MINUS the travel. Plus, and the two walls start on
+    # each other's side of the arena.
+    back = mul(travel, w.get("wallprogress", 0)) - travel
+    if vertical:
+        return (box[0], box[1] + back, box[2], box[3] + back)
+    return (box[0] + back, box[1], box[2] + back, box[3])
+
+
+def wall_reaches(w, i, depth):
+    return reaches(w["walls"][i][3], depth, C["BODYZ"] // 2)
+
+
+def shove_from_walls(s, w):
+    """A closing wall pushes a body out the way it came. Mirrors PlayerMotor.ShoveFromWalls."""
+    half = C["W"] // 2
+    h = C["CH"] if s.crouch else C["H"]
+    for i in range(len(w.get("walls", ()))):
+        if not wall_reaches(w, i, s.depth):
+            continue
+        wall = wall_at(w, i)
+        body = (s.x - half, s.y, s.x + half, s.y + h)
+        if not overlaps(body, wall):
+            continue
+
+        _box, travel, vertical, _span = w["walls"][i]
+        if vertical:
+            s.y = wall[1] - h - SKIN
+            if s.vy > 0: s.vy = 0
+        elif travel > 0:
+            s.x = wall[2] + half + SKIN
+            if s.vx < 0: s.vx = 0
+        else:
+            s.x = wall[0] - half - SKIN
+            if s.vx > 0: s.vx = 0
+
 
 def move_y(s, dy, w, shaft=-1):
     if dy == 0: return
@@ -246,6 +295,8 @@ def step(s, inp, w):
         return
     step_flat(s, inp, w)
     update_depth(s, w)
+    if w.get("walls"):
+        shove_from_walls(s, w)
 
 
 def update_depth(s, w):

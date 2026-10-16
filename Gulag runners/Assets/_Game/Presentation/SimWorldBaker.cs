@@ -170,6 +170,9 @@ namespace GulagRunners.Game
         readonly List<ArenaGate> _gates = new List<ArenaGate>();
         readonly List<List<Rect>> _gateRects = new List<List<Rect>>();
         readonly List<List<Span>> _gateSpans = new List<List<Span>>();
+
+        /// <summary>Every object belonging to a closing wall, so the static pass skips them.</summary>
+        readonly HashSet<int> _wallOwners = new HashSet<int>();
         readonly List<Rect> _gizmoGate = new List<Rect>();
 
         void Awake()
@@ -228,6 +231,24 @@ namespace GulagRunners.Game
             CollectGates();
             List<Aabb> gateBoxes = new List<Aabb>();
 
+            // The closing walls, before anything else looks at a collider: they are not part
+            // of the static arena, because they move, and a wall baked as a solid as well
+            // would be a wall that is also permanently where it ends up.
+            List<WallDef> walls = new List<WallDef>();
+            _wallOwners.Clear();
+            foreach (GameObject root in RootObjects())
+            {
+                foreach (ClosingWall w in root.GetComponentsInChildren<ClosingWall>(true))
+                {
+                    if (w == null || !w.enabled || !w.gameObject.activeInHierarchy) continue;
+
+                    w.Measure();
+                    walls.Add(w.ToDef());
+                    foreach (Transform t in w.GetComponentsInChildren<Transform>(true))
+                        _wallOwners.Add(t.gameObject.GetInstanceID());
+                }
+            }
+
             int roots = 0, slopes = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0, markedOffPlane = 0,
                 chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
@@ -260,6 +281,7 @@ namespace GulagRunners.Game
                     // backdrop left every one of those boxes to be baked again by the ordinary
                     // collider pass, on its layer, as a solid wall.
                     handled.Add(c.gameObject.GetInstanceID());
+                    if (_wallOwners.Contains(c.gameObject.GetInstanceID())) continue;
 
                     // enabled && activeInHierarchy, NOT isActiveAndEnabled. The two are not
                     // the same here: isActiveAndEnabled is false for a component Unity has
@@ -335,6 +357,10 @@ namespace GulagRunners.Game
                     if (col.isTrigger && !includeTriggers) { skippedTrigger++; continue; }
                     if (handled.Contains(col.gameObject.GetInstanceID()))
                     { skippedAlreadyMarked++; continue; }
+
+                    // A closing wall is held separately: it moves, so it cannot be one of
+                    // the immutable boxes.
+                    if (_wallOwners.Contains(col.gameObject.GetInstanceID())) continue;
 
                     // Never bake a player's own body: it would become a wall it stands inside.
                     if (col.GetComponentInParent<PlayerController>() != null)
@@ -449,6 +475,7 @@ namespace GulagRunners.Game
             World = new SimWorld
             {
                 Gates = gateDefs,
+                Walls = walls.ToArray(),
                 SolidGate = gateOf.ToArray(),
                 Solids = solids.ToArray(),
                 OneWay = oneWay.ToArray(),

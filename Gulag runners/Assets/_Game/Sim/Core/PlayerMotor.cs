@@ -44,6 +44,56 @@ namespace GulagRunners.Sim
 
             StepFlat(ref s, input, world, in cfg);
             UpdateDepth(ref s, world, in cfg);
+            ShoveFromWalls(ref s, world, in cfg);
+        }
+
+        /// <summary>
+        /// Pushes a body out of a closing wall that has caught up with it.
+        ///
+        /// Blocking alone is not enough for a wall that MOVES: a fighter standing still as
+        /// one arrives is not walking into anything, so nothing would stop it passing through
+        /// them. Being shoved is also the whole feeling the closing phase is for — docs/01
+        /// wants the arena to herd, and a wall you can stand inside herds nobody.
+        ///
+        /// Out the way it came, always, so a wall closing from the left pushes right. Pushing
+        /// out of the nearest face would sometimes post a fighter THROUGH the wall into the
+        /// dead ground behind it, which ends the match in an empty room.
+        /// </summary>
+        static void ShoveFromWalls(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            if (world.Walls.Length == 0) return;
+
+            Fix half = cfg.BodyWidth / 2;
+            Fix height = s.Crouching ? cfg.CrouchHeight : cfg.BodyHeight;
+            Fix halfZ = cfg.BodyDepth / 2;
+
+            for (int i = 0; i < world.Walls.Length; i++)
+            {
+                if (!world.WallReaches(i, s.Depth, halfZ)) continue;
+
+                Aabb wall = world.WallAt(i);
+                Aabb body = new Aabb(s.Position.X - half, s.Position.Y,
+                                     s.Position.X + half, s.Position.Y + height);
+                if (!body.Overlaps(in wall)) continue;
+
+                if (world.Walls[i].Vertical)
+                {
+                    // A ceiling coming down puts you under it, never on top.
+                    s.Position.Y = wall.MinY - height - Skin;
+                    if (s.Velocity.Y > Fix.Zero) s.Velocity.Y = Fix.Zero;
+                }
+                else if (world.Walls[i].Travel > Fix.Zero)
+                {
+                    // Travelling towards +X, so it came from the left and herds right.
+                    s.Position.X = wall.MaxX + half + Skin;
+                    if (s.Velocity.X < Fix.Zero) s.Velocity.X = Fix.Zero;
+                }
+                else
+                {
+                    s.Position.X = wall.MinX - half - Skin;
+                    if (s.Velocity.X > Fix.Zero) s.Velocity.X = Fix.Zero;
+                }
+            }
         }
 
         /// <summary>
@@ -1164,6 +1214,21 @@ namespace GulagRunners.Sim
                 if (!body.Overlaps(in solid)) continue;
 
                 targetX = dx > Fix.Zero ? solid.MinX - half - Skin : solid.MaxX + half + Skin;
+                s.Velocity.X = Fix.Zero;
+            }
+
+            // The closing walls, which are not in the baked list because they move.
+            for (int i = 0; i < world.Walls.Length; i++)
+            {
+                if (world.Walls[i].Vertical) continue;
+                if (!world.WallReaches(i, s.Depth, halfZ)) continue;
+
+                Aabb wall = world.WallAt(i);
+                Aabb body = new Aabb(targetX - half, s.Position.Y,
+                                     targetX + half, s.Position.Y + height);
+                if (!body.Overlaps(in wall)) continue;
+
+                targetX = dx > Fix.Zero ? wall.MinX - half - Skin : wall.MaxX + half + Skin;
                 s.Velocity.X = Fix.Zero;
             }
 

@@ -180,6 +180,25 @@ namespace GulagRunners.Sim
         /// How far through the result, 0 to 1, for a camera that holds on the end and then lets
         /// go. 0 everywhere but the Over phase, so a caller can drive on it unconditionally.
         /// </summary>
+        /// <summary>
+        /// How far the closing walls have come in, 0 to 1.
+        ///
+        /// Zero until the closing phase starts, then even across the shutter window, then one
+        /// for the rest of the match — so the walls arrive at their final width exactly when
+        /// the last shutter of docs/01 would have fallen, and stay there through sudden death.
+        /// </summary>
+        public Fix ClosingProgress(in MatchConfig cfg)
+        {
+            int from = MatchMotor.PhaseStart(MatchPhase.Closing, in cfg);
+            int window = cfg.ShutterFrames > 0 ? cfg.ShutterFrames : cfg.ClosingFrames;
+            if (window <= 0) return Frame >= from ? Fix.One : Fix.Zero;
+
+            int done = Frame - from;
+            if (done <= 0) return Fix.Zero;
+            if (done >= window) return Fix.One;
+            return Fix.FromMilli(done * 1000 / window);
+        }
+
         public Fix OverProgress(in MatchConfig cfg) =>
             Phase != MatchPhase.Over || cfg.RestartFrames <= 0
                 ? Fix.Zero

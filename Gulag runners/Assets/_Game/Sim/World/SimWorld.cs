@@ -107,6 +107,55 @@ namespace GulagRunners.Sim
     }
 
     /// <summary>
+    /// A wall that closes the arena by moving, rather than by appearing.
+    ///
+    /// The shutters above are boxes that switch on. That is right for a steel slab dropping
+    /// into a doorway and wrong for the thing docs/01 actually describes: the arena getting
+    /// SMALLER. Built out of switching boxes, a closing arena is a row of plates, and a
+    /// fighter reads each one as "a wall appeared" rather than as the space running out —
+    /// and no number of thinner plates fixes that, it only makes the steps smaller.
+    ///
+    /// So a wall is one box whose POSITION is a pure function of the frame. That keeps every
+    /// promise the baked arena makes: nothing is allocated, nothing is mutated during a tick,
+    /// and two devices given the same frame compute the same wall to the millimetre (docs/06).
+    /// The art reads the same function, so the picture cannot drift from the collision.
+    /// </summary>
+    public struct WallDef
+    {
+        /// <summary>Where it ends up: the box at full close.</summary>
+        public Aabb Box;
+
+        /// <summary>How deep it reaches. A wall one lane deep is a wall you step behind.</summary>
+        public Span Span;
+
+        /// <summary>
+        /// How far it travels to get there, signed, along its axis. The open position is the
+        /// closed one minus this, so a wall authored where it should END needs only this one
+        /// number to say where it starts.
+        /// </summary>
+        public Fix Travel;
+
+        /// <summary>False travels along X — a side wall. True along Y — a ceiling.</summary>
+        public bool Vertical;
+
+        /// <summary>
+        /// Where it stands at a given closeness, 0 open and 1 shut.
+        ///
+        /// The box is authored SHUT, so open is the box minus the travel: a wall that moves
+        /// +12 m to arrive started 12 m to the left of where it now is. Written the other way
+        /// about — plus the travel at zero — the two walls begin on each other's side of the
+        /// arena, which is not a subtle failure but is an easy one to type.
+        /// </summary>
+        public Aabb At(Fix progress)
+        {
+            Fix back = Travel * progress - Travel;
+            return Vertical
+                ? new Aabb(Box.MinX, Box.MinY + back, Box.MaxX, Box.MaxY + back)
+                : new Aabb(Box.MinX + back, Box.MinY, Box.MaxX + back, Box.MaxY);
+        }
+    }
+
+    /// <summary>
     /// The static collision of one arena, as plain data.
     /// Built once from the seed (or, for now, baked from the Unity scene) and never mutated
     /// during a tick, so both clients hold an identical world without any network traffic.
@@ -160,6 +209,25 @@ namespace GulagRunners.Sim
         /// with gates in it.
         /// </summary>
         public GateDef[] Gates = System.Array.Empty<GateDef>();
+
+        /// <summary>
+        /// The walls that close the arena by moving. Empty is an arena that never closes.
+        /// </summary>
+        public WallDef[] Walls = System.Array.Empty<WallDef>();
+
+        /// <summary>
+        /// How shut the walls are, 0 to 1. The only other thing about the arena that changes
+        /// during a match, and like <see cref="GatesShut"/> it is written from the clock
+        /// before anything moves and is a pure function of the frame.
+        /// </summary>
+        public Fix WallProgress;
+
+        /// <summary>Where wall i stands this tick.</summary>
+        public Aabb WallAt(int i) => Walls[i].At(WallProgress);
+
+        /// <summary>Is wall i in the way of a body on this slice?</summary>
+        public bool WallReaches(int i, Fix depth, Fix halfDepth) =>
+            Walls[i].Span.Reaches(depth, halfDepth);
 
         /// <summary>
         /// Which gate each solid belongs to, parallel to Solids. -1 — and any solid past the

@@ -352,7 +352,15 @@ namespace GulagRunners.Game
 
             // The arena, then the bodies in it. One word of state, copied onto the world the
             // motor reads, so every collision query this tick already knows what is shut.
-            if (world != null) world.GatesShut = _match.GatesShut;
+            if (world != null)
+            {
+                world.GatesShut = _match.GatesShut;
+
+                // How far the walls have come in. Written here, before anything moves, for
+                // the same reason the gate mask is: it is a pure function of the frame, so
+                // the two devices cannot disagree and a rollback needs nothing but the frame.
+                world.WallProgress = _match.ClosingProgress(rules);
+            }
 
             if (_match.GatesJustShut != 0)
             {
