@@ -103,7 +103,91 @@ modern objects, barbed wire, electric lights, gore
 
 ---
 
-### Промт A — «Камера підземелля» (основний)
+### Промт A — «Камера підземелля» (основний) — **v2, після тестового рендеру**
+
+![тестовий рендер меню v1](refs/test-menu-v1.webp)
+
+**Що вийшло і варто зберегти:** палітра й розподіл світла — теплий бурштин смолоскипа
+проти холодного синього з вікна; фасетна геометрія читається як low poly, а не як
+малюнок; ґрати обрамлюють центр і лишають кути вільними; калюжі з відображенням;
+бочки й мотузка стоять на підлозі; **UI сів рівно туди, куди просили** — портрет і
+смужки зліва вгорі, монета і три щоденні справа вгорі, дві круглі кнопки зліва внизу,
+PLAY справа внизу, підписи смужками замість нечитабельного тексту.
+
+**Що зламано і чим лікується:**
+
+| Проблема | Причина | Рядок, що лікує |
+|---|---|---|
+| **Боєць замалий** — займає ~40% висоти, скін не роздивитись | нема вказівки на розмір у кадрі | `the figure fills 60% of the frame height, knees to head in the lower two thirds` |
+| Стоїть **за ґратами**, у прорізі — читається як «чоловік у дверях» | ґрати описані і ліворуч-праворуч, і позаду | `the figure stands IN FRONT of the bars, closer to the camera than any bar` |
+| **Пласке світло на фігурі**, він блідо-сірий, а не в бурштині | смолоскип описаний, але не сказано, що він ключове світло саме на бійця | `the torch is the key light ON THE FIGURE, warm amber from above and in front` |
+| **Без зброї** — незрозуміло, у що це гра | не просили | `holding a medieval club in his right hand, tip resting on the floor` |
+| Смолоскип **прямо над головою** і дрібний | нема позиції | `the torch bracket is on the left wall at head height, not above him` |
+| **Порожня нижня третина** — суцільна підлога | камера зависоко | `camera low, at the figure's chest height` |
+| **Мертві зони** ліворуч і праворуч від фігури | нема чим зайняти | `a wooden weapon rack against the right wall, a straw pallet on the left` |
+| За ґратами **просто склепіння**, не видно, куди ведуть двері | фон описаний як інтер'єр | `beyond the gate a wide arena floor in pale fog, hinting at a larger space` |
+| UI **тьмяний**, губиться на тлі | нема контрасту в описі | `UI panels are dark charcoal with a warm gold stroke, clearly readable` |
+| Телефон — не 16:9, боки обріжуться | просили 16:9 | `20:9 ultrawide, all important content inside the central 16:9` |
+
+---
+
+#### Повний промт v2
+
+```
+A stylized low poly medieval dungeon cell seen from inside, 20:9 ultrawide,
+all important content inside the central 16:9.
+
+A single escaped prisoner stands in the centre of the frame, facing the
+camera, IN FRONT of the bars and closer to the camera than any of them.
+He fills 60% of the frame height, knees to head in the lower two thirds.
+Torn linen shirt, scuffed leather jerkin, cloth wraps on the shins,
+holding a medieval wooden club in his right hand, its tip resting on the
+flagstones beside his boot. Weight on one leg, shoulders square, calm.
+
+Camera low, at the figure's chest height, looking very slightly up.
+
+Behind him a heavy shut iron portcullis in a stone arch. Beyond the
+portcullis, pale and out of focus, a wide arena floor in cold fog,
+hinting at a much larger space than this cell.
+Thick iron bars fill the left and right thirds of the frame, nearer the
+camera than the arch but further than the figure.
+
+A burning torch in an iron wall bracket on the LEFT wall at head height
+is the key light ON THE FIGURE: warm amber from the front left, carving
+his face and the club out of the dark. Cold blue moonlight from a small
+barred window high on the right is the fill, and it never reaches him.
+
+A wooden weapon rack with two spears against the right wall.
+A straw pallet and two barrels against the left wall, a coil of rope on
+the floor. Everything rests flat on damp flagstones with shallow puddles
+that reflect the torch.
+
+Dark foreground, pale background, strong value separation, three clear
+depth planes: bars, figure, lit gate.
+
+game UI overlaid as flat vector shapes on top of the scene:
+bottom right a large rounded rectangle button reading PLAY in a gold
+stroke, top left a square portrait frame with two horizontal progress
+bars beside it, top right a coin icon with a short bar and under it
+three small square icons in a row, bottom left two small circular icons.
+UI panels are dark charcoal with a warm gold stroke, clearly readable
+against the scene, no readable paragraphs of text, labels shown as
+simple light bars. Nothing overlaps the figure.
+
+stylized low poly, rendered in Blender, flat-shaded faceted geometry,
+visible flat polygon facets, hard edges between facets, no smooth shading,
+clean silhouettes readable at phone size,
+everything rests on a solid surface, nothing floats in mid-air
+
+--no painterly, digital painting, concept art, photorealistic, smooth
+shading, noisy textures, garbled text, paragraphs of text, watermarks,
+real-world flags, historical insignia, dates, military regalia, modern
+objects, barbed wire, electric lights, gore, UI covering the character
+```
+
+---
+
+### Промт A — «Камера підземелля» (v1, початковий)
 
 ```
 A stylized low poly medieval dungeon cell seen from inside, wide landscape view.
