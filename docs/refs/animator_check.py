@@ -149,18 +149,40 @@ def main():
     return 1 if problems else 0
 
 
-def find_controllers(docs, assets):
-    """Every Animator Controller referenced anywhere in the scene's prefab instances or
-    Animator components. Narrow enough to be useful and wide enough not to miss the one in
-    play: a fighter's model is a prefab, and the controller is set inside it."""
-    found = set()
-    for fid, (cls, body) in docs.items():
-        for m in re.finditer(r"m_Controller: \{fileID: \d+, guid: ([0-9a-f]+)", body):
-            path = assets.get(m.group(1))
-            if path and path.endswith(".controller"):
-                found.add(path)
+CONTROLLER = re.compile(r"m_Controller: \{fileID: \d+, guid: ([0-9a-f]+)")
 
-    # And through the prefabs the scene instantiates.
+# A prefab instance does not rewrite the prefab: it records an override, and the controller
+# then appears as a propertyPath with its guid on the objectReference line below. Reading
+# only the plain m_Controller line finds the PREFAB's controller and misses the one actually
+# in play -- which reports a scene that is fine as fifteen missing states per fighter, and a
+# check that cries wolf is worse than no check.
+OVERRIDE = re.compile(
+    r"propertyPath: m_Controller\s*\n\s*value:.*\n\s*objectReference: "
+    r"\{fileID: \d+, guid: ([0-9a-f]+)")
+
+
+def find_controllers(docs, assets):
+    """The Animator Controller the fighters actually play.
+
+    An override wins outright rather than being added to what the prefab says: unioning the
+    two would let a state that exists only in the controller NOT in play answer for one that
+    is missing from the one that is."""
+    def resolve(guids):
+        out = set()
+        for g in guids:
+            path = assets.get(g)
+            if path and path.endswith(".controller"):
+                out.add(path)
+        return out
+
+    scene = "\n".join(body for _, (cls, body) in docs.items())
+    overridden = resolve(OVERRIDE.findall(scene))
+    if overridden:
+        return overridden
+
+    found = resolve(CONTROLLER.findall(scene))
+
+    # Otherwise through the prefabs the scene instantiates, where a model's Animator lives.
     for fid, (cls, body) in docs.items():
         if cls != 1001:
             continue
@@ -170,11 +192,8 @@ def find_controllers(docs, assets):
         prefab = assets.get(m.group(1))
         if not prefab or not prefab.endswith(".prefab"):
             continue
-        for c in re.finditer(r"m_Controller: \{fileID: \d+, guid: ([0-9a-f]+)",
-                             read(prefab)):
-            path = assets.get(c.group(1))
-            if path and path.endswith(".controller"):
-                found.add(path)
+        text = read(prefab)
+        found |= resolve(OVERRIDE.findall(text)) or resolve(CONTROLLER.findall(text))
     return found
 
 

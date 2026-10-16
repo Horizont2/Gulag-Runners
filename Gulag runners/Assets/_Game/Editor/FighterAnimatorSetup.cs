@@ -10,15 +10,16 @@ namespace GulagRunners.GameEditor
     /// Builds the fighter's Animator Controller: every state <see cref="PlayerAnimator"/>
     /// asks for, on two layers, with the mask that lets the arms fight while the legs run.
     ///
-    /// WHY THIS EXISTS AT ALL. The controller in play was the free Stickman pack's, which
-    /// has nine states: Idle, Walk, Run, Run Fast, Jumping Up, Sitting, Swimming, Yelling
-    /// and Ladder_Up. The component asks for twenty-odd, including seven ladder states and
-    /// three attacks, and <see cref="Animator.Play(int,int)"/> on a state that does not
-    /// exist does NOTHING — so the animator kept whatever was last played and the character
-    /// held one frame for the length of a climb. That was reported as a broken climb
-    /// animation, hunted through the IK, and was all along a controller that had never had
-    /// the states. Note the one that does exist is spelled "Ladder_Up" and the component
-    /// asks for "Ladder Up"; a hash is a hash.
+    /// WHY THIS EXISTS AT ALL. <see cref="Animator.Play(int,int)"/> on a state that does
+    /// not exist does NOTHING — not an error, not a fallback. The animator keeps whatever
+    /// was last played, so the character holds one frame, which from the outside is
+    /// indistinguishable from a broken clip. The free Stickman controller this project
+    /// started on has nine states against the twenty-one the component asks for, and the
+    /// one ladder state it does have is spelled "Ladder_Up" while the component asks for
+    /// "Ladder Up"; a hash is a hash. GR_Player.controller, built by hand since, has
+    /// twenty of the twenty-one, which is why this tool ADDS rather than builds: a hand-made
+    /// controller is somebody's work and a tool that overwrites it is a tool nobody runs
+    /// twice.
     ///
     /// WHY TWO LAYERS. A fighter who can attack while moving is drawing two things at once:
     /// the feet are carrying him somewhere and the blade is going somewhere else. One layer
@@ -34,8 +35,9 @@ namespace GulagRunners.GameEditor
     public static class FighterAnimatorSetup
     {
         const string Folder = "Assets/_Game/Animation";
-        const string ControllerPath = Folder + "/Fighter.controller";
+        const string ControllerPath = Folder + "/GR_Player.controller";
         const string MaskPath = Folder + "/Upper Body.mask";
+        const string UpperLayer = "Upper Body";
 
         /// <summary>
         /// State name -> the clip to put in it, by asset name.
@@ -115,27 +117,32 @@ namespace GulagRunners.GameEditor
 
             var missing = new List<string>();
 
-            // Added BY NAME, not as a struct we built ourselves. AddLayer(string) creates the
-            // state machine as a sub-asset of the controller; AddLayer(AnimatorControllerLayer)
-            // takes the struct as given and the state machine we made belongs to nothing, so
-            // it is dropped the next time the asset is loaded and the controller comes back
-            // with empty layers. That failure happens on reload, not on build, which is the
-            // worst time for it to happen.
-            controller.AddLayer("Base Layer");
-            controller.AddLayer("Upper Body");
+            if (controller.layers.Length == 0) controller.AddLayer("Base Layer");
 
-            Fill(controller, 0, Body, clips, missing);
-            Fill(controller, 0, Fight, clips, missing);
-            Fill(controller, 1, Fight, clips, missing);
+            // Added BY NAME, not as a struct built here. AddLayer(string) creates the state
+            // machine as a sub-asset of the controller; AddLayer(AnimatorControllerLayer)
+            // takes the struct as given and a state machine made by hand belongs to nothing,
+            // so it is dropped the next time the asset loads and the controller comes back
+            // with an empty layer. That failure happens on reload, not on build, which is
+            // the worst possible time for it.
+            int upper = IndexOf(controller, UpperLayer);
+            if (upper < 0)
+            {
+                controller.AddLayer(UpperLayer);
+                upper = controller.layers.Length - 1;
+            }
+
+            // Only what is not already there, and never a clip over one somebody chose.
+            int added = Fill(controller, 0, Body, clips, missing) +
+                        Fill(controller, 0, Fight, clips, missing) +
+                        Fill(controller, upper, Fight, clips, missing);
 
             // Weight 0 on the fight layer: PlayerAnimator drives it, and a layer left at 1
             // is a fighter permanently mid-swing.
             AnimatorControllerLayer[] built = controller.layers;
-            built[0].defaultWeight = 1f;
-            built[0].blendingMode = AnimatorLayerBlendingMode.Override;
-            built[1].avatarMask = mask;
-            built[1].defaultWeight = 0f;
-            built[1].blendingMode = AnimatorLayerBlendingMode.Override;
+            built[upper].avatarMask = mask;
+            built[upper].defaultWeight = 0f;
+            built[upper].blendingMode = AnimatorLayerBlendingMode.Override;
             controller.layers = built;
 
             // IK Pass on every layer, or OnAnimatorIK is never called and PlayerIK runs no
@@ -150,9 +157,9 @@ namespace GulagRunners.GameEditor
 
             int assigned = Assign(controller);
 
-            string made = $"{Folder}/Fighter.controller: {controller.layers.Length} layer(s), " +
-                          $"{Body.Length + Fight.Length} state(s) on the base layer and " +
-                          $"{Fight.Length} on the upper body, assigned to {assigned} fighter(s).";
+            string made = $"{ControllerPath}: {controller.layers.Length} layer(s), " +
+                          $"{added} state(s) added, \"{UpperLayer}\" masked to the upper " +
+                          $"body on layer {upper}, controller on {assigned} fighter(s).";
 
             if (missing.Count > 0)
                 Debug.LogWarning($"{made}\nNo clip found for: {string.Join(", ", missing)}. " +
@@ -163,12 +170,26 @@ namespace GulagRunners.GameEditor
                 Debug.Log(made);
         }
 
-        static void Fill(AnimatorController controller, int layer,
-                         (string state, string clip)[] table,
-                         Dictionary<string, AnimationClip> clips, List<string> missing)
+        static int IndexOf(AnimatorController controller, string layer)
         {
-            if (layer < 0 || layer >= controller.layers.Length) return;
+            AnimatorControllerLayer[] layers = controller.layers;
+            for (int i = 0; i < layers.Length; i++)
+                if (layers[i].name == layer) return i;
+            return -1;
+        }
+
+        /// <summary>
+        /// Adds the states in the table that this layer does not already have, and returns
+        /// how many. A state that IS there is left exactly as it is, clip and all: it was
+        /// put there by somebody, and this tool is not entitled to an opinion about it.
+        /// </summary>
+        static int Fill(AnimatorController controller, int layer,
+                        (string state, string clip)[] table,
+                        Dictionary<string, AnimationClip> clips, List<string> missing)
+        {
+            if (layer < 0 || layer >= controller.layers.Length) return 0;
             AnimatorStateMachine machine = controller.layers[layer].stateMachine;
+            int added = 0;
 
             foreach ((string state, string clip) in table)
             {
@@ -184,7 +205,11 @@ namespace GulagRunners.GameEditor
 
                 if (clips.TryGetValue(clip, out AnimationClip motion)) s.motion = motion;
                 else if (!missing.Contains(clip)) missing.Add(clip);
+
+                added++;
             }
+
+            return added;
         }
 
         static bool Has(AnimatorStateMachine machine, string state)
@@ -249,7 +274,11 @@ namespace GulagRunners.GameEditor
             return mask;
         }
 
-        /// <summary>Puts the controller on every fighter in the open scene.</summary>
+        /// <summary>
+        /// Puts the controller on any fighter that is still on a different one, and counts
+        /// the ones already on it. A fighter whose model already plays this controller is
+        /// left untouched, overrides and all.
+        /// </summary>
         static int Assign(AnimatorController controller)
         {
             PlayerController[] fighters =
@@ -260,6 +289,8 @@ namespace GulagRunners.GameEditor
             {
                 Animator animator = fighter.GetComponentInChildren<Animator>(true);
                 if (animator == null) continue;
+
+                if (animator.runtimeAnimatorController == controller) { done++; continue; }
 
                 Undo.RecordObject(animator, "Assign fighter animator");
                 animator.runtimeAnimatorController = controller;
