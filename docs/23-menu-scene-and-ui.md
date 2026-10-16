@@ -131,7 +131,109 @@ PLAY справа внизу, підписи смужками замість н�
 
 ---
 
-#### Повний промт v2
+#### Рендер v2 і що з ним не так
+
+![тестовий рендер меню v2](refs/test-menu-v2.webp)
+
+**Сцена готова.** Боєць великий і попереду ґрат, бурштин з лівого смолоскипа ліпить
+його, за опускними ґратами блідий туман арени, стійка зі списами праворуч, солом'яник
+і бочки ліворуч, калюжі, низька камера. Цю половину промта більше не чіпаємо.
+
+**UI виглядає накладеним зверху** — і причина не в смаку, а в тому, що кожен елемент
+оформлений однаково:
+
+| Проблема | Чому так вийшло | Що робити |
+|---|---|---|
+| Усе в **однаковій золотій рамці** з однаковим обведенням і радіусом | у промті один опис панелі на всі елементи | різні матеріали для різних ролей: PLAY — дерево з залізом, валюта — латунь, решта — **без рамки взагалі** |
+| **Нема ієрархії**: лічильник монет важить стільки ж, скільки PLAY | не сказано, що головне | `PLAY is the single heaviest element; every other element is quiet` |
+| Блок зліва вгорі **завеликий**, конкурує з бійцем | дві довгі смужки + велика рамка | `compact, one short bar` |
+| Елементи **в самих кутах**, як дебаг-оверлей | нема полів | `inset from every edge by 4% of the frame` |
+| **Золото скрізь**, тож акценту не лишилось | один колір на все | золото **тільки** на PLAY і монеті |
+| Іконки **нічого не кажуть про цю гру** | generic cog/shield/person | ковальський молот, шолом, монета з карбом |
+| UI **нічим не пов'язаний зі сценою** | описаний як плаский оверлей | те саме фасетне затінення, **те саме світло смолоскипа**, тепла тінь збоку |
+
+Головне з цього — останнє. Накладений вигляд лікується не «зробити гарніше», а тим,
+щоб UI був **з того самого матеріалу і під тим самим світлом**, що й підземелля.
+
+---
+
+#### Повний промт v3 — той самий кадр, інший UI
+
+```
+A stylized low poly medieval dungeon cell seen from inside, 20:9 ultrawide,
+all important content inside the central 16:9.
+
+A single escaped prisoner stands in the centre of the frame, facing the
+camera, IN FRONT of the bars and closer to the camera than any of them.
+He fills 60% of the frame height, knees to head in the lower two thirds.
+Torn linen shirt, scuffed leather jerkin, cloth wraps on the shins,
+holding a medieval wooden club in his right hand, its tip resting on the
+flagstones beside his boot. Weight on one leg, shoulders square, calm.
+
+Camera low, at the figure's chest height, looking very slightly up.
+
+Behind him a heavy shut iron portcullis in a stone arch. Beyond the
+portcullis, pale and out of focus, a wide arena floor in cold fog.
+Thick iron bars fill the left and right thirds of the frame, nearer the
+camera than the arch but further than the figure.
+
+A burning torch in an iron wall bracket on the LEFT wall at head height
+is the key light ON THE FIGURE: warm amber from the front left. Cold
+blue moonlight from a small barred window high on the right is the fill.
+
+A wooden weapon rack with two spears against the right wall. A straw
+pallet and two barrels against the left wall, a coil of rope on the
+floor. Damp flagstones with shallow puddles reflecting the torch.
+Dark foreground, pale background, three clear depth planes.
+
+THE INTERFACE IS PART OF THE ROOM, NOT A LAYER ON TOP OF IT.
+It is built from the same materials as the dungeon, shaded with the same
+flat facets, and lit by the same torch from the front left, so every
+piece carries a warm edge on its left side and a cool shadow on its right.
+Inset from every edge by 4% of the frame. Nothing overlaps the figure.
+
+One element dominates: bottom right, a PLAY button made of a thick oak
+plank bound in black iron straps with riveted corners, the word PLAY
+burned into the wood, lit by the torch. It is the single heaviest,
+brightest and largest piece of interface in the frame.
+
+Everything else is quiet and has NO panel or box behind it:
+- top left, a small carved stone plaque with a portrait relief, and
+  beside it one short horizontal progress bar inlaid like a groove in
+  the stone. Compact, a quarter the size of the PLAY button.
+- top right, a single aged brass coin with a struck design, and a short
+  bar beside it. Under it, three small flat iron icons in a row with no
+  frames: a blacksmith hammer, a helmet, a coin.
+- bottom left, two small iron icons with no frames.
+
+Colour discipline: warm off-white for every label and bar. ONE gold
+accent, used only on the PLAY button and the coin, nowhere else.
+All other interface is dark iron and weathered stone, nearly as dark as
+the scene, readable only by its warm lit edge.
+Labels as simple light bars, no readable paragraphs of text.
+A soft dark gradient along the top and bottom edges of the frame instead
+of panels, so the interface sits on shadow rather than on boxes.
+
+stylized low poly, rendered in Blender, flat-shaded faceted geometry,
+visible flat polygon facets, hard edges between facets, no smooth shading,
+clean silhouettes readable at phone size,
+everything rests on a solid surface, nothing floats in mid-air
+
+--no painterly, digital painting, concept art, photorealistic, smooth
+shading, noisy textures, garbled text, paragraphs of text, watermarks,
+real-world flags, historical insignia, dates, military regalia, modern
+objects, barbed wire, electric lights, gore, UI covering the character,
+rounded rectangle panels, glassmorphism, drop shadows, uniform gold
+outlines on every element, generic mobile game UI kit
+```
+
+Останні два рядки негативу — найважливіші в усьому промті. `rounded rectangle panels`
+і `uniform gold outlines on every element` — це буквально те, що вийшло в v2, і модель
+туди з'їжджає від самого слова «UI».
+
+---
+
+#### Повний промт v2 (попередній)
 
 ```
 A stylized low poly medieval dungeon cell seen from inside, 20:9 ultrawide,
