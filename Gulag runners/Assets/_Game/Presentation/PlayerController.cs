@@ -578,12 +578,32 @@ namespace GulagRunners.Game
             float height = (box.MaxY - box.MinY).Raw / (float)Fix.RawOne;
             if (height <= 0.01f) return Quaternion.identity;
 
-            Span lean = _world.LadderLean[i];
-            float run = (lean.Max - lean.Min).Raw / (float)Fix.RawOne;
-            if (Mathf.Abs(run) < 0.001f) return Quaternion.identity;
+            // BOTH leans. This used to read only the sideways one and tip about Z for it,
+            // which is self-consistent and silently useless here: every ladder in this arena
+            // leans AWAY FROM THE CAMERA and not one of them leans sideways, so the measured
+            // tilt was zero on all four and a body on a ladder propped at five degrees stood
+            // bolt upright through it.
+            Span sideways = _world.LadderLean[i];
+            float runX = (sideways.Max - sideways.Min).Raw / (float)Fix.RawOne;
 
-            float degrees = Mathf.Atan2(run, height) * Mathf.Rad2Deg * ladderTiltAmount;
-            return Quaternion.AngleAxis(-degrees, Vector3.forward);
+            float runZ = 0f;
+            if (i < _world.LadderLeanZ.Length)
+            {
+                Span back = _world.LadderLeanZ[i];
+                runZ = (back.Max - back.Min).Raw / (float)Fix.RawOne;
+            }
+
+            if (Mathf.Abs(runX) < 0.001f && Mathf.Abs(runZ) < 0.001f)
+                return Quaternion.identity;
+
+            // Sideways tips about Z, which on this camera is a roll in the screen plane.
+            // Away tips about X, which lays the body back along the rungs — the one that
+            // makes a propped ladder read as propped.
+            float roll = Mathf.Atan2(runX, height) * Mathf.Rad2Deg * ladderTiltAmount;
+            float lean = Mathf.Atan2(runZ, height) * Mathf.Rad2Deg * ladderTiltAmount;
+
+            return Quaternion.AngleAxis(lean, Vector3.right) *
+                   Quaternion.AngleAxis(-roll, Vector3.forward);
         }
 
         /// <summary>
@@ -760,9 +780,22 @@ namespace GulagRunners.Game
         {
             if (climbing && faceLadderWhenClimbing)
             {
-                // 0 degrees of world yaw points along +Z, away from the camera and into the
-                // ladder. The skew leans back towards whichever side the character came from.
                 float side = facing >= 0 ? 1f : -1f;
+
+                // Towards the rungs, measured, the way the chest below is measured. It used
+                // to be a constant that assumed the ladder was straight ahead at +Z — true
+                // of an upright ladder on the plane and of nothing else, so a ladder that
+                // leans, or one the body reached from an angle, left the climb facing a few
+                // degrees off into the air.
+                if (LadderDirection(out Vector3 rungs))
+                {
+                    float toRungs = Mathf.Atan2(rungs.x, rungs.z) * Mathf.Rad2Deg;
+                    return ModelYawOffset + Mathf.LerpAngle(toRungs, toRungs + 90f * side,
+                                                            ladderViewAngle / 90f);
+                }
+
+                // No ladder to measure — a climb-out, or a frame between the two. 0 degrees
+                // of world yaw points along +Z, into the ladder and away from the camera.
                 return ModelYawOffset + ladderViewAngle * side;
             }
 
@@ -781,6 +814,29 @@ namespace GulagRunners.Game
 
             float walkYaw = facing >= 0 ? 90f : -90f;    // +X or -X in world yaw
             return ModelYawOffset + walkYaw;
+        }
+
+        /// <summary>
+        /// Which way the rungs lie from the body, at the height it is at. False when there
+        /// is no ladder, which is every frame that is not a climb.
+        /// </summary>
+        bool LadderDirection(out Vector3 towards)
+        {
+            towards = Vector3.forward;
+
+            int i = _state.LadderIndex;
+            if (_world == null || i < 0 || i >= _world.Ladders.Length) return false;
+
+            Fix y = _state.Position.Y;
+            float x = _world.LadderCentreAt(i, y).ToMilli() / 1000f;
+            float z = _world.LadderDepthAt(i, y, _state.Depth, Fix.Zero).ToMilli() / 1000f;
+
+            towards = new Vector3(x - _state.Position.X.ToMilli() / 1000f, 0f,
+                                  z - _state.Depth.ToMilli() / 1000f);
+
+            // Directly on the rung line: nothing to point at, and normalising a zero vector
+            // would hand back a yaw of zero as though that were measured.
+            return towards.sqrMagnitude > 0.0001f;
         }
 
         /// <summary>Which way the chest being opened lies, from the body. False if it is gone.</summary>
