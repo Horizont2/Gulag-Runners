@@ -164,18 +164,58 @@ def fields_of(src, whole):
     return found
 
 
+# Unity's own value types. Ours are found rather than listed -- see _value_types.
+BUILT_IN_VALUES = (
+    "Color", "Color32", "Vector2", "Vector3", "Vector4", "Vector2Int", "Vector3Int",
+    "Quaternion", "Bounds", "Rect", "RectInt", "LayerMask", "Matrix4x4",
+    "String", "Single", "Int32", "Boolean", "KeyCode", "AnimationCurve", "Gradient",
+    "HumanBodyBones", "AnimatorCullingMode", "AvatarIKGoal",
+)
+
+_OURS = None
+
+
+def _value_types():
+    """Every struct and enum declared in this project.
+
+    Found rather than listed. The list used to be written out by hand, and the cost of that
+    showed the first time a config struct was added: FighterBrain.tuning is a BotConfig,
+    which is a struct, and the check asked somebody to drag one into the inspector. A list
+    that has to be remembered is a list that goes stale, and a check that cries wolf is one
+    people stop reading."""
+    global _OURS
+    if _OURS is not None:
+        return _OURS
+
+    _OURS = set()
+    for base, _, files in os.walk(os.path.join(ROOT, "Gulag runners", "Assets", "_Game")):
+        for f in files:
+            if not f.endswith(".cs"):
+                continue
+            text = io.open(os.path.join(base, f), encoding="utf-8",
+                           errors="replace").read()
+            for m in re.finditer(r'public\s+(?:readonly\s+)?(?:struct|enum)\s+(\w+)', text):
+                _OURS.add(m.group(1))
+
+            # And a [Serializable] plain class, which Unity writes INTO the object that
+            # holds it rather than as a link to another one -- MovementTuning, SoundTable
+            # and the rest of the tuning blocks. A class that derives from MonoBehaviour or
+            # ScriptableObject is a real reference and stays one.
+            for m in re.finditer(
+                    r'\[\s*(?:System\.)?Serializable\s*\][^{;]*?\bpublic\s+(?:sealed\s+)?'
+                    r'class\s+(\w+)\s*(?::\s*([\w.,\s]+))?\{', text, re.S):
+                bases = (m.group(2) or "")
+                if "MonoBehaviour" in bases or "ScriptableObject" in bases:
+                    continue
+                _OURS.add(m.group(1))
+    return _OURS
+
+
 def _looks_like_ours(name):
     """A field typed as one of our own components is a reference too."""
-    if name in ENUMS:
+    if name in ENUMS or name in BUILT_IN_VALUES or name in _value_types():
         return False
-    return bool(re.match(r'^[A-Z]', name)) and name not in (
-        "Color", "Vector2", "Vector3", "Vector4", "Quaternion", "Bounds", "Rect", "LayerMask",
-        "String", "Single", "Int32", "Boolean", "KeyCode", "AnimationCurve", "Gradient",
-        "ItemId", "NoiseLevel", "ChestKind", "GateWhen", "GateToward", "MatchPhase",
-        "SimColliderKind", "HumanBodyBones", "AnimatorCullingMode",
-        "ChestTuning", "DropTuning", "CombatTuning", "MovementTuning", "HearingTuning",
-        "SoundTable", "SoundId", "Wound", "MatchConfig",
-    )
+    return bool(re.match(r'^[A-Z]', name))
 
 
 def docs_in(path):
