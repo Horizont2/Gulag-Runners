@@ -64,111 +64,129 @@
 
 ## Промти сцени
 
-Спільні правила для всіх трьох (без них виходить 2D-малюнок, а не сцена, яку можна
-зібрати в Unity):
+Три правила, без яких виходить не те:
+
+1. **Блок стилю** — інакше модель малює концепт-арт, а не геометрію, яку можна повторити
+   в Unity. Той самий блок, що вижив після двох тестових рендерів у документі 08.
+2. **UI прямо в кадрі** — це **мокап**, а не фон. Без цього не видно, чи лишилося місце
+   під кнопки і чи не губиться боєць за ними.
+3. **Середньовіччя** — підземелля замку, а не табір ХХ століття. Це єдина епоха, що
+   збігається з тим, чим б'ються: булава, спис, бойовий молот, кольчуга, лати.
 
 ```
-STYLE BLOCK (додавати до кожного):
+STYLE BLOCK (до кожного):
 stylized low poly, rendered in Blender, flat-shaded faceted geometry,
 visible flat polygon facets, hard edges between facets, no smooth shading,
-no texture detail, clean silhouettes readable at phone size,
-a 1.8 meter tall human silhouette for scale,
+clean silhouettes readable at phone size, 16:9 landscape,
+a 1.8 meter tall human for scale,
 everything rests on a solid surface, nothing floats in mid-air
+
+UI BLOCK (до кожного — це мокап):
+game UI overlaid as flat vector shapes on top of the scene:
+bottom right a large rounded rectangle button reading PLAY,
+top left a small portrait frame with a horizontal progress bar beside it,
+top right a coin icon with a short bar, and under it three small square
+icons in a row, bottom left two small circular icons.
+UI is flat, semi transparent, warm off-white on dark panels, no readable
+paragraphs of text, labels shown as simple light bars.
 
 NEGATIVE (до кожного):
 painterly, digital painting, concept art, photorealistic, smooth shading,
-noisy textures, text, logos, watermarks, real-world flags, historical insignia,
-dates, military regalia, gore
+noisy textures, garbled text, paragraphs of text, watermarks,
+real-world flags, historical insignia, dates, military regalia,
+modern objects, barbed wire, electric lights, gore
 ```
 
-Останній рядок негативу — не стилістика, а вимога стору: документ 01 вимагає
-**нуль реальної історичної символіки**.
+Останні два рядки негативу — не смак: документ 01 вимагає **нуль реальної історичної
+символіки**, а «modern objects / barbed wire / electric lights» прибирають табір ХХ
+століття, в який модель з'їжджає від слова «prison».
 
 ---
 
-### Промт A — «Клітка» (основний, рекомендую)
-
-> Вертикальна композиція під бійця в центрі, місце під UI по кутах.
+### Промт A — «Камера підземелля» (основний)
 
 ```
-A stylized low poly holding cell seen from inside, wide landscape framing.
-Heavy iron bars fill the left and right thirds of the frame; the centre is
-open floor with a single escapee standing on it, facing the camera.
-Behind the bars, out of focus and pale: a muddy prison yard, wooden
-watchtowers, a chain fence, scaffolding, cold grey-green fog.
-A shut sliding door directly behind the figure, lit from above by one
-hanging lamp with a warm amber cone.
-The floor is flat, horizontal, wet concrete with puddles reflecting the lamp.
-Two wooden crates and a coil of rope against the left wall, resting on the floor.
-Cool teal rim light from the yard, warm key light from the lamp above the figure.
-Dark foreground, pale background, strong value separation.
+A stylized low poly medieval dungeon cell seen from inside, wide landscape view.
+Thick iron bars fill the left and right thirds of the frame; the centre is
+open flagstone floor with a single escaped prisoner standing on it, facing
+the camera, in torn linen and a leather jerkin.
+Behind the bars, pale and out of focus: a vaulted stone undercroft with
+round arches, a stone staircase, more cell doors along the far wall.
+A heavy iron portcullis directly behind the figure, shut.
+One burning torch in an iron bracket above him casting a warm amber cone.
+Flagstones flat and horizontal, damp, reflecting the torch.
+Two wooden barrels and a coil of rope against the left wall, resting on the floor.
+Cool blue moonlight from a barred window high on the right, warm torchlight
+on the figure. Dark foreground, pale background, strong value separation.
 + STYLE BLOCK
++ UI BLOCK
 ```
 
-**Чому саме це:** ґрати обрамлюють центр і лишають порожні кути під UI; тепле світло
-згори робить вітрину скіна; холодний фон — глибину. Двері за спиною — те, що відчиняє
-PLAY.
+**Чому:** ґрати обрамлюють центр і лишають кути вільними рівно під UI; смолоскип робить
+вітрину скіна; опускні ґрати за спиною — те, що відчиняє PLAY.
 
 ---
 
-### Промт B — «Двір перед боєм»
-
-> Якщо хочеться менше клаустрофобії і більше показати світ.
+### Промт B — «Двір замку на світанку»
 
 ```
-A stylized low poly prison yard at dawn, wide landscape framing,
+A stylized low poly medieval castle bailey at dawn, wide landscape view,
 camera at ground level looking slightly up.
-In the centre foreground a single escapee stands on flat wet ground,
-full body, facing the camera.
-Behind: a long low barrack with a sloped roof, a wooden watchtower on the
-left, a tall chain fence on the right, a row of shut cage doors along the back wall.
-Pale cold sky, low horizon, thin ground fog only behind the figure, never in front.
-Scattered crates and barrels on the ground, each sitting flat.
-Warm low sun from the right rim-lighting the figure; everything behind is
+In the centre foreground a single escaped prisoner stands on flat wet
+cobblestones, full body, facing the camera.
+Behind: a stone keep with narrow arrow slits, a round tower on the left,
+a timber palisade on the right, a row of shut iron cell doors along the
+back wall, a raised portcullis in a stone arch.
+Pale cold sky, low horizon, thin ground fog only behind the figure.
+Wooden barrels, a hay cart and crates on the ground, each sitting flat.
+Warm low sun from the right rim-lighting the figure; everything behind
 desaturated grey-green.
 + STYLE BLOCK
++ UI BLOCK
 ```
 
-**Чому:** дає місце під широку нижню панель (магазин/сезон) і читається як «перед
-виходом». Мінус — бійця видно гірше, ніж у A.
+**Чому:** більше світу і місце під широку нижню панель. Мінус — бійця видно гірше, ніж у A.
 
 ---
 
-### Промт C — «Розріз арени» (для екрана вибору режиму / сезону)
+### Промт C — «Розріз вежі» (екран режиму / сезону)
 
 ```
-A stylized low poly cross-section of a three storey wooden structure,
-sliced open like a doll house, wide landscape framing, seen from the side.
-Three flat horizontal floors connected by visible ladders and floor hatches.
-Small chests and crates stand on the floors, each resting flat.
+A stylized low poly cross-section of a three storey medieval stone tower,
+sliced open like a doll house, wide landscape view, seen from the side.
+Three flat horizontal floors of flagstone connected by visible wooden
+ladders and floor hatches.
+Iron-bound chests and wooden crates stand on the floors, each resting flat.
 Two 1.8 meter human silhouettes on different floors for scale.
-Cold green-grey palette, pale fog behind the structure only.
-Teal glowing outlines on the chests.
-The left and right wings have the same number of rooms but different shapes,
-not a mirror image.
+Cold grey-green stone palette, pale fog behind the tower only.
+Warm amber glow from the chests and from torches on the walls.
+The left and right wings have the same number of rooms but different
+shapes, not a mirror image.
 + STYLE BLOCK
++ UI BLOCK
 ```
 
-**Чому:** це та сама мова, що в документі 08, тож екран режиму виглядає як обіцянка того,
-що буде в матчі. Для головного меню — заслабкий фокус на персонажі, тому як фон другого
-рівня.
+**Чому:** та сама мова, що в документі 08, тож екран режиму — обіцянка того, що буде в
+матчі. Для головного меню фокус на персонажі заслабкий.
 
 ---
 
-### Промт D — «Силует» (запасний, найдешевший у виробництві)
+### Промт D — «Силует» (запасний, найдешевший)
 
 ```
-A stylized low poly scene, wide landscape framing, almost a silhouette.
-One escapee standing in the centre on flat ground, lit only from behind by
-a single tall floodlight, so the figure reads as a dark shape with a bright rim.
-Behind: a chain fence and a watchtower as flat dark shapes against pale fog.
+A stylized low poly medieval scene, wide landscape view, almost a silhouette.
+One escaped prisoner standing in the centre on flat flagstones, lit only
+from behind by a tall arched window, so the figure reads as a dark shape
+with a bright rim.
+Behind: a portcullis and a stone arch as flat dark shapes against pale mist.
 Three values only: near black foreground, mid grey figure, pale grey background.
-No detail anywhere except the figure's rim light.
+No detail anywhere except the figure's rim light and the torch flame.
 + STYLE BLOCK
++ UI BLOCK
 ```
 
-**Чому:** якщо часу мало. Такий фон робиться з трьох площин і одного світла, працює на
-слабких телефонах і ніколи не сперечається з UI.
+**Чому:** якщо часу мало. Три площини й одне світло, працює на слабких телефонах і ніколи
+не сперечається з UI.
 
 ## Як збирати в Unity
 
