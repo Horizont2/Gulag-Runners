@@ -150,10 +150,9 @@ namespace GulagRunners.Game
                 _shown = item.Item;
                 _block = null;
 
-                Renderer target = tintTarget != null
-                    ? tintTarget
-                    : (_shownRoot != null ? _shownRoot.GetComponentInChildren<Renderer>() : null);
-                ItemModels.Tint(target, ref _block, ItemModels.Tier(tierColours, item.Item), glow);
+                // No tint here: the end of this method does it every frame, including this
+                // one, and a second copy was two places that had to agree about what a
+                // rarity looks like.
             }
 
             Visible = _shownRoot != null;
@@ -185,8 +184,12 @@ namespace GulagRunners.Game
             Renderer r = tintTarget != null
                 ? tintTarget
                 : (_shownRoot != null ? _shownRoot.GetComponentInChildren<Renderer>() : null);
-            ItemModels.Tint(r, ref _block, ItemModels.Tier(tierColours, item.Item) * lit,
-                            glow * lit * offered);
+            // Offset by the item's own id so a row of three legendaries breathes out of
+            // step rather than blinking together like a string of fairy lights.
+            float beat = Time.time + (int)item.Item * 0.37f;
+            Color colour = ItemModels.RarityGlow(tierColours, item.Item, beat, glow,
+                                                 out float rarity);
+            ItemModels.Tint(r, ref _block, colour * lit, rarity * lit * offered);
         }
 
         public void Hide()

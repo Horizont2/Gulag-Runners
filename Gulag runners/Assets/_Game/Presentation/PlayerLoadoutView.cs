@@ -50,7 +50,19 @@ namespace GulagRunners.Game
                  "scaled to this. Taking the length from reach keeps the picture and the " +
                  "hitbox agreeing: docs/02 makes reach the whole difference between two " +
                  "weapons, and a spear drawn dagger-sized is that difference thrown away.")]
-        [Range(0f, 3f)] public float reachToLength = 1.35f;
+        [Range(0f, 3f)] public float reachToLength = 0.73f;
+
+        [Tooltip("The grip and head every weapon has before it has any reach at all, as a " +
+                 "share of the fighter's own height.\n\n" +
+                 "Without it the map from reach to length is a straight line through the " +
+                 "origin, and that is wrong at both ends at once: the dagger adds 0.10 m of " +
+                 "reach, which drew it at the minimum and heaped it in with the mace and " +
+                 "the gladius as the same small stick, while the warhammer came out at 119% " +
+                 "of the fighter's height and the two polearms hit the cap at 143%. A real " +
+                 "warhammer is about half its owner's height and a real spear about 120%.\n\n" +
+                 "With a base, the same table draws 35% for a dagger and 127% for a scythe, " +
+                 "in order and nothing clamped.")]
+        [Range(0f, 0.8f)] public float baseOfBody = 0.27f;
 
         [Tooltip("Shortest a weapon may be drawn, in metres. A dagger adds almost nothing to " +
                  "bare reach, and a dagger you cannot see is not a weapon.")]
@@ -103,7 +115,13 @@ namespace GulagRunners.Game
 
             // Sized before anything is shown, and once: the fit multiplies the model's own
             // scale, so running it twice would halve the weapon again.
-            ItemModels.FitAll(weapons, reachToLength, minLength, maxLength, fallbackLength);
+            // Proportional to the fighter, not a number in metres: the one decision this
+            // project has not taken yet is what a metre is, and a hard-coded haft would
+            // have to be found and changed again on the day it does.
+            float haft = baseOfBody * (player != null ? player.tuning.bodyHeight : 0.91f);
+
+            ItemModels.FitAll(weapons, reachToLength, minLength, maxLength, fallbackLength,
+                              haft);
             ItemModels.FitAll(armour, 0f, minLength, maxLength, fallbackLength);
 
             ItemModels.Show(weapons, ItemId.None);
@@ -131,13 +149,18 @@ namespace GulagRunners.Game
                 GameObject root = ItemModels.Show(armour, _armour);
                 MaterialPropertyBlock block = null;
                 if (root != null)
+                {
+                    Color worn = ItemModels.RarityGlow(tierColours, _armour, Time.time,
+                                                       glow, out float lit);
                     ItemModels.Tint(root.GetComponentInChildren<Renderer>(), ref block,
-                                    ItemModels.Tier(tierColours, _armour), glow);
+                                    worn, lit);
+                }
             }
 
             if (_weaponRenderer == null) return;
 
-            Color colour = ItemModels.Tier(tierColours, _weapon);
+            Color colour = ItemModels.RarityGlow(tierColours, _weapon, Time.time, glow,
+                                                 out float emission);
             int left = inv.WeaponDurability;
 
             if (_weapon != ItemId.None && left > 0 && left <= Mathf.Max(1, wornAt))
@@ -146,7 +169,7 @@ namespace GulagRunners.Game
                 colour = Color.Lerp(colour, wornColour, Mathf.Lerp(0.5f, 1f, pulse));
             }
 
-            ItemModels.Tint(_weaponRenderer, ref _block, colour, glow);
+            ItemModels.Tint(_weaponRenderer, ref _block, colour, emission);
         }
     }
 }

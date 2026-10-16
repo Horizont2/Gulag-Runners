@@ -40,7 +40,6 @@ namespace GulagRunners.GameEditor
             ("Scythe",      ItemId.Scythe),
             ("FlangedMace", ItemId.FlangedMace),
             ("Hammer",      ItemId.Warhammer),
-            ("Shield",      ItemId.Shield),
         };
 
         /// <summary>

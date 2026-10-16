@@ -3,7 +3,7 @@ import sim_motor_mirror as M
 from sim_motor_mirror import C, ONE, mul, ATTACK, DOD
 from loot_mirror import (ITEMS, NONE, FISTS, CLUB, SPEAR, DAGGER, SWORD, AXE, FLANGED_MACE,
                          WARHAMMER, GLADIUS, MACE, SABER, SCYTHE,
-                         LEATHER, CHAINMAIL, PLATE, SHIELD, WEAPON, ARMOUR)
+                         LEATHER, CHAINMAIL, PLATE, WEAPON, ARMOUR)
 
 # ---------------------------------------------------------------- CombatConfig.Default()
 K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,

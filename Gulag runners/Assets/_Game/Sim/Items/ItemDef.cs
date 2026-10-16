@@ -75,6 +75,14 @@ namespace GulagRunners.Sim
         // ---- utility
         public int Heal;
 
+        /// <summary>
+        /// The tier, named. T1 is common, T2 rare, anything above legendary — so a new tier
+        /// added later reads as legendary rather than as nothing.
+        /// </summary>
+        public Rarity Rarity => Tier <= 1 ? Rarity.Common
+                              : Tier == 2 ? Rarity.Rare
+                              : Rarity.Legendary;
+
         public bool IsWeapon => Kind == ItemKind.Weapon;
         public bool Breakable => Durability > 0;
     }

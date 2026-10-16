@@ -222,7 +222,7 @@ namespace GulagRunners.Game
         [Tooltip("How long the step-off clip is held after letting go of the foot of a ladder, " +
                  "in seconds. Presentation only: the simulation has already handed control back, " +
                  "so moving at any point cuts it short.")]
-        [Range(0f, 0.6f)] public float ladderExitHold = 0.22f;
+        [Range(0f, 1.2f)] public float ladderExitHold = 0.22f;
 
         [Header("Playback speed")]
         [Tooltip("The ground speed the walk and run clips were authored at. Playback is scaled " +
@@ -561,9 +561,27 @@ namespace GulagRunners.Game
                 default:
                     // Just stepped off the bottom of a ladder and not moving yet: finish the
                     // dismount instead of popping straight into Idle.
-                    if (_exitHold > 0f && speed <= idleThreshold && !s.Crouching)
+                    // Cancelled by WALKING, and by nothing else.
+                    //
+                    // It used to be cancelled by crouching too, and that made it invisible:
+                    // you climb down holding Down, and on the floor Down means crouch. The
+                    // dismount clip was therefore allowed on exactly ONE tick -- measured,
+                    // one of sixteen milliseconds -- and from the next the still-held key
+                    // was a crouch and killed it. "The landing animation cannot be seen at
+                    // all" was literally true. The crouch is not a new intention; it is the
+                    // same press that was climbing a moment ago.
+                    if (_exitHold > 0f && speed <= idleThreshold)
                     {
-                        playback = ladderActionPlayback;
+                        if (poseLadderByProgress)
+                        {
+                            // Posed across its own window, so the whole clip is shown
+                            // rather than its first frames under a cross-fade.
+                            scrub = 1f - Mathf.Clamp01(_exitHold / Mathf.Max(0.01f, ladderExitHold));
+                            playback = 0f;
+                            fade = 0f;
+                        }
+                        else playback = ladderActionPlayback;
+
                         return ladderExitState;
                     }
 
@@ -683,10 +701,16 @@ namespace GulagRunners.Game
         /// the distance the body has to cover, so it is a different number on every ladder
         /// and at every height.
         /// </summary>
-        static float ScriptProgress(in PlayerSimState s)
+        float ScriptProgress(in PlayerSimState s)
         {
             if (s.ScriptFrames <= 0) return 0f;
-            return Mathf.Clamp01(1f - s.ScriptTimer / (float)s.ScriptFrames);
+
+            // Through the render alpha, not off the tick counter. The body is drawn
+            // interpolated between ticks; a pose that is not steps at 60 Hz beside it, and
+            // a climb-out is TEN ticks long, so that is a tenth of the clip at a time
+            // against a body moving smoothly. Which is the jerk, exactly.
+            float done = s.ScriptFrames - s.ScriptTimer + player.Alpha;
+            return Mathf.Clamp01(done / s.ScriptFrames);
         }
 
         /// <summary>

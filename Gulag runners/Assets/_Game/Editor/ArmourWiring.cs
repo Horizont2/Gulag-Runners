@@ -39,13 +39,25 @@ namespace GulagRunners.GameEditor
 
         const string HolderName = "Armour";
 
-        /// <summary>Which of the pack's armour types stands for each item, light to heavy.</summary>
-        static readonly (ItemId Item, int Type)[] Mapping =
+        /// <summary>
+        /// THREE suits and no more, one per rarity, and which of the pack's numbered types
+        /// each one is cut from.
+        ///
+        /// The pack ships a wardrobe. A wardrobe is the wrong answer here: docs/02 and
+        /// docs/03 both want the armour slot readable from across the arena, because
+        /// knowing the other fighter is in plate decides whether you take the exchange at
+        /// all — and a dozen near-identical suits say nothing at a glance. Three say it in
+        /// one look, and they are the three the loot table already rolls.
+        ///
+        /// Types 1, 3 and 5 rather than 1, 2, 3: spread across the pack's range so the
+        /// three read as different kinds of protection rather than three shades of the
+        /// same one.
+        /// </summary>
+        static readonly (ItemId Item, Rarity Rarity, int Type)[] Mapping =
         {
-            (ItemId.LeatherVest, 1),
-            (ItemId.Shield,      2),
-            (ItemId.Chainmail,   3),
-            (ItemId.Plate,       5),
+            (ItemId.LeatherVest, Rarity.Common,    1),
+            (ItemId.Chainmail,   Rarity.Rare,      3),
+            (ItemId.Plate,       Rarity.Legendary, 5),
         };
 
         /// <summary>One piece per category. Each is a whole garment, not a per-limb part.</summary>
@@ -144,9 +156,11 @@ namespace GulagRunners.GameEditor
             List<string> report = new List<string>();
             Dictionary<string, GameObject> bare = new Dictionary<string, GameObject>();
 
-            foreach ((ItemId item, int type) in Mapping)
+            foreach ((ItemId item, Rarity rarity, int type) in Mapping)
             {
                 List<GameObject> worn = new List<GameObject>();
+                report.Add($"{rarity}: {item} from the pack's type {type}, " +
+                           $"{Categories.Length} piece(s)");
 
                 foreach ((string folder, string prefix) in Categories)
                 {

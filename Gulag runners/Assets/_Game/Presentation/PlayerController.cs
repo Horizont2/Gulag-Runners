@@ -231,6 +231,17 @@ namespace GulagRunners.Game
             : 100;
         public MoveConfig Config => _config;
         public SimWorld World => _world;
+
+        /// <summary>
+        /// How far this frame is between the last simulated tick and the next, 0 to 1.
+        ///
+        /// Everything the body does is drawn through it, so anything else that follows the
+        /// body has to use it too. A pose driven by a tick COUNTER against a position drawn
+        /// through this one steps at 60 Hz while the body moves smoothly, and on a move
+        /// ten ticks long that is a tenth of the clip at a time — which is the jerk at the
+        /// top of a ladder.
+        /// </summary>
+        public float Alpha => _alpha;
         /// <summary>Simulated feet position in world units.</summary>
         public Vector2 FeetPosition => new Vector2(_state.Position.X.Raw / (float)Fix.RawOne,
                                                    _state.Position.Y.Raw / (float)Fix.RawOne);
@@ -242,6 +253,9 @@ namespace GulagRunners.Game
         PlayerSimState _previous;
 
         float _accumulator;
+        float _alpha = 1f;
+        float _tilt;
+        float _tiltRoll, _tiltLean;
         InputFlags _held;             // what is held right now
         InputFlags _pending;          // held, plus anything tapped since the last tick
         Vector3 _baseVisualScale = Vector3.one;
@@ -559,6 +573,8 @@ namespace GulagRunners.Game
 
         void Render(float alpha)
         {
+            _alpha = alpha;
+
             Vector2 a = ToVector(_previous.Position);
             Vector2 b = ToVector(_state.Position);
             Vector2 p = Vector2.Lerp(a, b, alpha);
@@ -595,17 +611,46 @@ namespace GulagRunners.Game
         /// </summary>
         Quaternion LadderTilt()
         {
-            if (!matchLadderTilt || ladderTiltAmount <= 0.001f) return Quaternion.identity;
-            if (!FacingLadder(in _state)) return Quaternion.identity;
+            // Eased in and out on the same clock as the yaw, and for the same reason.
+            // It used to be switched: identity the frame a climb-out ended, and up to five
+            // and a half degrees of lean the frame before it. Five degrees is not much to
+            // look at and a great deal to have appear in one frame, on exactly the move
+            // that was reported as jerky -- stepping off the top of a ladder.
+            float want = matchLadderTilt && ladderTiltAmount > 0.001f &&
+                         FacingLadder(in _state) ? 1f : 0f;
+            _tilt = turnSmoothTime <= 0.001f
+                ? want
+                : Mathf.MoveTowards(_tilt, want, Time.deltaTime / turnSmoothTime);
 
+            // The angles are REMEMBERED, not looked up fresh each frame, because the
+            // fade has to outlive the ladder. A climb-out drops LadderIndex to -1 on its
+            // very first frame -- the move is no longer on the rungs -- so a tilt read
+            // from the ladder would have nothing to read and snap to upright exactly
+            // where the smoothing was wanted.
+            MeasureTilt();
+
+            if (_tilt <= 0.001f ||
+                (Mathf.Abs(_tiltRoll) < 0.001f && Mathf.Abs(_tiltLean) < 0.001f))
+                return Quaternion.identity;
+
+            float roll = _tiltRoll * ladderTiltAmount * _tilt;
+            float lean = _tiltLean * ladderTiltAmount * _tilt;
+
+            return Quaternion.AngleAxis(lean, Vector3.right) *
+                   Quaternion.AngleAxis(-roll, Vector3.forward);
+        }
+
+        /// <summary>The lean of the ladder being held, in degrees, kept until the next one.</summary>
+        void MeasureTilt()
+        {
             int i = _state.LadderIndex;
             if (_world == null || i < 0 || i >= _world.Ladders.Length ||
                 i >= _world.LadderLean.Length)
-                return Quaternion.identity;
+                return;
 
             Aabb box = _world.Ladders[i];
             float height = (box.MaxY - box.MinY).Raw / (float)Fix.RawOne;
-            if (height <= 0.01f) return Quaternion.identity;
+            if (height <= 0.01f) return;
 
             // BOTH leans. This used to read only the sideways one and tip about Z for it,
             // which is self-consistent and silently useless here: every ladder in this arena
@@ -622,17 +667,11 @@ namespace GulagRunners.Game
                 runZ = (back.Max - back.Min).Raw / (float)Fix.RawOne;
             }
 
-            if (Mathf.Abs(runX) < 0.001f && Mathf.Abs(runZ) < 0.001f)
-                return Quaternion.identity;
-
             // Sideways tips about Z, which on this camera is a roll in the screen plane.
             // Away tips about X, which lays the body back along the rungs — the one that
             // makes a propped ladder read as propped.
-            float roll = Mathf.Atan2(runX, height) * Mathf.Rad2Deg * ladderTiltAmount;
-            float lean = Mathf.Atan2(runZ, height) * Mathf.Rad2Deg * ladderTiltAmount;
-
-            return Quaternion.AngleAxis(lean, Vector3.right) *
-                   Quaternion.AngleAxis(-roll, Vector3.forward);
+            _tiltRoll = Mathf.Atan2(runX, height) * Mathf.Rad2Deg;
+            _tiltLean = Mathf.Atan2(runZ, height) * Mathf.Rad2Deg;
         }
 
         /// <summary>

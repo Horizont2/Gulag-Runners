@@ -52,21 +52,38 @@ namespace GulagRunners.Sim
         /// <summary>T2. The longest reach in the game, and slow enough that it had better land.</summary>
         Scythe = 12,
 
-        /// <summary>T1 armour.</summary>
+        // Three suits of armour and no more, one for each rarity, because the armour slot
+        // has to be readable at a glance from across the arena: knowing the other fighter
+        // is in plate decides whether you take the exchange at all, and a wardrobe of
+        // near-identical sets says nothing. Common, rare, legendary.
+        /// <summary>T1 armour — COMMON.</summary>
         LeatherVest = 20,
-        /// <summary>T2 armour. Visible on the character, which is information for the opponent.</summary>
+        /// <summary>T2 armour — RARE. Visible on the character, which is information for the opponent.</summary>
         Chainmail = 21,
-        /// <summary>T3 armour.</summary>
+        /// <summary>T3 armour — LEGENDARY.</summary>
         Plate = 22,
 
-        /// <summary>
-        /// T2, and the armour slot's real decision: it barely softens a hit, and it makes
-        /// BLOCKING work. Chainmail or shield, not both.
-        /// </summary>
-        Shield = 23,
+        // 23 was the shield, removed. The number is left out rather than reused: an id is
+        // what a replay and a rollback packet carry, and handing an old one to a different
+        // item turns a saved round into a different round.
 
         /// <summary>T1 utility.</summary>
         Bandage = 30
+    }
+
+    /// <summary>
+    /// How good a find is, in the one word a player reads instead of a stat line.
+    ///
+    /// Not a fourth number: it IS the tier, named. The loot table already rolls a tier per
+    /// chest and weights within it, and the fight is already balanced against those three
+    /// steps, so inventing a second scale would be two sources of truth for one idea. This
+    /// is the name presentation colours by, and the only place the words live.
+    /// </summary>
+    public enum Rarity : byte
+    {
+        Common = 0,
+        Rare = 1,
+        Legendary = 2
     }
 
     public enum ItemKind : byte

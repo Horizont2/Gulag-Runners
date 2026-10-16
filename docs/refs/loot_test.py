@@ -532,15 +532,22 @@ import sim_motor_mirror as _M
 import loot_mirror as _L
 HEIGHT = _M.F(_M.C["H"])
 ARM = ITEMS[FISTS]["reach"] / 65536.0
-REACH_TO_LENGTH, MIN_LENGTH, MAX_LENGTH = 1.35, 0.28, 1.3
+REACH_TO_LENGTH, MIN_LENGTH, MAX_LENGTH = 0.73, 0.28, 1.3
+BASE_OF_BODY = 0.27
+BASE = BASE_OF_BODY * HEIGHT
 
 
 def drawn(item):
-    """What ItemModels.Fit scales a model's longest axis to, in metres."""
+    """What ItemModels.Fit scales a model's longest axis to, in metres.
+
+    A haft PLUS the reach it adds, not the reach alone. Every weapon has a grip and a head
+    before it has any reach at all, so a straight line through the origin was wrong at both
+    ends: the dagger adds 0.10 m and landed on the minimum in a heap with the mace and the
+    gladius, while the warhammer came out at 119% of the fighter's own height."""
     reach = ITEMS[item].get("reach", 0) / 65536.0
     if reach <= ARM:
         return 0.0
-    return min(MAX_LENGTH, max(MIN_LENGTH, (reach - ARM) * REACH_TO_LENGTH))
+    return min(MAX_LENGTH, max(MIN_LENGTH, BASE + (reach - ARM) * REACH_TO_LENGTH))
 
 
 weapons = [i for i in sorted(ITEMS) if drawn(i) > 0]
@@ -565,6 +572,23 @@ check("the order on screen is the order in the hitbox, for every pair",
           for a in weapons for b in weapons
           if drawn(a) != drawn(b) and ITEMS[a]["reach"] != ITEMS[b]["reach"]),
       "a weapon that reaches further is never drawn shorter")
+# The family, not just its ends. Four of these used to sit between 31% and 52% of the
+# fighter -- the dagger pinned to the minimum with the mace and the gladius just above it --
+# which is what "some weapons are too small in the hands" was: not one bad number but a
+# crowd at the bottom under a warhammer taller than its owner.
+_band = [100 * drawn(i) / HEIGHT for i in weapons]
+check("no weapon is squashed onto the minimum length",
+      sum(1 for i in weapons if abs(drawn(i) - MIN_LENGTH) < 1e-6) == 0,
+      f"shortest is {min(_band):.0f}% of the fighter, floor is "
+      f"{100 * MIN_LENGTH / HEIGHT:.0f}%")
+check("and none is pinned to the ceiling either",
+      sum(1 for i in weapons if abs(drawn(i) - MAX_LENGTH) < 1e-6) == 0,
+      f"longest is {max(_band):.0f}%")
+check("the smallest weapon is still a third of the fighter",
+      min(_band) >= 30, f"{min(_band):.0f}%")
+check("and the largest is near a real polearm, not twice one",
+      max(_band) <= 135, f"{max(_band):.0f}% (a real spear is about 120% of its owner)")
+
 check("and a weapon is big enough to read at all",
       min(drawn(i) for i in weapons) / HEIGHT > 0.28,
       f"shortest is {100 * min(drawn(i) for i in weapons) / HEIGHT:.0f}% of the fighter")

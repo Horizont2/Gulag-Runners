@@ -10,7 +10,10 @@ BARE_GAIN = 1000
 NONE, FISTS, CLUB, SPEAR = 0, 1, 2, 3
 DAGGER, SWORD, AXE, FLANGED_MACE, WARHAMMER = 4, 5, 6, 7, 8
 GLADIUS, MACE, SABER, SCYTHE = 9, 10, 11, 12
-LEATHER, CHAINMAIL, PLATE, SHIELD = 20, 21, 22, 23
+LEATHER, CHAINMAIL, PLATE = 20, 21, 22
+# 23 was the shield, removed. The number is left out rather than reused: an id
+# is what a replay carries, and giving an old one to a new item rewrites a
+# saved round.
 BANDAGE = 30
 WEAPON, ARMOUR, UTILITY = 1, 2, 3
 
@@ -43,11 +46,20 @@ ITEMS = {
     LEATHER:   _a("leather vest", 1, 150, weight=100),
     CHAINMAIL: _a("chainmail", 2, 300, weight=100),
     PLATE:     _a("plate", 3, 450, weight=90),
-    SHIELD:    _a("shield", 2, 100, chip=400, parry=4, weight=90),
     BANDAGE:   dict(kind=UTILITY, tier=1, pry=0, dur=0, heal=30, weight=110, name="bandage"),
 }
 
 # ---------------------------------------------------------------- the deal (LootTable)
+COMMON, RARE, LEGENDARY = 0, 1, 2
+
+
+def rarity(item):
+    """ItemDef.Rarity: the tier, named. Not a fourth number -- the loot table already rolls
+    a tier per chest and the fight is balanced against those three steps."""
+    t = ITEMS[item].get("tier", 1)
+    return COMMON if t <= 1 else RARE if t == 2 else LEGENDARY
+
+
 class Rng:
     """xorshift32, the same sequence the sim's Rng produces. System.Random is out: docs/06
     needs two devices to make the same round from the same seed."""

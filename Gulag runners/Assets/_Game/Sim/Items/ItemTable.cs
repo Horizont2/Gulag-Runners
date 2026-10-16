@@ -266,21 +266,6 @@ namespace GulagRunners.Sim
                 DamageReduction = Fix.FromMilli(450)
             };
 
-            // The armour slot's real decision. Plate takes nearly half out of every hit you
-            // stand there and absorb; a shield does almost nothing for that and makes the hits
-            // you MEET nearly free, and widens the parry window enough to go hunting for one.
-            // Two opposite plans, one slot, and the silhouette says which you chose.
-            t[(int)ItemId.Shield] = new ItemDef
-            {
-                Id = ItemId.Shield,
-                Weight = 90,
-                Kind = ItemKind.Armour,
-                Tier = 2,
-                DamageReduction = Fix.FromMilli(100),   // 10%: it is not armour
-                BlockChipPermille = 400,                // a blocked hit costs 60% less
-                ParryBonusFrames = 4                    // docs/02's skill ceiling, widened
-            };
-
             t[(int)ItemId.Bandage] = new ItemDef
             {
                 Id = ItemId.Bandage,

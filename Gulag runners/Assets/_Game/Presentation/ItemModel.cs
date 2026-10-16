@@ -66,7 +66,8 @@ namespace GulagRunners.Game
         /// models is switched off when this runs and an inactive renderer has no bounds.
         /// </summary>
         public static void Fit(GameObject root, ItemId item, float reachToLength,
-                               float minLength, float maxLength, float fallback)
+                               float minLength, float maxLength, float fallback,
+                               float baseLength = 0f)
         {
             if (root == null) return;
 
@@ -77,7 +78,22 @@ namespace GulagRunners.Game
                 Fix arm = ItemTable.Get(ItemId.Fists).Reach;
                 if (reach.Raw > arm.Raw)
                 {
-                    want = (reach - arm).Raw / (float)Fix.RawOne * reachToLength;
+                    // A HAFT plus the reach it adds, not the reach alone.
+                    //
+                    // Measured straight off the added reach, the family came out wrong at
+                    // both ends at once. The dagger adds 0.10 m, which drew it at the
+                    // minimum length and put it in a heap with the mace and the gladius --
+                    // four weapons that all read as the same small stick. The warhammer
+                    // adds 0.80 m, which drew it at 119% of the fighter's own height, and
+                    // the two polearms ran into the cap at 143%. A real warhammer is half
+                    // its owner's height and a real spear is about 120% of it.
+                    //
+                    // Every weapon has a grip and a head before it has any reach at all, so
+                    // the straight line through the origin was the mistake. With a base,
+                    // the same table draws 35% for a dagger and 127% for a scythe, in
+                    // order, with nothing clamped at either end.
+                    want = baseLength +
+                           (reach - arm).Raw / (float)Fix.RawOne * reachToLength;
                     want = Mathf.Max(minLength, want);
                     if (maxLength > 0f) want = Mathf.Min(maxLength, want);
                 }
@@ -137,12 +153,13 @@ namespace GulagRunners.Game
 
         /// <summary>Sizes every model in a set, once. Call it from Awake.</summary>
         public static void FitAll(ItemModel[] models, float reachToLength, float minLength,
-                                  float maxLength, float fallback)
+                                  float maxLength, float fallback, float baseLength = 0f)
         {
             if (models == null) return;
             foreach (ItemModel m in models)
                 if (m != null && m.root != null)
-                    Fit(m.root, m.item, reachToLength, minLength, maxLength, fallback);
+                    Fit(m.root, m.item, reachToLength, minLength, maxLength, fallback,
+                        baseLength);
         }
 
         /// <summary>Tier colour, clamped to whatever palette the view was given.</summary>
@@ -151,6 +168,57 @@ namespace GulagRunners.Game
             if (palette == null || palette.Length == 0) return Color.white;
             int tier = Mathf.Clamp(ItemTable.Get(item).Tier, 0, palette.Length - 1);
             return palette[tier];
+        }
+
+        /// <summary>
+        /// How hard a rarity glows at rest.
+        ///
+        /// Three steps and a wide gap between them, because the whole job of this is to be
+        /// answered across an arena in half a second: is that worth walking to. A common
+        /// find is barely lit — it is the baseline, and if everything shouts then nothing
+        /// does. A legendary is three times as bright as the common and the only thing in
+        /// the room that moves.
+        /// </summary>
+        public static float RarityEmission(ItemId item) =>
+            ItemTable.Get(item).Rarity switch
+            {
+                Sim.Rarity.Legendary => 2.6f,
+                Sim.Rarity.Rare => 1.3f,
+                _ => 0.8f
+            };
+
+        /// <summary>
+        /// And how it moves, as a multiplier on the emission, 0 to 1 of a cycle.
+        ///
+        /// Movement is what the eye catches, so it is spent where it is worth catching. A
+        /// common item is steady. A rare one breathes, slowly and shallowly — enough to be
+        /// seen, not enough to nag. A legendary pulses twice as deep and half again as
+        /// fast, and that is deliberately the only thing in the arena doing it.
+        ///
+        /// Driven by a time the caller passes in rather than by Time.time read here, so a
+        /// view can offset it per item and a row of three legendaries does not blink in
+        /// unison like a string of fairy lights.
+        /// </summary>
+        public static float RarityPulse(ItemId item, float time) =>
+            ItemTable.Get(item).Rarity switch
+            {
+                Sim.Rarity.Legendary =>
+                    1f + 0.45f * Mathf.Sin(time * 2.1f * Mathf.PI),
+                Sim.Rarity.Rare =>
+                    1f + 0.18f * Mathf.Sin(time * 1.4f * Mathf.PI),
+                _ => 1f
+            };
+
+        /// <summary>
+        /// The whole look of one item's rarity: its colour, and how brightly it is lit this
+        /// frame. One function so a weapon in a hand, a weapon on the floor and a suit of
+        /// armour cannot drift into three different ideas of what "legendary" looks like.
+        /// </summary>
+        public static Color RarityGlow(Color[] palette, ItemId item, float time,
+                                       float strength, out float emission)
+        {
+            emission = strength * RarityEmission(item) * RarityPulse(item, time);
+            return Tier(palette, item);
         }
 
         /// <summary>The project's tier palette: none, white, blue, gold (docs/03).</summary>
