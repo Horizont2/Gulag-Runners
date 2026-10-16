@@ -171,6 +171,32 @@ namespace GulagRunners.Game
         [Header("Shake")]
         [Tooltip("Trauma from a hard landing, scaled by impact speed. 0 disables landing shake.")]
         [Range(0f, 1f)] public float landingTrauma = 0.25f;
+
+        [Tooltip("Trauma when THIS fighter is hit, at full health's worth of damage. Scaled by " +
+                 "how big the hit was, so a dagger is a knock and a warhammer is an event.\n\n" +
+                 "The camera is half of what makes a blow land. Hit stop stops the bodies; " +
+                 "this moves the room around them, and the two together are the difference " +
+                 "between watching a hit and taking one.")]
+        [Range(0f, 1f)] public float hitTrauma = 0.55f;
+
+        [Tooltip("Trauma when this fighter LANDS a hit. Smaller than taking one, and never " +
+                 "zero: a swing that connects into a camera that does not move reads as a " +
+                 "swing through air.")]
+        [Range(0f, 1f)] public float landedTrauma = 0.22f;
+
+        [Tooltip("Trauma when the guard eats a hit. Small — a block is supposed to feel like " +
+                 "less than being hit.")]
+        [Range(0f, 1f)] public float blockTrauma = 0.15f;
+
+        [Tooltip("Trauma on a parry. The biggest in the list: docs/02 makes the parry the " +
+                 "skill ceiling, and it is the one moment the game should feel like it " +
+                 "stopped to look.")]
+        [Range(0f, 1f)] public float parryTrauma = 0.8f;
+
+        [Tooltip("Optional. The other fighter, so that landing a hit shakes this camera too. " +
+                 "Left empty it is taken from the match's fighter list, and failing that only " +
+                 "hits TAKEN shake the camera, which is half the feeling.")]
+        public PlayerController opponent;
         [Tooltip("Metres of offset at full trauma.")]
         public float shakeAmplitude = 0.25f;
         [Tooltip("Degrees of roll at full trauma.")]
@@ -325,6 +351,12 @@ namespace GulagRunners.Game
             if (_subscribed == null) return;
             _subscribed.Landed += OnLanded;
             _subscribed.Teleported += SnapToTarget;
+            _subscribed.Hurt += OnHurt;
+            _subscribed.Blocked += OnBlocked;
+            _subscribed.Parried += OnParried;
+
+            _hitting = opponent != null ? opponent : OtherFighter();
+            if (_hitting != null) _hitting.Hurt += OnOpponentHurt;
         }
 
         void Unsubscribe()
@@ -332,8 +364,47 @@ namespace GulagRunners.Game
             if (_subscribed == null) return;
             _subscribed.Landed -= OnLanded;
             _subscribed.Teleported -= SnapToTarget;
+            _subscribed.Hurt -= OnHurt;
+            _subscribed.Blocked -= OnBlocked;
+            _subscribed.Parried -= OnParried;
             _subscribed = null;
+
+            if (_hitting != null) _hitting.Hurt -= OnOpponentHurt;
+            _hitting = null;
         }
+
+        PlayerController _hitting;
+
+        /// <summary>The fighter this camera does not follow, out of the match's own list.</summary>
+        PlayerController OtherFighter()
+        {
+            MatchState match = MatchState.Instance;
+            if (match == null || match.fighters == null) return null;
+
+            for (int i = 0; i < match.fighters.Count; i++)
+            {
+                PlayerController other = match.fighters[i];
+                if (other != null && other != _subscribed) return other;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// How big a hit this was, as a share of full health. Taken from the damage rather
+        /// than from the weapon, so armour and a blocked chip scale it down exactly as much
+        /// as they scale the hit down — which is the point: what the camera does should match
+        /// what happened, not what was swung.
+        /// </summary>
+        float Share(int damage)
+        {
+            int full = _subscribed != null ? _subscribed.MaxHealth : 100;
+            return full > 0 ? Mathf.Clamp01(damage / (float)full) : 0f;
+        }
+
+        void OnHurt(int damage) => AddTrauma(hitTrauma * Mathf.Sqrt(Share(damage)));
+        void OnBlocked(int through) => AddTrauma(blockTrauma * Mathf.Sqrt(Share(through)));
+        void OnParried() => AddTrauma(parryTrauma);
+        void OnOpponentHurt(int damage) => AddTrauma(landedTrauma * Mathf.Sqrt(Share(damage)));
 
         void OnLanded(float impactSpeed)
         {

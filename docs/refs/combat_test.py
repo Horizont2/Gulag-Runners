@@ -420,4 +420,47 @@ for _ in range(2):
     runs.append((a.x, a.y, a.health, a.stagger, b.x, b.y, b.health, b.stam))
 check("bit-identical replay", runs[0] == runs[1], f"{runs[0]}")
 
+print("\n12. hit stop: the weight of a blow")
+from combat_mirror import K
+
+# A clean hit freezes BOTH of them, for the configured frames, and nothing moves while it does.
+atk = fighter(-0.45, 1, CLUB)
+vic = fighter(0.45, -1)
+for t in range(200):
+    atk.x, vic.x = X(-0.45), X(0.45)
+    tick([atk, vic], [ATTACK, 0])
+    if vic.was_hit:
+        break
+check("a hit freezes the fighter who took it", vic.hitstop == K["HIT_STOP"],
+      f"{vic.hitstop} frame(s)")
+check("and the one who threw it", atk.hitstop == K["HIT_STOP"],
+      f"{atk.hitstop} frame(s)  — half the weight of a blow is the arm stopping")
+
+# Frozen means frozen: the body is held where the blow caught it, gravity included.
+held = (vic.x, vic.y, vic.vx, vic.vy)
+frames = 0
+while vic.hitstop > 0 and frames < 60:
+    tick([atk, vic], [0, 0])
+    frames += 1
+    if vic.hitstop > 0:
+        check(f"nothing moved on freeze frame {frames}",
+              (vic.x, vic.y, vic.vx, vic.vy) == held, "held exactly where it was caught")
+check("and it lasts the frames it was given", frames == K["HIT_STOP"], f"{frames}")
+
+# A parry stops the world for longer than a hit does: docs/02 makes it the skill ceiling.
+check("a parry freezes for longer than a hit", K["PARRY_STOP"] > K["HIT_STOP"],
+      f'parry {K["PARRY_STOP"]} vs hit {K["HIT_STOP"]}')
+check("and a block for less", K["BLOCK_STOP"] < K["HIT_STOP"],
+      f'block {K["BLOCK_STOP"]}')
+
+# The freeze must not be able to stack into a visible hitch.
+a2 = fighter(-0.45, 1, CLUB)
+v2 = fighter(0.45, -1, CLUB)
+worst = 0
+for t in range(600):
+    tick([a2, v2], [ATTACK, ATTACK])
+    worst = max(worst, a2.hitstop, v2.hitstop)
+check("two fighters trading never freeze longer than one parry",
+      worst <= K["PARRY_STOP"], f"worst {worst} frame(s)")
+
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

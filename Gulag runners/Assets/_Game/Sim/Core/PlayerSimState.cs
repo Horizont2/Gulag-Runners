@@ -104,6 +104,22 @@ namespace GulagRunners.Sim
         public int GuardBreakTimer;
 
         /// <summary>Hit and unable to act. Knockback is carried by velocity, not by this.</summary>
+        /// <summary>
+        /// Frames the whole body is frozen for, after a hit connects on it or from it.
+        ///
+        /// Hit stop, and the one thing in the fight that nothing else can stand in for. A
+        /// swing that merely changes a number has nothing in it for the hands: the weight of
+        /// a blow is the moment both fighters stop dead. It is a handful of frames, it is
+        /// what a heavy weapon has more of than a dagger, and it is the difference between a
+        /// hit you watch and a hit you feel.
+        ///
+        /// In the simulation rather than in the view, because it changes timing — the next
+        /// swing lands later for both of them — and a pause one device took and the other
+        /// did not would desynchronise the match on the first exchange (docs/06). One int,
+        /// which the 2 KB round state has room for.
+        /// </summary>
+        public int HitStopTimer;
+
         public int HitstunTimer;
         /// <summary>Parried. Longer than hitstun, and entirely the attacker's own fault.</summary>
         public int StaggerTimer;

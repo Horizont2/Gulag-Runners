@@ -33,6 +33,7 @@ class S:
         s.mode = "air"; s.facing = 1; s.crouch = False; s.jump_held = False
         s.coyote = s.buf = s.dodge = s.dodge_rec = s.fallthru = s.stepn = 0
         s.ladder_cd = 0
+        s.hitstop = 0
         s.script_t = 0; s.script_frames = 0; s.script_dir = 1
         s.script_from = (0,0); s.script_to = (0,0)
         s.script_from_depth = s.script_to_depth = 0
@@ -238,6 +239,11 @@ def move_towards(cur, tgt, md):
     return tgt if abs(d) <= md else cur + (md if d > 0 else -md)
 
 def step(s, inp, w):
+    # Hit stop: nothing integrates, so the body is held exactly where the blow caught it.
+    # The one place the timer is decremented, so the order inside a tick cannot matter.
+    if getattr(s, "hitstop", 0) > 0:
+        s.hitstop -= 1
+        return
     step_flat(s, inp, w)
     update_depth(s, w)
 

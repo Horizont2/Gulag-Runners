@@ -30,6 +30,18 @@ namespace GulagRunners.Sim
         public static void Step(ref PlayerSimState s, InputFlags input, SimWorld world,
                                 in MoveConfig cfg)
         {
+            // Hit stop. Nothing integrates: no gravity, no velocity, no depth. The body is
+            // held exactly where the blow caught it, which is the whole point — a freeze that
+            // still drifted would read as lag rather than as weight.
+            //
+            // The one place the timer is decremented, so the order inside a tick cannot
+            // matter: CombatMotor.Step sees it and returns, this sees it and counts it down.
+            if (s.HitStopTimer > 0)
+            {
+                s.HitStopTimer--;
+                return;
+            }
+
             StepFlat(ref s, input, world, in cfg);
             UpdateDepth(ref s, world, in cfg);
         }

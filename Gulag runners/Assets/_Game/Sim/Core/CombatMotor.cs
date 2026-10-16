@@ -36,6 +36,12 @@ namespace GulagRunners.Sim
                                       in CombatConfig cfg, in MoveConfig move)
         {
             ClearOutputs(ref s);
+
+            // Frozen by a blow: no timers run, no swing starts, no guard goes up, and the
+            // motor is handed nothing to move with. PlayerMotor counts the freeze down, so
+            // this never has to care which of the two ran first.
+            if (s.HitStopTimer > 0) return InputFlags.None;
+
             TickTimers(ref s);
 
             if (s.Dead) return InputFlags.None;
@@ -361,6 +367,8 @@ namespace GulagRunners.Sim
         static void Parry(ref PlayerSimState attacker, ref PlayerSimState victim,
                           in CombatConfig cfg)
         {
+            Freeze(ref attacker, ref victim, cfg.ParryStopFrames);
+
             victim.WasParried = true;
             victim.Noise = NoiseLevel.Medium;
 
@@ -390,6 +398,8 @@ namespace GulagRunners.Sim
 
             if (chip < 1) chip = 1;
 
+            Freeze(ref attacker, ref victim, cfg.BlockStopFrames);
+
             Wound(ref victim, chip);
             victim.DamageTaken = (short)chip;        // what got through, for the view to size
             victim.WasBlocked = true;
@@ -408,6 +418,23 @@ namespace GulagRunners.Sim
             victim.Noise = NoiseLevel.Loud;
         }
 
+        /// <summary>
+        /// Stops both of them dead for a few frames.
+        ///
+        /// Both, and not only the one who was hit: half the weight of a blow is the arm
+        /// coming to a stop against something. Freezing the victim alone reads as the victim
+        /// lagging, which is the opposite of the intended feeling.
+        ///
+        /// The longer freeze wins rather than accumulating, so a pair of hits landing on the
+        /// same tick cannot stack into a visible hitch.
+        /// </summary>
+        static void Freeze(ref PlayerSimState attacker, ref PlayerSimState victim, int frames)
+        {
+            if (frames <= 0) return;
+            if (attacker.HitStopTimer < frames) attacker.HitStopTimer = frames;
+            if (victim.HitStopTimer < frames) victim.HitStopTimer = frames;
+        }
+
         static void Hit(ref PlayerSimState attacker, ref PlayerSimState victim, int damage,
                         int side, bool heavy, in CombatConfig cfg)
         {
@@ -420,6 +447,8 @@ namespace GulagRunners.Sim
                 damage = Scale(damage, keep);
                 if (damage < 1) damage = 1;
             }
+
+            Freeze(ref attacker, ref victim, cfg.HitStopFrames);
 
             Wound(ref victim, damage);
             victim.WasHit = true;

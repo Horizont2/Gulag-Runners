@@ -30,6 +30,18 @@ namespace GulagRunners.Sim
         /// <summary>And it takes this much longer to wind up and recover from.</summary>
         public int HeavyTimingPermille;
 
+        /// <summary>
+        /// Frames both fighters freeze for when a blow lands, is blocked, or is parried.
+        ///
+        /// Three separate numbers because they are three separate events and docs/02 asks
+        /// that a player be able to tell them apart from across the arena. A parry gets the
+        /// longest by a wide margin: it is the skill ceiling of the medieval mode, and the
+        /// reward for finding one is that the world stops while everybody sees it happen.
+        /// </summary>
+        public int HitStopFrames;
+        public int BlockStopFrames;
+        public int ParryStopFrames;
+
         /// <summary>Hitstun per point of damage, in frames, and its ceiling.</summary>
         public int HitstunPerDamage;
         public int MaxHitstunFrames;
@@ -110,6 +122,13 @@ namespace GulagRunners.Sim
             c.MaxCombo = 3;
             c.HeavyDamagePermille = 1700;
             c.HeavyTimingPermille = 1500;
+
+            // 0.05 s on a hit, 0.03 blocked, 0.12 on a parry. Small numbers: hit stop is
+            // felt rather than seen, and past about a tenth of a second on an ordinary hit it
+            // stops reading as weight and starts reading as a dropped frame.
+            c.HitStopFrames = 3;
+            c.BlockStopFrames = 2;
+            c.ParryStopFrames = 7;
 
             c.HitstunPerDamage = 1;
             c.MaxHitstunFrames = 26;

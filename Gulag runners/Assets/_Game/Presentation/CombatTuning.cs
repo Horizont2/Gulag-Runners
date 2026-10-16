@@ -35,6 +35,23 @@ namespace GulagRunners.Game
         public float heavyTimingMultiplier = 1.5f;
 
         [Header("Being hit")]
+        [Header("Hit stop — the weight of a blow")]
+        [Tooltip("Seconds both fighters freeze for when a blow lands.\n\n" +
+                 "The one thing in a fight that nothing else can stand in for: a swing that " +
+                 "only changes a number has nothing in it for the hands. Felt rather than " +
+                 "seen, so it is small — past about a tenth of a second on an ordinary hit it " +
+                 "stops reading as weight and starts reading as a dropped frame.")]
+        [Range(0f, 0.25f)] public float hitStop = 0.05f;
+
+        [Tooltip("Seconds both freeze for when the guard eats it. Shorter than a clean hit: " +
+                 "a block is supposed to feel like less than being hit.")]
+        [Range(0f, 0.25f)] public float blockStop = 0.033f;
+
+        [Tooltip("Seconds both freeze for on a parry. The longest by a wide margin — docs/02 " +
+                 "makes the parry the skill ceiling, and the reward for finding one is that " +
+                 "the world stops while everybody sees it.")]
+        [Range(0f, 0.4f)] public float parryStop = 0.117f;
+
         [Tooltip("Frames of hitstun per point of damage, and the ceiling.")]
         public float hitstunPerDamage = 1f;
         public float maxHitstun = 0.43f;
@@ -102,6 +119,9 @@ namespace GulagRunners.Game
             MaxCombo = Mathf.Max(1, maxCombo),
             HeavyDamagePermille = P(heavyDamageMultiplier),
             HeavyTimingPermille = P(heavyTimingMultiplier),
+            HitStopFrames = F(hitStop),
+            BlockStopFrames = F(blockStop),
+            ParryStopFrames = F(parryStop),
             HitstunPerDamage = Mathf.Max(0, Mathf.RoundToInt(hitstunPerDamage)),
             MaxHitstunFrames = F(maxHitstun),
             KnockbackSpeed = M(knockbackSpeed),

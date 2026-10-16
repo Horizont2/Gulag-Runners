@@ -10,6 +10,7 @@ K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          HEAVY_DMG=1700, HEAVY_TIME=1500, STUN_PER_DMG=1, MAX_STUN=26,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
          CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
+         HIT_STOP=3, BLOCK_STOP=2, PARRY_STOP=7,
          PARRY=12, STAGGER=48, DEATH=90, GUARD_DRAIN=48,
          DESPERATE_HP=300, DESPERATE_DMG=1400, SUDDEN_BARE=2000,
          FALL_SPEED=M.M(12500), FALL_PER_SPEED=8)
@@ -62,6 +63,10 @@ def combat_step(s, inp):
     """One player's combat tick, before movement. Returns the input movement may act on."""
     s.damage_taken = 0
     s.was_hit = s.was_blocked = s.was_parried = s.swing_started = s.just_died = False
+
+    # Frozen by a blow: no timers, no swing, no guard, and nothing handed to the motor.
+    if getattr(s, "hitstop", 0) > 0:
+        return 0
 
     for a in ("stun", "stagger", "guard_break"):
         if getattr(s, a) > 0:
@@ -260,6 +265,12 @@ def land(atk, vic, sudden_death=False):
 
 
 def parry(atk, vic):
+    # Both of them, not only the one hit: half the weight of a blow is the arm
+    # coming to a stop. The longer freeze wins rather than accumulating.
+    for p in (atk, vic):
+        if getattr(p, "hitstop", 0) < K["PARRY_STOP"]:
+            p.hitstop = K["PARRY_STOP"]
+
     vic.was_parried = True
     vic.noise = 2
     atk.stagger = K["STAGGER"]
@@ -269,6 +280,12 @@ def parry(atk, vic):
 
 
 def block(atk, vic, dmg, side):
+    # Both of them, not only the one hit: half the weight of a blow is the arm
+    # coming to a stop. The longer freeze wins rather than accumulating.
+    for p in (atk, vic):
+        if getattr(p, "hitstop", 0) < K["BLOCK_STOP"]:
+            p.hitstop = K["BLOCK_STOP"]
+
     # Some weapons answer a shield rather than being answered by one (docs/03).
     pierce = weapon(atk).get("pierce", 0)
     through = pierce if pierce > K["CHIP"] else K["CHIP"]
@@ -297,6 +314,12 @@ def block(atk, vic, dmg, side):
 
 
 def hit(atk, vic, dmg, side, heavy):
+    # Both of them, not only the one hit: half the weight of a blow is the arm
+    # coming to a stop. The longer freeze wins rather than accumulating.
+    for p in (atk, vic):
+        if getattr(p, "hitstop", 0) < K["HIT_STOP"]:
+            p.hitstop = K["HIT_STOP"]
+
     reduction = ITEMS[vic.inv.armour].get("reduction", 0) if vic.inv.armour != NONE else 0
     if reduction:
         dmg = max(1, scale(dmg, 1000 - reduction))

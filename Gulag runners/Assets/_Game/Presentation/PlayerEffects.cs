@@ -105,6 +105,14 @@ namespace GulagRunners.Game
         [Tooltip("The swing leaving the hand, on the frame the hitbox goes live.")]
         public ActionEffect swing = new ActionEffect();
 
+        [Tooltip("Optional. A trail on the weapon, emitting for the length of a swing and " +
+                 "nothing else.\n\n" +
+                 "The cheapest thing in this component and the one that reads from furthest " +
+                 "away: an arc through the air says a swing happened even when the fighter is " +
+                 "forty pixels tall. Emitting is switched, never the renderer — switching the " +
+                 "renderer makes the tail vanish instead of fading, which looks like a bug.")]
+        public TrailRenderer swingTrail;
+
         [Tooltip("A hit that got through: this fighter is hurt.")]
         public ActionEffect hurt = new ActionEffect();
 
@@ -211,6 +219,11 @@ namespace GulagRunners.Game
                 if (s.Attack == AttackPhase.Active) Fire(swing, "swing");
                 _attack = s.Attack;
             }
+
+            // The trail runs for the whole swing, wind-up included: the arc is what makes the
+            // wind-up readable as a wind-up rather than as a pause.
+            if (swingTrail != null)
+                swingTrail.emitting = s.Attack != AttackPhase.None && s.HitStopTimer == 0;
 
             if (s.GuardBreakTimer > 0 && _guardBreak == 0) Fire(guardBroken, "guard broken");
             _guardBreak = s.GuardBreakTimer;
