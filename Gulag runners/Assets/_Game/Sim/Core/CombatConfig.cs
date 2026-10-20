@@ -69,6 +69,33 @@ namespace GulagRunners.Sim
         public int HitRecoveryCutPermille;
 
         /// <summary>
+        /// What each FURTHER hit of a string is worth, in thousandths of the one before.
+        ///
+        /// Without it the game had an infinite. Measured with both fighters holding attack
+        /// in range: a bare-handed fighter landed twenty blows in eight seconds and the man
+        /// with a club landed NONE -- he started twenty swings and every one of them was
+        /// cancelled by the next punch. Fists cycle in 19 frames; his stun plus his own
+        /// wind-up came to 22, so he was always hit first, for ever. The fast weapon simply
+        /// won, and the whole loot layer with it.
+        ///
+        /// So the guarantee below applies to the FIRST hit of a string only. That one
+        /// confirms and buys the turn; the ones after it are paid for out of damage alone
+        /// and worth this much less each time, until the string runs out and the other
+        /// player gets to move.
+        /// </summary>
+        public int ComboStunDecayPermille;
+
+        /// <summary>Frames of not being hit that end a string and clear the decay.</summary>
+        public int ComboStackFrames;
+
+        /// <summary>
+        /// Extra knockback per hit already taken in this string, in thousandths. The second
+        /// way a string ends: the attacker runs out of reach and has to step back in, and
+        /// stepping in is what costs him the frames that hand the turn over.
+        /// </summary>
+        public int ComboPushPermille;
+
+        /// <summary>
         /// The frames of initiative a clean hit is guaranteed to buy, whatever the weapon.
         ///
         /// Hitstun is raised to at least "what the attacker has left, plus this", so every
@@ -196,7 +223,10 @@ namespace GulagRunners.Sim
 
             c.AttackBufferFrames = 14;     // 0.23 s: clears the longest connected recovery (11)
             c.HitRecoveryCutPermille = 500;
-            c.HitAdvantageFrames = 4;      // +4 on hit with everything, more with the heavy
+            c.HitAdvantageFrames = 4;      // +4 on the FIRST hit, more with the heavy
+            c.ComboStunDecayPermille = 620;
+            c.ComboStackFrames = 75;       // 1.25 s without being hit and the string is over
+            c.ComboPushPermille = 300;
 
             c.KnockbackSpeed = Fix.FromMilli(3200);
             c.HeavyKnockbackSpeed = Fix.FromMilli(6000);

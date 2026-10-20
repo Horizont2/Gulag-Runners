@@ -74,8 +74,15 @@ namespace GulagRunners.Game
         public int ladderRegrabFrames = 12;
 
         [Header("Dodge")]
+        [Tooltip("Whether the defensive button can also dash.\n\nOff: this game has one " +
+                 "ground speed on purpose, and a fighter who can suddenly travel faster " +
+                 "than he runs reads as the character accelerating for no reason the " +
+                 "player asked for. With it off the same button raises the guard, and the " +
+                 "guard's own 42% is the only thing that changes anybody's speed.")]
+        public bool allowDodge = false;
+
         [Tooltip("Travel is speed x duration: 4.8 m/s over 0.35 s is 1.68 m — about two body " +
-                 "widths, which is a step out of reach rather than a teleport across the room.")]
+                 "widths. Only used while Allow Dodge is on.")]
         public float dodgeSpeed = 4.8f;
         [Tooltip("0.35 s of invulnerability, from docs/02. This is the window, not the distance.")]
         public int dodgeFrames = 21;
@@ -180,6 +187,7 @@ namespace GulagRunners.Game
             c.ScriptMinFrames = scriptMinFrames;
             c.ScriptMaxFrames = Mathf.Max(scriptMinFrames, scriptMaxFrames);
             c.LadderRegrabFrames = ladderRegrabFrames;
+            c.AllowDodge = allowDodge;
             c.DodgeSpeed = M(dodgeSpeed);
             c.DodgeFrames = dodgeFrames;
             c.DodgeRecoverFrames = dodgeRecoverFrames;

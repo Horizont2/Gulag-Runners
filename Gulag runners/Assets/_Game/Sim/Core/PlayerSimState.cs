@@ -127,6 +127,13 @@ namespace GulagRunners.Sim
         /// climb-out goes DOWN -- measured at 6.6 cm down on this arena's top ladder. The
         /// haul clip played over it is a man pulling himself up while his body sinks.
         /// </summary>
+        /// <summary>
+        /// Hits taken in the current string, and the clock that ends it. What stops the
+        /// fast weapon looping the slow one for ever.
+        /// </summary>
+        public byte StunStack;
+        public int StunStackTimer;
+
         public bool ScriptRises;
 
         public bool SwingSpent;

@@ -303,10 +303,18 @@ tick([a], [DOD])
 check("standing still, the press puts the guard up", a.blocking and a.mode == "ground",
       f"blocking={a.blocking} mode={a.mode}")
 
+# docs/02 let a direction turn the same press into a dodge. The dodge is a burst of speed,
+# and this game has one ground speed on purpose: a fighter who suddenly travels faster than
+# he runs reads as the character accelerating for no reason the player asked for. With
+# Allow Dodge off, the direction changes nothing and the guard simply goes up.
 a = fighter(-3.0)
 tick([a], [DOD | R])
-check("with a direction held, the same press is a dodge",
-      a.mode == "dodge" and not a.blocking, f"mode={a.mode} blocking={a.blocking}")
+check("with a direction held, the same press still only guards",
+      a.mode != "dodge" and a.blocking, f"mode={a.mode} blocking={a.blocking}")
+
+
+check("and nothing accelerates past a walk", abs(a.vx) <= M.C["RUN"],
+      f"{abs(a.vx) / 65536:.2f} m/s against a run of {M.C['RUN'] / 65536:.2f}")
 
 a = fighter(-3.0)
 tick([a], [JMP])
@@ -323,7 +331,7 @@ check("in the air it is neither", airborne and a.mode != "dodge" and not a.block
 a = fighter(-3.0)
 start = a.stam
 tick([a], [DOD | R])
-check("a dodge costs two of the four charges", a.stam == start - 2,
+check("and costs no charge, because nothing was spent", a.stam == start,
       f"{start} -> {a.stam}")
 
 print("\n10b2. a raised guard is an action, not a posture")

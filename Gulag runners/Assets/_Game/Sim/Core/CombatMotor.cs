@@ -70,7 +70,8 @@ namespace GulagRunners.Sim
             // going somewhere, so go there properly. Pressing it standing still puts the guard
             // up on the same frame, which is what makes the parry a tap rather than a bet on a
             // delay. Neither happens in the air: a fighter off the ground has committed.
-            bool wantsDodge = guardPressed && input.MoveX() != 0 && !s.Swinging &&
+            bool wantsDodge = move.AllowDodge &&
+                              guardPressed && input.MoveX() != 0 && !s.Swinging &&
                               s.Mode == MoveMode.Grounded && s.DodgeRecoverTimer <= 0;
 
             // The guard goes up only while standing, only with stamina, and never mid-swing:
@@ -117,6 +118,10 @@ namespace GulagRunners.Sim
         static void TickTimers(ref PlayerSimState s)
         {
             if (s.AttackBuffer > 0) s.AttackBuffer--;
+
+            // Long enough without being hit and the string is over: the next blow confirms
+            // again and buys its owner the turn, as the first one of any string does.
+            if (s.StunStackTimer > 0 && --s.StunStackTimer == 0) s.StunStack = 0;
             if (s.HitstunTimer > 0) s.HitstunTimer--;
             if (s.StaggerTimer > 0) s.StaggerTimer--;
             if (s.GuardBreakTimer > 0) s.GuardBreakTimer--;
@@ -523,10 +528,32 @@ namespace GulagRunners.Sim
             // always buys the next move -- and a heavy weapon still buys more, because its
             // damage clears the floor on its own.
             int stun = damage * cfg.HitstunPerDamage;
-            int floor = Owed(in attacker, in cfg) + cfg.HitAdvantageFrames;
-            if (stun < floor) stun = floor;
+
+            if (victim.StunStack == 0)
+            {
+                // The FIRST hit of a string confirms: it is worth at least what the
+                // attacker still owes plus the advantage, so connecting always buys the
+                // next move and attacking is never punished.
+                int floor = Owed(in attacker, in cfg) + cfg.HitAdvantageFrames;
+                if (stun < floor) stun = floor;
+            }
+            else
+            {
+                // Every one after it is paid for out of damage alone, and worth less each
+                // time. Guaranteeing the turn on EVERY hit is an infinite: measured, a
+                // bare-handed fighter landed twenty blows in eight seconds while the man
+                // with a club landed none at all.
+                for (int i = 0; i < victim.StunStack && stun > 0; i++)
+                    stun = Scale(stun, cfg.ComboStunDecayPermille);
+            }
+
             if (stun > cfg.MaxHitstunFrames) stun = cfg.MaxHitstunFrames;
+            if (stun < 1) stun = 1;
             victim.HitstunTimer = stun;
+
+            int stacked = victim.StunStack;
+            if (victim.StunStack < 250) victim.StunStack++;
+            victim.StunStackTimer = cfg.ComboStackFrames;
 
             victim.Blocking = false;
             victim.Attack = AttackPhase.None;
@@ -535,6 +562,16 @@ namespace GulagRunners.Sim
             victim.ComboTimer = 0;
 
             Fix push = heavy ? cfg.HeavyKnockbackSpeed : cfg.KnockbackSpeed;
+
+            // Each further hit of a string pushes harder, so the attacker runs out of reach
+            // and has to step back in. Stepping in is what costs him the frames that hand
+            // the turn over -- the second way a string ends, and the one the player can see.
+            if (stacked > 0 && cfg.ComboPushPermille > 0)
+            {
+                int grown = 1000 + cfg.ComboPushPermille * stacked;
+                push = new Fix((int)(((long)push.Raw * grown) / 1000));
+            }
+
             victim.Velocity.X = push * side;
 
             // Only the finisher lifts. A light blow leaves them standing, which is the one

@@ -177,6 +177,18 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix ScriptRiseMargin;
 
+        /// <summary>
+        /// Whether the defensive button can also dash.
+        ///
+        /// OFF. docs/02 gives the medieval fighter one defensive button and lets a
+        /// direction turn it into a dodge, but the dodge is a burst of speed, and this
+        /// game has one ground speed on purpose: a fighter who can suddenly travel faster
+        /// than he runs reads as the character accelerating for no reason the player
+        /// asked for. With it off the same button raises the guard whatever is held, and
+        /// the guard's 42% is the only thing that changes how fast anybody moves.
+        /// </summary>
+        public bool AllowDodge;
+
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
@@ -265,6 +277,7 @@ namespace GulagRunners.Sim
             c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
             c.MantleMinFrames = 26;                  // 0.43 s: long enough to read as a haul
             c.ScriptRiseMargin = Fix.FromMilli(120);   // 12 cm: a step, not a storey
+            c.AllowDodge = false;
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 

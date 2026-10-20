@@ -9,6 +9,7 @@ from loot_mirror import (ITEMS, NONE, FISTS, CLUB, SPEAR, DAGGER, SWORD, AXE, FL
 K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          HEAVY_DMG=1700, HEAVY_TIME=1500, STUN_PER_DMG=1, MAX_STUN=34,
          BUFFER=14, HIT_RECOVERY_CUT=500, HIT_ADVANTAGE=4,
+         COMBO_DECAY=620, COMBO_STACK_FRAMES=75, COMBO_PUSH=300,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
          CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
          WINDUP_SPEED=620, ACTIVE_SPEED=180, RECOVERY_SPEED=400,
@@ -42,6 +43,8 @@ def init(s):
     s.swing_spent = False
     s.swing_connected = False
     s.atk_buf = 0
+    s.stun_stack = 0
+    s.stun_stack_t = 0
     s.blocking = False
     s.guard_t = 0
     s.guard_break = 0
@@ -79,6 +82,12 @@ def combat_step(s, inp):
     if s.atk_buf > 0:
         s.atk_buf -= 1
 
+    # Long enough without being hit and the string is over.
+    if s.stun_stack_t > 0:
+        s.stun_stack_t -= 1
+        if s.stun_stack_t == 0:
+            s.stun_stack = 0
+
     for a in ("stun", "stagger", "guard_break"):
         if getattr(s, a) > 0:
             setattr(s, a, getattr(s, a) - 1)
@@ -111,7 +120,8 @@ def combat_step(s, inp):
     # it is the guard, and in the air it is neither.
     from sim_motor_mirror import L, R
     moving = bool(inp & L) != bool(inp & R)
-    wants_dodge = (guard_pressed and moving and not swinging(s)
+    # The dodge is a burst of speed, and this game has one ground speed on purpose.
+    wants_dodge = (M.C["ALLOW_DODGE"] and guard_pressed and moving and not swinging(s)
                    and s.mode == "ground" and s.dodge_rec <= 0)
 
     can_guard = (guard_held and not wants_dodge and s.guard_break <= 0 and s.stam > 0
@@ -377,16 +387,31 @@ def hit(atk, vic, dmg, side, heavy):
     vic.was_hit = True
     vic.damage_taken = dmg
     vic.noise = 3
-    # Hitstun is the larger of what the damage earns and what the TURN costs: the floor is
-    # whatever the attacker still owes plus HIT_ADVANTAGE, so connecting always buys the
-    # next move. Damage can still clear the floor on its own, and a heavy weapon does.
-    vic.stun = min(max(dmg * K["STUN_PER_DMG"], owed(atk) + K["HIT_ADVANTAGE"]),
-                   K["MAX_STUN"])
+    stun = dmg * K["STUN_PER_DMG"]
+    if vic.stun_stack == 0:
+        # The FIRST hit of a string confirms and buys the turn.
+        stun = max(stun, owed(atk) + K["HIT_ADVANTAGE"])
+    else:
+        # The rest are paid for out of damage alone and worth less each time. Guaranteeing
+        # the turn on EVERY hit is an infinite: measured, a bare-handed fighter landed
+        # twenty blows in eight seconds while the man with a club landed none at all.
+        for _ in range(vic.stun_stack):
+            stun = scale(stun, K["COMBO_DECAY"])
+    vic.stun = max(1, min(stun, K["MAX_STUN"]))
+
+    stacked = vic.stun_stack
+    vic.stun_stack = min(250, vic.stun_stack + 1)
+    vic.stun_stack_t = K["COMBO_STACK_FRAMES"]
     vic.blocking = False
     vic.attack, vic.attack_t = NONE_P, 0
     vic.combo = vic.combo_t = 0
 
-    vic.vx = (K["HEAVY_KNOCK"] if heavy else K["KNOCK"]) * side
+    push = K["HEAVY_KNOCK"] if heavy else K["KNOCK"]
+    # Each further hit pushes harder, so the attacker runs out of reach and has to step
+    # back in -- and stepping in is what costs him the frames that hand the turn over.
+    if stacked > 0 and K["COMBO_PUSH"] > 0:
+        push = (push * (1000 + K["COMBO_PUSH"] * stacked)) // 1000
+    vic.vx = push * side
     # Only the finisher lifts; a light blow leaves them standing, which is the one change
     # that makes a second hit possible at all.
     if heavy and vic.mode == "ground" and K["LIFT"] > 0:
