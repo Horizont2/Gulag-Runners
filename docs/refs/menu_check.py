@@ -24,6 +24,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
 SETTINGS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Settings")
+GAME = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game")
 
 
 def read(path):
@@ -137,6 +138,29 @@ def per_object_limit():
     return best if best is not None else 4
 
 
+def asset_paths():
+    """guid -> asset path, so a prefab instance can be read back to its prefab."""
+    out = {}
+    root = os.path.join(HERE, "..", "..", "Gulag runners", "Assets")
+    for where, _, files in os.walk(root):
+        for f in files:
+            if not f.endswith(".meta"):
+                continue
+            m = re.search(r"^guid: ([0-9a-f]{32})", read(os.path.join(where, f)), re.M)
+            if m:
+                out[m.group(1)] = os.path.join(where, f)[:-5]
+    return out
+
+
+def script_guid(rel):
+    """The guid a scene writes for one of our scripts, or None if it has moved."""
+    meta = os.path.join(GAME, rel) + ".meta"
+    if not os.path.exists(meta):
+        return None
+    m = re.search(r"^guid: ([0-9a-f]{32})", read(meta), re.M)
+    return m.group(1) if m else None
+
+
 def lights_and_torches(path):
     """The menu's light budget, and whether every torch was treated the same."""
     text = read(path)
@@ -197,6 +221,55 @@ def lights_and_torches(path):
             problems += 1
             print(f"      PROBLEM - a Torch Fire carries a Light with no TorchLight on it, "
                   "so the flame moves and the light it casts does not.")
+
+    # The fighter. Dragging the match prefab in is the obvious way to put somebody in
+    # the menu, and it half works: he stands there in the editor, and on Play
+    # PlayerController ticks a motor with no MatchState and writes transform.position
+    # from a simulation that never started, so he walks off the spot he was placed on.
+    controller = script_guid("Presentation/PlayerController.cs")
+    fighter = script_guid("Menu/MenuFighter.cs")
+
+    posed = any(
+        fighter and re.search(r"m_Script: \{fileID: -?\d+, guid: " + fighter, body)
+        for comps in owner.values() for cls, body in comps if cls == 114)
+
+    # The controller is almost never a document in this scene: the fighter is a prefab
+    # INSTANCE, so the component lives in the prefab and the scene only holds overrides.
+    # Reading the scene alone finds nothing and passes a scene that is broken.
+    live = []
+    if controller:
+        assets = asset_paths()
+        for chunk in re.split(r"^--- ", text, flags=re.M)[1:]:
+            if not chunk.startswith("!u!1001 "):
+                continue
+            g = re.search(r"m_SourcePrefab: \{fileID: \d+, guid: ([0-9a-f]{32})", chunk)
+            src = assets.get(g.group(1)) if g else None
+            if not src or not src.endswith(".prefab") or not os.path.exists(src):
+                continue
+            inside = read(src)
+            for part in re.split(r"^--- ", inside, flags=re.M)[1:]:
+                m = re.match(r"!u!114 &(-?\d+)", part)
+                if not m or controller not in part:
+                    continue
+                off = re.search(
+                    r"target: \{fileID: " + m.group(1) + r",[^\n]*\n\s*propertyPath: "
+                    r"m_Enabled\s*\n\s*value: 0", chunk)
+                if not off:
+                    live.append(os.path.basename(src))
+
+    if live:
+        problems += 1
+        print(f"      PROBLEM - {', '.join(sorted(set(live)))} brings a live "
+              "PlayerController into the menu. There is "
+              "no match here, so on Play each one ticks a motor with no MatchState and "
+              "moves the fighter off the mark he was placed on.")
+    if not posed:
+        problems += 1
+        print("      PROBLEM - no MenuFighter in the menu, so whoever is standing there "
+              "holds his bind pose: the T-pose. Run Tools/Gulag Runners/Set up the "
+              "menu scene.")
+    elif not live:
+        print("      fighter: MenuFighter present, PlayerController quiet")
 
     return problems
 

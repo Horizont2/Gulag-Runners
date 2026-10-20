@@ -40,21 +40,41 @@ namespace GulagRunners.GameEditor
         /// <summary>
         /// The fighter, on whatever model is standing in the scene.
         ///
-        /// Found as an Animator that is NOT part of a PlayerController: the menu's model is
-        /// a model, and if a controller is on it then this is the wrong scene to be doing
-        /// this in.
+        /// A model without a PlayerController is taken as it is. A model WITH one is taken
+        /// too, and the controller is switched off along with everything else on it that
+        /// acts — which is the case that actually turns up, because the obvious thing to
+        /// drag into a menu is the fighter prefab from the match, and it half works: he
+        /// stands there in the editor and then, on Play, PlayerController ticks a motor
+        /// with no MatchState and writes transform.position from a simulation that has
+        /// not started, so he leaves the spot he was placed on.
+        ///
+        /// Switched off and not deleted: the components are the prefab's, the menu only
+        /// overrides them, and the day this model goes back into a match nothing has been
+        /// lost.
         /// </summary>
         static MenuFighter Fighter(System.Text.StringBuilder said)
         {
             MenuFighter had = Object.FindFirstObjectByType<MenuFighter>();
             Animator model = null;
+            Animator fallback = null;
 
             foreach (Animator a in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include,
                                                                        FindObjectsSortMode.None))
             {
-                if (a.GetComponentInParent<PlayerController>() != null) continue;
+                if (a.GetComponentInParent<PlayerController>() != null)
+                {
+                    if (fallback == null) fallback = a;
+                    continue;
+                }
                 model = a;
                 break;
+            }
+
+            if (model == null && fallback != null)
+            {
+                model = fallback;
+                said.AppendLine($"  {Quiet(fallback)} match behaviour(s) switched off on "
+                              + "the fighter: this is a menu, not a match.");
             }
 
             if (model == null)
@@ -85,12 +105,16 @@ namespace GulagRunners.GameEditor
                 }
             }
 
-            // On the model's own object, so Pose State drives the Animator beside it.
-            MenuFighter f = had != null ? had : model.GetComponent<MenuFighter>();
+            // Beside the Animator, or -- when the model is a fighter prefab -- on the
+            // prefab's root, where the components it has to stand in for already are.
+            PlayerController owner = model.GetComponentInParent<PlayerController>();
+            GameObject host = owner != null ? owner.gameObject : model.gameObject;
+
+            MenuFighter f = had != null ? had : host.GetComponent<MenuFighter>();
             if (f == null)
             {
-                f = Undo.AddComponent<MenuFighter>(model.gameObject);
-                said.AppendLine($"  MenuFighter added to {model.name}");
+                f = Undo.AddComponent<MenuFighter>(host);
+                said.AppendLine($"  MenuFighter added to {host.name}");
             }
 
             Undo.RecordObject(f, "Set up the menu scene");
@@ -111,6 +135,31 @@ namespace GulagRunners.GameEditor
             said.AppendLine($"  pose: \"{f.poseState}\", freeze {f.freeze}, "
                           + $"sway {f.sway}");
             return f;
+        }
+
+        /// <summary>
+        /// Switches off everything on a match fighter that does something, and says how
+        /// many. The Animator stays on -- it is the whole point -- and so does anything
+        /// that only holds a reference, like the weapon socket.
+        /// </summary>
+        static int Quiet(Animator model)
+        {
+            PlayerController owner = model.GetComponentInParent<PlayerController>();
+            if (owner == null) return 0;
+
+            int off = 0;
+            foreach (MonoBehaviour mb in owner.GetComponents<MonoBehaviour>())
+            {
+                if (mb == null || mb is MenuFighter || mb is MenuDirector || mb is MenuUI)
+                    continue;
+                if (!mb.enabled) continue;
+
+                Undo.RecordObject(mb, "Set up the menu scene");
+                mb.enabled = false;
+                EditorUtility.SetDirty(mb);
+                off++;
+            }
+            return off;
         }
 
         static MenuDirector Director(MenuFighter fighter, System.Text.StringBuilder said)
