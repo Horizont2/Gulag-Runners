@@ -104,3 +104,11 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Unity Asset Store packs may ship inside the game but may not be redistributed,
+# which includes committing them to a public repository.
+# CC0 packs may be kept in the repository: put them in Assets/_ThirdParty/CC0/.
+/[Aa]ssets/_ThirdParty/**
+!/[Aa]ssets/_ThirdParty/CC0/
+!/[Aa]ssets/_ThirdParty/CC0/**
+!/[Aa]ssets/_ThirdParty/**/*.meta
