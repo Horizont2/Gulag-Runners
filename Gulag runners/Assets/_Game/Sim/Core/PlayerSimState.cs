@@ -122,6 +122,21 @@ namespace GulagRunners.Sim
         /// <summary>This swing has already connected; one swing hits once.</summary>
         public bool SwingSpent;
 
+        /// <summary>
+        /// This swing has already connected, which is what buys back half the recovery.
+        /// </summary>
+        public bool SwingConnected;
+
+        /// <summary>
+        /// Frames an attack press is still worth something.
+        ///
+        /// Without it a press during recovery is simply dropped, and the only way to chain
+        /// is to let go and press again on the exact frame the swing ends — which on a
+        /// phone is not a skill, it is a coin toss. Every fighting game made since the
+        /// nineties remembers the press for a few frames; this is that, and nothing more.
+        /// </summary>
+        public int AttackBuffer;
+
         public bool Blocking;
         /// <summary>Frames the guard has been up. Under ParryFrames it parries instead of blocks.</summary>
         public int GuardTimer;

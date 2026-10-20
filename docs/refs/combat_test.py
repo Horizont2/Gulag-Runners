@@ -3,7 +3,8 @@ a time to kill of 8 to 14 seconds of ACTIVE fighting."""
 import sim_motor_mirror as M
 import combat_mirror as K
 from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD, ATTACK
-from loot_mirror import Inv, NONE, FISTS, CLUB, SPEAR, CHAINMAIL, BANDAGE, ITEMS
+from loot_mirror import (Inv, NONE, FISTS, CLUB, SPEAR, DAGGER, WARHAMMER,
+                         CHAINMAIL, BANDAGE, ITEMS)
 from combat_mirror import combat_step, resolve, hitbox, init, K as CFG
 from arena_geometry import world
 
@@ -614,5 +615,103 @@ for t in range(120):
     a.x, v.x = X(-0.45), X(0.45)
     blocked |= v.was_blocked
 check("a guard covers the way the fighter aims", blocked, f"health {v.health}")
+
+# ---------------------------------------------------------------- the turn
+#
+# The one number that decides whether a fight is a fight: who may act first once a blow
+# has landed. Measured before this was fixed, EVERY weapon in the game was negative --
+# saber -3, club -5, spear -8, scythe -12 -- which means landing a hit handed the turn to
+# the person you just hit, and the correct play was never to swing first. Two players both
+# playing correctly then produce a stand-off, which is what a wooden fight is.
+print("\n9. landing a blow buys the turn")
+
+# K was rebound to the config dict further up the file; the module itself is still needed.
+import combat_mirror as CM
+from combat_mirror import RECOVERY
+
+
+def free(p):
+    return (not CM.swinging(p) and getattr(p, "hitstop", 0) == 0 and p.stun == 0
+            and p.stagger == 0 and not CM.reeling(p))
+
+
+def advantage(weapon_id, guard=False):
+    """Frames the attacker is free BEFORE the victim, counted from the blow landing."""
+    reach = ITEMS[FISTS if weapon_id == NONE else weapon_id]["reach"] / 65536.0
+    a = fighter(0.0, 1, weapon_id)
+    v = fighter(0.5 + reach * 0.5, -1)
+    landed = af = vf = None
+    for t in range(300):
+        tick([a, v], [ATTACK if t == 0 else 0, DOD if guard else 0])
+        if landed is None and (v.was_hit or v.was_blocked):
+            landed = t
+        if landed is not None:
+            if af is None and free(a): af = t
+            if vf is None and free(v): vf = t
+            if af is not None and vf is not None:
+                return vf - af
+    return None
+
+
+worst = None
+for name, wid in (("fists", NONE), ("club", CLUB), ("spear", SPEAR)):
+    adv = advantage(wid)
+    print(f"        {name:8} {adv:+d} on hit")
+    if worst is None or adv < worst:
+        worst = adv
+check("every weapon is PLUS on hit, so connecting keeps the initiative",
+      worst is not None and worst > 0, f"worst {worst:+d}")
+
+# And minus on block, or there is no reason to ever put the guard up.
+onblock = advantage(CLUB, guard=True)
+check("and minus on block, so guarding takes the turn back",
+      onblock is not None and onblock < 0, f"club {onblock:+d} on block")
+
+# A press during recovery used to be thrown away, so continuing a string meant releasing
+# and pressing again on the exact frame the swing ended -- which on a phone is a coin toss,
+# not a skill. The buffer has to outlast the longest recovery a player is actually trying
+# to chain out of, which is the recovery of a swing that LANDED (halved), the worst of them
+# being the warhammer's eleven frames.
+def buffered(weapon_id):
+    """One tap on the first frame of recovery after a blow LANDS, then nothing.
+
+    Against a victim on purpose. A whiffed heavy swing should NOT come round again off a
+    stale press -- the long recovery of a miss is the punish window, and the buffer is
+    there to continue a string, not to hide a mistake."""
+    reach = ITEMS[FISTS if weapon_id == NONE else weapon_id]["reach"] / 65536.0
+    a = fighter(0.0, 1, weapon_id)
+    v = fighter(0.5 + reach * 0.5, -1)
+    tick([a, v], [ATTACK, 0])
+    for _ in range(90):
+        if a.attack == RECOVERY:
+            break
+        tick([a, v], [0, 0])
+    tick([a, v], [ATTACK, 0])
+    for _ in range(90):
+        tick([a, v], [0, 0])
+        if a.swing_started:
+            return True
+    return False
+
+
+missed = [n for n, w in (("dagger", DAGGER), ("club", CLUB), ("spear", SPEAR),
+                         ("warhammer", WARHAMMER)) if not buffered(w)]
+check("a tap during recovery is remembered and starts the next swing",
+      not missed, "dropped by " + ", ".join(missed) if missed else "every weapon chained")
+
+# A light hit used to lift the victim 3 cm and take them off the ground for 21 frames,
+# which slid them out of reach before any follow-up could land.
+a = fighter(0, 1, CLUB)
+v = fighter(0.8, -1)
+air = 0
+for t in range(60):
+    tick([a, v], [ATTACK if t == 0 else 0, 0])
+    if v.was_hit:
+        for _ in range(40):
+            tick([a, v], [0, 0])
+            if v.mode != "ground":
+                air += 1
+        break
+check("a light blow leaves them standing", air == 0, f"{air} airborne frame(s)")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

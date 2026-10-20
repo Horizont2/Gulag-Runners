@@ -46,9 +46,52 @@ namespace GulagRunners.Sim
         public int HitstunPerDamage;
         public int MaxHitstunFrames;
 
+        /// <summary>
+        /// Frames an attack press survives while it cannot be used yet.
+        ///
+        /// A press during recovery used to be thrown away, so continuing a string meant
+        /// releasing and pressing again on the exact frame the swing ended. The buffer is
+        /// the difference between a game that reads what you meant and one that asks you
+        /// to guess a frame number.
+        /// </summary>
+        public int AttackBufferFrames;
+
+        /// <summary>
+        /// What a CONNECTED swing gets back of its own recovery, in thousandths.
+        ///
+        /// Measured before this existed, every weapon in the game was at a frame
+        /// DISADVANTAGE after landing a blow: from -3 with a saber to -12 with a scythe.
+        /// The person you just hit acted first. That makes the correct play never to swing
+        /// first, and two players both playing correctly produce the stand-off that reads
+        /// as a wooden fight. Halving the recovery of a swing that landed is what turns a
+        /// hit into a turn.
+        /// </summary>
+        public int HitRecoveryCutPermille;
+
+        /// <summary>
+        /// The frames of initiative a clean hit is guaranteed to buy, whatever the weapon.
+        ///
+        /// Hitstun is raised to at least "what the attacker has left, plus this", so every
+        /// weapon is at worst this far ahead after connecting. Damage can still earn more
+        /// -- a warhammer stuns for longer than this floor on its own -- but nothing is
+        /// ever punished for landing a blow.
+        /// </summary>
+        public int HitAdvantageFrames;
+
         public Fix KnockbackSpeed;
         public Fix HeavyKnockbackSpeed;
-        /// <summary>Upward part of a knockback. A little, so a hit reads; not a launch.</summary>
+
+        /// <summary>
+        /// Upward part of a knockback, and ONLY on the heavy finisher.
+        ///
+        /// It used to be every hit, and it was the quietest of the reasons the fight felt
+        /// bad: 1.6 m/s against this gravity is a peak of three centimetres -- nothing you
+        /// can see -- but it took the victim off the ground for 21 frames while stunning
+        /// them for 8. So a light blow produced no visible lift, slid the victim away with
+        /// no footing, and put them out of reach before the follow-up could land. Keeping
+        /// them planted is what makes a second hit possible at all; the finisher still
+        /// lifts, and that is what makes the finisher read as the finisher.
+        /// </summary>
         public Fix KnockbackLift;
 
         // ---- blocking (docs/02: the medieval mode's answer to pressure)
@@ -149,7 +192,11 @@ namespace GulagRunners.Sim
             c.ParryStopFrames = 7;
 
             c.HitstunPerDamage = 1;
-            c.MaxHitstunFrames = 26;
+            c.MaxHitstunFrames = 34;   // was 26, which clipped the floor below off a warhammer
+
+            c.AttackBufferFrames = 14;     // 0.23 s: clears the longest connected recovery (11)
+            c.HitRecoveryCutPermille = 500;
+            c.HitAdvantageFrames = 4;      // +4 on hit with everything, more with the heavy
 
             c.KnockbackSpeed = Fix.FromMilli(3200);
             c.HeavyKnockbackSpeed = Fix.FromMilli(6000);

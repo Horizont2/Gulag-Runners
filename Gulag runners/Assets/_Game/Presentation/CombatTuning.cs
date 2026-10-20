@@ -54,10 +54,33 @@ namespace GulagRunners.Game
 
         [Tooltip("Frames of hitstun per point of damage, and the ceiling.")]
         public float hitstunPerDamage = 1f;
-        public float maxHitstun = 0.43f;
+        public float maxHitstun = 0.57f;
+
+        [Tooltip("How long an attack press is still worth something when it cannot be used " +
+                 "yet.\n\nWithout it a tap during recovery is thrown away and continuing a " +
+                 "string means pressing again on the exact frame the swing ends. 0.23 s " +
+                 "clears the longest recovery a landed swing leaves behind.")]
+        [Range(0f, 0.4f)] public float attackBuffer = 0.233f;
+
+        [Tooltip("What a swing that CONNECTS gets back of its own recovery.\n\n" +
+                 "Every weapon used to be at a frame disadvantage after landing a blow — " +
+                 "from -3 with a saber to -12 with a scythe — so the person you had just " +
+                 "hit moved first and the correct play was never to swing. A miss still " +
+                 "pays the full price; that is what a miss is for.")]
+        [Range(0.1f, 1f)] public float hitRecoveryKept = 0.5f;
+
+        [Tooltip("Frames of initiative a clean hit is guaranteed to buy, whatever the " +
+                 "weapon. Hitstun is raised to at least what the attacker still owes plus " +
+                 "this, so connecting is never punished. Damage can earn more.")]
+        [Range(0f, 0.25f)] public float hitAdvantage = 0.067f;
+
         public float knockbackSpeed = 3.2f;
         public float heavyKnockbackSpeed = 6f;
-        [Tooltip("Upward part of a knockback. Enough that a hit reads; not a launch.")]
+
+        [Tooltip("Upward part of a knockback, and ONLY on the heavy finisher.\n\n" +
+                 "On every hit it lifted them three centimetres — nothing you can see — " +
+                 "while taking them off the ground for 21 frames, which slid them out of " +
+                 "reach before any follow-up could land.")]
         public float knockbackLift = 1.6f;
 
         [Header("Guard")]
@@ -124,6 +147,9 @@ namespace GulagRunners.Game
             ParryStopFrames = F(parryStop),
             HitstunPerDamage = Mathf.Max(0, Mathf.RoundToInt(hitstunPerDamage)),
             MaxHitstunFrames = F(maxHitstun),
+            AttackBufferFrames = F(attackBuffer),
+            HitRecoveryCutPermille = P(hitRecoveryKept),
+            HitAdvantageFrames = F(hitAdvantage),
             KnockbackSpeed = M(knockbackSpeed),
             HeavyKnockbackSpeed = M(heavyKnockbackSpeed),
             KnockbackLift = M(knockbackLift),

@@ -7,7 +7,8 @@ from loot_mirror import (ITEMS, NONE, FISTS, CLUB, SPEAR, DAGGER, SWORD, AXE, FL
 
 # ---------------------------------------------------------------- CombatConfig.Default()
 K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
-         HEAVY_DMG=1700, HEAVY_TIME=1500, STUN_PER_DMG=1, MAX_STUN=26,
+         HEAVY_DMG=1700, HEAVY_TIME=1500, STUN_PER_DMG=1, MAX_STUN=34,
+         BUFFER=14, HIT_RECOVERY_CUT=500, HIT_ADVANTAGE=4,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
          CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
          WINDUP_SPEED=620, ACTIVE_SPEED=180, RECOVERY_SPEED=400,
@@ -39,6 +40,8 @@ def init(s):
     s.combo = 0
     s.combo_t = 0
     s.swing_spent = False
+    s.swing_connected = False
+    s.atk_buf = 0
     s.blocking = False
     s.guard_t = 0
     s.guard_break = 0
@@ -68,6 +71,13 @@ def combat_step(s, inp):
     # Frozen by a blow: no timers, no swing, no guard, and nothing handed to the motor.
     if getattr(s, "hitstop", 0) > 0:
         return 0
+
+    # Remembered BEFORE anything can refuse the press, so a tap during recovery counts.
+    if (inp & ATTACK) and K["BUFFER"] > 0:
+        s.atk_buf = K["BUFFER"]
+
+    if s.atk_buf > 0:
+        s.atk_buf -= 1
 
     for a in ("stun", "stagger", "guard_break"):
         if getattr(s, a) > 0:
@@ -128,14 +138,17 @@ def combat_step(s, inp):
 
 
 def start_swing(s, inp):
-    if not (inp & ATTACK):
+    if not (inp & ATTACK) and s.atk_buf <= 0:
         return
+    s.atk_buf = 0
     heavy = s.combo >= K["MAX_COMBO"] - 1
     windup = weapon(s)["frames"]
     if heavy:
         windup = scale(windup, K["HEAVY_TIME"])
     s.attack, s.attack_t = WINDUP, max(1, windup)
     s.swing_spent = False
+    s.swing_connected = False
+    s.atk_buf = 0
     s.swing_started = True
     s.blocking = False
     s.noise = 1
@@ -155,6 +168,9 @@ def advance(s):
         rec = scale(weapon(s)["frames"], K["RECOVERY"])
         if heavy:
             rec = scale(rec, K["HEAVY_TIME"])
+        # Landed, so half of it is given back.
+        if s.swing_connected and K["HIT_RECOVERY_CUT"] > 0:
+            rec = max(1, scale(rec, K["HIT_RECOVERY_CUT"]))
         s.attack, s.attack_t = RECOVERY, max(1, rec)
     else:
         s.attack, s.attack_t = NONE_P, 0
@@ -245,6 +261,7 @@ def resolve(players, sudden_death=False):
             if abs(atk.depth - vic.depth) > M.C["BODYZ"]:
                 continue
             atk.swing_spent = True
+            atk.swing_connected = True
             land(atk, vic, sudden_death)
             break
 
@@ -291,6 +308,7 @@ def parry(atk, vic):
     vic.was_parried = True
     vic.noise = 2
     atk.stagger = K["STAGGER"]
+    atk.swing_connected = False
     atk.attack, atk.attack_t = NONE_P, 0
     atk.combo = atk.combo_t = 0
     atk.vx = 0
@@ -330,6 +348,20 @@ def block(atk, vic, dmg, side):
     vic.noise = 3
 
 
+def owed(s):
+    """Frames the attacker still owes after the blow lands: the rest of the active window
+    plus the recovery it is about to roll into, with the connected cut already applied."""
+    if s.attack != ACTIVE:
+        return 0
+    heavy = s.combo >= K["MAX_COMBO"] - 1
+    rec = scale(weapon(s)["frames"], K["RECOVERY"])
+    if heavy:
+        rec = scale(rec, K["HEAVY_TIME"])
+    if K["HIT_RECOVERY_CUT"] > 0:
+        rec = max(1, scale(rec, K["HIT_RECOVERY_CUT"]))
+    return max(0, s.attack_t - 1) + rec
+
+
 def hit(atk, vic, dmg, side, heavy):
     # Both of them, not only the one hit: half the weight of a blow is the arm
     # coming to a stop. The longer freeze wins rather than accumulating.
@@ -345,13 +377,19 @@ def hit(atk, vic, dmg, side, heavy):
     vic.was_hit = True
     vic.damage_taken = dmg
     vic.noise = 3
-    vic.stun = min(dmg * K["STUN_PER_DMG"], K["MAX_STUN"])
+    # Hitstun is the larger of what the damage earns and what the TURN costs: the floor is
+    # whatever the attacker still owes plus HIT_ADVANTAGE, so connecting always buys the
+    # next move. Damage can still clear the floor on its own, and a heavy weapon does.
+    vic.stun = min(max(dmg * K["STUN_PER_DMG"], owed(atk) + K["HIT_ADVANTAGE"]),
+                   K["MAX_STUN"])
     vic.blocking = False
     vic.attack, vic.attack_t = NONE_P, 0
     vic.combo = vic.combo_t = 0
 
     vic.vx = (K["HEAVY_KNOCK"] if heavy else K["KNOCK"]) * side
-    if vic.mode == "ground" and K["LIFT"] > 0:
+    # Only the finisher lifts; a light blow leaves them standing, which is the one change
+    # that makes a second hit possible at all.
+    if heavy and vic.mode == "ground" and K["LIFT"] > 0:
         vic.vy = K["LIFT"]
         vic.mode = "air"
     if vic.mode in ("ladder", "mount", "mantle"):

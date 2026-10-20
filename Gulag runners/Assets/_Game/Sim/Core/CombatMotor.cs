@@ -42,6 +42,11 @@ namespace GulagRunners.Sim
             // this never has to care which of the two ran first.
             if (s.HitStopTimer > 0) return InputFlags.None;
 
+            // Remembered BEFORE anything can refuse the press, so a tap during recovery
+            // still counts. Drained in TickTimers.
+            if (input.Has(InputFlags.Attack) && cfg.AttackBufferFrames > 0)
+                s.AttackBuffer = cfg.AttackBufferFrames;
+
             TickTimers(ref s);
 
             if (s.Dead) return InputFlags.None;
@@ -111,6 +116,7 @@ namespace GulagRunners.Sim
 
         static void TickTimers(ref PlayerSimState s)
         {
+            if (s.AttackBuffer > 0) s.AttackBuffer--;
             if (s.HitstunTimer > 0) s.HitstunTimer--;
             if (s.StaggerTimer > 0) s.StaggerTimer--;
             if (s.GuardBreakTimer > 0) s.GuardBreakTimer--;
@@ -129,7 +135,9 @@ namespace GulagRunners.Sim
 
         static void TryStartSwing(ref PlayerSimState s, InputFlags input, in CombatConfig cfg)
         {
-            if (!input.Has(InputFlags.Attack)) return;
+            // Either pressed now, or pressed recently enough to still mean it.
+            if (!input.Has(InputFlags.Attack) && s.AttackBuffer <= 0) return;
+            s.AttackBuffer = 0;
 
             ItemDef weapon = s.Inventory.WeaponDef;
             bool heavy = s.ComboIndex >= cfg.MaxCombo - 1;
@@ -141,6 +149,7 @@ namespace GulagRunners.Sim
             s.AttackTimer = windup > 0 ? windup : 1;
             s.AttackPhaseFrames = s.AttackTimer;
             s.SwingSpent = false;
+            s.SwingConnected = false;
             s.SwingStarted = true;
             s.Blocking = false;
 
@@ -169,6 +178,15 @@ namespace GulagRunners.Sim
                     bool heavy = s.ComboIndex >= cfg.MaxCombo - 1;
                     int recovery = Scale(weapon.AttackFrames, cfg.RecoveryPermille);
                     if (heavy) recovery = Scale(recovery, cfg.HeavyTimingPermille);
+
+                    // Landed, so half of it is given back. A blow that connects has already
+                    // told the other player to stop; a blow that whiffed is the one you are
+                    // supposed to be punished for.
+                    if (s.SwingConnected && cfg.HitRecoveryCutPermille > 0)
+                    {
+                        recovery = Scale(recovery, cfg.HitRecoveryCutPermille);
+                        if (recovery < 1) recovery = 1;
+                    }
 
                     s.Attack = AttackPhase.Recovery;
                     s.AttackTimer = recovery > 0 ? recovery : 1;
@@ -341,6 +359,7 @@ namespace GulagRunners.Sim
                         continue;
 
                     players[a].SwingSpent = true;
+                    players[a].SwingConnected = true;
                     Land(ref players[a], ref players[b], in cfg, in move, suddenDeath);
                     break;                       // one swing, one victim
                 }
@@ -411,6 +430,7 @@ namespace GulagRunners.Sim
             victim.Noise = NoiseLevel.Medium;
 
             attacker.StaggerTimer = cfg.StaggerFrames;
+            attacker.SwingConnected = false;
             attacker.Attack = AttackPhase.None;
             attacker.AttackTimer = 0;
             attacker.ComboIndex = 0;
@@ -493,7 +513,18 @@ namespace GulagRunners.Sim
             victim.DamageTaken = (short)damage;
             victim.Noise = NoiseLevel.Loud;
 
+            // Hitstun is the larger of what the damage earns and what the TURN costs.
+            //
+            // Damage alone left every weapon in the game at a disadvantage after landing:
+            // a club stunned for 8 frames while its own active and recovery ran 12, so the
+            // man who had just been hit moved first. Measured across the table it ran from
+            // -3 to -12, which means the whole fight rewards waiting. Here the floor is
+            // whatever the attacker still owes plus HitAdvantageFrames, so connecting
+            // always buys the next move -- and a heavy weapon still buys more, because its
+            // damage clears the floor on its own.
             int stun = damage * cfg.HitstunPerDamage;
+            int floor = Owed(in attacker, in cfg) + cfg.HitAdvantageFrames;
+            if (stun < floor) stun = floor;
             if (stun > cfg.MaxHitstunFrames) stun = cfg.MaxHitstunFrames;
             victim.HitstunTimer = stun;
 
@@ -505,7 +536,11 @@ namespace GulagRunners.Sim
 
             Fix push = heavy ? cfg.HeavyKnockbackSpeed : cfg.KnockbackSpeed;
             victim.Velocity.X = push * side;
-            if (victim.Mode == MoveMode.Grounded && cfg.KnockbackLift > Fix.Zero)
+
+            // Only the finisher lifts. A light blow leaves them standing, which is the one
+            // change that makes a second hit possible: lifted, they slid away with no
+            // footing for 21 frames over 3 centimetres of height nobody could see.
+            if (heavy && victim.Mode == MoveMode.Grounded && cfg.KnockbackLift > Fix.Zero)
             {
                 victim.Velocity.Y = cfg.KnockbackLift;
                 victim.Mode = MoveMode.Airborne;
@@ -531,6 +566,30 @@ namespace GulagRunners.Sim
             victim.Blocking = false;
             victim.Attack = AttackPhase.None;
             victim.Noise = NoiseLevel.Loud;
+        }
+
+        /// <summary>
+        /// Frames the attacker still owes after the blow lands: the rest of the active
+        /// window plus the recovery it is about to roll into, with the connected cut
+        /// already applied. Read at the moment of the hit, before AdvanceSwing gets there,
+        /// which is why it recomputes the recovery rather than reading AttackTimer.
+        /// </summary>
+        static int Owed(in PlayerSimState s, in CombatConfig cfg)
+        {
+            if (s.Attack != AttackPhase.Active) return 0;
+
+            bool heavy = s.ComboIndex >= cfg.MaxCombo - 1;
+            int recovery = Scale(s.Inventory.WeaponDef.AttackFrames, cfg.RecoveryPermille);
+            if (heavy) recovery = Scale(recovery, cfg.HeavyTimingPermille);
+            if (cfg.HitRecoveryCutPermille > 0)
+            {
+                recovery = Scale(recovery, cfg.HitRecoveryCutPermille);
+                if (recovery < 1) recovery = 1;
+            }
+
+            int left = s.AttackTimer - 1;
+            if (left < 0) left = 0;
+            return left + recovery;
         }
 
         static int Scale(int value, int permille) => (int)(((long)value * permille) / 1000);
