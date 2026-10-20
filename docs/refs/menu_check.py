@@ -10,6 +10,12 @@ And the volume is terrain bounds PLUS horizontalPadding, so the padding has to b
 enough to reach whatever is being fogged. Shrinking it to the size of the room drops the
 room outside its own fog.
 
+It also counts the menu's lights, because URP drops the surplus past
+m_AdditionalLightsPerObjectLimit per object per frame -- silently, and differently as the
+camera moves, so a fifth light in one small room does not look like a fifth light, it
+looks like the other four flickering. The menu is one room where every light reaches
+everything in it, which is why this is checked here and not for the arena.
+
 Run: python3 menu_check.py"""
 import os
 import re
@@ -17,6 +23,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
+SETTINGS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Settings")
 
 
 def read(path):
@@ -115,6 +122,85 @@ def check(path):
     return problems, True
 
 
+def per_object_limit():
+    """The tightest additional-light cap across the pipeline assets, or URP's default."""
+    best = None
+    if os.path.isdir(SETTINGS):
+        for f in sorted(os.listdir(SETTINGS)):
+            if not f.endswith(".asset"):
+                continue
+            m = re.search(r"m_AdditionalLightsPerObjectLimit: (\d+)",
+                          read(os.path.join(SETTINGS, f)))
+            if m:
+                n = int(m.group(1))
+                best = n if best is None else min(best, n)
+    return best if best is not None else 4
+
+
+def lights_and_torches(path):
+    """The menu's light budget, and whether every torch was treated the same."""
+    text = read(path)
+    docs = documents(text)
+    problems = 0
+
+    # GameObjects by fileID, so a light can be traced back to the object carrying it.
+    by_id, owner = {}, {}
+    for chunk in re.split(r"^--- ", text, flags=re.M)[1:]:
+        m = re.match(r"!u!(\d+) &(-?\d+)( stripped)?", chunk)
+        cls, fid, stripped = int(m.group(1)), m.group(2), bool(m.group(3))
+        if cls == 1 and not stripped:
+            nm = re.search(r"^  m_Name: (.*)$", chunk, re.M)
+            by_id[fid] = (nm.group(1).strip() if nm else "",
+                          field(chunk, "m_IsActive", "1") == "1")
+        else:
+            g = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", chunk)
+            if g:
+                owner.setdefault(g.group(1), []).append((cls, chunk))
+
+    cap = per_object_limit()
+    extra = 0
+    for go, comps in owner.items():
+        on = by_id.get(go, ("", True))[1]
+        for cls, body in comps:
+            if cls != 108 or not on:
+                continue
+            if field(body, "m_Enabled", "1") != "1":
+                continue
+            if field(body, "m_Type", "2") != "1":       # 1 is directional; the rest count
+                extra += 1
+
+    print(f"  {os.path.basename(path)}: {extra} additional light(s), "
+          f"pipeline cap {cap} per object")
+    if extra > cap:
+        problems += 1
+        print(f"      PROBLEM - {extra} additional lights in one room against a cap of "
+              f"{cap}. URP keeps the {cap} it likes best PER OBJECT PER FRAME and drops "
+              "the rest, so they will blink in and out as the camera moves.")
+
+    # Torches: the fire goes on all of them or the unlit ones read as broken props.
+    torches = [b for cls, b in docs
+               if cls == 1001 and re.search(r"value: Torch(?: \(\d+\))?\s*$", b, re.M)]
+    fires = [go for go, (nm, _) in by_id.items() if nm == "Torch Fire"]
+    if torches:
+        print(f"      {len(torches)} torch(es), {len(fires)} with fire")
+        if len(fires) < len(torches):
+            problems += 1
+            print(f"      PROBLEM - {len(torches) - len(fires)} torch(es) carry no fire. "
+                  "Run Tools/Gulag Runners/Light the torches.")
+
+    # A steady lamp on a flame is the thing that made them read as props to begin with.
+    for go in fires:
+        comps = owner.get(go, [])
+        has_light = any(cls == 108 for cls, _ in comps)
+        has_flicker = any(cls == 114 and "baseIntensity:" in b for cls, b in comps)
+        if has_light and not has_flicker:
+            problems += 1
+            print(f"      PROBLEM - a Torch Fire carries a Light with no TorchLight on it, "
+                  "so the flame moves and the light it casts does not.")
+
+    return problems
+
+
 def main():
     looked = 0
     problems = 0
@@ -124,6 +210,8 @@ def main():
         bad, had = check(os.path.join(SCENES, f))
         problems += bad
         looked += 1 if had else 0
+        if f.lower().startswith("menu"):
+            problems += lights_and_torches(os.path.join(SCENES, f))
 
     if looked == 0:
         print("menu_check: no scene uses the volumetric fog — nothing to check.")

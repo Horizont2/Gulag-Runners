@@ -126,6 +126,34 @@ def check(path, guids):
         if f != "0" and t not in kids.get(f, [t]):
             bad.append(f"transform {t} names {f} as parent, which does not list it")
 
+    # An object added UNDER a prefab instance has to be declared by that instance.
+    #
+    # Its m_Father points at the instance's stripped transform, which is enough for it to
+    # draw in the right place -- and not enough for Unity to keep it. The owning
+    # PrefabInstance lists what was added to it in m_AddedGameObjects, and an added child
+    # missing from that list is dropped to the scene root the first time the instance
+    # reconciles. Nothing warns; the torch fires simply end up in a heap at the origin.
+    stripped_owner = {}
+    for cls, fid, stripped, body in docs:
+        if stripped and cls in ("4", "224"):
+            m = re.search(r'm_PrefabInstance: \{fileID: (-?\d+)\}', body)
+            if m:
+                stripped_owner[fid] = m.group(1)
+    declared = {}
+    for cls, fid, stripped, body in docs:
+        if cls == "1001":
+            declared[fid] = set(re.findall(r'addedObject: \{fileID: (-?\d+)\}', body))
+    for cls, fid, stripped, body in docs:
+        if cls not in ("4", "224") or stripped:
+            continue
+        m = re.search(r'm_Father: \{fileID: (-?\d+)\}', body)
+        if not m or m.group(1) not in stripped_owner:
+            continue
+        inst = stripped_owner[m.group(1)]
+        if fid not in declared.get(inst, set()):
+            bad.append(f"transform {fid} hangs under prefab instance {inst} but is not in "
+                       f"its m_AddedGameObjects, so Unity will reparent it to the scene root")
+
     for b in bad:
         print(f"  {rel}: {b}")
     return len(bad)
