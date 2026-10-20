@@ -154,6 +154,25 @@ def check(path, guids):
             bad.append(f"transform {fid} hangs under prefab instance {inst} but is not in "
                        f"its m_AddedGameObjects, so Unity will reparent it to the scene root")
 
+    # A match whose ending nobody is listening to.
+    #
+    # MatchState raises Ended on the tick the match is decided, and for a long time it had
+    # no subscribers at all: the loser's health reached zero, both fighters carried on
+    # standing in whatever pose they were in, and the next round dealt. The fight stopped
+    # rather than finished, and nothing anywhere said so.
+    def script(name):
+        for g, path in guids.items():
+            if path.replace(os.sep, "/").endswith("/" + name):
+                return g
+        return None
+
+    if path.endswith(".unity"):
+        match_g = script("MatchState.cs")
+        outcome_g = script("MatchOutcomeView.cs")
+        if match_g and outcome_g and match_g in src and outcome_g not in src:
+            bad.append("has a MatchState but nothing listening to its Ended event, so "
+                       "winning the match plays no differently from pausing it")
+
     for b in bad:
         print(f"  {rel}: {b}")
     return len(bad)

@@ -16511,6 +16511,7 @@ GameObject:
   - component: {fileID: 1900000116}
   - component: {fileID: 1900000117}
   - component: {fileID: 1900000400}
+  - component: {fileID: 1900008000}
   m_Layer: 0
   m_Name: SimWorld
   m_TagString: Untagged
@@ -25749,3 +25750,62 @@ SceneRoots:
   - {fileID: 1900001001}
   - {fileID: 1900000701}
   - {fileID: 1900003001}
+--- !u!114 &1900008000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000118}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ab07ace128f15bf17a88a77e87a0e08, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  match: {fileID: 1900000400}
+  view: {fileID: 0}
+  freeze: 0.22
+  slowMotion: 0.35
+  slowSeconds: 1.1
+  pushIn: 1.6
+  pushSeconds: 1.3
+  pushEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  winnerState: 
+  loserState: 
+  layTheLoserDown: 1
+  fallDegrees: 82
+  fallSeconds: 0.45
+  fallSink: 0.12
+  onEnded:
+    m_PersistentCalls:
+      m_Calls: []
+  onDraw:
+    m_PersistentCalls:
+      m_Calls: []
+  onSettled:
+    m_PersistentCalls:
+      m_Calls: []
+  state: waiting
