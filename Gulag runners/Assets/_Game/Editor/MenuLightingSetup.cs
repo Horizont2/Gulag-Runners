@@ -106,8 +106,9 @@ namespace GulagRunners.GameEditor
             foreach (Renderer r in Object.FindObjectsByType<Renderer>(FindObjectsInactive.Exclude,
                                                                       FindObjectsSortMode.None))
             {
-                // A terrain left over from another scene is not this room, and it is forty
-                // times its size -- measured in, it would put the key light in a field.
+                // The terrain is left OUT of the measurement -- it is forty times the
+                // room and would put the key light in a field. It is not left out of the
+                // scene: the fog needs it, and removing it removes the fog.
                 if (r.GetComponentInParent<Terrain>() != null) continue;
                 if (r is ParticleSystemRenderer) continue;
 
@@ -220,23 +221,28 @@ namespace GulagRunners.GameEditor
                 { "nearFadeDistance", depth * 0.85f },
                 { "maximumFogDistance", Mathf.Max(20f, depth * 10f) },
 
-                // One raymarch step was 105 m. Thirty steps across what is visible.
-                { "targetStepLength", Mathf.Max(0.2f, depth / 10f) },
-                { "shadowDistance", Mathf.Max(10f, depth * 5f) },
+                // One raymarch step was 105 m. The component clamps this at 2, so that is
+                // as fine as it gets -- about five samples across a room this size.
+                { "targetStepLength", Mathf.Max(2f, depth / 10f) },
+                { "shadowDistance", Mathf.Max(20f, depth * 5f) },
 
-                { "groundFogHeight", Mathf.Max(1.5f, room.size.y * 0.9f) },
+                { "groundFogHeight", Mathf.Max(1.5f, room.size.y * 1.2f) },
                 { "topSoftness", 0.35f },
                 { "largeNoiseScale", Mathf.Max(3f, reach * 1.5f) },
-                { "detailNoiseScale", Mathf.Max(0.8f, reach * 0.4f) },
+                { "detailNoiseScale", Mathf.Max(1f, reach * 0.4f) },
                 { "windSpeed", 0.25f },
-                { "density", 0.45f },
+                { "density", 0.3f },            // the component's own ceiling
                 { "anisotropy", 0.65f },        // forward scatter, so the bars throw shafts
                 { "sunScattering", 0.8f },
                 { "ambientStrength", 0.55f },
                 { "fogSelfShadowStrength", 1.2f },
-                { "horizontalPadding", reach * 2f },
-                { "topPadding", reach * 1.5f },
-                { "bottomPadding", 2f },
+
+                // NOT shrunk to the room. The volume is built from the TERRAIN's bounds
+                // plus this padding, and the terrain in this scene sits several metres
+                // away -- cut it down and the room falls outside its own fog.
+                { "horizontalPadding", 40f },
+                { "topPadding", 60f },
+                { "bottomPadding", 20f },
             };
 
             var colours = new Dictionary<string, Color>
@@ -247,11 +253,22 @@ namespace GulagRunners.GameEditor
 
             var flags = new Dictionary<string, bool>
             {
-                // A terrain from another scene is not this room's ground.
-                { "findActiveTerrainsAutomatically", false },
+                // ON, always. UpdateTerrainBounds returns early when no terrain resolves,
+                // and the volume is built from nothing else -- so with this off and the
+                // terrain list empty there is no volume and therefore NO FOG AT ALL.
+                // Turning it off once because a terrain looked like a leftover is what
+                // made the fog vanish, and the terrain is not a leftover: it is the only
+                // thing giving this effect a ground to sit on.
+                { "findActiveTerrainsAutomatically", true },
                 { "enableVolumetricShadows", true },
                 { "useUnityRealtimeShadows", true },
             };
+
+            if (Object.FindFirstObjectByType<Terrain>() == null)
+                Debug.LogWarning(
+                    "This scene has no Terrain. The volumetric fog builds its entire volume " +
+                    "from terrain bounds, so it will render nothing at all until there is " +
+                    "one — a single flat terrain under the room is enough.");
 
             SerializedObject so = new SerializedObject(fog);
             int done = 0;
