@@ -988,6 +988,7 @@ namespace GulagRunners.Sim
 
             s.ScriptFrames = frames;
             s.ScriptTimer = frames;
+            s.ScriptRises = s.ScriptTo.Y > s.ScriptFrom.Y + cfg.ScriptRiseMargin;
             s.ScriptDir = (sbyte)(side >= 0 ? 1 : -1);
             s.Mode = MoveMode.Mantling;
             s.LadderIndex = -1;
@@ -1209,10 +1210,23 @@ namespace GulagRunners.Sim
             }
             else
             {
-                // Height leads and the step across follows, which is the shape of a real mantle
-                // rather than a diagonal slide.
-                yT = SmoothStep(Clamp01(t * 3 / 2));
-                xT = SmoothStep(Clamp01((t - Fix.FromMilli(300)) * 10 / 7));
+                // Height leads and the step across follows -- but the axis that actually
+                // TRAVELS gets the whole window, and the other one leads inside it.
+                //
+                // Fixed at "Y over the first two thirds, X over the last seven tenths" this
+                // was measured climbing out of the top hatch of the arena, where the step is
+                // 1.10 m sideways and 0.10 m of height: the body crept for ten frames at
+                // under 0.4 m/s, then slid 1.1 m at a peak of 4.71 m/s -- half again the run
+                // speed -- while the haul clip scrubbed at one flat rate over the whole
+                // thing. A stall and then a bolt, under an animation pacing neither.
+                bool across = Fix.Abs(s.ScriptTo.X - s.ScriptFrom.X) >=
+                              Fix.Abs(s.ScriptTo.Y - s.ScriptFrom.Y);
+
+                Fix wide = SmoothStep(t);                              // the whole window
+                Fix lead = SmoothStep(Clamp01(t * 10 / 7));            // in front of it
+
+                xT = across ? wide : SmoothStep(Clamp01((t - Fix.FromMilli(300)) * 10 / 7));
+                yT = across ? lead : wide;
             }
 
             s.Position = new FixVec2(

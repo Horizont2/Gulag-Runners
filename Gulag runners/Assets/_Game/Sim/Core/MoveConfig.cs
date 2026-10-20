@@ -167,6 +167,16 @@ namespace GulagRunners.Sim
         /// </summary>
         public int MantleMinFrames;
 
+        /// <summary>
+        /// How much higher a scripted move has to end before it counts as a climb UP.
+        ///
+        /// Below this it is a step, and the presentation plays a step rather than a haul:
+        /// a ladder standing flush with its platform ends the climb slightly ABOVE the
+        /// floor, so its climb-out descends, and a haul clip over a descent is a man
+        /// pulling himself up while he sinks.
+        /// </summary>
+        public Fix ScriptRiseMargin;
+
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
@@ -254,6 +264,7 @@ namespace GulagRunners.Sim
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
             c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
             c.MantleMinFrames = 26;                  // 0.43 s: long enough to read as a haul
+            c.ScriptRiseMargin = Fix.FromMilli(120);   // 12 cm: a step, not a storey
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 

@@ -141,8 +141,19 @@ check("and climbs back out onto floor 1", s.mode == "ground" and abs(F(s.y) - fl
       f"mode={s.mode} y={F(s.y):.2f}")
 check("not one tick of the climb is a jump", worst(ticks) <= JERK,
       f"worst {worst(ticks):.3f} m/tick")
-check("and the climb-out is the fastest thing on the whole route",
-      worst(ticks) > worst(t1 + t2), f"climb {worst(ticks):.3f} vs descent {worst(t1 + t2):.3f}")
+# This used to assert the climb-out was the FASTEST thing on the route, which encoded the
+# symptom rather than the intent. Traced on the top hatch it was: ten frames creeping under
+# 0.4 m/s, then 1.10 m slid at a peak of 4.71 m/s — half again the run speed — with the haul
+# clip scrubbing at one flat rate over both halves. A stall and then a bolt.
+RUN = M.C["RUN"] / 65536.0
+peak = worst(ticks) * 60
+check("the climb-out never outruns a sprint", peak <= RUN * 1.15,
+      f"peak {peak:.2f} m/s against a run of {RUN:.2f}")
+
+mantle = [(dx * dx + dy * dy) ** 0.5 for dx, dy, mode in ticks if mode == "mantle"]
+still = sum(1 for d in mantle if d * 60 < 0.5)
+check("and does not stall inside itself either", still <= 3,
+      f"{still} near-still tick(s) in the move")
 
 print("\n7. nothing flickers")
 s = settle(ladder_x(0), 0.9)

@@ -20,7 +20,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
          BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
-         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=26,
+         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=26, RISEMARGIN=M(120),
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
@@ -37,7 +37,7 @@ class S:
         s.coyote = s.buf = s.dodge = s.dodge_rec = s.fallthru = s.stepn = 0
         s.ladder_cd = 0
         s.hitstop = 0
-        s.script_t = 0; s.script_frames = 0; s.script_dir = 1
+        s.script_t = 0; s.script_frames = 0; s.script_dir = 1; s.script_rises = False
         s.script_from = (0,0); s.script_to = (0,0)
         s.script_from_depth = s.script_to_depth = 0
         s.script_forward = False
@@ -674,7 +674,14 @@ def step_scripted(s, w):
     if s.mode == "mount":
         xT = ss(t); yT = xT
     else:
-        yT = ss(t*3//2); xT = ss((t - M(300))*10//7)
+        # The axis that actually TRAVELS gets the whole window; the other leads inside it.
+        # Fixed at "Y over the first two thirds, X over the last seven tenths" the top
+        # hatch climb-out crept for ten frames under 0.4 m/s then slid 1.1 m at 4.71 m/s.
+        across = abs(s.script_to[0]-s.script_from[0]) >= abs(s.script_to[1]-s.script_from[1])
+        wide = ss(t)
+        lead = ss(t*10//7)
+        xT = wide if across else ss((t - M(300))*10//7)
+        yT = lead if across else wide
     s.x = s.script_from[0] + mul(s.script_to[0]-s.script_from[0], xT)
     s.y = s.script_from[1] + mul(s.script_to[1]-s.script_from[1], yT)
     # Depth rides with the height: the fighter leans back onto the next floor as they come up
@@ -760,6 +767,10 @@ def start_scripted(s, landing, side, to_depth=None):
     # short to read as one.
     frames = max(frames, C["MANTLE_MINF"])
     s.script_frames=frames; s.script_t=frames
+    # Does this climb-out actually go UP? A ladder whose head is flush with its platform
+    # leaves the body slightly ABOVE the floor it steps onto, so the move descends, and a
+    # haul clip over a descent is a man pulling himself up while he sinks.
+    s.script_rises = s.script_to[1] > s.script_from[1] + C["RISEMARGIN"]
     s.script_dir = 1 if side>=0 else -1
     s.mode="mantle"; s.ladder=-1
     s.vx=s.vy=0; s.facing = 1 if side>=0 else -1

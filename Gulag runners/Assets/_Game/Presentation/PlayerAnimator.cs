@@ -69,6 +69,14 @@ namespace GulagRunners.Game
         [Tooltip("Climbing down a ladder.")]    public string climbDownState = "Ladder Down";
         [Tooltip("Holding still on a ladder.")] public string climbIdleState = "Ladder Idle";
         [Tooltip("Climbing out at the top of a ladder.")] public string mantleState = "Ladder Out";
+
+        [Tooltip("Getting off a ladder onto a floor that is NOT above you.\n\n" +
+                 "A ladder whose head is flush with its platform leaves the body slightly " +
+                 "above the floor it steps onto, so that climb-out descends — measured at " +
+                 "9.8 cm down on this arena's top ladder — and the haul clip over it is a " +
+                 "man pulling himself up while he sinks. Leave empty to use the haul " +
+                 "anyway.")]
+        public string mantleStepState = "";
         [Tooltip("Reaching for a ladder from below, to climb up it.")]
         public string mountUpState = "Ladder Up Start";
         [Tooltip("Stepping backwards onto a ladder from above, to climb down it.")]
@@ -540,7 +548,9 @@ namespace GulagRunners.Game
                 case MoveMode.Mantling:
                     if (poseLadderByProgress) { scrub = ScriptProgress(in s); playback = 0f; }
                     else { playback = ladderActionPlayback; fade = ScriptedFade(in s); }
-                    return mantleState;
+                    return !s.ScriptRises && !string.IsNullOrEmpty(mantleStepState)
+                        ? mantleStepState
+                        : mantleState;
 
                 case MoveMode.Mounting:
                     if (poseLadderByProgress) { scrub = ScriptProgress(in s); playback = 0f; }
@@ -709,7 +719,14 @@ namespace GulagRunners.Game
             // interpolated between ticks; a pose that is not steps at 60 Hz beside it, and
             // a climb-out is TEN ticks long, so that is a tenth of the clip at a time
             // against a body moving smoothly. Which is the jerk, exactly.
-            float done = s.ScriptFrames - s.ScriptTimer + player.Alpha;
+            //
+            // And ONE TICK BEHIND the counter, because the body is too. The controller
+            // draws between the PREVIOUS tick's position and this one, so at alpha 0 it is
+            // showing where the body was a tick ago. Reading the counter straight put the
+            // pose a full tick in front of the body for the whole move -- measured at a
+            // constant 1/30 of the clip on this arena's top ladder, which is the hands
+            // arriving on the ledge before the body does.
+            float done = s.ScriptFrames - s.ScriptTimer - 1 + player.Alpha;
             return Mathf.Clamp01(done / s.ScriptFrames);
         }
 

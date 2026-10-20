@@ -120,6 +120,15 @@ namespace GulagRunners.Sim
         /// <summary>Frames left to continue the combo with another press.</summary>
         public int ComboTimer;
         /// <summary>This swing has already connected; one swing hits once.</summary>
+        /// <summary>
+        /// True when the scripted move ends HIGHER than it began, which is the only case
+        /// the haul-yourself-up clip describes. A ladder whose head is flush with its
+        /// platform leaves the body slightly above the floor it is stepping onto, and that
+        /// climb-out goes DOWN -- measured at 6.6 cm down on this arena's top ladder. The
+        /// haul clip played over it is a man pulling himself up while his body sinks.
+        /// </summary>
+        public bool ScriptRises;
+
         public bool SwingSpent;
 
         /// <summary>
