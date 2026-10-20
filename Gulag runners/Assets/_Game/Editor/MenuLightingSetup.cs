@@ -215,10 +215,12 @@ namespace GulagRunners.GameEditor
 
             var set = new Dictionary<string, float>
             {
-                // Finish fading in just SHORT of the far wall, so the room stays clear and
-                // everything past the gateway is veiled. It was 5 m against a 3.7 m room,
-                // which is why the fog never appeared where it was wanted.
-                { "nearFadeDistance", depth * 0.85f },
+                // Begin just BEHIND THE FIGHTER, not behind the far wall. 0.85 of the
+                // depth put the first haze past everything worth hazing: the shaft of
+                // moonlight through the ceiling slot was still crisp air by the time it
+                // reached the floor. Half the depth starts it a step past him, so he
+                // stays sharp and everything behind him recedes.
+                { "nearFadeDistance", depth * 0.5f },
                 { "maximumFogDistance", Mathf.Max(20f, depth * 10f) },
 
                 // One raymarch step was 105 m. The component clamps this at 2, so that is

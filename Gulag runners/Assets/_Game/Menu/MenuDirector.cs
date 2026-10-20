@@ -111,12 +111,37 @@ namespace GulagRunners.Game
             if (view != null) view.transform.position = _viewHome;
         }
 
+        /// <summary>
+        /// Which way "out" is.
+        ///
+        /// Toward the gate, when there is one -- NOT the way the camera happens to face.
+        /// In this menu the gate is BEHIND the camera: the shot looks down the cell at the
+        /// dressed back wall, and the way out is the arch at the other end. Walking along
+        /// the camera's forward vector there does not leave the cell, it drives five
+        /// metres into a wall four metres away.
+        ///
+        /// Flattened, and the camera does not turn. Reversing out under the arch while
+        /// still facing the room reads as being taken out of it, which is the right
+        /// feeling for a gulag and costs nothing to animate.
+        /// </summary>
+        Vector3 Leaving(Vector3 from)
+        {
+            if (gate != null)
+            {
+                Vector3 away = gate.position - from;
+                away.y = 0f;
+                if (away.sqrMagnitude > 0.0001f) return away.normalized;
+            }
+
+            return view != null ? view.transform.forward : Vector3.forward;
+        }
+
         IEnumerator Leave()
         {
             state = "opening";
 
             Vector3 from = view != null ? view.transform.position : Vector3.zero;
-            Vector3 forward = view != null ? view.transform.forward : Vector3.forward;
+            Vector3 forward = Leaving(from);
 
             AsyncOperation load = null;
             float longest = Mathf.Max(gateSeconds, walkStartsAt * gateSeconds + walkSeconds);

@@ -120,6 +120,41 @@ def check(path):
         if high is not None and v > high:
             print(f"      note - {key} is {v:g}; the component clamps it to {high:g}")
 
+    # The fog scatters ONE light: the directional in this field. There is no point-light
+    # input anywhere in the component, so an empty or disabled slot leaves the haze lit by
+    # ambientColor alone -- flat, and with no warning that it ever did anything else.
+    sun = re.search(r"^[ \t]*directionalLight: \{fileID: (-?\d+)\}", fog, re.M)
+    lit = None
+    if sun and sun.group(1) != "0":
+        for cls, body in docs:
+            if cls == 108 and field(body, "m_Type", "") == "1":
+                lit = body
+    if sun is None or sun.group(1) == "0":
+        problems += 1
+        print("      PROBLEM - the fog has no directional light assigned. It scatters that "
+              "one light and nothing else, so the haze will be flat ambient colour.")
+    elif lit is not None and field(lit, "m_Enabled", "1") != "1":
+        problems += 1
+        print("      PROBLEM - the fog's directional light is disabled, so the haze is "
+              "flat ambient colour.")
+
+    # And the camera has to be able to see as far as the fog claims to reach.
+    try:
+        reach = float(field(fog, "maximumFogDistance", "0"))
+        for cls, body in docs:
+            if cls != 20:
+                continue
+            far = float(field(body, "far clip plane", "1000"))
+            if far < reach:
+                problems += 1
+                print(f"      PROBLEM - the camera stops at {far:g} m and the fog claims "
+                      f"{reach:g} m. Everything past the far plane is unrendered, so the "
+                      "fog quietly ends early.")
+            else:
+                print(f"      camera far plane {far:g} m covers the fog's {reach:g} m")
+    except ValueError:
+        pass
+
     return problems, True
 
 
