@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 37703ab352f411b469fd0421bfc94e3c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 186894
+  packageName: 'Dreamscape Nature : Meadows : Stylized Open World Environment'
+  packageVersion: 2.3
+  assetPath: Assets/Polyart/PolyartStudio/SharedResources/Shaders/Deprecated/PolyartWorldAlignedTexture.asset
+  uploadId: 915226

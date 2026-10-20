@@ -36,8 +36,24 @@ namespace GulagRunners.Game
         [Tooltip("The SimWorldBaker in the scene.")]
         public SimWorldBaker worldBaker;
 
+        [Tooltip("The shared round state: which chests are open. Leave empty to use the one in " +
+                 "the scene. Without it this player simply cannot open anything.")]
+        public MatchState matchState;
+
+        [Tooltip("0 for player one, 1 for player two. A chest records which player is opening " +
+                 "it, so the two of them must not share an index.")]
+        public int playerIndex;
+
         [Tooltip("Transform that carries the mesh. Leave empty to move this object directly.")]
         public Transform visualRoot;
+
+        [Tooltip("Distance from the visual root's own origin DOWN to the model's soles, in " +
+                 "metres of the model's own scale.\n\n" +
+                 "0 for an imported character, which hangs from its root by the feet. Only a " +
+                 "model authored around its hips needs anything else, and the body gizmo " +
+                 "draws the model's measured top and bottom so the right number is readable " +
+                 "rather than guessed at.")]
+        public float modelSoleOffset;
 
         [Header("Tuning")]
         public MovementTuning tuning = new MovementTuning();
@@ -46,9 +62,41 @@ namespace GulagRunners.Game
         [Tooltip("The single gameplay plane. The arena is 3D; the fight is not (docs/02).")]
         public float planeZ;
 
+        [Tooltip("Take the plane's depth from wherever this object is placed in the scene, " +
+                 "instead of from the field above.\n\n" +
+                 "On a hand-built location the fighter belongs where the level artist put him, " +
+                 "and a configured depth silently teleports him somewhere else the moment you " +
+                 "press play. With this on, Plane Z is filled in from the scene and shows you " +
+                 "the depth you are actually on.")]
+        public bool depthFromScene = true;
+
+        [Tooltip("Follow a ladder's own depth while climbing it.\n\n" +
+                 "A ladder modelled in front of the platform it serves is climbed in front of " +
+                 "it too; staying on the plane would draw the body inside the floor it is " +
+                 "climbing past. 0 snaps.")]
+        public float depthSmoothTime = 0.12f;
+
         [Tooltip("Distance from this object's origin down to the feet, because the simulation " +
                  "tracks the feet. For the scaled capsule this is 0.9, half the body height.")]
         public float visualYOffset = 0.9f;
+
+        [Tooltip("Seconds to ease the drawn height onto a step the simulation has already " +
+                 "taken. 0 draws every step the instant it happens.\n\n" +
+                 "An AABB world has no slopes, so every ramp in the game is a staircase — the " +
+                 "plank in Arena_Demo is seven steps of 11 cm. Walked at running speed that is " +
+                 "a 11 cm jump ten times a second, and it reads as exactly what it is: a " +
+                 "character going up stairs that are not drawn. The simulation keeps its exact " +
+                 "heights, because collision and rollback depend on them; only the drawing is " +
+                 "eased, and at this length the steps blend into the straight line the plank " +
+                 "actually is.")]
+        [Range(0f, 0.3f)] public float stepSmoothTime = 0.07f;
+
+        [Tooltip("The largest height change this will ease, in metres. Anything bigger is drawn " +
+                 "at once.\n\n" +
+                 "A step is eased; a fall is not. Smoothing a two-metre drop would float the " +
+                 "character down after the simulation has already landed him, so this stays " +
+                 "just above the step-up height and no higher.")]
+        public float stepSmoothMax = 0.4f;
 
         [Tooltip("Squash the visual when crouching. Leave off for a rigged character — the " +
                  "crouch clip conveys it, and squashing a skeleton reads as a bug.")]
@@ -67,6 +115,52 @@ namespace GulagRunners.Game
         [Tooltip("Which way this player looks when the round starts. Set player two to -1 so the " +
                  "two of them face each other.")]
         public int spawnFacing = 1;
+
+        [Tooltip("Where this fighter starts. Empty means wherever this object happens to sit " +
+                 "when the scene loads.\n\n" +
+                 "Worth filling in, because those are not the same thing. The fighter's own " +
+                 "transform is written every frame of play, and whatever it was left at when " +
+                 "play stopped is the new spawn — so moving the fight to another floor means " +
+                 "dragging the character itself, and a stray drag in the scene view is a " +
+                 "silent change to where the round begins. A marker is a thing you can see, " +
+                 "snap to the floor, and leave alone.")]
+        public Transform spawnPoint;
+
+        [Tooltip("Turn to face the ladder while climbing instead of staying side-on. The climb " +
+                 "clips are authored with the character facing the rungs, so played side-on they " +
+                 "read as someone climbing sideways through thin air.")]
+        public bool faceLadderWhenClimbing = true;
+
+        [Tooltip("Lean the body along a ladder that leans.\n\n" +
+                 "A ladder propped against a wall is climbed at its own angle. Standing bolt " +
+                 "upright on one puts the character's legs through the rungs at one end and " +
+                 "leaves them in the air at the other, which is the whole of \"he climbs into " +
+                 "the texture\". The angle is measured from the ladder's own geometry at the " +
+                 "bake, so there is nothing to keep in step by hand: stand a ladder up and the " +
+                 "lean is zero.")]
+        public bool matchLadderTilt = true;
+
+        [Tooltip("How much of a leaning ladder's angle the body actually takes, 0 to 1. " +
+                 "1 lies the body exactly along the rungs; a little less keeps a climb up a " +
+                 "steep ladder from reading as a crawl.")]
+        [Range(0f, 1f)] public float ladderTiltAmount = 1f;
+
+        [Tooltip("Degrees turned back towards the camera while on a ladder. Square to the ladder " +
+                 "is a flat back and a dead silhouette; a few degrees of angle keeps the body " +
+                 "readable without losing the sense that the character is facing the rungs.")]
+        [Range(0f, 60f)] public float ladderViewAngle = 25f;
+
+        [Tooltip("Turn to the chest while prying at one, the way the climb turns to the rungs.\n\n" +
+                 "The simulation's facing is left or right and nothing else, so it can say " +
+                 "which SIDE of a chest you are on and never that you are facing it — and a " +
+                 "chest in this location sits a metre behind the lane the fight happens on. " +
+                 "Left to the simulation alone, a fighter forcing a crate stands side-on to it " +
+                 "working at thin air. This is the same answer the ladder already gets.")]
+        public bool faceChestWhenLooting = true;
+
+        [Tooltip("Degrees kept turned back towards the camera while working at a chest, so the " +
+                 "body still reads as a body rather than a back.")]
+        [Range(0f, 60f)] public float chestViewAngle = 30f;
 
         [Header("Safety")]
         [Tooltip("At spawn, seat the player on the first floor below instead of dropping them " +
@@ -89,12 +183,65 @@ namespace GulagRunners.Game
         /// <summary>Raised on the tick a fall ends, with the impact speed in m/s.</summary>
         public event Action<float> Landed;
 
+        /// <summary>Raised on the tick something is taken off the floor.</summary>
+        public event Action<ItemId> PickedUp;
+
+        /// <summary>Raised on the tick something is pushed out of a slot to make room.</summary>
+        public event Action<ItemId> Dropped;
+
+        /// <summary>Raised on the tick this player is hurt, with the damage that got through.</summary>
+        public event Action<int> Hurt;
+
+        /// <summary>
+        /// A hit the guard ate, with what got through it. Separate from Hurt because the two
+        /// have to look nothing alike: docs/02 wants the difference between taking a hit and
+        /// meeting one readable from across the arena, since it is the whole reason to hold
+        /// the guard up.
+        /// </summary>
+        public event Action<int> Blocked;
+
+        /// <summary>A hit turned on its owner. The loudest thing a defender can do.</summary>
+        public event Action Parried;
+
+        /// <summary>Raised on the tick this player dies.</summary>
+        public event Action Died;
+
+        /// <summary>
+        /// This fighter was put somewhere, rather than having walked there: the start of a
+        /// round, a rematch, or a fall past killY.
+        ///
+        /// It exists for the camera. Everything that follows a fighter is smoothed, and
+        /// smoothing a teleport is a pan — so a rematch would open by sweeping the camera from
+        /// where the loser fell back to their cage, across the whole arena, which is precisely
+        /// the shot docs/01 is built on not giving anybody.
+        /// </summary>
+        public event Action Teleported;
+
         /// <summary>Feet height of the last ground stood on. The camera anchors to this.</summary>
         public float GroundedY { get; private set; }
 
         public PlayerSimState State => _state;
+
+        /// <summary>
+        /// Full health for this round, from the match's combat tuning. Views need it to say
+        /// what a share of health is, and the number lives in one place for everyone.
+        /// </summary>
+        public int MaxHealth => matchState != null && matchState.Combat.MaxHealth > 0
+            ? matchState.Combat.MaxHealth
+            : 100;
         public MoveConfig Config => _config;
         public SimWorld World => _world;
+
+        /// <summary>
+        /// How far this frame is between the last simulated tick and the next, 0 to 1.
+        ///
+        /// Everything the body does is drawn through it, so anything else that follows the
+        /// body has to use it too. A pose driven by a tick COUNTER against a position drawn
+        /// through this one steps at 60 Hz while the body moves smoothly, and on a move
+        /// ten ticks long that is a tenth of the clip at a time — which is the jerk at the
+        /// top of a ladder.
+        /// </summary>
+        public float Alpha => _alpha;
         /// <summary>Simulated feet position in world units.</summary>
         public Vector2 FeetPosition => new Vector2(_state.Position.X.Raw / (float)Fix.RawOne,
                                                    _state.Position.Y.Raw / (float)Fix.RawOne);
@@ -106,6 +253,9 @@ namespace GulagRunners.Game
         PlayerSimState _previous;
 
         float _accumulator;
+        float _alpha = 1f;
+        float _tilt;
+        float _tiltRoll, _tiltLean;
         InputFlags _held;             // what is held right now
         InputFlags _pending;          // held, plus anything tapped since the last tick
         Vector3 _baseVisualScale = Vector3.one;
@@ -145,35 +295,132 @@ namespace GulagRunners.Game
             }
             _world = worldBaker != null ? (worldBaker.World ?? worldBaker.Bake()) : new SimWorld();
 
+            if (matchState == null) matchState = MatchState.Instance;
+
             if (visualRoot == null) visualRoot = transform;
             _baseVisualScale = visualRoot.localScale;
 
-            Vector3 p = transform.position;
-            _spawnPoint = new Vector2(p.x, p.y - visualYOffset);
+            // The model has to stand where the fighter stands. Render writes the simulated
+            // position — including which slice of the level the body is on — onto THIS
+            // object every frame, so an offset on the visual root underneath it is not a
+            // presentation choice: it is the model and the body coming apart. The fighter
+            // then collides where the simulation says and is DRAWN somewhere else, standing
+            // on nothing and swinging from somewhere he is not. In this scene one fighter's
+            // model was 2.92 m in front of his body and the other was 3.28 m to the side and
+            // 3.3 m in the air, which is every "he is standing on invisible geometry" report
+            // at once.
+            //
+            // visualYOffset is the one knob for this, and it is on the controller, where the
+            // simulation can see it.
+            //
+            // SIDEWAYS and in DEPTH, nothing: there is no honest reason for a model to stand
+            // beside the body that collides for it.
+            //
+            // VERTICALLY is the opposite case, and zeroing it was a bug of mine that cost
+            // this scene a fortnight of "the player hangs in the air". This object is drawn
+            // from its middle — visualYOffset is the distance down to the feet — while an
+            // imported character hangs from its root by the soles, so the model MUST sit
+            // visualYOffset below its parent or it floats by exactly that much. Both players
+            // had the right number keyed in by hand (-1.73 and -1.20 of local, under a 0.5
+            // scale) and Awake threw both away on every play, lifting one fighter 0.87 m and
+            // the other 0.59 m off his own feet. So it is computed here instead of asked for:
+            // two numbers that have to cancel are two numbers that eventually will not.
+            PlaceVisualRoot();
+
+            Vector3 p = SpawnFeet();
+            if (depthFromScene) planeZ = p.z;
+
+            // Now that the plane is known, and not before: the simulation needs it to bring a
+            // fighter back onto the plane after a fall, and with Depth From Scene on it is the
+            // object's own Z, which the config built at the top of Awake could not have seen.
+            ApplyTuning();
+            _depth = planeZ;
+            _spawnPoint = new Vector2(p.x, p.y);
             SpawnAt(_spawnPoint, spawnFacing);
         }
 
-        void SpawnAt(Vector2 feet, int facing)
+        /// <summary>
+        /// Puts the fighter down somewhere.
+        ///
+        /// <paramref name="keepLoadout"/> is the difference between a new round and a
+        /// rescue. A round deals fresh: no weapon, no armour, full health, which is docs/01's
+        /// symmetric start. Being fished out from under the world is not that — it is the
+        /// game apologising for a hole in the floor — and taking everything the player had
+        /// found as the price makes a bug into a punishment.
+        /// </summary>
+        void SpawnAt(Vector2 feet, int facing, bool keepLoadout = false)
         {
+            Inventory carried = _state.Inventory;
+            short health = _state.Health;
+
             FixVec2 position = new FixVec2(ToFix(feet.x), ToFix(feet.y));
 
+            // The slice comes first, because the seating below is only meaningful on one. The
+            // search used to run over every baked box: in a location whose backdrop stands a
+            // metre taller than the platform in front of it, that seated the fighter on the
+            // backdrop, a box their own lane cannot touch, and the match opened with them
+            // falling through the floor.
+            Fix depth = ToFix(planeZ);
+
             if (snapToGroundOnSpawn && _world != null &&
-                PlayerMotor.TryFindGroundBelow(position, _world, in _config,
+                PlayerMotor.TryFindGroundBelow(position, depth, _world, in _config,
                                                ToFix(snapSearchDistance), out Fix groundY))
             {
                 position.Y = groundY;
             }
 
             _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
+            _state.Depth = depth;
+
+            if (keepLoadout)
+            {
+                _state.Inventory = carried;
+                if (health > 0) _state.Health = health;
+            }
+
+            // Never start inside the level. One box marked solid that should not have been —
+            // the wall behind a location, say — lands across the floor, the fighter spawns in
+            // it, and because nothing pushes a body out of a box it already overlaps, they
+            // fall through the world instead. Loudly, with the offending box named, because
+            // the symptom on its own points nowhere.
+            if (_world != null &&
+                PlayerMotor.TryLiftClear(ref _state, _world, in _config, out Aabb stuckIn))
+            {
+                Debug.LogWarning(
+                    $"{name}: spawned inside a baked solid " +
+                    $"(x {stuckIn.MinX.ToMilli() / 1000f:0.00}..{stuckIn.MaxX.ToMilli() / 1000f:0.00}, " +
+                    $"y {stuckIn.MinY.ToMilli() / 1000f:0.00}..{stuckIn.MaxY.ToMilli() / 1000f:0.00}) " +
+                    $"and was lifted out to y {_state.Position.Y.ToMilli() / 1000f:0.00}. " +
+                    "Something in the scene is marked solid that should not be: check that box " +
+                    "against the gameplay plane, or mark it Ignore.\n" +
+                    (worldBaker != null ? worldBaker.LastReport : "no baker"), this);
+            }
+            else if (_world != null && _world.Solids.Length > 0 &&
+                     !PlayerMotor.TryFindGroundBelow(_state.Position, _state.Depth, _world,
+                                                     in _config,
+                                                     ToFix(snapSearchDistance), out _))
+            {
+                Debug.LogWarning(
+                    $"{name}: nothing to stand on within {snapSearchDistance} m of the spawn " +
+                    $"at ({_state.Position.X.ToMilli() / 1000f:0.00}, " +
+                    $"{_state.Position.Y.ToMilli() / 1000f:0.00}), so this fighter will fall.\n" +
+                    (worldBaker != null ? worldBaker.LastReport : "no baker"), this);
+            }
+
             _previous = _state;
             _accumulator = 0f;
+            _drawnYValid = false;                      // a spawn is not a step
 
             // Start already facing the right way: a spin on spawn looks like a glitch.
-            _yaw = TargetYaw(_state.Facing);
+            _yaw = TargetYaw(_state.Facing, FacingLadder(in _state));
             _yawVelocity = 0f;
             GroundedY = position.Y.Raw / (float)Fix.RawOne;
 
             Render(1f);
+
+            // Last, with the body already drawn where it now is, so anything that reacts by
+            // reading this transform reads the new place rather than the old one.
+            Teleported?.Invoke();
         }
 
         void Update()
@@ -225,10 +472,75 @@ namespace GulagRunners.Game
                 }
             }
 
+            // The match's own clock first, before anything in the arena moves. docs/01's
+            // shutters change collision, and a gate counted as shut after the bodies have
+            // stepped is a gate they walk through on the tick it closes. It also puts the
+            // input lock and the phase on the same tick. Only the tick owner's call does
+            // anything; everyone else's returns.
+            if (matchState != null) matchState.BeginTick(this, _world);
+
             bool wasAirborne = _state.Mode == MoveMode.Airborne;
             float fallSpeed = -_state.Velocity.Y.Raw / (float)Fix.RawOne;
 
-            PlayerMotor.Step(ref _state, input, _world, in _config);
+            // In the cage, nothing. The doors are still coming up, and a fighter who can walk
+            // through a closed door during the three seconds nobody is watching him is a
+            // fighter with a three second head start.
+            if (matchState != null && !matchState.Match.InputAllowed)
+            {
+                input = InputFlags.None;
+
+                // A clock that is not running locks the input forever and says nothing about
+                // it, which is indistinguishable from a game that is simply broken. So it
+                // says something: the lock is legitimate only while the clock is MOVING.
+                if (matchState.Match.Frame == _lockedAt) _lockedTicks++;
+                else { _lockedAt = matchState.Match.Frame; _lockedTicks = 0; }
+
+                if (_lockedTicks == StallTicks)
+                    Debug.LogError(
+                        $"{name}: input has been locked for {StallTicks / PlayerMotor.TicksPerSecond} s " +
+                        $"and the match clock has not moved off tick {_lockedAt} " +
+                        $"({matchState.Match.Phase}). Nobody can move until it does — check " +
+                        "the Fighters list on MatchState, and the Console above for why it " +
+                        "could not step.", this);
+            }
+            else
+            {
+                _lockedTicks = 0;
+            }
+
+            // The fight decides what the body is allowed to do before it moves: a swing is a
+            // commitment to where you are standing, and that is what makes reach matter.
+            InputFlags moveInput = input;
+            if (matchState != null)
+                moveInput = CombatMotor.Step(ref _state, input, matchState.Combat, in _config);
+
+            PlayerMotor.Step(ref _state, moveInput, _world, in _config);
+
+            // Fired from inside the tick, not sampled from State in a later frame: these last
+            // one tick each, and a frame that happens to run two ticks or none would double
+            // them or lose them.
+            if (_state.WasHit) Hurt?.Invoke(_state.DamageTaken);
+            if (_state.WasBlocked) Blocked?.Invoke(_state.DamageTaken);
+            if (_state.WasParried) Parried?.Invoke();
+            if (_state.JustDied) Died?.Invoke();
+
+            // Loot after movement: where the body ended up this tick decides which chest it is
+            // standing at. Movement never depends on the inventory, so the order is not a choice
+            // that can be got wrong later.
+            if (matchState != null)
+            {
+                // Loot in the air belongs to nobody, so it steps once for the whole match rather
+                // than once per player. Whoever asks first drives it, from inside this same loop.
+                matchState.AdvanceShared(this, _world);
+
+                LootMotor.Step(ref _state, playerIndex, input, _world, matchState.ChestStates,
+                               matchState.GroundItems, matchState.Config, matchState.Drops,
+                               in _config);
+
+                if (_state.OpenedChest >= 0) matchState.ReportOpened(playerIndex, _state.OpenedChest);
+                if (_state.PickedUp != ItemId.None) PickedUp?.Invoke(_state.PickedUp);
+                if (_state.Dropped != ItemId.None) Dropped?.Invoke(_state.Dropped);
+            }
 
             if (_state.Mode == MoveMode.Grounded)
             {
@@ -241,29 +553,44 @@ namespace GulagRunners.Game
 
             if (_state.Position.Y.Raw < ToFix(killY).Raw)
             {
-                Debug.LogWarning($"{name}: fell past killY, returning to the spawn point.", this);
-                SpawnAt(_spawnPoint, _state.Facing);
+                Debug.LogWarning($"{name}: fell past killY, returning to the spawn point " +
+                                 "with what they were carrying.", this);
+                SpawnAt(_spawnPoint, _state.Facing, keepLoadout: true);
             }
         }
 
+        /// <summary>Two seconds of a stalled clock. The cage phase is three.</summary>
+        const int StallTicks = 2 * PlayerMotor.TicksPerSecond;
+
+        int _lockedTicks;
+        int _lockedAt = -1;
+
+        float _depth;
+        float _depthVelocity;
+        float _drawnY;
+        float _drawnYVelocity;
+        bool _drawnYValid;
+
         void Render(float alpha)
         {
+            _alpha = alpha;
+
             Vector2 a = ToVector(_previous.Position);
             Vector2 b = ToVector(_state.Position);
             Vector2 p = Vector2.Lerp(a, b, alpha);
 
-            transform.position = new Vector3(p.x, p.y + visualYOffset, planeZ);
+            transform.position = new Vector3(p.x, DrawnY(p.y) + visualYOffset, Depth(alpha));
 
             // The visual root keeps whatever local offset it was authored with: a capsule sits
             // centred on this object, while a character model hangs from it by its feet.
             Transform v = visualRoot != null ? visualRoot : transform;
 
-            float target = TargetYaw(_state.Facing);
+            float target = TargetYaw(_state.Facing, FacingLadder(in _state));
             _yaw = turnSmoothTime <= 0.001f
                 ? target
                 : Mathf.SmoothDampAngle(_yaw, target, ref _yawVelocity, turnSmoothTime,
                                         Mathf.Infinity, Time.deltaTime);
-            v.localRotation = Quaternion.Euler(0f, _yaw, 0f);
+            v.localRotation = LadderTilt() * Quaternion.Euler(0f, _yaw, 0f);
 
             if (squashOnCrouch)
             {
@@ -274,6 +601,141 @@ namespace GulagRunners.Game
             }
         }
 
+        /// <summary>
+        /// The lean of the ladder being climbed, as a rotation to lay the body along it.
+        ///
+        /// Taken from the ladder's own baked lean line, so an upright ladder gives identity
+        /// and nothing changes. Rotating about world Z tips the model's up axis towards world
+        /// X, which is the plane the fight and the lean both live in; the body keeps facing
+        /// the rungs while it does it.
+        /// </summary>
+        Quaternion LadderTilt()
+        {
+            // Eased in and out on the same clock as the yaw, and for the same reason.
+            // It used to be switched: identity the frame a climb-out ended, and up to five
+            // and a half degrees of lean the frame before it. Five degrees is not much to
+            // look at and a great deal to have appear in one frame, on exactly the move
+            // that was reported as jerky -- stepping off the top of a ladder.
+            float want = matchLadderTilt && ladderTiltAmount > 0.001f &&
+                         FacingLadder(in _state) ? 1f : 0f;
+            _tilt = turnSmoothTime <= 0.001f
+                ? want
+                : Mathf.MoveTowards(_tilt, want, Time.deltaTime / turnSmoothTime);
+
+            // The angles are REMEMBERED, not looked up fresh each frame, because the
+            // fade has to outlive the ladder. A climb-out drops LadderIndex to -1 on its
+            // very first frame -- the move is no longer on the rungs -- so a tilt read
+            // from the ladder would have nothing to read and snap to upright exactly
+            // where the smoothing was wanted.
+            MeasureTilt();
+
+            if (_tilt <= 0.001f ||
+                (Mathf.Abs(_tiltRoll) < 0.001f && Mathf.Abs(_tiltLean) < 0.001f))
+                return Quaternion.identity;
+
+            float roll = _tiltRoll * ladderTiltAmount * _tilt;
+            float lean = _tiltLean * ladderTiltAmount * _tilt;
+
+            return Quaternion.AngleAxis(lean, Vector3.right) *
+                   Quaternion.AngleAxis(-roll, Vector3.forward);
+        }
+
+        /// <summary>The lean of the ladder being held, in degrees, kept until the next one.</summary>
+        void MeasureTilt()
+        {
+            int i = _state.LadderIndex;
+            if (_world == null || i < 0 || i >= _world.Ladders.Length ||
+                i >= _world.LadderLean.Length)
+                return;
+
+            Aabb box = _world.Ladders[i];
+            float height = (box.MaxY - box.MinY).Raw / (float)Fix.RawOne;
+            if (height <= 0.01f) return;
+
+            // BOTH leans. This used to read only the sideways one and tip about Z for it,
+            // which is self-consistent and silently useless here: every ladder in this arena
+            // leans AWAY FROM THE CAMERA and not one of them leans sideways, so the measured
+            // tilt was zero on all four and a body on a ladder propped at five degrees stood
+            // bolt upright through it.
+            Span sideways = _world.LadderLean[i];
+            float runX = (sideways.Max - sideways.Min).Raw / (float)Fix.RawOne;
+
+            float runZ = 0f;
+            if (i < _world.LadderLeanZ.Length)
+            {
+                Span back = _world.LadderLeanZ[i];
+                runZ = (back.Max - back.Min).Raw / (float)Fix.RawOne;
+            }
+
+            // Sideways tips about Z, which on this camera is a roll in the screen plane.
+            // Away tips about X, which lays the body back along the rungs — the one that
+            // makes a propped ladder read as propped.
+            _tiltRoll = Mathf.Atan2(runX, height) * Mathf.Rad2Deg;
+            _tiltLean = Mathf.Atan2(runZ, height) * Mathf.Rad2Deg;
+        }
+
+        /// <summary>
+        /// What height to draw at this frame.
+        ///
+        /// The simulation's own height, eased by a few hundredths of a second while the
+        /// fighter is on the ground. That is the whole fix for a ramp that is really a
+        /// staircase: the body steps up 11 cm ten times a second and the drawing follows it
+        /// as a line. Nothing here feeds back into the simulation — it keeps its exact
+        /// heights, because collision and rollback are decided on them.
+        ///
+        /// Only while grounded, and only for a step-sized change: a fall is drawn as it
+        /// happens, or the character would float down after already having landed.
+        /// </summary>
+        float DrawnY(float simY)
+        {
+            bool eased = _drawnYValid
+                         && stepSmoothTime > 0.001f
+                         && _state.Mode == MoveMode.Grounded
+                         && Mathf.Abs(simY - _drawnY) <= stepSmoothMax;
+
+            if (!eased)
+            {
+                _drawnY = simY;
+                _drawnYVelocity = 0f;
+                _drawnYValid = true;
+                return _drawnY;
+            }
+
+            _drawnY = Mathf.SmoothDamp(_drawnY, simY, ref _drawnYVelocity, stepSmoothTime,
+                                       Mathf.Infinity, Time.deltaTime);
+            return _drawnY;
+        }
+
+        /// <summary>
+        /// What depth to draw at this frame: the ladder's while climbing one, the plane's
+        /// otherwise, eased between the two so the step out of a climb is a step and not a cut.
+        /// </summary>
+        float Depth(float alpha)
+        {
+            // The simulation owns this now: which slice of the level a body is on decides
+            // which boxes are in its way, so it cannot be a presentation flourish. All that
+            // is left here is the same interpolation x and y get between ticks.
+            float a = _previous.Depth.ToMilli() / 1000f;
+            float b = _state.Depth.ToMilli() / 1000f;
+            float want = Mathf.Lerp(a, b, alpha);
+
+            // On a ladder, not even that. The rungs are in the SIMULATION's frame -- the IK
+            // reaches for the world positions the motor collides against -- so a body drawn
+            // a smoothing lag behind the motor is a body whose hands have to stretch to
+            // reach a ladder it is supposedly holding. The simulation already bounds how
+            // fast depth may change, so there is nothing here left to smooth.
+            if (depthSmoothTime <= 0.001f || _state.LadderIndex >= 0)
+            {
+                _depth = want;
+                _depthVelocity = 0f;
+                return _depth;
+            }
+
+            _depth = Mathf.SmoothDamp(_depth, want, ref _depthVelocity, depthSmoothTime,
+                                      Mathf.Infinity, Time.deltaTime);
+            return _depth;
+        }
+
         /// <summary>Teleports the simulation. Use this for spawning, not transform.position.</summary>
         public void Teleport(Vector2 feetPosition, int facing = 1)
         {
@@ -281,30 +743,269 @@ namespace GulagRunners.Game
             SpawnAt(feetPosition, facing);
         }
 
-        /// <summary>Re-reads the inspector tuning. Handy while tuning in play mode.</summary>
-        public void ApplyTuning() => _config = tuning.ToConfig();
+        /// <summary>
+        /// Re-reads the inspector tuning. Handy while tuning in play mode.
+        ///
+        /// Also the one place the config is built, so that re-reading it can never drop the
+        /// gameplay plane the simulation needs to bring a fighter back onto.
+        /// </summary>
+        public void ApplyTuning()
+        {
+            _config = tuning.ToConfig();
+            _config.HomeDepth = ToFix(planeZ);
+        }
 
         /// <summary>
-        /// Yaw that points the model along +X or -X, the only two directions that exist on the
-        /// gameplay plane. Rotating a +Z-facing model by 0 or 180 degrees — the obvious-looking
-        /// thing — turns it towards and away from the camera instead, which is no turn at all.
+        /// Replaces this player's whole simulation state.
+        ///
+        /// Only <see cref="MatchState"/> calls it, and only to write back the result of resolving
+        /// hits for the match. It exists because the players still own their own state while two
+        /// of them tick independently; the match ticker that rollback needs (docs/06) takes that
+        /// ownership away, and this method goes with it.
         /// </summary>
-        float TargetYaw(int facing)
+        public void OverwriteState(in PlayerSimState state) => _state = state;
+
+        /// <summary>Back on their feet at the spawn point, whole. One call is a new round.</summary>
+        public void Respawn() => SpawnAt(_spawnPoint, spawnFacing);
+
+        /// <summary>
+        /// Says why this fighter cannot stand, walk or climb where the scene puts them.
+        ///
+        /// Right-click the component header and pick it. In play mode it reports where the
+        /// fighter actually is; out of play mode it bakes the scene first and reports the
+        /// spawn the transform describes, which is the one that matters when a spawn has just
+        /// been moved to another floor.
+        ///
+        /// It exists because the three ways this goes wrong — standing inside a solid, standing
+        /// over a floor that is off the lane, and reaching for a ladder that baked as a wall —
+        /// look identical in the scene view and identical to each other in play.
+        /// </summary>
+        [ContextMenu("Explain this spawn")]
+        public void ExplainSpawn()
         {
-            float faceRight = modelForward switch
+            SimWorld world = _world;
+            MoveConfig config = _config;
+            Vector2 feet;
+            float depth;
+
+            if (Application.isPlaying && world != null)
             {
-                ModelForward.PlusZ => 90f,
-                ModelForward.MinusZ => -90f,
-                ModelForward.PlusX => 0f,
-                _ => 180f
-            };
-            return facing >= 0 ? faceRight : faceRight + 180f;
+                feet = new Vector2(_state.Position.X.ToMilli() / 1000f,
+                                   _state.Position.Y.ToMilli() / 1000f);
+                depth = _state.Depth.ToMilli() / 1000f;
+            }
+            else
+            {
+                if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
+                world = worldBaker != null ? (worldBaker.World ?? worldBaker.Bake()) : null;
+                config = tuning.ToConfig();
+
+                Vector3 p = SpawnFeet();
+                feet = new Vector2(p.x, p.y);
+                depth = depthFromScene ? p.z : planeZ;
+            }
+
+            Debug.Log(SpawnReport.Explain(name, world, in config, feet, depth,
+                                          snapSearchDistance) +
+                      (worldBaker != null ? "\n  BAKE\n    " + worldBaker.LastReport : ""),
+                      this);
+        }
+
+        /// <summary>
+        /// Yaw correction for a model that does not look along +Z. Everything else is expressed
+        /// as a world direction and then offset by this, so there is one place that knows which
+        /// way a given character faces.
+        /// </summary>
+        float ModelYawOffset => modelForward switch
+        {
+            ModelForward.PlusZ => 0f,
+            ModelForward.MinusZ => 180f,
+            ModelForward.PlusX => -90f,
+            _ => 90f
+        };
+
+        /// <summary>
+        /// Whether the character should be turned towards the rungs. The grab counts: starting the
+        /// turn with the reach means the character is already facing the ladder by the time it is
+        /// on it, instead of swinging round afterwards. The climb-out does not — it steps off
+        /// sideways, and that is the direction it should be looking.
+        /// </summary>
+        /// <summary>
+        /// Should the model be facing the rungs this frame.
+        ///
+        /// A climb-out counts when it goes FORWARD — onto the floor the ladder ends at, which
+        /// in this location is every ladder, since they all stand in front of the walkway they
+        /// serve. Dropping the ladder facing the moment the climb-out began turned the body
+        /// side-on while it was still on the rungs, and the whole move then read as a fighter
+        /// hauling himself out sideways onto a platform that is in fact straight ahead of him.
+        /// A hatch climb-out really is sideways, and that one still turns.
+        /// </summary>
+        static bool FacingLadder(in PlayerSimState s) =>
+            s.Mode == MoveMode.Climbing || s.Mode == MoveMode.Mounting ||
+            (s.Mode == MoveMode.Mantling && s.ScriptForward);
+
+        /// <summary>
+        /// Yaw that points the model where it should look.
+        ///
+        /// Walking, that is +X or -X — the only two directions that exist on the gameplay plane.
+        /// Rotating a +Z-facing model by 0 or 180 degrees, the obvious-looking thing, turns it
+        /// towards and away from the camera instead, which is no turn at all.
+        ///
+        /// Climbing, it is into the screen: the character turns its back to the camera and faces
+        /// the rungs, angled a little so the silhouette still reads as a body.
+        /// </summary>
+        float TargetYaw(int facing, bool climbing)
+        {
+            if (climbing && faceLadderWhenClimbing)
+            {
+                float side = facing >= 0 ? 1f : -1f;
+
+                // Towards the rungs, measured, the way the chest below is measured. It used
+                // to be a constant that assumed the ladder was straight ahead at +Z — true
+                // of an upright ladder on the plane and of nothing else, so a ladder that
+                // leans, or one the body reached from an angle, left the climb facing a few
+                // degrees off into the air.
+                if (LadderDirection(out Vector3 rungs))
+                {
+                    float toRungs = Mathf.Atan2(rungs.x, rungs.z) * Mathf.Rad2Deg;
+                    return ModelYawOffset + Mathf.LerpAngle(toRungs, toRungs + 90f * side,
+                                                            ladderViewAngle / 90f);
+                }
+
+                // No ladder to measure — a climb-out, or a frame between the two. 0 degrees
+                // of world yaw points along +Z, into the ladder and away from the camera.
+                return ModelYawOffset + ladderViewAngle * side;
+            }
+
+            // Working at a chest: towards the chest, which is a real direction in three
+            // dimensions and not one the simulation's left-or-right facing can name.
+            if (faceChestWhenLooting && _state.OpeningChest >= 0 &&
+                ChestDirection(_state.OpeningChest, out Vector3 towards))
+            {
+                float yaw = Mathf.Atan2(towards.x, towards.z) * Mathf.Rad2Deg;
+                float side = facing >= 0 ? 1f : -1f;
+
+                // Turned back a little, so the silhouette is still a body and not a back.
+                return ModelYawOffset + Mathf.LerpAngle(yaw, yaw + 90f * side,
+                                                        chestViewAngle / 90f);
+            }
+
+            float walkYaw = facing >= 0 ? 90f : -90f;    // +X or -X in world yaw
+            return ModelYawOffset + walkYaw;
+        }
+
+        /// <summary>
+        /// Which way the rungs lie from the body, at the height it is at. False when there
+        /// is no ladder, which is every frame that is not a climb.
+        /// </summary>
+        bool LadderDirection(out Vector3 towards)
+        {
+            towards = Vector3.forward;
+
+            int i = _state.LadderIndex;
+            if (_world == null || i < 0 || i >= _world.Ladders.Length) return false;
+
+            Fix y = _state.Position.Y;
+            float x = _world.LadderCentreAt(i, y).ToMilli() / 1000f;
+            float z = _world.LadderDepthAt(i, y, _state.Depth, Fix.Zero).ToMilli() / 1000f;
+
+            towards = new Vector3(x - _state.Position.X.ToMilli() / 1000f, 0f,
+                                  z - _state.Depth.ToMilli() / 1000f);
+
+            // Directly on the rung line: nothing to point at, and normalising a zero vector
+            // would hand back a yaw of zero as though that were measured.
+            return towards.sqrMagnitude > 0.0001f;
+        }
+
+        /// <summary>Which way the chest being opened lies, from the body. False if it is gone.</summary>
+        bool ChestDirection(int index, out Vector3 towards)
+        {
+            towards = Vector3.forward;
+
+            Chest[] sources = worldBaker != null ? worldBaker.ChestSources : null;
+            if (sources == null || index < 0 || index >= sources.Length) return false;
+            if (sources[index] == null) return false;
+
+            Vector3 at = sources[index].transform.position - transform.position;
+            at.y = 0f;
+            if (at.sqrMagnitude < 0.0001f) return false;
+
+            towards = at.normalized;
+            return true;
         }
 
         static Fix ToFix(float metres) => Fix.FromMilli(Mathf.RoundToInt(metres * 1000f));
 
         static Vector2 ToVector(FixVec2 v) =>
             new Vector2(v.X.Raw / (float)Fix.RawOne, v.Y.Raw / (float)Fix.RawOne);
+
+        /// <summary>
+        /// Hangs the model off this object so its soles land on the simulated feet.
+        ///
+        /// Three frames of reference meet on one transform and all three are easy to get
+        /// wrong by hand, which is why none of them is asked for twice:
+        ///
+        ///   * the SIMULATION tracks the feet, and writes them to this object's position
+        ///     plus <see cref="visualYOffset"/>, because what is drawn here — the greybox
+        ///     capsule — is drawn from its middle;
+        ///   * the MODEL hangs from the visual root by its soles, or by whatever
+        ///     <see cref="modelSoleOffset"/> says instead;
+        ///   * and the visual root's own LOCAL space is this object's, which is scaled: a
+        ///     fighter half the authored size needs twice the local offset for the same
+        ///     metre of world, and that factor is where a hand-keyed number goes wrong.
+        ///
+        /// So the offset is computed from the three and written in, and a number that was
+        /// already there and disagreed is reported rather than silently replaced — it is
+        /// usually the right answer to a question asked of the wrong scale.
+        /// </summary>
+        void PlaceVisualRoot()
+        {
+            if (visualRoot == null || visualRoot == transform) return;
+
+            // Into the parent's local space. A zero scale would divide by nothing, and is a
+            // mistake of its own kind; leave the model where it is and say so.
+            Vector3 scale = transform.localScale;
+            if (Mathf.Abs(scale.y) < 0.0001f)
+            {
+                Debug.LogWarning(
+                    $"{name}: this object's Y scale is {scale.y:0.###}, so the model cannot be " +
+                    "hung off it. Left where it was.", this);
+                return;
+            }
+
+            float want = (modelSoleOffset - visualYOffset) / scale.y;
+            Vector3 lp = visualRoot.localPosition;
+
+            if (Mathf.Abs(lp.x) > 0.001f || Mathf.Abs(lp.z) > 0.001f)
+                Debug.LogWarning(
+                    $"{name}: the model stands ({lp.x:0.00}, {lp.z:0.00}) to the side of the " +
+                    "body that collides for it, so the fighter would be drawn somewhere he is " +
+                    "not. Flattened. Move the fighter itself, not its mesh.", this);
+
+            if (Mathf.Abs(lp.y - want) > 0.01f)
+                Debug.Log(
+                    $"{name}: the model hung at {lp.y:0.00} of local and its soles belong at " +
+                    $"{want:0.00} — Visual Y Offset {visualYOffset:0.00} m over a scale of " +
+                    $"{scale.y:0.###}. Using {want:0.00}.", this);
+
+            visualRoot.localPosition = new Vector3(0f, want, 0f);
+        }
+
+        /// <summary>
+        /// Where the round begins, in FEET: the marker if there is one, this object otherwise.
+        ///
+        /// The offset is the whole reason this is one method rather than three copies. A
+        /// marker is dropped on the floor, so it already is the feet; this object is the
+        /// fighter, drawn from its middle, so its own position is a body's worth above them.
+        /// Getting that wrong puts the fighter a metre into the floor or a metre above it,
+        /// and the spawn-time ground snap then hides which.
+        /// </summary>
+        Vector3 SpawnFeet()
+        {
+            Vector3 p = spawnPoint != null ? spawnPoint.position : transform.position;
+            if (spawnPoint == null) p.y -= visualYOffset;
+            return p;
+        }
 
         void OnDrawGizmosSelected()
         {
@@ -313,7 +1014,7 @@ namespace GulagRunners.Game
             float h = Application.isPlaying && _state.Crouching ? tuning.crouchHeight : tuning.bodyHeight;
             Vector3 feet = Application.isPlaying
                 ? new Vector3(FeetPosition.x, FeetPosition.y, planeZ)
-                : new Vector3(transform.position.x, transform.position.y - visualYOffset, planeZ);
+                : new Vector3(SpawnFeet().x, SpawnFeet().y, planeZ);
 
             // The simulated body: this box, and nothing about the mesh, is what collides.
             Gizmos.color = new Color(1f, 0.4f, 0.2f, 0.9f);

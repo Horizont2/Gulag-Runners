@@ -140,8 +140,11 @@ namespace GulagRunners.GameEditor
 
             // The gap goes on the top floor, the only one with open sky above it: indoors the
             // ceiling clips a jump to about a metre, so a gap down there would be a wall.
-            if (floor == b.floors - 1 && b.buildTestFeatures && b.floorGapWidth > 0.05f)
-                holes.Add((-b.floorGapWidth * 0.5f, b.floorGapWidth * 0.5f));
+            if (floor == b.floors - 1 && b.buildTestFeatures)
+            {
+                float gap = GapWidth(b);
+                if (gap > 0.05f) holes.Add((-gap * 0.5f, gap * 0.5f));
+            }
 
             holes.Sort((p, q) => p.min.CompareTo(q.min));
 
@@ -168,17 +171,48 @@ namespace GulagRunners.GameEditor
         /// The four obstacles the movement has to be tested against. Each one exists to prove a
         /// specific rule from docs/02 rather than to look like anything.
         /// </summary>
+        /// <summary>
+        /// Body sizes to scale the obstacles against. Read from the player when there is one,
+        /// because an obstacle sized in metres stops working the moment the character changes
+        /// height, and it does so silently.
+        /// </summary>
+        static void PlayerSize(ArenaBuilder b, out float body, out float crouch)
+        {
+            body = 1.8f;
+            crouch = 1.1f;
+
+            PlayerController pc = b.playerToPlace != null
+                ? b.playerToPlace.GetComponent<PlayerController>()
+                : null;
+            if (pc == null) return;
+
+            body = Mathf.Max(0.2f, pc.tuning.bodyHeight);
+            crouch = Mathf.Min(pc.tuning.crouchHeight, body * 0.75f);
+        }
+
+        static float GapWidth(ArenaBuilder b)
+        {
+            if (!b.scaleFeaturesToPlayer) return b.floorGapWidth;
+            PlayerSize(b, out float body, out _);
+            return body * 0.8f;        // comfortably inside a running jump at any body size
+        }
+
         static void BuildTestFeatures(ArenaBuilder b, Transform root, float z)
         {
             float left = b.LeftEdge;
             float clear = b.floorHeight - b.slabThickness;
+            PlayerSize(b, out float body, out float crouch);
+
+            float stepHeight = b.scaleFeaturesToPlayer ? body * 0.17f : 0.3f;
+            float beamBottom = b.scaleFeaturesToPlayer ? (body + crouch) * 0.5f : 1.3f;
+            beamBottom = Mathf.Min(beamBottom, clear - 0.2f);
 
             // Ledge assist: a step low enough to be walked up without jumping.
-            Box(b, root, "Test_StepLedge", new Vector3(left + 9.6f, 0.15f, z),
-                new Vector3(1.6f, 0.3f, 1f), SimColliderKind.Solid);
+            Box(b, root, "Test_StepLedge", new Vector3(left + 9.6f, stepHeight * 0.5f, z),
+                new Vector3(1.6f, stepHeight, 1f), SimColliderKind.Solid);
 
-            // Crouch: a beam hanging low enough that you cannot pass standing.
-            float beamBottom = 1.3f;
+            // Crouch: a beam hanging between crouch height and standing height, so it blocks one
+            // and passes the other whatever size the character is.
             Box(b, root, "Test_LowBeam",
                 new Vector3(left + 12.6f, beamBottom + (clear - beamBottom) * 0.5f, z),
                 new Vector3(1.6f, clear - beamBottom, 1f), SimColliderKind.Solid);

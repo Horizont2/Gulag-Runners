@@ -1,5 +1,5 @@
 import sim_motor_mirror as T
-from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD
+from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, JMP, DOD
 
 # ---- the exact arena baked into SetupScene -------------------------------------
 floors, rooms = 3, 3
@@ -62,7 +62,7 @@ base = F(s.y); apex = base
 for i in range(120):
     step(s, JMP, W); apex = max(apex, F(s.y))
 ok &= check("apex below a floor", apex-base < floor_h, f"apex={apex-base:.3f} floor={floor_h}")
-ok &= check("apex is usable indoors", apex-base > 0.7, f"apex={apex-base:.3f} headroom={floor_h-slab-1.8:.2f}")
+ok &= check("apex is usable indoors", apex-base > 0.7, f"apex={apex-base:.3f}")
 
 print("\n4. ladder to the floor above")
 s = S(ladder_x, 0.0); run(s, 0, 10)
@@ -96,7 +96,8 @@ s = S(0, 0.0); run(s, 0, 10)
 x0 = F(s.x); stam0 = s.stam
 for _ in range(21): step(s, DOD | R, W)
 ok &= check("dodge travels", abs(F(s.x)-x0) > 1.5, f"d={F(s.x)-x0:.2f} m")
-ok &= check("dodge costs stamina", s.stam == stam0-1, f"stam={s.stam}")
+ok &= check("dodge costs stamina", s.stam == C["SMAX"] - C["DCOST"],
+      f"{C['SMAX']} -> {s.stam}, a dodge costs {C['DCOST']}")
 
 print("\n8. crouch under a lintel")
 wallx = left + 2*room_w
@@ -117,6 +118,77 @@ s = S(0,0.0); run(s,0,10)
 noises=set()
 for _ in range(120): step(s, R|DN, W); noises.add(s.noise)
 ok &= check("crouch-walking is silent", noises == {0}, f"levels={sorted(noises)}")
+
+print("\n11a. the jump is one height, not a thumb measurement")
+peaks = []
+for hold in (3, 8, 20, 200):
+    s2 = S(-3.0, 0.9)
+    for _ in range(120):
+        step(s2, 0, W)
+        if s2.mode == "ground": break
+    top = F(s2.y)
+    for t in range(90):
+        step(s2, JMP if t < hold else 0, W)
+        top = max(top, F(s2.y))
+    peaks.append(round(top, 3))
+check("every tap gives the same jump", len(set(peaks)) == 1, f"apex {peaks} m for 3/8/20/200 frames held")
+
+print("\n10c. a slope made of boxes is walked up, a wall is not")
+# An AABB world has no slopes, only stairs. A step over the free 0.30 m is hauled up at the
+# cost of the speed carried into it, which is what turns a stack of crates into a ramp —
+# and the haul has to find the HIGHEST reachable surface, or a stack stops the body at its
+# first step with the second one sitting on top of the landing.
+STAIRS = {"solid": [(X(-6.0), X(-1.0), X(6.0), X(0.0))] +
+                   [(X(-1.0 + i), X(-1.0), X(6.0), X(i * 0.5)) for i in range(1, 5)] +
+                   [(X(4.0), X(-1.0), X(5.0), X(3.5))],
+          "oneway": [], "ladder": []}
+
+
+def walk(st, inp, cond, limit=600):
+    for _ in range(limit):
+        step(st, inp, STAIRS)
+        if cond(st):
+            return True
+    return False
+
+
+s2 = S(-3.0, 0.2)
+walk(s2, 0, lambda st: st.mode == "ground", 120)
+base = F(s2.y)
+check("four 0.50 m steps are walked up with no jump at all",
+      walk(s2, R, lambda st: F(st.y) > 1.95), f"{base:.2f} -> {F(s2.y):.2f} m")
+check("and the 1.5 m wall at the top is still a wall",
+      not walk(s2, R, lambda st: F(st.y) > 2.1, 240), f"y {F(s2.y):.2f}")
+
+s2 = S(-3.0, 0.2)
+walk(s2, 0, lambda st: st.mode == "ground", 120)
+walk(s2, R, lambda st: F(st.y) > 0.4)
+check("the haul costs most of the speed it was walked at", F(s2.vx) < 1.5,
+      f"{F(s2.vx):.2f} m/s of {F(T.C['RUN']):.2f} on the step up")
+
+print("\n11b. the dodge is rare and short")
+s2 = S(-3.0, 0.9)
+for _ in range(120):
+    step(s2, 0, W)
+    if s2.mode == "ground": break
+# back to back: a dodge is 21 frames plus 9 of recovery, so 30 is as fast as it can be asked for
+dodges = 0
+for t in range(95):
+    was = s2.mode
+    step(s2, (DOD | R) if t % 30 == 0 else 0, W)
+    if s2.mode == "dodge" and was != "dodge": dodges += 1
+check("the pool pays for two in a row and then makes you wait", dodges == 2,
+      f"{dodges} dodges in 1.6 s, stamina {s2.stam}/{C['SMAX']}")
+
+s2 = S(-3.0, 0.9)
+for _ in range(120):
+    step(s2, 0, W)
+    if s2.mode == "ground": break
+start = F(s2.x)
+for _ in range(23):
+    step(s2, DOD, W)
+travel = abs(F(s2.x) - start)
+check("and it is a step out of reach, not a teleport", 1.4 < travel < 2.0, f"{travel:.2f} m")
 
 print("\n11. facing")
 s = S(0, 0.0); run(s, 0, 10)

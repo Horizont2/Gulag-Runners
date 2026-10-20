@@ -26,6 +26,13 @@ namespace GulagRunners.Game
 
         public InputFlags Read()
         {
+            // One source may take the fighter over -- a bot, a replay. Merging it with a
+            // keyboard would give a fighter two drivers, and the symptom of that is a
+            // character who will not stop walking because something is always pressing.
+            for (int i = 0; i < _sources.Count; i++)
+                if (_sources[i] is IInputTakeover takeover && takeover.TakingOver)
+                    return _sources[i].Read();
+
             InputFlags flags = InputFlags.None;
             for (int i = 0; i < _sources.Count; i++) flags |= _sources[i].Read();
             return flags;

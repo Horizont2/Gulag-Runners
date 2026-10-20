@@ -32,6 +32,11 @@ namespace GulagRunners.Game
         [Tooltip("Apex = jumpSpeed^2 / (2*gravity). Keep it BELOW the 2.5 m floor height: " +
                  "if a jump cleared a floor, ladders would be pointless (docs/05).")]
         public float jumpSpeed = 9.5f;
+
+        [Tooltip("Let go early and the jump is cut short. OFF by default: a jump whose height " +
+                 "depends on how long a thumb stayed on glass is a jump nobody can aim, and " +
+                 "every ledge then needs a different tap.")]
+        public bool variableJumpHeight;
         [Range(0f, 1f)] public float jumpCutMultiplier = 0.45f;
         public int coyoteFrames = 6;
         public int jumpBufferFrames = 7;
@@ -39,30 +44,106 @@ namespace GulagRunners.Game
         [Header("Ladders")]
         public float climbUpSpeed = 2.0f;
         public float climbDownSpeed = 2.6f;
-        [Tooltip("How fast you edge sideways off a ladder onto a landing.")]
-        public float ladderDismountSpeed = 1.5f;
+        [Tooltip("How fast the body is pulled back to a ladder's centre line after drifting off " +
+                 "it. The grab eases on by itself, so this only has a sideways nudge to undo: at " +
+                 "climbing speed it is invisible, and at four times that it is a yank.")]
+        public float ladderSnapSpeed = 2f;
+
+        [Tooltip("Clearance kept below the top of a ladder. Climbing past the top is what made " +
+                 "the character pop off the ladder and fall straight back onto it.")]
+        public float ladderTopMargin = 0.06f;
+
+        [Tooltip("How far to either side the climb-out looks for floor to step onto.\n\n" +
+                 "It is the whole way off a ladder sideways now, at the top of one or halfway " +
+                 "up it: hold a direction with no up or down and the fighter climbs out onto " +
+                 "whatever floor is within this of them on that side, or stays on the rungs " +
+                 "when there is none. Nothing edges the body off the ladder any more — that " +
+                 "walked a fighter out over the hatch they had just come up through.")]
+        public float mantleReach = 1.6f;
+
+        [Tooltip("Average speed of the two scripted ladder moves: the grab at the bottom and the " +
+                 "climb-out at the top. Each lasts as long as its own distance at this speed, so " +
+                 "neither can be a snap. Raise it for brisker ladders, lower it for heavier ones.")]
+        public float scriptSpeed = 2.4f;
+        [Tooltip("Shortest and longest a scripted ladder move may take, in frames.")]
+        public int scriptMinFrames = 10;
+        public int scriptMaxFrames = 30;
+
+        [Tooltip("Frames after letting go of a ladder during which it cannot be grabbed again. " +
+                 "Without it, jumping off while still holding up re-grabs the ladder at once.")]
+        public int ladderRegrabFrames = 12;
 
         [Header("Dodge")]
-        public float dodgeSpeed = 7f;
-        [Tooltip("0.35 s of invulnerability, from docs/02.")]
+        [Tooltip("Travel is speed x duration: 4.8 m/s over 0.35 s is 1.68 m — about two body " +
+                 "widths, which is a step out of reach rather than a teleport across the room.")]
+        public float dodgeSpeed = 4.8f;
+        [Tooltip("0.35 s of invulnerability, from docs/02. This is the window, not the distance.")]
         public int dodgeFrames = 21;
         public int dodgeRecoverFrames = 9;
+        [Tooltip("Charges one dodge costs. Raising this against the pool below is what makes " +
+                 "dodges rare: three of six means two in a row and no more.")]
+        public int dodgeStaminaCost = 3;
 
         [Header("Stamina")]
-        public int staminaMax = 3;
-        [Tooltip("1.2 s per charge, from docs/02.")]
-        public int staminaRecoverFrames = 72;
+        [Tooltip("A pool of small charges, not a count of dodges: docs/02 spends stamina on the " +
+                 "dodge AND on holding a guard, and those two cannot share a resource unless one " +
+                 "of them can cost more.")]
+        public int staminaMax = 6;
+        [Tooltip("Seconds per charge. At 0.55 s a spent dodge is back in 1.65 s.")]
+        public int staminaRecoverFrames = 33;
 
         [Header("Body")]
         [Tooltip("Collision width. Match it to the character's silhouette, not to its T-pose " +
                  "bounds: those span both outstretched arms and are useless as a body width.")]
         public float bodyWidth = 0.45f;
         public float bodyHeight = 1.8f;
+        [Tooltip("Height while crouching. Clamped to 75% of the body height on conversion: a " +
+                 "crouch taller than the character makes the hitbox GROW when you duck, which " +
+                 "inverts every ceiling check that depends on it.")]
         public float crouchHeight = 1.1f;
+
+        [Header("Depth (docs/02: the arena is 3D, the fight is not)")]
+        [Tooltip("How much of the level's DEPTH the body occupies, in metres. Never moved " +
+                 "through — it only decides which slice of the location the body is on, and " +
+                 "therefore which boxes are in its way.")]
+        public float bodyDepth = 0.6f;
+
+        [Tooltip("How fast the body slides between slices, in m/s. 0 snaps, which reads as a " +
+                 "teleport sideways whenever a ramp starts at another depth.")]
+        public float depthSnapSpeed = 4f;
+
+        [Tooltip("How far ahead to look for the next thing worth standing on, in metres. The " +
+                 "body walks onto the slice of whatever it is about to climb, which is what " +
+                 "lets one floor hold a ramp at one depth and a crate stair at another.")]
+        public float laneLookahead = 1.2f;
+
+        [Tooltip("The furthest the body will shift in depth to meet something, in metres. " +
+                 "Without a limit a fighter is pulled onto the slice of anything they could " +
+                 "step on — the wall at the back included — and walks out of the fight.")]
+        public float laneReach = 2f;
+
+        [Tooltip("How far the body's centre sits in front of a ladder's near face while " +
+                 "climbing, in metres.\n\n" +
+                 "Half the thickness of the CHARACTER MODEL, and nothing else — the ladder's " +
+                 "own thickness is read off the ladder. Do not reach for Body Depth here: " +
+                 "that is a lane width (how deep a slice of the level the body occupies), " +
+                 "and using half of it left this fighter hanging 33 cm off the rungs. If the " +
+                 "model is thicker, raise this; if it clips into the ladder, lower it.")]
+        [Range(0f, 0.6f)] public float ladderStandOff = 0.08f;
 
         [Header("Ledge assist")]
         [Tooltip("Steps this low are climbed instead of blocking you.")]
         public float stepUpHeight = 0.3f;
+
+        [Tooltip("The tallest ledge a standing fighter hauls themselves onto without jumping. " +
+                 "Anything above Step Up Height costs most of the speed they were carrying, so " +
+                 "a slope built out of boxes — the only kind an AABB world has — is walked up " +
+                 "at a crawl instead of hopped up one box at a time, and a kerb is still a " +
+                 "kerb. 0 leaves only the free step.")]
+        public float clamberHeight = 0.55f;
+
+        [Tooltip("Share of the speed kept after hauling up. The cost that makes it read.")]
+        [Range(0f, 1f)] public float clamberSpeed = 0.4f;
         [Tooltip("A rising jump clipping a corner by less than this is nudged through.")]
         public float cornerCorrect = 0.25f;
         public int fallThroughFrames = 18;
@@ -86,21 +167,36 @@ namespace GulagRunners.Game
             c.Gravity = M(gravity);
             c.MaxFallSpeed = M(maxFallSpeed);
             c.JumpSpeed = M(jumpSpeed);
+            c.VariableJumpHeight = variableJumpHeight;
             c.JumpCutMul = M(jumpCutMultiplier);
             c.CoyoteFrames = coyoteFrames;
             c.JumpBufferFrames = jumpBufferFrames;
             c.ClimbUpSpeed = M(climbUpSpeed);
             c.ClimbDownSpeed = M(climbDownSpeed);
-            c.LadderDismountSpeed = M(ladderDismountSpeed);
+            c.LadderSnapSpeed = M(ladderSnapSpeed);
+            c.LadderTopMargin = M(ladderTopMargin);
+            c.MantleReach = M(mantleReach);
+            c.ScriptSpeed = M(scriptSpeed);
+            c.ScriptMinFrames = scriptMinFrames;
+            c.ScriptMaxFrames = Mathf.Max(scriptMinFrames, scriptMaxFrames);
+            c.LadderRegrabFrames = ladderRegrabFrames;
             c.DodgeSpeed = M(dodgeSpeed);
             c.DodgeFrames = dodgeFrames;
             c.DodgeRecoverFrames = dodgeRecoverFrames;
+            c.DodgeStaminaCost = Mathf.Max(1, dodgeStaminaCost);
             c.StaminaMax = staminaMax;
             c.StaminaRecoverFrames = staminaRecoverFrames;
             c.BodyWidth = M(bodyWidth);
             c.BodyHeight = M(bodyHeight);
-            c.CrouchHeight = M(crouchHeight);
+            c.CrouchHeight = M(Mathf.Min(crouchHeight, bodyHeight * 0.75f));
+            c.BodyDepth = M(bodyDepth);
+            c.DepthSnapSpeed = M(depthSnapSpeed);
+            c.LaneLookahead = M(laneLookahead);
+            c.LaneReach = M(laneReach);
+            c.LadderStandOff = M(ladderStandOff);
             c.StepUpHeight = M(stepUpHeight);
+            c.ClamberHeight = M(clamberHeight);
+            c.ClamberSpeedPermille = Mathf.RoundToInt(Mathf.Clamp01(clamberSpeed) * 1000f);
             c.CornerCorrect = M(cornerCorrect);
             c.FallThroughFrames = fallThroughFrames;
             c.LoudSpeed = M(loudSpeed);

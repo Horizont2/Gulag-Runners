@@ -1,0 +1,114 @@
+using UnityEngine;
+using GulagRunners.Sim;
+
+namespace GulagRunners.Game
+{
+    /// <summary>
+    /// Binds the loot pool in <see cref="MatchState"/> to the views in the scene.
+    ///
+    /// One view per pool slot, fixed for the whole match. An item keeps the same object from the
+    /// moment it leaves a chest to the moment somebody takes it, which is the only way the arc
+    /// reads as one thing moving rather than a model appearing somewhere new each frame.
+    ///
+    /// Nothing is created here. If the pool is larger than the number of views, the extra slots
+    /// are invisible but still pickable, and this says so once rather than letting a player walk
+    /// through loot they cannot see.
+    /// </summary>
+    [DefaultExecutionOrder(120)]      // after the players have ticked
+    [DisallowMultipleComponent]
+    public sealed class LootView : MonoBehaviour
+    {
+        [Header("Wiring")]
+        [Tooltip("Leave empty to use the MatchState in the scene.")]
+        public MatchState matchState;
+
+        [Tooltip("One per slot of the loot pool, in order. Match this count to Ground Item " +
+                 "Capacity on MatchState.\n\n" +
+                 "Optional: left empty it is filled from the children at load, in hierarchy " +
+                 "order, and a scene with no views in it is a scene with no loot drawn — the " +
+                 "movement sandbox of docs/11, say, where the pool still works and nothing " +
+                 "needs to be seen.")]
+        public GroundItemView[] views;
+
+        [Tooltip("Take the plane from the fighters rather than from the number below.\n\n" +
+                 "On, and it cannot go stale. This was a hand-typed zero while the fighters " +
+                 "stood at -2.51, so every item a chest coughed up was drawn two and a half " +
+                 "metres behind the person who could pick it up — and picking it up still " +
+                 "worked, because the simulation is flat, which is exactly the kind of wrong " +
+                 "that survives a playtest.")]
+        public bool planeFromFighters = true;
+
+        [Tooltip("Z of the gameplay plane the loot sits on, when it is not taken from them.")]
+        public float planeZ;
+
+        bool _warned;
+
+        void Awake()
+        {
+            if (matchState == null) matchState = MatchState.Instance;
+            CollectViews(false);
+        }
+
+        /// <summary>
+        /// Fills the list from the children, in hierarchy order, when it has not been filled by
+        /// hand. The views are prefab instances, and a scene cannot hold a direct reference into
+        /// one without a stripped component entry — so this resolves it the same way every other
+        /// component here resolves its wiring, and the inspector button writes it down properly.
+        /// </summary>
+        public int CollectViews(bool force)
+        {
+            if (!force && views != null && views.Length > 0) return views.Length;
+            views = GetComponentsInChildren<GroundItemView>(true);
+            return views.Length;
+        }
+
+        void LateUpdate()
+        {
+            if (matchState == null) matchState = MatchState.Instance;
+            if (matchState == null || views == null) return;
+
+            GroundItem[] items = matchState.GroundItems;
+
+            if (planeFromFighters)
+                for (int p = 0; p < matchState.fighters.Count; p++)
+                    if (matchState.fighters[p] != null)
+                    {
+                        planeZ = matchState.fighters[p].planeZ;
+                        break;
+                    }
+
+            if (items.Length > views.Length && !_warned)
+            {
+                _warned = true;
+                Debug.LogWarning($"{name}: the loot pool holds {items.Length} items but there are " +
+                                 $"only {views.Length} views, so loot in the slots past {views.Length} " +
+                                 "will be invisible and still pickable. Add views, or lower " +
+                                 "Ground Item Capacity on MatchState.", this);
+            }
+
+            // Which item, if any, the action button would swap for. docs/03 wants a
+            // contextual button that says what it would do BEFORE it is pressed, and there is
+            // no interface to say it in — so the item says it, by lifting out of the bob.
+            // Walking over something with a free slot just takes it, so the only case worth
+            // marking is the one that costs you what you are holding.
+            for (int p = 0; p < matchState.fighters.Count; p++)
+            {
+                PlayerController fighter = matchState.fighters[p];
+                if (fighter == null) continue;
+                int over = fighter.State.StandingOn;
+                if (over >= 0 && over < views.Length && views[over] != null)
+                    views[over].Offer(true);
+            }
+
+            for (int i = 0; i < views.Length; i++)
+            {
+                GroundItemView view = views[i];
+                if (view == null) continue;
+
+                if (i < items.Length && items[i].Live) view.Show(in items[i], planeZ, i);
+                else if (view.Visible) view.PlayTaken();      // it was there a frame ago
+                else view.Hide();
+            }
+        }
+    }
+}

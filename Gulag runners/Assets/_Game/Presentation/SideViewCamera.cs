@@ -39,8 +39,23 @@ namespace GulagRunners.Game
         public bool autoFindPlayer;
 
         [Header("Framing")]
-        [Tooltip("Height of the visible world in metres. A 1.8 m fighter at 10 m fills 18% of " +
-                 "screen height, the readable minimum from docs/02.")]
+        [Tooltip("How much of the view's height the fighter fills. docs/02 asks for 17-20% on a " +
+                 "6\" phone; below that nothing reads.\n\n" +
+                 "This is the number to tune, not a height in metres. A view measured in metres " +
+                 "is only right for one character size, and this project has already changed " +
+                 "character twice: at 10 m it framed the old 1.8 m fighter at 18% and the one " +
+                 "actually in the scene, 0.91 m, at 9% — half the readable minimum.")]
+        [Range(0.08f, 0.5f)] public float bodyScreenFraction = 0.18f;
+
+        [Tooltip("Body height to frame against. Leave at 0 to take it from the player's own " +
+                 "tuning, which is what keeps the framing right when the character is rescaled.")]
+        public float framingBodyHeight;
+
+        [Tooltip("Ignore the fraction above and use Visible World Height as an absolute number. " +
+                 "Only for framing something that is not a fighter.")]
+        public bool manualFraming;
+
+        [Tooltip("Height of the visible world in metres. Used only with Manual Framing.")]
         [Range(4f, 30f)] public float visibleWorldHeight = 10f;
 
         [Tooltip("Narrow FOV keeps fighters from deforming at the edges of frame.")]
@@ -53,6 +68,11 @@ namespace GulagRunners.Game
         [Tooltip("Z of the gameplay plane the camera focuses on.")]
         public float planeZ;
 
+        [Tooltip("Take the plane's depth from the fighter this camera follows.\n\n" +
+                 "The camera and the fighter have to agree on which slice of the level the " +
+                 "fight is on, and keeping that in two fields is how they stop agreeing.")]
+        public bool depthFromPlayer = true;
+
         [Tooltip("Scale the framing by the viewport's height, so Visible World Height always " +
                  "means the full-screen framing of the real game.\n\n" +
                  "Without this a half-height split-screen view shows TWICE the width: 35.6 m " +
@@ -62,9 +82,11 @@ namespace GulagRunners.Game
                  "same 17.8 m span and the same 18%.")]
         public bool scaleFramingToViewport = true;
 
-        [Tooltip("Metres above the feet that the camera aims at. Roughly chest height, so there " +
-                 "is more headroom than floor in frame.")]
-        public float aimHeight = 1.1f;
+        [Tooltip("Where the camera aims, in body heights above the feet. 0.6 is roughly chest " +
+                 "height, which leaves more headroom than floor in frame. In body heights rather " +
+                 "than metres for the same reason the framing is: a fixed 1.1 m aimed at the " +
+                 "chest of the old character and over the head of this one.")]
+        [Range(0f, 1.5f)] public float aimHeightBodies = 0.6f;
 
         [Header("Dead zone (fraction of the view)")]
         [Tooltip("Half-width of the box the player moves in without the camera reacting.")]
@@ -88,9 +110,10 @@ namespace GulagRunners.Game
         public float climbSmoothTime = 0.10f;
 
         [Header("Look-ahead")]
-        [Tooltip("Metres the camera leads in the direction of travel, so there is more room " +
-                 "ahead than behind.")]
-        public float lookAhead = 2.0f;
+        [Tooltip("How far the camera leads in the direction of travel, as a fraction of the " +
+                 "view height, so there is more room ahead than behind. A fraction rather than " +
+                 "metres so that re-framing the view does not quietly re-tune the follow.")]
+        public float lookAheadFraction = 0.20f;
 
         [Tooltip("Seconds for the lead to swing across after a direction change. Long on " +
                  "purpose: a lead that snaps makes the camera lurch every time the player taps " +
@@ -104,13 +127,14 @@ namespace GulagRunners.Game
         [Tooltip("Hold the camera on the floor last stood on instead of following jump arcs.")]
         public bool anchorToGround = true;
 
-        [Tooltip("While airborne, rising this far above the anchor pulls the camera up anyway, " +
-                 "so a jump to a high ledge is never blind.")]
-        public float airRiseSlack = 2.2f;
+        [Tooltip("While airborne, rising this far above the anchor — as a fraction of the view " +
+                 "height — pulls the camera up anyway, so a jump to a high ledge is never blind.")]
+        public float airRiseSlackFraction = 0.22f;
 
-        [Tooltip("Falling this far below the anchor pulls the camera down. A fall the player " +
-                 "cannot see is the one unforgivable camera failure.")]
-        public float airFallSlack = 1.6f;
+        [Tooltip("Falling this far below the anchor, as a fraction of the view height, pulls " +
+                 "the camera down. A fall the player cannot see is the one unforgivable camera " +
+                 "failure.")]
+        public float airFallSlackFraction = 0.16f;
 
         [Tooltip("Descending faster than this, the camera stops trailing behind the anchor and " +
                  "tracks the player directly.\n\n" +
@@ -123,9 +147,10 @@ namespace GulagRunners.Game
                  "be the thing that moves the camera.")]
         public float fallSmoothTime = 0.07f;
 
-        [Tooltip("Metres the camera leads BELOW the player at terminal velocity, so the ground " +
-                 "comes into frame before the landing rather than after it.")]
-        public float fallLookAhead = 1.4f;
+        [Tooltip("How far the camera leads BELOW the player at terminal velocity, as a fraction " +
+                 "of the view height, so the ground comes into frame before the landing rather " +
+                 "than after it.")]
+        public float fallLookAheadFraction = 0.14f;
 
         [Header("Two-target framing")]
         [Tooltip("Extra metres kept around both fighters when framing them together.")]
@@ -146,6 +171,32 @@ namespace GulagRunners.Game
         [Header("Shake")]
         [Tooltip("Trauma from a hard landing, scaled by impact speed. 0 disables landing shake.")]
         [Range(0f, 1f)] public float landingTrauma = 0.25f;
+
+        [Tooltip("Trauma when THIS fighter is hit, at full health's worth of damage. Scaled by " +
+                 "how big the hit was, so a dagger is a knock and a warhammer is an event.\n\n" +
+                 "The camera is half of what makes a blow land. Hit stop stops the bodies; " +
+                 "this moves the room around them, and the two together are the difference " +
+                 "between watching a hit and taking one.")]
+        [Range(0f, 1f)] public float hitTrauma = 0.55f;
+
+        [Tooltip("Trauma when this fighter LANDS a hit. Smaller than taking one, and never " +
+                 "zero: a swing that connects into a camera that does not move reads as a " +
+                 "swing through air.")]
+        [Range(0f, 1f)] public float landedTrauma = 0.22f;
+
+        [Tooltip("Trauma when the guard eats a hit. Small — a block is supposed to feel like " +
+                 "less than being hit.")]
+        [Range(0f, 1f)] public float blockTrauma = 0.15f;
+
+        [Tooltip("Trauma on a parry. The biggest in the list: docs/02 makes the parry the " +
+                 "skill ceiling, and it is the one moment the game should feel like it " +
+                 "stopped to look.")]
+        [Range(0f, 1f)] public float parryTrauma = 0.8f;
+
+        [Tooltip("Optional. The other fighter, so that landing a hit shakes this camera too. " +
+                 "Left empty it is taken from the match's fighter list, and failing that only " +
+                 "hits TAKEN shake the camera, which is half the feeling.")]
+        public PlayerController opponent;
         [Tooltip("Metres of offset at full trauma.")]
         public float shakeAmplitude = 0.25f;
         [Tooltip("Degrees of roll at full trauma.")]
@@ -155,9 +206,18 @@ namespace GulagRunners.Game
         public float traumaDecay = 1.8f;
 
         [Header("Split screen (local testing only)")]
-        [Tooltip("Apply the rect below on Awake. On a device each player owns the whole screen.")]
+        [Tooltip("Apply the rect below. On a device each player owns the whole screen.")]
         public bool applyViewportRect;
         public Rect viewportRect = new Rect(0f, 0f, 1f, 1f);
+
+        [Tooltip("Shrink the viewport to this aspect ratio, centred, letterboxing the rest.\n\n" +
+                 "This is what makes a split-screen test honest. Half of a 16:9 window is 32:9, " +
+                 "an aspect no phone has: at a readable character size it showed 17.8 m of a " +
+                 "21.6 m arena, so the camera was pinned against its own borders and every " +
+                 "follow rule below looked broken. At a phone's 19.5:9 the same framing shows " +
+                 "11 m and the camera moves.\n\n" +
+                 "0 fills the whole rect.")]
+        public float deviceAspect = 19.5f / 9f;
 
         [Header("Debug")]
         public bool drawZones = true;
@@ -180,12 +240,67 @@ namespace GulagRunners.Game
         public Vector2 Focus => _focus;
 
         /// <summary>
-        /// Visible height actually used, after the viewport correction. Authoring stays in
-        /// full-screen terms no matter how the screen is divided during local testing.
+        /// Metres of world visible from top to bottom of this camera's viewport.
+        ///
+        /// Derived from the character rather than authored in metres: what has to stay constant
+        /// is the fraction of the frame the fighter fills, and that is a ratio, not a length.
         /// </summary>
-        public float EffectiveViewHeight =>
-            visibleWorldHeight *
-            (scaleFramingToViewport && applyViewportRect ? Mathf.Clamp01(viewportRect.height) : 1f);
+        public float EffectiveViewHeight
+        {
+            get
+            {
+                if (manualFraming)
+                    return visibleWorldHeight *
+                           (scaleFramingToViewport && applyViewportRect
+                               ? Mathf.Clamp01(viewportRect.height) : 1f);
+
+                return FramingBodyHeight / Mathf.Max(0.02f, bodyScreenFraction);
+            }
+        }
+
+        /// <summary>The body height the framing is measured against.</summary>
+        public float FramingBodyHeight =>
+            framingBodyHeight > 0.01f ? framingBodyHeight
+                : (player != null && player.tuning != null ? player.tuning.bodyHeight : 1.8f);
+
+        /// <summary>Metres above the feet the camera aims at.</summary>
+        public float AimHeight => FramingBodyHeight * aimHeightBodies;
+
+        /// <summary>
+        /// The viewport this camera actually renders into: the assigned rect, shrunk to the
+        /// device aspect and centred inside it.
+        /// </summary>
+        public Rect FittedViewportRect() =>
+            FittedViewportRect(new Vector2(Screen.width, Screen.height));
+
+        /// <summary>
+        /// The same, against a screen size given explicitly. The editor needs this: inside an
+        /// inspector, Screen is the inspector window, not the Game view.
+        /// </summary>
+        public Rect FittedViewportRect(Vector2 screen)
+        {
+            Rect r = viewportRect;
+            if (deviceAspect <= 0.01f) return r;
+
+            float w = screen.x * r.width;
+            float h = screen.y * r.height;
+            if (w <= 1f || h <= 1f) return r;
+
+            float have = w / h;
+            if (have > deviceAspect)
+            {
+                float fit = r.width * (deviceAspect / have);
+                r.x += (r.width - fit) * 0.5f;
+                r.width = fit;
+            }
+            else
+            {
+                float fit = r.height * (have / deviceAspect);
+                r.y += (r.height - fit) * 0.5f;
+                r.height = fit;
+            }
+            return r;
+        }
 
         void Awake()
         {
@@ -211,7 +326,7 @@ namespace GulagRunners.Game
                 }
             }
 
-            if (applyViewportRect && _camera != null) _camera.rect = viewportRect;
+            ApplyViewport();
 
             ApplyLens();
             SnapToTarget();
@@ -225,17 +340,71 @@ namespace GulagRunners.Game
 
         void OnDisable()
         {
-            if (_subscribed != null) _subscribed.Landed -= OnLanded;
-            _subscribed = null;
+            Unsubscribe();
         }
 
         void Subscribe()
         {
             if (_subscribed == player) return;
-            if (_subscribed != null) _subscribed.Landed -= OnLanded;
+            Unsubscribe();
             _subscribed = player;
-            if (_subscribed != null) _subscribed.Landed += OnLanded;
+            if (_subscribed == null) return;
+            _subscribed.Landed += OnLanded;
+            _subscribed.Teleported += SnapToTarget;
+            _subscribed.Hurt += OnHurt;
+            _subscribed.Blocked += OnBlocked;
+            _subscribed.Parried += OnParried;
+
+            _hitting = opponent != null ? opponent : OtherFighter();
+            if (_hitting != null) _hitting.Hurt += OnOpponentHurt;
         }
+
+        void Unsubscribe()
+        {
+            if (_subscribed == null) return;
+            _subscribed.Landed -= OnLanded;
+            _subscribed.Teleported -= SnapToTarget;
+            _subscribed.Hurt -= OnHurt;
+            _subscribed.Blocked -= OnBlocked;
+            _subscribed.Parried -= OnParried;
+            _subscribed = null;
+
+            if (_hitting != null) _hitting.Hurt -= OnOpponentHurt;
+            _hitting = null;
+        }
+
+        PlayerController _hitting;
+
+        /// <summary>The fighter this camera does not follow, out of the match's own list.</summary>
+        PlayerController OtherFighter()
+        {
+            MatchState match = MatchState.Instance;
+            if (match == null || match.fighters == null) return null;
+
+            for (int i = 0; i < match.fighters.Count; i++)
+            {
+                PlayerController other = match.fighters[i];
+                if (other != null && other != _subscribed) return other;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// How big a hit this was, as a share of full health. Taken from the damage rather
+        /// than from the weapon, so armour and a blocked chip scale it down exactly as much
+        /// as they scale the hit down — which is the point: what the camera does should match
+        /// what happened, not what was swung.
+        /// </summary>
+        float Share(int damage)
+        {
+            int full = _subscribed != null ? _subscribed.MaxHealth : 100;
+            return full > 0 ? Mathf.Clamp01(damage / (float)full) : 0f;
+        }
+
+        void OnHurt(int damage) => AddTrauma(hitTrauma * Mathf.Sqrt(Share(damage)));
+        void OnBlocked(int through) => AddTrauma(blockTrauma * Mathf.Sqrt(Share(through)));
+        void OnParried() => AddTrauma(parryTrauma);
+        void OnOpponentHurt(int damage) => AddTrauma(landedTrauma * Mathf.Sqrt(Share(damage)));
 
         void OnLanded(float impactSpeed)
         {
@@ -268,6 +437,18 @@ namespace GulagRunners.Game
             _camera.fieldOfView = fieldOfView;
         }
 
+        /// <summary>
+        /// Re-applies the viewport. Every frame rather than once on Awake, because the Game view
+        /// is resized constantly while working and the letterbox has to follow it.
+        /// </summary>
+        void ApplyViewport()
+        {
+            if (!applyViewportRect || _camera == null) return;
+
+            Rect want = FittedViewportRect();
+            if (_camera.rect != want) _camera.rect = want;
+        }
+
         void LateUpdate()
         {
             if (target == null) return;
@@ -275,6 +456,7 @@ namespace GulagRunners.Game
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
+            ApplyViewport();
             Subscribe();
 
             Vector2 aim = AimPoint(dt, out float desiredZoom);
@@ -294,7 +476,8 @@ namespace GulagRunners.Game
 
             float vSmooth = verticalSmoothTime;
             if (_fastFall) vSmooth = fallSmoothTime;
-            else if (player != null && player.State.Mode == Sim.MoveMode.Climbing)
+            else if (player != null && (player.State.Mode == Sim.MoveMode.Climbing ||
+                                        player.State.Mode == Sim.MoveMode.Mounting))
                 vSmooth = climbSmoothTime;
 
             _focus.x = Mathf.SmoothDamp(_focus.x, wantX, ref _focusVelocity.x,
@@ -334,7 +517,7 @@ namespace GulagRunners.Game
                 desiredZoom = Mathf.Clamp(Mathf.Max(neededHeight, neededWidth / aspect)
                                           / Mathf.Max(0.01f, EffectiveViewHeight), minZoom, maxZoom);
                 _lookAhead = 0f;
-                return new Vector2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f + aimHeight);
+                return new Vector2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f + AimHeight);
             }
 
             // Lead by where the player is actually going, not by which way they last pressed:
@@ -348,11 +531,13 @@ namespace GulagRunners.Game
                     : 0f;
             }
 
-            _lookAhead = Mathf.SmoothDamp(_lookAhead, direction * lookAhead, ref _lookAheadVelocity,
+            _lookAhead = Mathf.SmoothDamp(_lookAhead,
+                                          direction * lookAheadFraction * EffectiveViewHeight,
+                                          ref _lookAheadVelocity,
                                           lookAheadSmoothTime, Mathf.Infinity, dt);
 
             float y = AnchoredY(a.y);
-            return new Vector2(a.x + _lookAhead, y + aimHeight);
+            return new Vector2(a.x + _lookAhead, y + AimHeight);
         }
 
         /// <summary>
@@ -375,6 +560,7 @@ namespace GulagRunners.Game
                     return _anchorY;
 
                 case Sim.MoveMode.Climbing:
+                case Sim.MoveMode.Mounting:
                     _fastFall = false;
                     _anchorY = targetY;             // a ladder is deliberate vertical travel
                     return _anchorY;
@@ -388,15 +574,18 @@ namespace GulagRunners.Game
                     if (vy < -fallFollowSpeed)
                     {
                         float range = Mathf.Max(0.1f, player.tuning.maxFallSpeed - fallFollowSpeed);
-                        float lead = Mathf.Clamp01((-vy - fallFollowSpeed) / range) * fallLookAhead;
+                        float lead = Mathf.Clamp01((-vy - fallFollowSpeed) / range) *
+                                     fallLookAheadFraction * EffectiveViewHeight;
                         _anchorY = targetY - lead;
                         _fastFall = true;
                         return _anchorY;
                     }
 
                     _fastFall = false;
-                    if (targetY > _anchorY + airRiseSlack) _anchorY = targetY - airRiseSlack;
-                    else if (targetY < _anchorY - airFallSlack) _anchorY = targetY + airFallSlack;
+                    float rise = airRiseSlackFraction * EffectiveViewHeight;
+                    float fall = airFallSlackFraction * EffectiveViewHeight;
+                    if (targetY > _anchorY + rise) _anchorY = targetY - rise;
+                    else if (targetY < _anchorY - fall) _anchorY = targetY + fall;
                     return _anchorY;
                 }
             }
@@ -442,6 +631,8 @@ namespace GulagRunners.Game
 
         void Place(Vector2 focus, float zoom, Vector3 shake)
         {
+            if (depthFromPlayer && player != null) planeZ = player.planeZ;
+
             float halfFov = Mathf.Deg2Rad * fieldOfView * 0.5f;
             float pitch = Mathf.Deg2Rad * pitchDegrees;
 

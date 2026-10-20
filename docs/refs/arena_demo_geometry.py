@@ -1,0 +1,909 @@
+"""Bakes Arena_Demo.unity the way SimWorldBaker does, so the harness measures the real level.
+
+The location in Arena_Demo was built in 3D by hand. The simulation is flat, so what the fight
+actually happens on is not the geometry in the scene view — it is the set of boxes the bake
+produces from it: scenery culled by depth, anything marked Ignore dropped, and a hatch cut
+through every solid a ladder passes through. Reading the scene file and doing exactly that is
+the only way to test the level we ship rather than a description of it.
+
+Mirrors: SimWorldBaker.Bake, SimWorldBaker.CutHatches, SimCollider.WorldRect.
+"""
+import math
+import os
+import re
+
+from sim_motor_mirror import X, C
+
+SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     "..", "..", "Gulag runners", "Assets", "Scenes", "Arena_Demo.unity")
+
+SIM_COLLIDER_GUID = "a92ea500d0103a36b3143c8a534b18b2"
+CHEST_GUID = "b133d746e1ad16c0613fc1ce415afb0c"
+PLAYER_GUID = "882fe3a922af38d6658c85cd54734955"
+BAKER_GUID = "dbc7640cd37666d57e8cc1de33f92772"
+GATE_GUID = "2d7a16f4c8b94e03a5f61d820c74b9e5"
+
+# Unity's built-in meshes, as (local centre, local half-extents). Cylinder and Capsule are TWO
+# units tall, which is the whole reason the bake may not assume a unit cube.
+PRIMITIVE_BOX = {
+    "10202": ([0.0, 0.0, 0.0], [0.5, 0.5, 0.5]),    # Cube
+    "10206": ([0.0, 0.0, 0.0], [0.5, 1.0, 0.5]),    # Cylinder
+    "10207": ([0.0, 0.0, 0.0], [0.5, 0.5, 0.5]),    # Sphere
+    "10208": ([0.0, 0.0, 0.0], [0.5, 1.0, 0.5]),    # Capsule
+    "10209": ([0.0, 0.0, 0.0], [5.0, 0.0, 5.0]),    # Plane
+    "10210": ([0.0, 0.0, 0.0], [0.5, 0.5, 0.0]),    # Quad
+}
+
+SOLID, ONEWAY, LADDER, IGNORE = 0, 1, 2, 3
+
+
+# ---------------------------------------------------------------- the scene file
+
+def _docs(text):
+    out = {}
+    for m in re.finditer(r'^--- !u!(\d+) &(\d+)(?: stripped)?\n', text, re.M):
+        nxt = text.find('\n--- !u!', m.end())
+        out[int(m.group(2))] = (int(m.group(1)),
+                                text[m.end(): nxt if nxt != -1 else len(text)])
+    return out
+
+
+def _vec(body, name, default=None):
+    m = re.search(r'^\s{2}' + re.escape(name) + r':\s*\{(.*?)\}', body, re.M | re.S)
+    if not m:
+        return default
+    d = {}
+    for kv in m.group(1).split(','):
+        k, _, v = kv.partition(':')
+        d[k.strip()] = float(v)
+    return d
+
+
+def _ref(body, name):
+    m = re.search(r'^\s{2}' + re.escape(name) + r':\s*\{fileID: (-?\d+)', body, re.M)
+    return int(m.group(1)) if m else 0
+
+
+def _field(body, name, cast=float, default=None):
+    # (.+?) rather than (\S+): a value with a space in it is still a value, and m_Name is
+    # the one that matters — "Player 1" used to read back as nothing at all.
+    m = re.search(r'^\s+' + re.escape(name) + r': (.+?)\s*$', body, re.M)
+    return cast(m.group(1)) if m else default
+
+
+def _qmat(q):
+    x, y, z, w = q
+    n = math.sqrt(x * x + y * y + z * z + w * w) or 1.0
+    x, y, z, w = x / n, y / n, z / n, w / n
+    return [[1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+            [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+            [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]]
+
+
+def _mul(a, b):
+    return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+
+def _apply(m, v):
+    return [sum(m[i][k] * v[k] for k in range(3)) for i in range(3)]
+
+
+_PREFABS = {}
+
+
+def _prefab(guid):
+    """The one chest prefab behind a guid: its root transform, reach box and Chest fields."""
+    if guid in _PREFABS:
+        return _PREFABS[guid]
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "..", "..", "Gulag runners", "Assets")
+    path = None
+    for base, _dirs, files in os.walk(root):
+        for f in files:
+            if f.endswith('.prefab.meta'):
+                if f'guid: {guid}' in open(os.path.join(base, f), encoding='utf-8',
+                                           errors='ignore').read():
+                    path = os.path.join(base, f[:-5])
+                    break
+        if path:
+            break
+    if path is None:
+        _PREFABS[guid] = None
+        return None
+    text = open(path, encoding='utf-8').read()
+    docs = _docs(text)
+    chest = next((b for cls, b in docs.values()
+                  if cls == 114 and f'guid: {CHEST_GUID}' in b), None)
+    if chest is None:
+        _PREFABS[guid] = dict(text=text)        # some other prefab; not a chest
+        return _PREFABS[guid]
+    owner = _ref(chest, 'm_GameObject')
+    box = next(b for cls, b in docs.values()
+               if cls == 65 and _ref(b, 'm_GameObject') == owner)
+    tr = next(b for cls, b in docs.values()
+              if cls == 4 and _ref(b, 'm_GameObject') == owner)
+    go = next(b for fid, (cls, b) in docs.items() if cls == 1 and fid == owner)
+    _PREFABS[guid] = dict(
+        text=text,
+        pos=_vec(tr, 'm_LocalPosition', {'x': 0, 'y': 0, 'z': 0}),
+        scale=_vec(tr, 'm_LocalScale', {'x': 1, 'y': 1, 'z': 1}),
+        centre=_vec(box, 'm_Center', {'x': 0, 'y': 0, 'z': 0}),
+        size=_vec(box, 'm_Size', {'x': 1, 'y': 1, 'z': 1}),
+        kind=_field(chest, 'kind', int, 0),
+        contents=_field(chest, 'contents', int, 0),
+        name=_field(go, 'm_Name', str, 'chest'))
+    return _PREFABS[guid]
+
+
+class Scene:
+    """Just enough of Unity's transform hierarchy to reproduce Collider.bounds."""
+
+    def __init__(self, path=SCENE):
+        self.docs = _docs(open(path, encoding='utf-8').read())
+        self.transforms, self.gos = {}, {}
+        for fid, (cls, body) in self.docs.items():
+            if cls == 4:
+                self.transforms[fid] = dict(
+                    go=_ref(body, 'm_GameObject'),
+                    pos=_vec(body, 'm_LocalPosition', {'x': 0, 'y': 0, 'z': 0}),
+                    rot=_vec(body, 'm_LocalRotation', {'x': 0, 'y': 0, 'z': 0, 'w': 1}),
+                    scale=_vec(body, 'm_LocalScale', {'x': 1, 'y': 1, 'z': 1}),
+                    parent=_ref(body, 'm_Father'))
+            elif cls == 1:
+                comps = []
+                lst = re.search(r'  m_Component:\n((?:  - component: \{fileID: -?\d+\}\n)*)', body)
+                if lst and lst.group(1):
+                    comps = [int(v) for v in re.findall(r'fileID: (-?\d+)', lst.group(1))]
+                self.gos[fid] = dict(name=_field(body, 'm_Name', str, ''),
+                                     active=_field(body, 'm_IsActive', int, 1),
+                                     comps=comps)
+        self.tr_of_go = {v['go']: k for k, v in self.transforms.items() if v['go']}
+
+    # --- transforms
+
+    def basis(self, tfid):
+        chain = []
+        cur = tfid
+        while cur in self.transforms:
+            chain.append(self.transforms[cur])
+            cur = self.transforms[cur]['parent']
+        origin, basis = [0.0, 0.0, 0.0], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        for tr in reversed(chain):
+            p, s = tr['pos'], tr['scale']
+            lp = _apply(basis, [p['x'], p['y'], p['z']])
+            origin = [origin[i] + lp[i] for i in range(3)]
+            basis = _mul(basis, _qmat((tr['rot']['x'], tr['rot']['y'],
+                                      tr['rot']['z'], tr['rot'].get('w', 1))))
+            basis = [[basis[i][0] * s['x'], basis[i][1] * s['y'], basis[i][2] * s['z']]
+                     for i in range(3)]
+        return origin, basis
+
+    def active(self, go):
+        """A GameObject is only in the bake if nothing above it is switched off."""
+        cur = self.tr_of_go.get(go)
+        while cur in self.transforms:
+            if not self.gos.get(self.transforms[cur]['go'], {}).get('active', 1):
+                return False
+            cur = self.transforms[cur]['parent']
+        return True
+
+    # --- prefab instances
+
+    def prefab_chests(self):
+        """The chests, which are prefab instances: the component lives in the prefab file.
+
+        SimWorldBaker finds them with GetComponentsInChildren, which does not care whether an
+        object came from a prefab. A harness that only reads the scene file does, so it has to
+        open the prefab and apply the instance's overrides itself — otherwise the level tests
+        green with no loot in it at all.
+        """
+        out = []
+        for fid, (cls, body) in sorted(self.docs.items()):
+            if cls != 1001:
+                continue
+            src = re.search(r'm_SourcePrefab: \{fileID: \d+, guid: (\w+)', body)
+            if not src:
+                continue
+            prefab = _prefab(src.group(1))
+            if prefab is None or CHEST_GUID not in prefab['text']:
+                continue
+            mods = dict(re.findall(r'propertyPath: (\S+)\n      value: (\S*)', body))
+            pos = [float(mods.get('m_LocalPosition.' + a, prefab['pos'][a])) for a in 'xyz']
+            scale = [float(mods.get('m_LocalScale.' + a, prefab['scale'][a])) for a in 'xyz']
+            origin, basis = self.basis(_ref(body, 'm_TransformParent'))
+            wp = [origin[i] + _apply(basis, pos)[i] for i in range(3)]
+            centre, size = prefab['centre'], prefab['size']
+            half = [size['x'] / 2 * scale[0], size['y'] / 2 * scale[1], size['z'] / 2 * scale[2]]
+            c = [wp[i] + _apply(basis, [centre['x'] * scale[0], centre['y'] * scale[1],
+                                        centre['z'] * scale[2]])[i] for i in range(3)]
+            ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
+            lo = [c[i] - ext[i] for i in range(3)]
+            hi = [c[i] + ext[i] for i in range(3)]
+            out.append((_aabb(lo, hi),
+                        int(mods.get('kind', prefab['kind'])),
+                        int(mods.get('contents', prefab['contents'])),
+                        mods.get('m_Name', prefab['name'])))
+        return out
+
+    # --- colliders
+
+    def local_box(self, go):
+        """The box this object occupies in its OWN space, exactly as SimCollider.LocalBox:
+        the BoxCollider's if it has one, the mesh's own bounds if it has a mesh, a unit cube
+        when it has neither. Unity's Cylinder and Capsule meshes are TWO units tall, so a
+        unit cube guessed at the pivot bakes a pillar at half its visible height."""
+        for c in self.gos[go]['comps']:
+            cls, body = self.docs.get(c, (0, ''))
+            if cls == 65:                                   # BoxCollider
+                centre = _vec(body, 'm_Center', {'x': 0, 'y': 0, 'z': 0})
+                size = _vec(body, 'm_Size', {'x': 1, 'y': 1, 'z': 1})
+                return ([centre['x'], centre['y'], centre['z']],
+                        [size['x'] / 2, size['y'] / 2, size['z'] / 2])
+        for c in self.gos[go]['comps']:
+            cls, body = self.docs.get(c, (0, ''))
+            if cls != 33:                                   # MeshFilter
+                continue
+            m = re.search(r'm_Mesh: \{fileID: (-?\d+)', body)
+            if m and m.group(1) in PRIMITIVE_BOX:
+                return PRIMITIVE_BOX[m.group(1)]
+            break
+        return ([0.0, 0.0, 0.0], [0.5, 0.5, 0.5])
+
+    def bounds(self, go):
+        """World-space Collider.bounds of the first collider on this object, or None."""
+        for c in self.gos[go]['comps']:
+            cls, body = self.docs.get(c, (0, ''))
+            if cls == 65:                                   # BoxCollider
+                centre = _vec(body, 'm_Center', {'x': 0, 'y': 0, 'z': 0})
+                size = _vec(body, 'm_Size', {'x': 1, 'y': 1, 'z': 1})
+                half = [size['x'] / 2, size['y'] / 2, size['z'] / 2]
+            elif cls == 136:                                # CapsuleCollider
+                centre = _vec(body, 'm_Center', {'x': 0, 'y': 0, 'z': 0})
+                r = _field(body, 'm_Radius', float, 0.5)
+                h = _field(body, 'm_Height', float, 2.0)
+                axis = _field(body, 'm_Direction', int, 1)
+                half = [r, r, r]
+                half[axis] = max(r, h / 2)
+            else:
+                continue
+            origin, basis = self.basis(self.tr_of_go[go])
+            lc = _apply(basis, [centre['x'], centre['y'], centre['z']])
+            wc = [origin[i] + lc[i] for i in range(3)]
+            ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
+            return [wc[i] - ext[i] for i in range(3)], [wc[i] + ext[i] for i in range(3)]
+
+        # No collider at all: SimCollider.RotatedBounds takes the box from the MESH, and
+        # places it with TransformPoint, so a mesh whose pivot is not its centre gets a box
+        # that sits on the mesh rather than beside it.
+        if self.script(go, SIM_COLLIDER_GUID) is not None:
+            origin, basis = self.basis(self.tr_of_go[go])
+            centre, half = self.local_box(go)
+            lc = _apply(basis, centre)
+            wc = [origin[i] + lc[i] for i in range(3)]
+            ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
+            return [wc[i] - ext[i] for i in range(3)], [wc[i] + ext[i] for i in range(3)]
+        return None
+
+    def _unused(self, go, centre, size, half, basis, origin):
+        if True:
+            lc = _apply(basis, [centre['x'], centre['y'], centre['z']])
+            wc = [origin[i] + lc[i] for i in range(3)]
+            ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
+            return [wc[i] - ext[i] for i in range(3)], [wc[i] + ext[i] for i in range(3)]
+        return None
+
+    def renders(self, go):
+        """Does this object actually draw anything. An invisible collider cannot occlude."""
+        return any(self.docs.get(c, (0, ''))[0] in (23, 137)       # Mesh/SkinnedMeshRenderer
+                   for c in self.gos[go]['comps'])
+
+    def occluders(self, plane_z):
+        """Everything drawn between the camera and the gameplay plane, nearest first.
+
+        SideViewCamera stands at planeZ - distance and looks along +Z, so anything with a
+        smaller Z than the plane is between it and the fight. In a level modelled in 3D that
+        set is the whole answer to "why can I not see my own fighter".
+        """
+        out = []
+        for fid in self.gos:
+            if fid not in self.tr_of_go or not self.renders(fid):
+                continue
+            b = self.bounds(fid)
+            if b is None or b[0][2] >= plane_z:
+                continue
+            out.append((self.gos[fid]['name'], b[0], b[1]))
+        out.sort(key=lambda r: r[1][2])
+        return out
+
+    def corners(self, go):
+        """The eight world corners of this box, as (x, y, z). A tilted plank's silhouette is
+        not its bounding box, and baking the box is what makes a ramp a wall. Z comes along
+        because a ladder's lean is a question about depth as much as about X."""
+        centre, half = self.local_box(go)
+        origin, basis = self.basis(self.tr_of_go[go])
+        out = []
+        for i in (-1, 1):
+            for j in (-1, 1):
+                for k in (-1, 1):
+                    local = [centre[0] + half[0] * i,
+                             centre[1] + half[1] * j,
+                             centre[2] + half[2] * k]
+                    w = _apply(basis, local)
+                    out.append((origin[0] + w[0], origin[1] + w[1], origin[2] + w[2]))
+        return out
+
+    def visual_offsets(self):
+        """Where each fighter's MODEL sits relative to the body the simulation moves.
+
+        Render() writes the simulated slice into the PlayerController's own transform.z every
+        frame, so a visual root pushed forward in Z is the model and the body coming apart:
+        the fighter collides where the simulation says and is drawn somewhere else, standing
+        on nothing. Here it was 2.92 m — three metres in front of the platform under his feet.
+        """
+        out = []
+        for fid, (cls, body) in self.docs.items():
+            if cls != 114 or f'guid: {PLAYER_GUID}' not in body:
+                continue
+            go = _ref(body, 'm_GameObject')
+            name = self.gos[go]['name'] if go in self.gos else '?'
+            vr = re.search(r'visualRoot: \{fileID: (-?\d+)\}', body)
+            if not vr or vr.group(1) == '0':
+                out.append((name, (0.0, 0.0, 0.0)))
+                continue
+            out.append((name, self._local_pos(int(vr.group(1)))))
+        return sorted(out)
+
+    def _local_pos(self, tfid):
+        """A transform's local position, read the way Unity reads it: a stripped prefab
+        transform keeps its position in the PrefabInstance's modification list."""
+        cls, body = self.docs.get(tfid, (0, ''))
+        inst = re.search(r'm_PrefabInstance: \{fileID: (\d+)\}', body)
+        src_tf = re.search(r'm_CorrespondingSourceObject: \{fileID: (-?\d+)', body)
+        if inst and inst.group(1) != '0' and src_tf:
+            _, ibody = self.docs.get(int(inst.group(1)), (0, ''))
+            # Match the modification by TARGET. One PrefabInstance carries overrides for every
+            # object in the prefab, bones included, so the first m_LocalPosition.x in the list
+            # is almost never the root's.
+            v = []
+            for axis in 'xyz':
+                m = re.search(
+                    r'- target: \{fileID: ' + src_tf.group(1) + r',[^\n]*\n'
+                    r'\s+propertyPath: m_LocalPosition\.' + axis + r'\n'
+                    r'\s+value: ([-\d.eE+]+)', ibody)
+                v.append(float(m.group(1)) if m else 0.0)
+            return tuple(v)
+        p = _vec(body, 'm_LocalPosition', {'x': 0, 'y': 0, 'z': 0})
+        return (p['x'], p['y'], p['z'])
+
+    def prefab_players(self):
+        """Fighters that are prefab instances: index, x, feet y, facing, z."""
+        found = []
+        for fid, (cls, body) in self.docs.items():
+            if cls != 1001:
+                continue
+
+            src_guid = re.search(r'm_SourcePrefab: \{fileID: \d+, guid: ([0-9a-f]{32})', body)
+            if src_guid is None:
+                continue
+            prefab = _prefab(src_guid.group(1))
+            if prefab is None or PLAYER_GUID not in prefab['text']:
+                continue
+
+            pos = {}
+            for axis in 'xyz':
+                m = re.search(r'propertyPath: m_LocalPosition\.' + axis
+                              + r'\n      value: ([-\d.eE+]+)', body)
+                pos[axis] = float(m.group(1)) if m else 0.0
+
+            # The controller's own settings live in the prefab unless this instance says
+            # otherwise, so an override wins and the asset is the fallback.
+            def setting(name, cast, default):
+                m = re.search(r'propertyPath: ' + name + r'\n      value: ([-\d.eE+]+)', body)
+                if m:
+                    return cast(float(m.group(1)))
+                pbody = re.search(r'guid: ' + PLAYER_GUID + r'[^\n]*\n(?:.*\n)*?',
+                                  prefab['text'])
+                return _field(prefab['text'], name, cast, default)
+
+            offset = setting('visualYOffset', float, 0.0)
+            found.append((setting('playerIndex', int, len(found)),
+                          pos['x'], pos['y'] - offset,
+                          setting('spawnFacing', int, 1), pos['z']))
+        return found
+
+    def baker_field(self, name, cast=float, default=None):
+        """One value off the scene's SimWorldBaker, so a test can measure against what the
+        scene actually asks for rather than against a number copied into the test."""
+        body = next((b for fid, (cls, b) in self.docs.items()
+                     if cls == 114 and f'guid: {BAKER_GUID}' in b), None)
+        if body is None:
+            raise SystemExit('Arena_Demo has no SimWorldBaker')
+        return _field(body, name, cast, default)
+
+    def trigger(self, go):
+        for c in self.gos[go]['comps']:
+            cls, body = self.docs.get(c, (0, ''))
+            if cls in (65, 136) and _field(body, 'm_IsTrigger', int, 0):
+                return True
+        return False
+
+    def script(self, go, guid):
+        for c in self.gos[go]['comps']:
+            cls, body = self.docs.get(c, (0, ''))
+            if cls == 114 and f'guid: {guid}' in body and _field(body, 'm_Enabled', int, 1):
+                return body
+        return None
+
+    def ancestor_has(self, go, guid):
+        cur = self.tr_of_go.get(go)
+        while cur in self.transforms:
+            owner = self.transforms[cur]['go']
+            if owner in self.gos and self.script(owner, guid) is not None:
+                return True
+            cur = self.transforms[cur]['parent']
+        return False
+
+
+# ---------------------------------------------------------------- the bake
+
+def _aabb(lo, hi):
+    return (X(lo[0]), X(lo[1]), X(hi[0]), X(hi[1]))
+
+
+def _top_at(corners, x):
+    """The highest the silhouette reaches at this x. Convex, so a scan over edges is exact."""
+    top = None
+    for i in range(len(corners)):
+        for j in range(i + 1, len(corners)):
+            px, py = corners[i][0], corners[i][1]
+            qx, qy = corners[j][0], corners[j][1]
+            if px == qx or x < min(px, qx) or x > max(px, qx):
+                continue
+            y = py + (qy - py) * (x - px) / (qx - px)
+            if top is None or y > top:
+                top = y
+    return top
+
+
+def ladder_lean(corners, axis=0):
+    """Where a ladder's centre line is at its foot and at its head, on one axis. A leaning
+    ladder's box is wider than the ladder, and climbing the middle of the box is climbing the
+    air beside it. axis 0 is X, axis 2 is depth: one propped against a walkway leans in both."""
+    by_y = sorted(corners, key=lambda c: c[1])
+    bottom = sum(c[axis] for c in by_y[:4]) / 4
+    top = sum(c[axis] for c in by_y[4:]) / 4
+    return (X(bottom), X(top))
+
+
+def slope_steps(corners, step, min_rise):
+    """A tilted box cut into a staircase that follows its top edge, or None if it is a box."""
+    if step <= 0.01:
+        return None
+    xs = [c[0] for c in corners]
+    lo_x, hi_x, lo_y = min(xs), max(xs), min(c[1] for c in corners)
+    if hi_x - lo_x < step:
+        return None
+    if abs(_top_at(corners, lo_x) - _top_at(corners, hi_x)) < min_rise:
+        return None
+
+    count = max(1, min(64, int(math.ceil((hi_x - lo_x) / step))))
+    run = (hi_x - lo_x) / count
+    out = []
+    for i in range(count):
+        a = lo_x + run * i
+        b = a + run
+        # The surface at the MIDDLE of the step, not the higher of its two ends: taking the
+        # high end puts every step above the board it stands in for, and a fighter walking
+        # down the ramp walks down it through the air.
+        top = _top_at(corners, (a + b) / 2)
+        if top - lo_y <= 0.001:
+            continue
+        out.append(((a, lo_y, 0.0), (b, top, 0.0)))
+    return out or None
+
+
+def cut_hatches(solids, ladders, margin, min_overlap):
+    """SimWorldBaker.CutHatches: a ladder opens a hole through anything it runs through.
+
+    A solid the ladder only stands on keeps its floor: the ladder has to reach min_overlap into
+    it first. Vlad's right-hand ladder is modelled one centimetre inside its own platform, and
+    without that test the fighter who spawns there drops through a 0.78 m hole.
+    """
+    m = X(margin)
+    tol = X(min_overlap)
+    sliver = X(0.05)
+    cut = 0
+    for lad in ladders:
+        working = []
+        for s in solids:
+            lo, hi = lad[0] - m, lad[2] + m
+            overlap_y = min(s[3], lad[3]) - max(s[1], lad[1])
+            if not (s[0] < hi and s[2] > lo) or overlap_y <= tol:
+                working.append(s)
+                continue
+            cut += 1
+            if lo - s[0] > sliver:
+                working.append((s[0], s[1], lo, s[3]))
+            if s[2] - hi > sliver:
+                working.append((hi, s[1], s[2], s[3]))
+        solids = working
+    return solids, cut
+
+
+def _gate_of(sc, go):
+    """Which ArenaGate owns this box, by its gameobject id, or None."""
+    cur = sc.tr_of_go.get(go)
+    while cur in sc.transforms:
+        owner = sc.transforms[cur]['go']
+        if owner in sc.gos and sc.script(owner, GATE_GUID) is not None:
+            return owner
+        cur = sc.transforms[cur]['parent']
+    return None
+
+
+def bake(scene=None, report=False):
+    sc = scene or Scene()
+    baker = next((b for fid, (cls, b) in sc.docs.items()
+                  if cls == 114 and f'guid: {BAKER_GUID}' in b), None)
+    if baker is None:
+        raise SystemExit('Arena_Demo has no SimWorldBaker')
+    plane_z = _field(baker, 'planeZ', float, 0.0)
+    thickness = _field(baker, 'planeThickness', float, 1.5)
+    restrict = _field(baker, 'restrictToPlane', int, 1)
+    cuts_hatch = _field(baker, 'ladderCutsHatch', int, 0)
+    filters_marked = _field(baker, 'planeFiltersMarked', int, 1)
+    margin = _field(baker, 'hatchMargin', float, 0.1)
+    min_overlap = _field(baker, 'hatchMinOverlap', float, 0.05)
+    drop_backdrop = _field(baker, 'dropBackdrop', int, 1)
+    backdrop_behind = _field(baker, 'backdropBehind', float, 0.5)
+
+    def is_backdrop(b):
+        """Behind the fight rather than part of it, judged on the box's nearest face."""
+        return bool(drop_backdrop) and b[0][2] >= plane_z + backdrop_behind
+
+    solids, oneway, ladders, chests = [], [], [], []
+    solidz, onewayz, ladderz, ladderlean = [], [], [], []
+    ladderleanz = []
+    culled = []
+    gates = {}
+    slopes = 0
+    step_m = _field(baker, 'slopeStep', float, 0.2)
+    min_rise = _field(baker, 'slopeMinRise', float, 0.12)
+
+    def fill(depths, upto, z):
+        while len(depths) < upto:
+            depths.append(z)
+    marked, ignored, off_plane, triggers, on_player, on_chest = 0, 0, 0, 0, 0, 0
+    backdrop = 0
+    handled = set()
+
+    # 1. SimCollider wins, and is never depth-culled: it is an explicit decision.
+    for go in sorted(sc.gos):
+        body = sc.script(go, SIM_COLLIDER_GUID)
+        if body is None:
+            continue
+        # A marker claims the object whether or not it is switched on: turning it off means no
+        # collision, not "fall back to the BoxCollider the art came with".
+        handled.add(go)
+        if not sc.active(go):
+            continue
+        marked += 1
+        kind = _field(body, 'kind', int, 0)
+        if kind == IGNORE:
+            ignored += 1
+            continue
+        b = sc.bounds(go)
+        if b is None:
+            continue
+        # The backdrop is dropped outright, and never to the rescue list: a location with no
+        # floor left needs its band moved, and the backdrop is not the floor it is missing.
+        if is_backdrop(b):
+            backdrop += 1
+            continue
+        # A marker says WHAT a box is, not that it is on the gameplay plane.
+        if filters_marked and restrict and not (b[1][2] >= plane_z - thickness
+                                                and b[0][2] <= plane_z + thickness):
+            off_plane += 1
+            if kind == SOLID:
+                culled.append(_aabb(*b))
+            continue
+        mz = (X(b[0][2]), X(b[1][2]))
+
+        # A shutter is not part of the arena until the closing phase reaches it, so it is set
+        # aside here and appended after the hatch cutting — which is what the baker does, and
+        # the reason the gate numbers can be an array parallel to the solid list at all.
+        gate = _gate_of(sc, go)
+        if gate is not None and kind == SOLID:
+            gates.setdefault(gate, []).append((_aabb(*b), mz))
+            continue
+
+        cut = slope_steps(sc.corners(go), step_m, min_rise) if kind == SOLID else None
+        if cut:
+            slopes += 1
+            for lo2, hi2 in cut:
+                solids.append(_aabb(lo2, hi2))
+        else:
+            (solids if kind == SOLID else oneway if kind == ONEWAY else ladders).append(_aabb(*b))
+        fill(solidz, len(solids), mz)
+        fill(onewayz, len(oneway), mz)
+        fill(ladderz, len(ladders), mz)
+        while len(ladderlean) < len(ladders):
+            cn = sc.corners(go)
+            ladderlean.append(ladder_lean(cn, 0))
+            ladderleanz.append(ladder_lean(cn, 2))
+
+    # 2. Chests, before the ordinary colliders, so a chest never becomes a wall.
+    for go in sorted(sc.gos):
+        body = sc.script(go, CHEST_GUID)
+        if body is None:
+            continue
+        handled.add(go)
+        if not sc.active(go):
+            continue
+        b = sc.bounds(go)
+        if b is not None:
+            chests.append((_aabb(*b), _field(body, 'kind', int, 0),
+                           _field(body, 'contents', int, 0), sc.gos[go]['name']))
+    chests += sc.prefab_chests()
+
+    # 3. Then every other collider in the scene.
+    for go in sorted(sc.gos):
+        if go in handled or not sc.active(go):
+            continue
+        b = sc.bounds(go)
+        if b is None:
+            continue
+        if sc.trigger(go):
+            triggers += 1
+            continue
+        if sc.ancestor_has(go, PLAYER_GUID):
+            on_player += 1
+            continue
+        if sc.ancestor_has(go, CHEST_GUID):
+            on_chest += 1
+            continue
+        lo, hi = b
+        if is_backdrop(b):
+            backdrop += 1
+            continue
+        if restrict and not (hi[2] >= plane_z - thickness and lo[2] <= plane_z + thickness):
+            off_plane += 1
+            culled.append(_aabb(lo, hi))
+            continue
+        cz = (X(lo[2]), X(hi[2]))
+        cut = slope_steps(sc.corners(go), step_m, min_rise)
+        if cut:
+            slopes += 1
+            for lo2, hi2 in cut:
+                solids.append(_aabb(lo2, hi2))
+        else:
+            solids.append(_aabb(lo, hi))
+        fill(solidz, len(solids), cz)
+
+    # A band that culls the whole arena is a band in the wrong place, not an empty arena.
+    band_took_everything = not solids and culled
+    if band_took_everything:
+        solids.extend(culled)
+        fill(solidz, len(solids), (X(-1000.0), X(1000.0)))
+
+    hatches = 0
+    if cuts_hatch:
+        solids, hatches = cut_hatches(solids, ladders, margin, min_overlap)
+
+    while len(solidz) < len(solids):
+        solidz.append((X(-1000.0), X(1000.0)))
+    del solidz[len(solids):]
+
+    # Now the shutters, on the end, in the order they will shut — which is the sort, because
+    # gate n is bit n of one word and the clock spreads them across the shutter window in
+    # array order (docs/01). Name breaks a tie, as in the baker.
+    gate_defs = []
+    solid_gate = [-1] * len(solids)
+    for owner in sorted(gates, key=lambda g: (_field(sc.script(g, GATE_GUID), 'when', int, 0),
+                                              _field(sc.script(g, GATE_GUID), 'order', int, 0),
+                                              sc.gos[g]['name'])):
+        body = sc.script(owner, GATE_GUID)
+        boxes = gates[owner]
+        index = len(gate_defs)
+        box = boxes[0][0]
+        span = boxes[0][1]
+        for b, z in boxes:
+            solids.append(b)
+            solidz.append(z)
+            solid_gate.append(index)
+            box = (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+            span = (min(span[0], z[0]), max(span[1], z[1]))
+        gate_defs.append(dict(name=sc.gos[owner]['name'], box=box, span=span,
+                              order=_field(body, 'order', int, 0),
+                              when=_field(body, 'when', int, 0),
+                              toward=_field(body, 'toward', int, 1),
+                              boxes=len(boxes)))
+
+    if report:
+        print(f"bake: plane z {plane_z} +-{thickness} -> {len(solids)} solid "
+              f"({hatches} cut by ladders), {len(oneway)} one-way, {len(ladders)} ladder, "
+              f"{len(gate_defs)} gate, {len(chests)} chest; {marked} marked "
+              f"({ignored} ignored), "
+              f"{off_plane} off the plane, {backdrop} backdrop, {triggers} trigger, "
+              f"{on_player} on a fighter, {on_chest} on a chest, "
+              f"{slopes} slope(s) cut into steps")
+
+    return {"solid": solids, "oneway": oneway, "ladder": ladders, "chest": chests,
+            "solidz": solidz, "onewayz": onewayz, "ladderz": ladderz,
+            "ladderlean": ladderlean, "ladderleanz": ladderleanz,
+            "gate": gate_defs, "solidgate": solid_gate}
+
+
+def world(report=False):
+    b = bake(report=report)
+
+    # The gameplay plane the fight happens at, taken from the scene exactly as
+    # PlayerController takes it from the fighter's own Z. The motor needs it to bring a body
+    # back onto the plane after a fall, so it belongs to the level, not to the test.
+    sp = spawns()
+    if sp:
+        C["HOME"] = X(sp[0][3])
+
+    w = {k: b[k] for k in ("solid", "oneway", "ladder",
+                           "solidz", "onewayz", "ladderz",
+                           "ladderlean", "ladderleanz")}
+    w["solidgate"] = b["solidgate"]
+    w["gate"] = b["gate"]
+    w["gatesshut"] = 0
+    return w
+
+
+INTRO_CAMERA_GUID = "4e8b15c0d7a2496fb3e09c742a5d1f68"
+
+
+
+def opening_shots(scene=None):
+    """Each round-intro camera's authored opening shot, as (position, rotation, viewport).
+
+    The shot is composed by hand in the scene, which means it can be composed WRONG by hand
+    in the scene — and the way that fails is the cage being off the edge of the frame, which
+    is exactly what happened and took three rounds to find. So it is measured.
+    """
+    sc = scene or Scene()
+    out = []
+    for go in sorted(sc.gos):
+        body = sc.script(go, INTRO_CAMERA_GUID)
+        if body is None:
+            continue
+        shot = re.search(r'openingShot: \{fileID: (\d+)\}', body)
+        if not shot or shot.group(1) == "0":
+            continue
+        tr = sc.transforms.get(int(shot.group(1)))
+        if tr is None:
+            continue
+        cam_tr = sc.transforms[sc.tr_of_go[go]]
+        rect = None
+        for c in sc.gos[go]['comps']:
+            cls, b = sc.docs.get(c, (0, ''))
+            if cls == 20:
+                r = re.search(r'm_NormalizedViewPortRect:\n(?:.*\n){0,2}?\s*serializedVersion: 2'
+                              r'\n\s*x: ([-\d.]+)\n\s*y: ([-\d.]+)\n\s*width: ([-\d.]+)'
+                              r'\n\s*height: ([-\d.]+)', b)
+                fov = re.search(r'field of view: ([\d.]+)', b)
+                if r:
+                    rect = (float(r.group(3)), float(r.group(4)),
+                            float(fov.group(1)) if fov else 30.0)
+        out.append((sc.gos[go]['name'], tr['pos'], tr['rot'], rect))
+    return out
+
+
+CAGE_DOOR_GUID = "9c4a0db75e1f4e3380c2a6f91b4d7e05"
+
+
+def cage_grilles(scene=None):
+    """Each cage's lifting grille, as the box the camera has to have in shot."""
+    sc = scene or Scene()
+    out = []
+    for go in sorted(sc.gos):
+        body = sc.script(go, CAGE_DOOR_GUID)
+        if body is None:
+            continue
+        tr = sc.transforms[sc.tr_of_go[go]]
+        door = re.search(r'door: \{fileID: (\d+)\}', body)
+        bars = sc.transforms.get(int(door.group(1))) if door else None
+        widest = 0.0
+        for t in sc.transforms.values():
+            if bars is not None and t['parent'] == int(door.group(1)):
+                widest = max(widest, abs(t['pos']['x']))
+        out.append(dict(x=tr['pos']['x'], z=tr['pos']['z'], floor=tr['pos']['y'],
+                        span=widest))
+    return out
+
+
+CAMERA_GUID = "b921a9be9303a1887f282de341a5ae31"
+
+
+def cameras(scene=None):
+    """Every SideViewCamera in the scene, as the numbers that decide what it frames."""
+    sc = scene or Scene()
+    out = []
+    for fid, (cls, body) in sorted(sc.docs.items()):
+        if cls != 114 or f'guid: {CAMERA_GUID}' not in body:
+            continue
+        lo = _vec(body, 'bordersMin', {'x': 0, 'y': 0})
+        hi = _vec(body, 'bordersMax', {'x': 0, 'y': 0})
+        out.append(dict(
+            planeZ=_field(body, 'planeZ', float, 0.0),
+            fov=_field(body, 'fieldOfView', float, 30.0),
+            pitch=_field(body, 'pitchDegrees', float, 12.0),
+            fraction=_field(body, 'bodyScreenFraction', float, 0.18),
+            aspect=_field(body, 'deviceAspect', float, 19.5 / 9),
+            min=(lo['x'], lo['y']), max=(hi['x'], hi['y'])))
+    return out
+
+
+def camera(scene=None):
+    """Where the first camera ends up, worked out the way SideViewCamera.Place does."""
+    sc = scene or Scene()
+    cam = cameras(sc)[0]
+    body_h = 0.91
+    for fid, (cls, b) in sc.docs.items():
+        if cls == 114 and f'guid: {PLAYER_GUID}' in b:
+            m = re.search(r'^    bodyHeight: (\S+)$', b, re.M)
+            if m:
+                body_h = float(m.group(1))
+            break
+    height = body_h / max(0.02, cam['fraction'])
+    pitch = math.radians(cam['pitch'])
+    distance = height * 0.5 * math.cos(pitch) / math.tan(math.radians(cam['fov'] / 2))
+    # deviceAspect 0 means "do not letterbox", which is an editor convenience. What the
+    # fighter actually plays on is still a phone, so that is what the framing is measured
+    # against.
+    aspect = cam['aspect'] if cam['aspect'] > 0.01 else 19.5 / 9
+    return dict(height=height, distance=distance, aspect=aspect,
+                planeZ=cam['planeZ'],
+                z=cam['planeZ'] - distance * math.cos(pitch),
+                rise=distance * math.sin(pitch))
+
+
+def spawns(scene=None):
+    """Where the two fighters' feet start, straight out of the scene.
+
+    A fighter may be an object in the scene or an instance of a player prefab — Vlad made both
+    of them prefabs so the two stay in step — so this reads either. For an instance the
+    position is in the PrefabInstance's modification list and everything else is in the prefab
+    asset, overridden per instance where it differs; reading only the scene finds nothing at
+    all, which is how the whole arena test came to have no fighters in it.
+    """
+    sc = scene or Scene()
+    out = []
+
+    for go in sorted(sc.gos):
+        body = sc.script(go, PLAYER_GUID)
+        if body is None:
+            continue
+        tr = sc.transforms[sc.tr_of_go[go]]
+        offset = _field(body, 'visualYOffset', float, 0.0)
+        out.append((_field(body, 'playerIndex', int, 0),
+                    tr['pos']['x'], tr['pos']['y'] - offset,
+                    _field(body, 'spawnFacing', int, 1),
+                    tr['pos']['z']))
+
+    out += sc.prefab_players()
+    return [s[1:] for s in sorted(out)]
+
+
+if __name__ == '__main__':
+    W = bake(report=True)
+    print("\ngates:")
+    for i, g in enumerate(W["gate"]):
+        print(f"  {i} {g['name']:18s} order {g['order']} when {g['when']} "
+              f"toward {g['toward']}  X {g['box'][0]/65536:6.2f}..{g['box'][2]/65536:6.2f}  "
+              f"Y {g['box'][1]/65536:5.2f}..{g['box'][3]/65536:5.2f}  "
+              f"Z {g['span'][0]/65536:5.2f}..{g['span'][1]/65536:5.2f}")
+
+    for name, boxes in (("solid", W["solid"]), ("ladder", W["ladder"])):
+        print(f"\n{name}:")
+        for b in sorted(boxes, key=lambda b: (b[1], b[0])):
+            print(f"  X {b[0]/65536:7.2f}..{b[2]/65536:7.2f}  Y {b[1]/65536:6.2f}..{b[3]/65536:6.2f}")
+    print("\nchests:")
+    for box, kind, contents, name in W["chest"]:
+        print(f"  {name:24s} kind={kind} contents={contents:2d}  "
+              f"X {box[0]/65536:6.2f}..{box[2]/65536:6.2f}  Y {box[1]/65536:5.2f}..{box[3]/65536:5.2f}")
+    print("\nspawns:", [f"p{i + 1} ({x:.2f}, {y:.2f}, z {z:.2f}) facing {f:+d}"
+                        for i, (x, y, f, z) in enumerate(spawns())])

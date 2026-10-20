@@ -27,28 +27,162 @@ namespace GulagRunners.Sim
         public Fix Gravity;
         public Fix MaxFallSpeed;
         public Fix JumpSpeed;
+
+        /// <summary>
+        /// Let go of the button early and the rise is cut short by this. Off by default: a jump
+        /// whose height depends on how long a thumb stayed on glass is a jump a player cannot
+        /// aim, and every ledge in the arena is then a different distance depending on the tap.
+        /// </summary>
+        public bool VariableJumpHeight;
         public Fix JumpCutMul;
         public int CoyoteFrames;
         public int JumpBufferFrames;
 
         public Fix ClimbUpSpeed;
         public Fix ClimbDownSpeed;
-        /// <summary>How fast you edge sideways off a ladder.</summary>
-        public Fix LadderDismountSpeed;
+
+        /// <summary>
+        /// How fast the body is drawn back to the ladder's centre line after drifting off it. The
+        /// grab itself no longer uses this — it eases on over several frames — so all this has left
+        /// to undo is a sideways nudge, and it does it at climbing speed so it cannot be seen.
+        /// </summary>
+        public Fix LadderSnapSpeed;
+
+        /// <summary>Clearance kept below the top of a ladder box, so climbing never leaves it.</summary>
+        public Fix LadderTopMargin;
+
+        /// <summary>
+        /// The depth the fight happens at: the level's gameplay plane, which PlayerController
+        /// fills in from the fighter's own Plane Z.
+        ///
+        /// Lanes exist so a fighter can step back onto a ramp or a walkway that was modelled
+        /// behind the plane — not so he can take up residence there. Whenever the surface
+        /// under his feet reaches this, it is where he stands.
+        /// </summary>
+        public Fix HomeDepth;
+
+        /// <summary>How far to either side the climb-out looks for floor to step onto.</summary>
+        public Fix MantleReach;
+
+        /// <summary>
+        /// Average speed of a scripted ladder move — the grab at the bottom of a ladder and the
+        /// climb-out at the top. Both last as long as their own distance at this speed, so neither
+        /// is ever a snap: the eased peak is one and a half times this, which at the default is
+        /// exactly a run. A fixed duration cannot do that, because the distance is not fixed.
+        /// </summary>
+        public Fix ScriptSpeed;
+        /// <summary>Floor and ceiling on a scripted move's length, in frames. The ceiling is what
+        /// stops a long climb-out from taking a whole second; it is high enough that the peak stays
+        /// below a dodge even at full reach.</summary>
+        public int ScriptMinFrames;
+        public int ScriptMaxFrames;
+
+        /// <summary>
+        /// Frames after letting go of a ladder during which it cannot be grabbed again. Without it,
+        /// jumping off a ladder while still holding the stick up re-grabs it on the very next tick,
+        /// which is the ladder trap wearing a different hat.
+        /// </summary>
+        public int LadderRegrabFrames;
 
         public Fix DodgeSpeed;
         public int DodgeFrames;
         public int DodgeRecoverFrames;
+        /// <summary>Charges one dodge costs. More than one is what makes dodges rare.</summary>
+        public int DodgeStaminaCost;
 
+        /// <summary>
+        /// Stamina is a pool of small charges rather than a count of dodges, because docs/02
+        /// spends it on two things at once — the dodge and holding a guard — and those two cannot
+        /// share a resource sensibly unless one of them can cost more than the other.
+        /// </summary>
         public int StaminaMax;
         public int StaminaRecoverFrames;
 
         public Fix BodyWidth;
+
+        /// <summary>
+        /// How much of the level's DEPTH a body occupies. The fight is flat, so this is never
+        /// moved through — it only decides which slice of a 3D location a body is standing on,
+        /// and therefore which boxes are in its way. docs/02: the arena is 3D, the fight is not.
+        /// </summary>
+        public Fix BodyDepth;
+
+        /// <summary>How fast a body slides between slices, in m/s. 0 snaps.</summary>
+        public Fix DepthSnapSpeed;
+
+        /// <summary>
+        /// How far ahead to look for the next thing worth standing on, in metres. A body walks
+        /// onto the slice of whatever it is about to climb: that is what lets one floor hold a
+        /// ramp at one depth and a crate staircase at another, and a fighter use both.
+        /// </summary>
+        public Fix LaneLookahead;
+
+        /// <summary>
+        /// The furthest a body will shift in depth to meet something, in metres. Without it a
+        /// fighter is pulled onto the slice of anything they could step onto, including the
+        /// wall at the back of the building, and walks out of the fight into the scenery.
+        /// </summary>
+        public Fix LaneReach;
+
+        /// <summary>
+        /// How far the body's centre sits in front of a ladder's NEAR FACE while climbing,
+        /// in metres. Smaller Z is towards the camera (docs/02).
+        ///
+        /// Half the thickness of the character's MODEL, and nothing else. The first version
+        /// of this took half of <see cref="BodyDepth"/> instead, which looked like the same
+        /// quantity and is not: body depth is how deep a slice of the LEVEL the body occupies
+        /// — a lane width, 0.6 m — while the fighter who has to touch the rungs is a stick
+        /// figure a hand's breadth thick. Measured on the arena's own ladder, that put the
+        /// body 33 cm off the rungs, hanging in mid-air beside a ladder it was supposedly
+        /// holding.
+        ///
+        /// The ladder's own thickness is not in here either. It is read per ladder from the
+        /// baked span, because a modelled ladder and a drawn-on one are not the same depth
+        /// and neither is a guess worth keeping in a config.
+        /// </summary>
+        public Fix LadderStandOff;
+
+        /// <summary>
+        /// Frames a deliberate aim outlives the swipe that asked for it.
+        ///
+        /// A swipe is one frame of input; the movement stick is held for hundreds. With no
+        /// lock the aim would be taken back by the feet before the windup finished, and a
+        /// blow asked for in one direction would land in the other — which is the bug that
+        /// makes the whole feature feel broken rather than absent. Long enough to cover a
+        /// windup and the swing it starts, and no longer: an aim that outlives its swing is
+        /// a fighter who will not turn round.
+        /// </summary>
+        public int AimLockFrames;
+
+        /// <summary>
+        /// The shortest a CLIMB-OUT may be, in frames, whatever its distance.
+        ///
+        /// Separate from ScriptMinFrames, which the two moves used to share. Reaching for a
+        /// ladder is genuinely quick and ten frames suits it. Hauling yourself onto a floor
+        /// is a whole-body move with a whole-body animation, and in this arena it covers
+        /// almost no height at all — the ladders' heads are flush with the floors they
+        /// serve — so by distance it came out at the minimum and was over in a sixth of a
+        /// second. An 0.83 s clip played in 0.17 s is not a fast climb-out, it is a flicker
+        /// followed by a cut.
+        /// </summary>
+        public int MantleMinFrames;
+
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
         /// <summary>Ledge assist: steps this high are climbed instead of blocking you.</summary>
         public Fix StepUpHeight;
+
+        /// <summary>
+        /// The tallest ledge a standing body will haul itself onto without jumping. Anything
+        /// over StepUpHeight costs most of the speed it was carrying, so a stepped slope is
+        /// walked up at a crawl rather than hopped up one box at a time — and a kerb is still
+        /// a kerb. 0 leaves only the free step.
+        /// </summary>
+        public Fix ClamberHeight;
+
+        /// <summary>Share of the speed kept after hauling up. The cost that makes it read.</summary>
+        public int ClamberSpeedPermille;
         /// <summary>Ledge assist: a jump clipping a corner by less than this is nudged through.</summary>
         public Fix CornerCorrect;
 
@@ -59,6 +193,15 @@ namespace GulagRunners.Sim
         public int StepNoiseFrames;
         /// <summary>Landing faster than this is a Loud landing.</summary>
         public Fix HardLandSpeed;
+
+        /// <summary>
+        /// How long a fighter is knocked about for by a closing gate (docs/01's shutters).
+        ///
+        /// Being put somewhere you did not walk to has to read as something that happened to
+        /// you rather than a teleport, and the window is what makes being shoved through a
+        /// doorway a risk instead of a free escape from whoever was chasing you through it.
+        /// </summary>
+        public int GateStaggerFrames;
 
         public static MoveConfig Default()
         {
@@ -73,26 +216,50 @@ namespace GulagRunners.Sim
             c.Gravity          = Fix.FromMilli(28000);
             c.MaxFallSpeed     = Fix.FromMilli(18000);
             c.JumpSpeed        = Fix.FromMilli(9500);
+            c.VariableJumpHeight = false;
             c.JumpCutMul       = Fix.FromMilli(450);
             c.CoyoteFrames     = 6;   // 0.10 s
             c.JumpBufferFrames = 7;   // 0.12 s
 
             c.ClimbUpSpeed   = Fix.FromMilli(2000);
             c.ClimbDownSpeed = Fix.FromMilli(2600);
-            c.LadderDismountSpeed = Fix.FromMilli(1500);
+            c.LadderSnapSpeed = Fix.FromMilli(2000);
+            c.LadderTopMargin = Fix.FromMilli(60);
 
-            c.DodgeSpeed         = Fix.FromMilli(7000);
-            c.DodgeFrames        = 21;  // 0.35 s
+            // The gameplay plane, which only the scene knows: PlayerController fills it in from
+            // the fighter's own Plane Z. Zero here is the right default — a world with no depth
+            // data has one slice and it is this one.
+            c.HomeDepth = Fix.Zero;
+            c.MantleReach = Fix.FromMilli(1600);
+            c.ScriptSpeed = Fix.FromMilli(2400);
+            c.ScriptMinFrames = 10;       // 0.17 s
+            c.ScriptMaxFrames = 30;       // 0.50 s
+            c.LadderRegrabFrames = 12;    // 0.20 s
+
+            c.DodgeSpeed         = Fix.FromMilli(4800);   // 1.68 m, down from 2.45
+            c.DodgeFrames        = 21;  // 0.35 s of invulnerability, straight from docs/02
             c.DodgeRecoverFrames = 9;
+            c.DodgeStaminaCost   = 2;      // two dodges back to back, then 2.4 s of waiting
 
-            c.StaminaMax            = 3;
-            c.StaminaRecoverFrames  = 72; // 1.2 s
+            c.StaminaMax            = 4;   // docs/02 says 3; 4 so a block can cost 1 and a
+                                           // dodge 2, which is the "two in a row" the dodge
+                                           // was retuned to in the movement pass
+            c.StaminaRecoverFrames  = 72;  // 1.2 s a charge, straight from docs/02
 
             c.BodyWidth   = Fix.FromMilli(600);
+            c.BodyDepth   = Fix.FromMilli(600);
+            c.DepthSnapSpeed = Fix.FromMilli(4000);
+            c.LaneLookahead  = Fix.FromMilli(1200);
+            c.LaneReach      = Fix.FromMilli(2000);
+            c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
+            c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
+            c.MantleMinFrames = 26;                  // 0.43 s: long enough to read as a haul
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 
             c.StepUpHeight  = Fix.FromMilli(300);
+            c.ClamberHeight = Fix.FromMilli(550);   // one crate of this location's staircases
+            c.ClamberSpeedPermille = 400;
             c.CornerCorrect = Fix.FromMilli(250);
 
             c.FallThroughFrames = 18;
@@ -100,6 +267,8 @@ namespace GulagRunners.Sim
             c.LoudSpeed       = Fix.FromMilli(2500);
             c.StepNoiseFrames = 18;  // a footstep every 0.3 s
             c.HardLandSpeed   = Fix.FromMilli(8000);
+
+            c.GateStaggerFrames = 24;  // 0.40 s: shoved, and briefly open for it
             return c;
         }
     }
