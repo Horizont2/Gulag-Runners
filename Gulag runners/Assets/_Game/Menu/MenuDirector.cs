@@ -57,8 +57,14 @@ namespace GulagRunners.Game
 
         [Header("The match")]
         [Tooltip("Scene to load. Empty plays the whole move and loads nothing, which is how " +
-                 "to look at the transition without leaving the menu.")]
-        public string matchScene = "SetupScene";
+                 "to look at the transition without leaving the menu.\n\n" +
+                 "Arena_Demo is the match: the arena, the chests, the cage doors and the " +
+                 "only HUD in the project. SetupScene is the movement bench from docs/11 " +
+                 "and has no canvas at all, so a phone build that lands there has no " +
+                 "controls and nothing to read.\n\n" +
+                 "This is a NAME, checked by nobody. A scene missing from the build list " +
+                 "loads fine in the editor and fails on the device.")]
+        public string matchScene = "Arena_Demo";
 
         [Tooltip("Start loading at this point of the walk, 0 to 1, and show the next scene " +
                  "only once the walk has finished. Loading early hides the wait inside the " +

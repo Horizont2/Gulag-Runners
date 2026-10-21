@@ -426,8 +426,7 @@ namespace GulagRunners.GameEditor
 
             EnsureEventSystem();
 
-            if (search.director == null)
-                search.director = Object.FindFirstObjectByType<MenuDirector>();
+            if (search.director == null) search.director = EnsureDirector(wired);
             if (search.progress == null)
                 search.progress = Object.FindFirstObjectByType<PlayerProgress>();
 
@@ -446,7 +445,7 @@ namespace GulagRunners.GameEditor
 
             string made = drew.Count > 0 ? $" Drew {string.Join(", ", drew)}." : "";
             string warn = search.director == null
-                ? "\nNo MenuDirector in this scene, so there is nothing to load the arena."
+                ? "\nNo MenuDirector and none could be made, so nothing loads the arena."
                 : "";
             Debug.Log($"Search screen: built at {_scale:0.##}x.{made}\n" +
                       $"Wired: {string.Join(", ", wired)}. " +
@@ -454,6 +453,34 @@ namespace GulagRunners.GameEditor
                       "component, every number taken out of the game as it stands.\n" +
                       "Drop your stills into Menu Backdrop > Stills on the canvas." + warn,
                       rootGo);
+        }
+
+        /// <summary>
+        /// The thing that actually leaves the menu, made if it is not there.
+        ///
+        /// It used to be looked up and, when absent, left null with a line in the console.
+        /// That is the quietest failure this screen has: PLAY opens the search, the search
+        /// finds an opponent, and then Loading() takes its director == null branch, goes
+        /// straight to Starting and loads nothing. Everything animates, the bar fills, and
+        /// the game never begins. Both this builder and the menu's wire a director into
+        /// something, so both can supply one -- it has no required references, it finds
+        /// its own fighter and camera, and the gate is optional.
+        ///
+        /// Same object name MenuSceneSetup uses, so running that afterwards finds this one
+        /// and fills in the gate rather than making a second.
+        /// </summary>
+        static MenuDirector EnsureDirector(List<string> wired)
+        {
+            MenuDirector d = Object.FindFirstObjectByType<MenuDirector>();
+            if (d != null) return d;
+
+            GameObject go = GameObject.Find("Menu") ?? new GameObject("Menu");
+            Undo.RegisterCreatedObjectUndo(go, "Build the search screen");
+            d = Undo.AddComponent<MenuDirector>(go);
+            if (d.view == null) d.view = Camera.main ?? Object.FindFirstObjectByType<Camera>();
+            wired.Add("a MenuDirector (there was none — set its Gate by hand, or run "
+                      + "Setup > Set up the menu scene)");
+            return d;
         }
 
         MenuBackdrop BuildBackdrop(Transform screen, GameObject rootGo,

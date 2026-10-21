@@ -383,8 +383,30 @@ namespace GulagRunners.GameEditor
 
             EnsureEventSystem();
 
+            // Made if the scene has none, for the same reason the progress below is: a
+            // null here is the quietest failure the menu has. PLAY calls Play(), Play()
+            // hands over to the search, and the search's Loading() takes its
+            // director == null branch and loads nothing. Every animation runs and the
+            // game never begins. A MenuDirector has no required references -- it finds
+            // its own fighter and camera and the gate is optional -- so there is nothing
+            // to stop this supplying one.
+            //
+            // Same object name MenuSceneSetup uses, so running that afterwards fills in
+            // this one's gate rather than making a second director.
             if (view.director == null)
+            {
                 view.director = Object.FindFirstObjectByType<MenuDirector>();
+                if (view.director == null)
+                {
+                    GameObject go = GameObject.Find("Menu") ?? new GameObject("Menu");
+                    Undo.RegisterCreatedObjectUndo(go, "Build the menu");
+                    view.director = Undo.AddComponent<MenuDirector>(go);
+                    view.director.view = Camera.main
+                                         ?? Object.FindFirstObjectByType<Camera>();
+                    wired.Add("a MenuDirector (there was none — set its Gate by hand, or "
+                              + "run Setup > Set up the menu scene)");
+                }
+            }
 
             // The ladder and the purse live here, because the menu is the only screen that
             // reads them and the only one that outlives a match. Made if the scene has
