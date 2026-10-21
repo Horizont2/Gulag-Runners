@@ -43,6 +43,7 @@ namespace GulagRunners.GameEditor
         float _scale = 1f;
         float _readoutScale = 1f;
         float _buttonScale = 1f;
+        Font _font;
 
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
         readonly List<string> _unmatched = new List<string>();
@@ -130,6 +131,15 @@ namespace GulagRunners.GameEditor
                 foreach (string path in _unmatched)
                     EditorGUILayout.LabelField("   unused", Path.GetFileName(path));
             }
+
+            EditorGUILayout.Space();
+            _font = (Font)EditorGUILayout.ObjectField(
+                new GUIContent("Typeface",
+                               "Optional. The sheet is set in Inter; this project ships no " +
+                               "font and no TextMeshPro, so without one here every label " +
+                               "comes out in Unity's built-in Arial and the screen will " +
+                               "not read like the mock-up. Import Inter and drop it in."),
+                _font, typeof(Font), false);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Size on screen", EditorStyles.boldLabel);
@@ -375,8 +385,26 @@ namespace GulagRunners.GameEditor
 
             if (view.director == null)
                 view.director = Object.FindFirstObjectByType<MenuDirector>();
+
+            // The ladder and the purse live here, because the menu is the only screen that
+            // reads them and the only one that outlives a match. Made if the scene has
+            // none: without it the league and the gold are the typed-in numbers on
+            // MenuProfile, which look exactly like real ones and are not.
             if (view.progress == null)
+            {
                 view.progress = Object.FindFirstObjectByType<PlayerProgress>();
+                if (view.progress == null)
+                {
+                    GameObject save = new GameObject("Player Progress", typeof(PlayerProgress));
+                    Undo.RegisterCreatedObjectUndo(save, "Build the menu");
+                    view.progress = save.GetComponent<PlayerProgress>();
+                    wired.Add("a new Player Progress");
+                }
+                else wired.Add("the Player Progress already in the scene");
+            }
+
+            if (view.director == null)
+                dead.Add("MenuDirector — PLAY will do nothing until one is in the scene");
 
             EditorUtility.SetDirty(view);
             Selection.activeGameObject = rootGo;
@@ -422,7 +450,7 @@ namespace GulagRunners.GameEditor
             Wire(view.leagueChanged, leagueLabel.Set, "league name", wired, dead);
 
             Vector2 track = Size("menu/bar/track", 430, 10);
-            RectTransform trackRt = Make("Rank bar", block, 64, 52 + badge.y + 12,
+            RectTransform trackRt = Make("Rank bar", block, 64, 106,
                                          track.x, track.y, 0f, 0f, k);
             Picture(trackRt.gameObject, sprites, "menu/bar/track", true);
 
@@ -441,29 +469,106 @@ namespace GulagRunners.GameEditor
                         List<string> wired, List<string> dead)
         {
             RectTransform block = Panel("Purse", root);
-            float k = _readoutScale;
 
+            // Rows that HUG their contents and hang off the right edge, which is what the
+            // sheet's auto-layout does and what a fixed box cannot.
+            //
+            // The first version gave the number a 320-wide right-aligned box and put the
+            // coin a fixed distance left of the BOX. The number is only as wide as the
+            // number, so the coin ended up floating a third of the way across the screen
+            // from the figure it belongs to. A purse that grows from 240 to 24 000 moves
+            // the coin here; it moved nothing there, which is the same bug seen twice.
+            RectTransform goldRow = Row(block, "Gold", 64, 54, 10);
             Vector2 coin = Size("menu/icon/coin", 24, 24) * 1.25f;
-            // Right-anchored, so the number grows LEFT from the edge and a four figure
-            // purse does not push the coin off the screen.
-            RectTransform goldRt = Make("Gold", block, DesignW - 64 - 320, 54, 320, 38, 1f, 0f, k);
-            MenuLabel gold = LabelOn(goldRt, "1 240", "Bold", 30, TextAnchor.MiddleRight);
+            Image coinImage = Icon(goldRow, sprites, "menu/icon/coin", coin);
+            coinImage.color = Gold;
+
+            MenuLabel gold = LabelIn(goldRow, "Gold", "1 240", 30, true);
+            gold.target.color = Gold;
             Wire(view.goldChanged, gold.Set, "gold", wired, dead);
 
-            RectTransform coinRt = Make("Coin", block, DesignW - 64 - 320 - coin.x - 10, 58,
-                                        coin.x, coin.y, 1f, 0f, k);
-            Picture(coinRt.gameObject, sprites, "menu/icon/coin", false);
-
+            RectTransform dailyRow = Row(block, "Contracts", 64, 104, 10);
             Vector2 scroll = Size("menu/icon/contract", 24, 24) * 1.1f;
-            RectTransform dailyRt = Make("Contracts", block, DesignW - 64 - 320, 104,
-                                         320, 34, 1f, 0f, k);
-            MenuLabel daily = LabelOn(dailyRt, "1 / 3", "Regular", 26, TextAnchor.MiddleRight);
-            Wire(view.dailiesChanged, daily.Set, "contracts", wired, dead);
+            Icon(dailyRow, sprites, "menu/icon/contract", scroll);
 
-            RectTransform scrollRt = Make("Contract icon",
-                                          block, DesignW - 64 - 320 - scroll.x - 10, 106,
-                                          scroll.x, scroll.y, 1f, 0f, k);
-            Picture(scrollRt.gameObject, sprites, "menu/icon/contract", false);
+            MenuLabel daily = LabelIn(dailyRow, "Contracts", "1 / 3", 26, false);
+            Wire(view.dailiesChanged, daily.Set, "contracts", wired, dead);
+        }
+
+        /// <summary>The one coloured thing on the screen besides PLAY.</summary>
+        static readonly Color Gold = new Color(0.91f, 0.64f, 0.24f);
+
+        /// <summary>Whatever was dropped in, or the one font that is always there.</summary>
+        Font Face => _font != null
+            ? _font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        /// <summary>
+        /// A row pinned to the right edge that is exactly as wide as what is in it.
+        ///
+        /// uGUI's own layout rather than arithmetic, because the width of a line of text
+        /// is not knowable until it is laid out — and the whole reason the first version
+        /// put the coin in the wrong place is that it tried to guess it.
+        /// </summary>
+        RectTransform Row(Transform parent, string name, float fromRight, float fy, float gap)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            Undo.RegisterCreatedObjectUndo(go, "Build the menu");
+            RectTransform rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(1f, 1f);
+            rt.anchoredPosition = new Vector2(-fromRight, -fy) * _readoutScale;
+
+            HorizontalLayoutGroup row = Undo.AddComponent<HorizontalLayoutGroup>(go);
+            row.spacing = gap * _readoutScale;
+            row.childAlignment = TextAnchor.MiddleRight;
+            row.childControlWidth = true;
+            row.childControlHeight = true;
+            row.childForceExpandWidth = false;
+            row.childForceExpandHeight = false;
+
+            ContentSizeFitter fit = Undo.AddComponent<ContentSizeFitter>(go);
+            fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            return rt;
+        }
+
+        /// <summary>An icon inside a layout row, held at its own size.</summary>
+        Image Icon(Transform row, Dictionary<string, Sprite> sprites, string key, Vector2 size)
+        {
+            GameObject go = new GameObject(Tail(key), typeof(RectTransform));
+            Undo.RegisterCreatedObjectUndo(go, "Build the menu");
+            go.transform.SetParent(row, false);
+
+            LayoutElement fixedSize = Undo.AddComponent<LayoutElement>(go);
+            fixedSize.preferredWidth = size.x * _readoutScale;
+            fixedSize.preferredHeight = size.y * _readoutScale;
+
+            return Picture(go, sprites, key, false);
+        }
+
+        /// <summary>A label inside a layout row; the row decides how wide it ends up.</summary>
+        MenuLabel LabelIn(Transform row, string name, string chars, float size, bool bold)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            Undo.RegisterCreatedObjectUndo(go, "Build the menu");
+            go.transform.SetParent(row, false);
+
+            Text t = Undo.AddComponent<Text>(go);
+            t.text = chars;
+            t.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _readoutScale));
+            t.alignment = TextAnchor.MiddleRight;
+            t.raycastTarget = false;
+            t.color = new Color(1f, 1f, 1f, 0.92f);
+            t.font = Face;
+            t.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
+            t.horizontalOverflow = HorizontalWrapMode.Overflow;
+            t.verticalOverflow = VerticalWrapMode.Overflow;
+
+            MenuLabel label = Undo.AddComponent<MenuLabel>(go);
+            label.target = t;
+            label.placeholder = chars;
+            return label;
         }
 
         void BuildPlate(Transform root, Dictionary<string, Sprite> sprites, MenuUI view,
@@ -489,9 +594,9 @@ namespace GulagRunners.GameEditor
             RectTransform block = Panel("Play", root);
             Vector2 play = Size("menu/button/play", 400, 112);
 
+            // 648 from the top on the sheet, which is 104 up from the bottom edge.
             RectTransform rt = Make("Button / PLAY", block, DesignW - 64 - play.x,
-                                    DesignH - 152 - play.y, play.x, play.y,
-                                    1f, 1f, _buttonScale);
+                                    648, play.x, play.y, 1f, 1f, _buttonScale);
             Image face = Picture(rt.gameObject, sprites, "menu/button/play", true);
             // The only coloured thing on the screen, and the one the eye has to find first.
             face.color = new Color(0.91f, 0.64f, 0.24f);
@@ -506,7 +611,8 @@ namespace GulagRunners.GameEditor
             UnityEventTools.AddPersistentListener(button.onClick, new UnityAction(view.Play));
             wired.Add("PLAY");
 
-            RectTransform modeRt = Make("Mode", block, DesignW - 64 - 300, DesignH - 118,
+            // Directly under the button, by the sheet's own ten-unit gap.
+            RectTransform modeRt = Make("Mode", block, DesignW - 64 - 300, 648 + play.y + 10,
                                         300, 28, 1f, 1f, _buttonScale);
             Text mode = TextOn(modeRt, "MEDIEVAL", "Regular", 20, TextAnchor.MiddleRight);
             mode.color = new Color(1f, 1f, 1f, 0.55f);
@@ -623,7 +729,7 @@ namespace GulagRunners.GameEditor
             t.alignment = align;
             t.raycastTarget = false;
             t.color = new Color(1f, 1f, 1f, 0.92f);
-            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            t.font = Face;
             t.fontStyle = style == "Bold" || style == "Semi Bold" ? FontStyle.Bold : FontStyle.Normal;
             return t;
         }
