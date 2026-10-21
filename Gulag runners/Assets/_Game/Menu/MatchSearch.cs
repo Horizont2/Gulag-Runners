@@ -63,19 +63,50 @@ namespace GulagRunners.Game
         [Tooltip("Seconds the found opponent is shown before the walk begins.")]
         [Range(0.2f, 3f)] public float foundSeconds = 1.1f;
 
+        /// <summary>
+        /// The pool, and the only copy of it. SearchBuilder used to carry its own and
+        /// overwrite this one, which is two lists that have to agree -- the same trap as
+        /// two scrim gradients. The builder now reads whatever is here.
+        ///
+        /// Every number is taken out of the game as it stands, not out of the design
+        /// documents. A tip that is nearly true is worse than no tip: it is the interface
+        /// telling a player something they will be punished for believing. Where each
+        /// came from:
+        ///
+        ///   siren        MatchConfig.SirenFrames 90, at 0:25, and SirenDirection
+        ///   noise        NoiseLevel -- crouching is Silent, running is Loud
+        ///   prying       ChestConfig: 150 frames bare, half that with a tool, ToolWear 2,
+        ///                BareNoise Medium against ToolNoise Loud
+        ///   desperation  DesperationHealthPermille 300, DesperationDamagePermille 1400,
+        ///                and CombatMotor applies it to the ATTACKER, whatever is in hand
+        ///   parry        ParryFrames 12, and Parry() sets StaggerTimer to StaggerFrames 48
+        ///   guard break  GuardBreakFrames 42
+        ///   chip         ChipPermille 300 -- a block eats 70%, not all of it
+        ///   guard drain  GuardDrainFrames 48, four charges
+        ///   combo        MaxCombo 3, ComboWindowFrames 20
+        ///   the rooms    180+1320+90+2010 = 3600 frames, so Closing opens at 1:00 and
+        ///                ShutterFrames takes the rooms to 2:00. The ceiling is a
+        ///                different thing at a different time: sudden death, 2:20.
+        /// </summary>
         [Header("Tips")]
         [Tooltip("Shown one at a time, top left. The other half of what docs/09 asks the " +
                  "daily contracts to do: teach the mechanics. A player stares at this " +
-                 "screen twice a match and at nothing else while they wait.")]
+                 "screen twice a match and at nothing else while they wait.\n\n" +
+                 "Every number in them is read out of the live config. Check one before " +
+                 "you change it.")]
         [TextArea(2, 4)]
         public string[] tips =
         {
-            "A SIREN AT 0:25\nGIVES A DIRECTION,\nNEVER A POSITION.",
-            "A GUARD HELD TOO LONG\nBREAKS. THE SECOND\nAFTER IS WHEN YOU DIE.",
-            "BARE HANDS HIT HARDER\nBELOW A THIRD OF YOUR\nHEALTH. SO DO THEIRS.",
-            "A CHEST YOU OPEN IS\nA SOUND THEY HEAR.\nOPEN IT ANYWAY.",
-            "THE CEILING COMES DOWN\nAT 1:00. THE ROOMS SHUT\nBEFORE IT DOES.",
-            "A PARRY COSTS NOTHING\nAND BUYS SEVEN FRAMES.\nA BLOCK COSTS STAMINA.",
+            "THE SIREN AT 0:25\nGIVES A DIRECTION,\nNEVER A POSITION.",
+            "CROUCHING IS SILENT.\nRUNNING IS THE LOUDEST\nTHING YOU CAN DO.",
+            "A TOOL HALVES THE PRY,\n2.5 S TO 1.25 — AND COSTS\nTWO SWINGS AND THE NOISE.",
+            "BELOW 30% HEALTH\nYOUR BLOWS HIT 40% HARDER.\nSO DO HIS.",
+            "A PARRY IS TWELVE FRAMES\nWIDE AND STAGGERS HIM\nFOR EIGHT TENTHS.",
+            "A BROKEN GUARD LEAVES\nYOU OPEN FOR 0.7 S.\nLONG ENOUGH FOR TWO.",
+            "A BLOCK EATS 70%\nOF A BLOW, NOT ALL.\nTHE REST STILL LANDS.",
+            "A RAISED GUARD SPENDS\nA CHARGE EVERY 0.8 S.\nFOUR CHARGES IS 3.2.",
+            "THREE BLOWS CHAIN.\nTHE WINDOW BETWEEN THEM\nIS A THIRD OF A SECOND.",
+            "THE ROOMS START SHUTTING\nAT 1:00. THE CEILING\nCOMES LATER, AND LOWER.",
         };
 
         [Tooltip("Seconds each tip is held. Long enough to read three lines twice.")]
