@@ -169,5 +169,44 @@ check("ten quiet periods leave the rating alone", abs(away["value"] - 1800.0) < 
 check("but the ladder is less sure of it", away["deviation"] > 60.0, "%.0f" % away["deviation"])
 check("and never more unsure than a brand new player", away["deviation"] <= 350.0)
 
+print("\nthe search: the net widens, and never past what the ladder allows")
+check("the net starts at 60 points either side", m.band(0) == 60, str(m.band(0)))
+check("it is fully cast at 14 seconds (400)", m.band(14) == 400, str(m.band(14)))
+check("and never goes wider", m.band(600) == 400, str(m.band(600)))
+check("the bar runs 0 to 1 across that",
+      m.cast(0) == 0.0 and m.cast(14) == 1.0,
+      "%.2f..%.2f" % (m.cast(0), m.cast(14)))
+check("and is monotone, never jumping back",
+      all(m.cast(t / 2.0) <= m.cast((t + 1) / 2.0) for t in range(0, 60)))
+
+check("two silvers 200 apart are refused on the first second",
+      not m.accepts(0, 40, 1400, 40, 1600))
+check("and accepted once the net has widened to reach them",
+      m.accepts(10, 40, 1400, 40, 1600))
+
+# THE safety property, and the reason any of this exists. docs/09's Miro note is
+# "professionals wont fight with starting players"; an empty queue is exactly when
+# somebody would be tempted to break it, so the band must never be able to.
+worst = []
+for seconds in range(0, 121, 1):
+    for rating in range(1700, 2400, 25):
+        if m.accepts(seconds, 10, 1500, 400, rating):
+            worst.append((seconds, rating))
+check("a newcomer never meets Platinum or above, at ANY wait (121s x 28 ratings)",
+      not worst, str(worst[:3]))
+
+trainee = [s for s in range(0, 121) if m.accepts(s, 2, 1500, 400, 1500)]
+check("somebody in their first five matches is never given a human", not trainee,
+      str(trainee[:3]))
+
+print("\nand when it gives up, it gives up to a bot rather than to a spinner")
+check("the first five matches are bots from the first second", m.offer_bot(2, 0))
+check("a veteran is not fobbed off at twenty seconds", not m.offer_bot(40, 20))
+check("but is at thirty", m.offer_bot(40, 30))
+early = [s for s in range(0, 25) if m.offer_bot(40, s)]
+check("never before the net is fully cast AND the clock has run", not early, str(early[:3]))
+check("the net being wide is not enough on its own",
+      not m.offer_bot(40, 14) and m.cast(14) >= 1.0)
+
 print("\n%s" % ("ALL PASS" if not fails else "%d FAIL(S): %s" % (len(fails), ", ".join(fails))))
 raise SystemExit(1 if fails else 0)

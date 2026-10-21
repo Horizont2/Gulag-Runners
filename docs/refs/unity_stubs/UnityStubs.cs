@@ -77,6 +77,7 @@ namespace UnityEngine.UI
     {
         public Color color;
         public bool raycastTarget;
+        public RectTransform rectTransform;
     }
 
     // Enough of each to type-check the casts HudView makes. It holds its references as

@@ -65,9 +65,26 @@ namespace GulagRunners.Game
                  "move; showing early throws the move away.")]
         [Range(0f, 1f)] public float loadStartsAt = 0.2f;
 
+        [Tooltip("Hold the finished load until Release() is called.\n\n" +
+                 "Off, the walk ends and the arena appears, which is right when there is " +
+                 "nobody else in it. On, the scene waits — because the other runner may " +
+                 "still be loading, and two fighters who started at different moments are " +
+                 "not in the same match. MatchSearch switches this on.")]
+        public bool waitForRelease;
+
         [Header("Debug")]
         public string state = "waiting";
 
+        /// <summary>0 to 1 while the arena loads, so something can show it.</summary>
+        public float LoadProgress { get; private set; }
+
+        /// <summary>Loaded and waiting for <see cref="Release"/>.</summary>
+        public bool ReadyToHandOver { get; private set; }
+
+        /// <summary>Let the arena through. Only meaningful with Wait For Release on.</summary>
+        public void Release() => _released = true;
+
+        bool _released;
         bool _leaving;
         Vector3 _gateHome;
         Vector3 _viewHome;
@@ -106,6 +123,9 @@ namespace GulagRunners.Game
         {
             StopAllCoroutines();
             _leaving = false;
+            _released = false;
+            ReadyToHandOver = false;
+            LoadProgress = 0f;
             state = "waiting";
             if (gate != null) gate.localPosition = _gateHome;
             if (view != null) view.transform.position = _viewHome;
@@ -174,6 +194,11 @@ namespace GulagRunners.Game
                     if (load != null) load.allowSceneActivation = false;
                 }
 
+                // Held back at 0.9 by Unity, which keeps the last tenth for activation.
+                // Reported as the whole of it, because a bar that stops at nine tenths and
+                // then jumps is a bar nobody believes the next time.
+                if (load != null) LoadProgress = Mathf.Clamp01(load.progress / 0.9f);
+
                 yield return null;
             }
 
@@ -181,6 +206,16 @@ namespace GulagRunners.Game
             {
                 state = string.IsNullOrEmpty(matchScene) ? "done (no scene set)" : "done";
                 yield break;
+            }
+
+            LoadProgress = 1f;
+
+            // Loaded here. Whether that means ready depends on who else is coming.
+            if (waitForRelease)
+            {
+                ReadyToHandOver = true;
+                state = "loaded, waiting to be let through";
+                while (!_released) yield return null;
             }
 
             state = "handing over";

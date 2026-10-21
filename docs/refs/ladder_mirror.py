@@ -158,3 +158,32 @@ def total(r):
 def day_at(matches, wins, dailies_done):
     return (matches * PER_MATCH + wins * PER_WIN +
             (FIRST_OF_DAY if matches > 0 else 0) + dailies_done * PER_DAILY)
+
+
+# ---------------------------------------------------------------- the search
+# Mirrors Assets/_Game/Meta/Matchmaker.cs.
+START_BAND, WIDEN_PER_SECOND, MAX_BAND, BOT_AFTER = 60, 25, 400, 25
+
+
+def band(seconds, start=START_BAND, widen=WIDEN_PER_SECOND, top=MAX_BAND):
+    return min(max(start, top), start + round(max(0.0, seconds) * widen))
+
+
+def cast(seconds, start=START_BAND, widen=WIDEN_PER_SECOND, top=MAX_BAND):
+    top = max(start, top)
+    if top == start:
+        return 1.0
+    return min(1.0, max(0.0, (band(seconds, start, widen, top) - start) / (top - start)))
+
+
+def accepts(seconds, matches_a, rating_a, matches_b, rating_b, **kw):
+    # The ladder's own rules FIRST. The band only ever narrows what they already allow.
+    if not may_meet(matches_a, rating_a, matches_b, rating_b):
+        return False
+    return abs(rating_a - rating_b) <= band(seconds, **kw)
+
+
+def offer_bot(matches_played, seconds, bot_after=BOT_AFTER, **kw):
+    if pool_for(matches_played) == "Training":
+        return True
+    return seconds >= max(1, bot_after) and cast(seconds, **kw) >= 1.0

@@ -70,6 +70,12 @@ namespace GulagRunners.Game
         [Tooltip("Runs the gate and loads the match. Found in the scene when empty.")]
         public MenuDirector director;
 
+        [Tooltip("Optional. The search screen.\n\n" +
+                 "Set it and PLAY looks for an opponent first; leave it empty and PLAY " +
+                 "walks straight out of the gate, which is what it did before there was " +
+                 "anybody to look for and is still how to test the transition on its own.")]
+        public MatchSearch search;
+
         [Tooltip("The fighter on show, so the shop can dress him. Optional.")]
         public MenuFighter fighter;
 
@@ -154,6 +160,12 @@ namespace GulagRunners.Game
         public void Play()
         {
             CloseAll();
+
+            // The search owns the walk once it exists: it has to find somebody before
+            // there is any point opening a gate, and it is the thing that holds the loaded
+            // scene back until the other runner is in.
+            if (search != null) { search.Begin(); return; }
+
             if (director != null) director.Play();
             else Debug.LogWarning($"{name}: no MenuDirector, so PLAY has nothing to open.", this);
         }
