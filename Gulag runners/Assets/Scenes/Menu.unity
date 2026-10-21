@@ -19253,7 +19253,7 @@ MonoBehaviour:
   sway: 1
   swayDegrees: 7
   swayPerSecond: 0.12
-  facing: 180
+  facing: 90
   skins: []
   skin: 
   weapons: []
@@ -19298,8 +19298,8 @@ Transform:
   m_GameObject: {fileID: 1900007000}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.3, y: 2.53, z: 1.125}
-  m_LocalScale: {x: 4.8, y: 0.2, z: 2.35}
+  m_LocalPosition: {x: -0.3, y: 2.53, z: 0.7801}
+  m_LocalScale: {x: 4.8, y: 0.2, z: 3.0397248}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 334806396}
