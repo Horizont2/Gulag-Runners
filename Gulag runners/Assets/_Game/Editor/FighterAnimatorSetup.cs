@@ -178,11 +178,18 @@ namespace GulagRunners.GameEditor
             built[upper].blendingMode = AnimatorLayerBlendingMode.Override;
             controller.layers = built;
 
-            // IK Pass on every layer, or OnAnimatorIK is never called and PlayerIK runs no
-            // code at all -- the same tick box Set up IK exists for, set here while the
+            // IK Pass on the BASE layer, or OnAnimatorIK is never called and PlayerIK runs
+            // no code at all -- the same tick box Set up IK exists for, set here while the
             // layers are being made rather than fixed up afterwards.
+            //
+            // On the base layer and nowhere else. Unity calls OnAnimatorIK once per layer
+            // that has it, and PlayerIK does a frame's work each time it is called: blends
+            // stepped by deltaTime, springs integrated, goals read back out of the animator
+            // and written again. Ticked on both layers it ran twice a frame, which halved
+            // every blend time and fed each goal back into itself. The goals set on the
+            // base pass carry into the later ones regardless, so there is nothing to gain.
             AnimatorControllerLayer[] layers = controller.layers;
-            for (int i = 0; i < layers.Length; i++) layers[i].iKPass = true;
+            for (int i = 0; i < layers.Length; i++) layers[i].iKPass = i == 0;
             controller.layers = layers;
 
             EditorUtility.SetDirty(controller);

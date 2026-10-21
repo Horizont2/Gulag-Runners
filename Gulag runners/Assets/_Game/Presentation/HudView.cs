@@ -49,6 +49,16 @@ namespace GulagRunners.Game
         public Color legendary = new Color(0.70f, 0.25f, 1.00f);
         public Color empty = new Color(0.40f, 0.42f, 0.45f);
 
+        [Header("Button glyphs")]
+        [Tooltip("The icon inside each ring. The RINGS stay white: they are interface, and " +
+                 "docs/26 keeps the interface to one colour so that a glow means rarity and " +
+                 "nothing else. The glyph inside is not interface, it is the verb — and a " +
+                 "verb is found faster by colour than by shape, especially under a thumb.")]
+        public Color attackGlyph = new Color(0.95f, 0.33f, 0.28f);
+        public Color blockGlyph = new Color(0.38f, 0.66f, 1f);
+        public Color actionGlyph = new Color(1f, 0.82f, 0.42f);
+        public Color jumpGlyph = new Color(0.52f, 0.88f, 0.55f);
+
         [Header("Danger")]
         [Tooltip("A weapon about to break, and health below the share where bare hands " +
                  "start hitting harder. One colour for both, because both mean the same " +
@@ -119,6 +129,17 @@ namespace GulagRunners.Game
         [Tooltip("The square itself.")]
         public Graphic frame;
 
+        [Tooltip("The square drawn SOLID, for a slot with something in it.")]
+        public Sprite filled;
+
+        [Tooltip("And drawn DASHED, for an empty one.\n\n" +
+                 "The two together are the only thing on the column that says \"this is " +
+                 "where a belt would go\" rather than \"this is a belt\". Built, the " +
+                 "dashed square was hard-wired to the utility slot and the other four were " +
+                 "always solid, so the difference looked like decoration and meant nothing. " +
+                 "Leave either empty and the square simply keeps the sprite it has.")]
+        public Sprite dashed;
+
         [Tooltip("Optional soft halo behind it. Its ALPHA is the rarity, not its colour.")]
         public Graphic glow;
 
@@ -137,6 +158,9 @@ namespace GulagRunners.Game
         public Graphic ring;
         public Graphic glyph;
     }
+
+    /// <summary>Which palette colour a button's glyph takes.</summary>
+    public enum GlyphInk { Attack, Block, Action, Jump }
 
     /// <summary>
     /// Paints the combat HUD from the simulation, and nothing else.
@@ -218,6 +242,29 @@ namespace GulagRunners.Game
         public HudButton action = new HudButton();
         public HudButton jump = new HudButton();
 
+        [Header("Off-screen cue")]
+        [Tooltip("The arc above the joystick, and the little chest at its point.\n\n" +
+                 "It is not decoration and it is not a joystick part: it is the answer to " +
+                 "\"the other one just found something — where?\". It stays INVISIBLE " +
+                 "until the opponent forces a chest, then points at it for a few seconds " +
+                 "and fades. Built, it was painted white and left on screen permanently, " +
+                 "which is why it read as a grey slab nobody could explain.\n\n" +
+                 "Optional: leave them empty and the HUD simply has no cue.")]
+        public Graphic cueArc;
+
+        [Tooltip("Optional. The little chest at the arc's point — WHAT happened, where the " +
+                 "arc is WHERE. It does not turn with the arc: a chest lying on its side " +
+                 "is not easier to read for it.")]
+        public Graphic cueIcon;
+
+        [Tooltip("Optional. The arc's rect, turned to point at what happened. Leave it " +
+                 "empty and the cue still appears, it just always points the way it was " +
+                 "drawn.")]
+        public RectTransform cuePivot;
+
+        [Tooltip("Seconds the cue stays up before it has faded away entirely.")]
+        [Range(0.5f, 8f)] public float cueSeconds = 2.5f;
+
         [Header("Everything else on one colour")]
         [Tooltip("Joystick, sound arc, mannequin, leader lines — anything that is simply " +
                  "a white line and never changes meaning. Drag them all in here.")]
@@ -235,7 +282,69 @@ namespace GulagRunners.Game
                  "you ever want to set a colour by hand and have it stay.")]
         public bool paintInEditMode = true;
 
+        // How much of the cue is left, and which way it points.
+        float _cue;
+        float _cueAngle;
+
         void Reset() => matchState = MatchState.Instance;
+
+        void OnEnable()
+        {
+            if (matchState == null) matchState = MatchState.Instance;
+            if (matchState != null) matchState.ChestOpened += OnChestOpened;
+        }
+
+        void OnDisable()
+        {
+            if (matchState != null) matchState.ChestOpened -= OnChestOpened;
+        }
+
+        /// <summary>
+        /// The opponent forced a chest. Point at it and start the clock.
+        ///
+        /// Only the opponent's: a player watching his own hands does not need an arrow
+        /// telling him where they are, and an indicator that fires on everything is an
+        /// indicator nobody reads.
+        /// </summary>
+        void OnChestOpened(int playerIndex, int chestIndex)
+        {
+            if (playerIndex == localPlayer) return;
+
+            PlayerController me = localPlayer == 0 ? player1 : player2;
+            SimWorld world = me != null ? me.World : null;
+            if (world == null || chestIndex < 0 || chestIndex >= world.Chests.Length) return;
+
+            Aabb box = world.Chests[chestIndex].Box;
+            float cx = Mid(box.MinX, box.MaxX), cy = Mid(box.MinY, box.MaxY);
+            float dx = cx - Metres(me.State.Position.X);
+            float dy = cy - Metres(me.State.Position.Y);
+
+            // The arc is drawn pointing up and to the left, so that is its zero.
+            _cueAngle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg - 135f;
+            _cue = Mathf.Max(0.5f, cueSeconds);
+        }
+
+        void PaintCue()
+        {
+            if (cueArc == null && cueIcon == null) return;
+
+            if (_cue > 0f) _cue -= Time.deltaTime;
+            float left = Mathf.Max(0f, _cue);
+            // Full for the first half, then out: an indicator that starts fading the
+            // instant it appears is one that is never seen at full strength.
+            float alpha = Application.isPlaying
+                ? Mathf.Clamp01(left / Mathf.Max(0.01f, cueSeconds * 0.5f))
+                : 0f;
+
+            if (cuePivot != null && alpha > 0f)
+                cuePivot.localRotation = Quaternion.Euler(0f, 0f, _cueAngle);
+
+            Tint(cueArc, Fade(palette.line, lineArtAlpha * alpha));
+            Tint(cueIcon, Fade(palette.line, alpha));
+        }
+
+        static float Mid(Fix a, Fix b) => (Metres(a) + Metres(b)) * 0.5f;
+        static float Metres(Fix v) => v.ToMilli() / 1000f;
 
         void LateUpdate()
         {
@@ -247,6 +356,7 @@ namespace GulagRunners.Game
             PaintClock();
             PaintColumn();
             PaintControls();
+            PaintCue();
 
             foreach (Graphic g in lineArt) Tint(g, Fade(palette.line, lineArtAlpha));
         }
@@ -311,7 +421,31 @@ namespace GulagRunners.Game
             bool sudden = matchState != null && Application.isPlaying &&
                           matchState.Match.Phase == MatchPhase.SuddenDeath;
             Tint(clock, sudden ? palette.danger : palette.line);
+
+            // The NUMBER, which until now was the mock's painted-on "1:24" and never moved.
+            // A clock that does not move is worse than no clock: the whole of docs/01 is a
+            // match on a timer, and an interface that shows a stopped one is lying about
+            // the only thing on screen the player cannot work out for himself.
+            if (clock is Text label)
+            {
+                string now = ClockText();
+                if (label.text != now) label.text = now;
+            }
         }
+
+        /// <summary>m:ss left of the match, or the mock's own number outside play mode.</summary>
+        string ClockText()
+        {
+            if (matchState == null || !Application.isPlaying) return "1:24";
+
+            int left = Mathf.Max(0, MatchMotor.TotalFrames(matchState.MatchRules) -
+                                    matchState.Match.Frame);
+            int seconds = Mathf.CeilToInt(left / (float)TicksPerSecond);
+            return $"{seconds / 60}:{seconds % 60:00}";
+        }
+
+        /// <summary>The simulation's fixed tick, which is what Match.Frame counts.</summary>
+        const int TicksPerSecond = 60;
 
         // ---------------------------------------------------------------- the column
 
@@ -343,6 +477,15 @@ namespace GulagRunners.Game
                     colour = Color.Lerp(colour, palette.danger, Mathf.Lerp(0.5f, 1f, beat));
                     glow = Mathf.Max(glow, 0.55f);
                 }
+
+                // Solid when something is in it, dashed when it is a place for something.
+                // Hard-wired to the utility row by the builder, the dashed square looked
+                // like a style nobody could account for; driven by what is IN the slot it
+                // is the one thing on the column that distinguishes a belt from a slot a
+                // belt would go in.
+                Sprite want = item == ItemId.None ? slot.dashed : slot.filled;
+                if (want != null && slot.frame is Image square && square.sprite != want)
+                    square.sprite = want;
 
                 Tint(slot.frame, colour);
                 Tint(slot.glow, Fade(colour, glow));
@@ -382,19 +525,32 @@ namespace GulagRunners.Game
             if (owner != null && Application.isPlaying)
                 guardBroken = owner.State.GuardBreakTimer > 0;
 
-            PaintButton(attack, false);
-            PaintButton(block, guardBroken);
-            PaintButton(action, false);
-            PaintButton(jump, false);
+            PaintButton(attack, GlyphInk.Attack, false);
+            PaintButton(block, GlyphInk.Block, guardBroken);
+            PaintButton(action, GlyphInk.Action, false);
+            PaintButton(jump, GlyphInk.Jump, false);
         }
 
-        void PaintButton(HudButton button, bool disabled)
+        void PaintButton(HudButton button, GlyphInk ink, bool disabled)
         {
             if (button == null) return;
-            Color colour = disabled ? Fade(palette.line, palette.disabledAlpha) : palette.line;
-            Tint(button.ring, colour);
-            Tint(button.glyph, colour);
+
+            // The ring is interface and stays white; the glyph is the verb and is coloured.
+            Color ring = disabled ? Fade(palette.line, palette.disabledAlpha) : palette.line;
+            Color glyph = Ink(ink);
+            if (disabled) glyph = Fade(glyph, palette.disabledAlpha);
+
+            Tint(button.ring, ring);
+            Tint(button.glyph, glyph);
         }
+
+        Color Ink(GlyphInk ink) => ink switch
+        {
+            GlyphInk.Block => palette.blockGlyph,
+            GlyphInk.Action => palette.actionGlyph,
+            GlyphInk.Jump => palette.jumpGlyph,
+            _ => palette.attackGlyph
+        };
 
         // ---------------------------------------------------------------- the reset button
 
@@ -419,6 +575,8 @@ namespace GulagRunners.Game
             foreach (HudSlot slot in slots)
             {
                 if (slot == null) continue;
+                if (slot.dashed != null && slot.frame is Image square)
+                    square.sprite = slot.dashed;
                 Tint(slot.frame, palette.empty);
                 Tint(slot.glow, Fade(palette.empty, 0f));
                 Tint(slot.icon, Fade(palette.line, 0f));
@@ -426,10 +584,10 @@ namespace GulagRunners.Game
                     slot.swapArrow.SetActive(false);
             }
 
-            PaintButton(attack, false);
-            PaintButton(block, false);
-            PaintButton(action, false);
-            PaintButton(jump, false);
+            PaintButton(attack, GlyphInk.Attack, false);
+            PaintButton(block, GlyphInk.Block, false);
+            PaintButton(action, GlyphInk.Action, false);
+            PaintButton(jump, GlyphInk.Jump, false);
 
             foreach (Graphic g in lineArt) Tint(g, Fade(palette.line, lineArtAlpha));
         }

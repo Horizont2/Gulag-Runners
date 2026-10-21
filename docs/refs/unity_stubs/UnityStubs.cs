@@ -66,10 +66,32 @@ namespace UnityEngine.InputSystem
 // Stubbed to the surface that file uses and no further, which is the rule for everything in
 // here: a stub that is larger than the code's real appetite stops being a check and starts
 // being a second, quieter engine.
+namespace UnityEngine
+{
+    public class Sprite : Object { }
+}
+
 namespace UnityEngine.UI
 {
     public class Graphic : MonoBehaviour
     {
         public Color color;
+        public bool raycastTarget;
+    }
+
+    // Enough of each to type-check the casts HudView makes. It holds its references as
+    // Graphic on purpose -- the base of Image, Text and TMP_Text alike -- and reaches for
+    // the derived type only where it needs something Graphic does not have: the sprite on
+    // a slot square, the string on the clock.
+    public class Image : Graphic
+    {
+        public Sprite sprite;
+        public bool preserveAspect;
+    }
+
+    public class Text : Graphic
+    {
+        public string text;
+        public int fontSize;
     }
 }

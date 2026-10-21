@@ -85,7 +85,7 @@ namespace GulagRunners.GameEditor
         {
             new Asset("hud/slot/frame", 64, 64, 12),
             new Asset("hud/slot/frame-dashed", 64, 64, 12),
-            new Asset("hud/slot/glow", 160, 160),
+            new Asset("hud/slot/glow", 100, 100),
             new Asset("hud/slot/swap-arrow", 18, 18),
             new Asset("hud/bar/frame", 440, 32, 8),
             new Asset("hud/bar/fill", 424, 16, 4),
@@ -380,14 +380,27 @@ namespace GulagRunners.GameEditor
         // lines come out as whichever single path was selected. Neither is art — one is a
         // distance field and the other is five straight lines — so generating them is both
         // easier and sharper than a 4x raster of someone else's blur.
+        /// <summary>
+        /// The pieces this tool draws itself, because Figma cannot export them usefully.
+        ///
+        /// The sound arc is here now as well. What came out of the export was a 444x213
+        /// bitmap of a shape whose frame is 210x62 -- the vector cropped to its own bounds
+        /// at some other scale -- and no rect that is the right SIZE is also the right
+        /// SHAPE for it. Drawn here it is an arc, at whatever scale the rest of the export
+        /// came out at.
+        /// </summary>
         static readonly string[] Generated =
-            { "hud/slot/glow", "hud/leaders", "hud/leaders-mirrored" };
+            { "hud/slot/glow", "hud/leaders", "hud/leaders-mirrored", "hud/sound/arc" };
 
+        /// <summary>
+        /// Redrawn every build, not only when missing: these files are this tool's output,
+        /// in a folder called "generated", and a design size changed up in Needed has to
+        /// reach the PNG or it changes nothing at all.
+        /// </summary>
         void GenerateMissing(string root, List<string> made)
         {
             foreach (string key in Generated)
             {
-                if (_found.ContainsKey(key)) continue;
                 Asset asset = Needed.First(a => a.Key == key);
                 string dir = $"{root}/generated";
                 if (!AssetDatabase.IsValidFolder(dir))
@@ -398,7 +411,10 @@ namespace GulagRunners.GameEditor
                 int at = Mathf.Max(1, Mathf.RoundToInt(_scale));
                 Texture2D tex = key == "hud/slot/glow"
                     ? DrawGlow((int)asset.W, (int)asset.H, at)
-                    : DrawLeaders((int)asset.W, (int)asset.H, at, key.EndsWith("mirrored"));
+                    : key == "hud/sound/arc"
+                        ? DrawArc((int)asset.W, (int)asset.H, at)
+                        : DrawLeaders((int)asset.W, (int)asset.H, at,
+                                      key.EndsWith("mirrored"));
 
                 File.WriteAllBytes(path, tex.EncodeToPNG());
                 Object.DestroyImmediate(tex);
@@ -412,15 +428,63 @@ namespace GulagRunners.GameEditor
         /// A soft square halo as a distance field, which is what a blur of a rounded
         /// rectangle is anyway — and sharper, because it is computed rather than sampled.
         /// </summary>
+        /// <summary>
+        /// The off-screen cue: a thin arc, fading out at both ends.
+        ///
+        /// A circular segment whose chord is the full width and whose sagitta is the
+        /// height, so it fills the rect it is given at any size. The ends fade over the
+        /// outer third of the sweep, which is what stops it reading as a closed shape --
+        /// it is a direction, not a dial.
+        /// </summary>
+        static Texture2D DrawArc(int w, int h, int scale)
+        {
+            int W = w * scale, H = h * scale;
+            Texture2D tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
+            Color[] px = new Color[W * H];
+
+            float stroke = 3f * scale;
+            float a = W * 0.5f;                       // half the chord
+            float sag = Mathf.Max(1f, H - stroke * 2f);
+            float R = (a * a + sag * sag) / (2f * sag);
+            Vector2 centre = new Vector2(W * 0.5f, stroke + R);   // y grows downward
+            float sweep = Mathf.Asin(Mathf.Clamp01(a / R));       // half the angle, radians
+
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    Vector2 d = new Vector2(x + 0.5f - centre.x, y + 0.5f - centre.y);
+                    float r = d.magnitude;
+
+                    // Across the stroke: one pixel of antialiasing on each side.
+                    float band = 1f - Mathf.SmoothStep(stroke * 0.5f - 1f,
+                                                       stroke * 0.5f + 1f, Mathf.Abs(r - R));
+
+                    // Along it: full in the middle third, gone by the ends.
+                    float ang = Mathf.Abs(Mathf.Atan2(d.x, -d.y));
+                    float ends = 1f - Mathf.SmoothStep(sweep * 0.45f, sweep, ang);
+
+                    px[y * W + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(band * ends));
+                }
+
+            tex.SetPixels(px);
+            tex.Apply();
+            return tex;
+        }
+
         static Texture2D DrawGlow(int w, int h, int scale)
         {
             int W = w * scale, H = h * scale;
             Texture2D tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
             Color[] px = new Color[W * H];
 
+            // The square it sits behind is 64; the halo is whatever Needed says, and the
+            // falloff is what is left over. Written as fractions so the halo can be made
+            // smaller in one place -- at 160 it was two and a half times the square it
+            // was meant to be haloing, which on a 0.65-scaled column is most of the gap
+            // between one slot and the next.
             float half = 32f * scale;              // the 64 px square at the middle
             float radius = 12f * scale;
-            float falloff = 46f * scale;
+            float falloff = Mathf.Max(6f, (w * 0.5f - 32f) * 1.25f) * scale;
             Vector2 centre = new Vector2(W * 0.5f, H * 0.5f);
 
             for (int y = 0; y < H; y++)
@@ -705,13 +769,15 @@ namespace GulagRunners.GameEditor
                                       leadSize.x, leadSize.y, 0f, 0f, k);
             Picture(lead.gameObject, sprites, "hud/leaders", false);
 
-            (string name, ItemKind kind, string icon, float y, bool empty)[] rows =
+            // The icon is the one the slot shows while it is EMPTY -- a ghost of what
+            // belongs there. HudView swaps in the real item's own icon on pickup.
+            (string name, ItemKind kind, string icon, float y)[] rows =
             {
-                ("Slot / Helmet",  ItemKind.Helmet,  "hud/icon/coif",      176, false),
-                ("Slot / Weapon",  ItemKind.Weapon,  "hud/icon/club",      252, false),
-                ("Slot / Armour",  ItemKind.Armour,  "hud/icon/chainmail", 328, false),
-                ("Slot / Belt",    ItemKind.Belt,    "hud/icon/belt",      404, false),
-                ("Slot / Utility", ItemKind.Utility, null,                 480, true),
+                ("Slot / Helmet",  ItemKind.Helmet,  "hud/icon/coif",      176),
+                ("Slot / Weapon",  ItemKind.Weapon,  "hud/icon/club",      252),
+                ("Slot / Armour",  ItemKind.Armour,  "hud/icon/chainmail", 328),
+                ("Slot / Belt",    ItemKind.Belt,    "hud/icon/belt",      404),
+                ("Slot / Utility", ItemKind.Utility, "hud/icon/bandage",   480),
             };
 
             Vector2 square = Size("hud/slot/frame", 64, 64);
@@ -734,9 +800,15 @@ namespace GulagRunners.GameEditor
                 RectTransform glowRt = Make("Glow", rt, off.x, off.y, halo.x, halo.y, 0f, 0f, k);
                 Image glow = Picture(glowRt.gameObject, sprites, "hud/slot/glow", false);
 
+                // Every square starts DASHED, because every slot starts empty, and both
+                // sprites go on the view so it can swap them as things are picked up.
+                // Hard-wiring the dash to the utility row made the difference look like a
+                // style rather than a state: four solid squares with nothing in them say
+                // the fighter is wearing four invisible things.
                 RectTransform frameRt = Make("Frame", rt, 0, 0, square.x, square.y, 0f, 0f, k);
-                Image frame = Picture(frameRt.gameObject, sprites,
-                                      row.empty ? "hud/slot/frame-dashed" : "hud/slot/frame", true);
+                Image frame = Picture(frameRt.gameObject, sprites, "hud/slot/frame-dashed", true);
+                sprites.TryGetValue("hud/slot/frame", out Sprite solid);
+                sprites.TryGetValue("hud/slot/frame-dashed", out Sprite dash);
 
                 Vector2 icoOff = (square - iconSize) * 0.5f;
                 RectTransform iconRt = Make("Icon", rt, icoOff.x, icoOff.y,
@@ -752,7 +824,7 @@ namespace GulagRunners.GameEditor
                 slots.Add(new HudSlot
                 {
                     slot = row.kind, frame = frame, glow = glow, icon = icon,
-                    swapArrow = swapRt.gameObject,
+                    filled = solid, dashed = dash, swapArrow = swapRt.gameObject,
                 });
             }
             view.slots = slots.ToArray();
@@ -795,14 +867,28 @@ namespace GulagRunners.GameEditor
             // whatever scale the two were exported at, which for these two is not the
             // scale everything else came out at.
             Vector2 chestSize = Size("hud/sound/source-chest", 46, 46);
-            RectTransform src = Make("Source / chest", arc, arcSize.x * 0.419f,
-                                     -arcSize.y * 0.226f, chestSize.x, chestSize.y, 0f,
-                                     0f, _readoutScale);
+            RectTransform src = Make("Source / chest", sound, 0, 0,
+                                     chestSize.x, chestSize.y, 0f, 1f, _readoutScale);
+            // Centred over the arc's apex, and a SIBLING of it rather than a child: the
+            // arc swings round to point at what happened and a chest lying on its side
+            // is not easier to read for it.
+            src.anchoredPosition = new Vector2(
+                arc.anchoredPosition.x + (arc.sizeDelta.x - src.sizeDelta.x) * 0.5f,
+                arc.anchoredPosition.y + src.sizeDelta.y * 0.35f);
+
+            // The arc turns, so it turns about its middle.
+            Centred(arc);
+
+            // The cue is NOT line art. Line art is painted white and left on screen; the
+            // cue is invisible until the opponent forces a chest, and the only reason it
+            // read as an unexplainable grey shape above the joystick is that it was in
+            // this list.
+            view.cueArc = Picture(arc.gameObject, sprites, "hud/sound/arc", false);
+            view.cueIcon = Picture(src.gameObject, sprites, "hud/sound/source-chest", false);
+            view.cuePivot = arc;
 
             view.lineArt = new[]
             {
-                Picture(arc.gameObject, sprites, "hud/sound/arc", false),
-                Picture(src.gameObject, sprites, "hud/sound/source-chest", false),
                 Picture(ring.gameObject, sprites, "hud/joystick/ring", false),
                 Picture(knob.gameObject, sprites, "hud/joystick/knob", false),
                 Existing(root, "Equipment Column/Mannequin"),
@@ -902,7 +988,20 @@ namespace GulagRunners.GameEditor
             touch.jumpButton = Hit(view.jump);
             EditorUtility.SetDirty(touch);
 
-            return $"Stick and four buttons wired into {owner.name}'s TouchInputSource.";
+            // Named one by one, because "wired" is a claim and a list is a receipt. A ring
+            // that failed to build leaves a null here, and a null in TouchInputSource is a
+            // button that silently does nothing on a phone an hour from now.
+            List<string> live = new List<string>();
+            List<string> dead = new List<string>();
+            (touch.stick != null ? live : dead).Add("stick");
+            (touch.attackButton != null ? live : dead).Add("attack");
+            (touch.dodgeButton != null ? live : dead).Add("block/dodge");
+            (touch.actionButton != null ? live : dead).Add("action");
+            (touch.jumpButton != null ? live : dead).Add("jump");
+
+            string missing = dead.Count == 0 ? ""
+                : $"  NOT wired: {string.Join(", ", dead)} — those controls will do nothing.";
+            return $"{owner.name} reads: {string.Join(", ", live)}." + missing;
         }
 
         static VirtualButton Hit(HudButton button)

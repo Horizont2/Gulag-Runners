@@ -80,10 +80,16 @@ namespace GulagRunners.GameEditor
             AnimatorControllerLayer[] layers = controller.layers;
             int changed = 0;
 
+            // The base layer gets the pass and the others have it taken away. PlayerIK does
+            // a frame's work every time OnAnimatorIK is called, and Unity calls it once per
+            // layer that asks -- so a second ticked layer runs every blend at double rate
+            // and feeds each IK goal back into itself. The goals survive into the later
+            // passes anyway.
             for (int i = 0; i < layers.Length; i++)
             {
-                if (layers[i].iKPass) continue;
-                layers[i].iKPass = true;
+                bool want = i == 0;
+                if (layers[i].iKPass == want) continue;
+                layers[i].iKPass = want;
                 changed++;
             }
 

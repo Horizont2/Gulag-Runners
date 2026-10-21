@@ -197,6 +197,17 @@ namespace GulagRunners.Game
         [Tooltip("Cross-fade time between states, in seconds.")]
         [Range(0f, 0.5f)] public float crossFade = 0.12f;
 
+        [Tooltip("How long the swing may keep playing after the simulation has finished " +
+                 "with it, so the follow-through is seen.\n\n" +
+                 "The swing is POSED off a tick counter, and a counter cannot land on a " +
+                 "clip's last frame: that frame belongs to the instant the phase ends. " +
+                 "Dropped there, the arms fade out of a pose the animation never resolved, " +
+                 "which is the jerk at the end of a blow. So the clip is let off the leash " +
+                 "and allowed to run out on its own before the layer fades.\n\n" +
+                 "A cap, not a duration: it ends the moment the clip does. Zero switches " +
+                 "it off.")]
+        [Range(0f, 0.4f)] public float swingTail = 0.14f;
+
         [Tooltip("Below this speed the character counts as standing still, in m/s.")]
         public float idleThreshold = 0.15f;
 
@@ -264,6 +275,12 @@ namespace GulagRunners.Game
         int _currentHash;
         int _upperHash;
         float _upperWeight;
+
+        // The follow-through, on each layer: which swing is still running itself out, and
+        // how long it is still allowed to. See the Swing Tail tooltip.
+        float _armsTail, _bodyTail;
+        int _armsTailHash;
+        string _bodyTailState;
         bool _warned;
         MoveMode _lastMode = MoveMode.Grounded;
         float _exitHold;
@@ -420,6 +437,24 @@ namespace GulagRunners.Game
         {
             if (upperLayer <= 0 || upperLayer >= animator.layerCount) return;
 
+            // The simulation has finished with the blow, but the clip has not. Hold the
+            // layer where it is and stop posing it: with the animator back at speed 1 the
+            // state runs itself out from wherever the last pose left it, which is the
+            // follow-through that puts the arms back to neutral. Then it fades, out of a
+            // pose the animation actually arrived at.
+            if (string.IsNullOrEmpty(state) && _armsTail > 0f)
+            {
+                _armsTail -= Time.deltaTime;
+                AnimatorStateInfo at = animator.GetCurrentAnimatorStateInfo(upperLayer);
+                if (at.shortNameHash == _armsTailHash && at.normalizedTime < 1f)
+                {
+                    _upperWeight = 1f;
+                    animator.SetLayerWeight(upperLayer, 1f);
+                    return;
+                }
+                _armsTail = 0f;
+            }
+
             float want = string.IsNullOrEmpty(state) ? 0f : 1f;
             _upperWeight = upperFade <= 0.001f
                 ? want
@@ -441,6 +476,8 @@ namespace GulagRunners.Game
             if (scrub >= 0f)
             {
                 _upperHash = hash;
+                _armsTail = swingTail;
+                _armsTailHash = hash;
                 animator.Play(hash, upperLayer, scrub);
             }
             else if (hash != _upperHash)
@@ -558,9 +595,28 @@ namespace GulagRunners.Game
                     {
                         scrub = SwingProgress(in s);
                         playback = 0f;
+                        _bodyTail = swingTail;
+                        _bodyTailState = swing;
                     }
                     return swing;
                 }
+            }
+
+            // The blow is over for the simulation and the clip is still mid follow-through.
+            // Left posed it would be abandoned at the frame the counter reached; crossfaded
+            // away it would be abandoned faster. Handed back unposed, Play leaves it alone
+            // -- the hash has not changed -- and it runs itself out at speed 1.
+            //
+            // Only while standing: on the move there are legs under this state with
+            // somewhere to be, and the fight layer is carrying the swing anyway.
+            if (_bodyTail > 0f && !string.IsNullOrEmpty(_bodyTailState))
+            {
+                _bodyTail -= Time.deltaTime;
+                if (speed <= idleThreshold && _currentHash ==
+                    Animator.StringToHash(_bodyTailState) &&
+                    animator.GetCurrentAnimatorStateInfo(0).normalizedTime < 1f)
+                    return _bodyTailState;
+                _bodyTail = 0f;
             }
 
             // Working at a chest. The simulation has already turned the fighter to face it.
@@ -730,19 +786,22 @@ namespace GulagRunners.Game
             // and runs a whole tick in front of it. On a wind-up that is a swing arriving
             // before the arm does, in nineteen visible steps.
             //
-            // Over total-1 and not over total, which is the whole of why swings used to
-            // jump at the end. A phase of N ticks is sampled at its tick boundaries, so
-            // there are N-1 intervals between the first pose and the last; dividing by N
-            // leaves the last one unspent and the clip stops short of its final frame.
-            // Measured: a four-tick recovery ended at 90% of the clip, an eight-tick one
-            // at 95%. What sits in that missing tail is the follow-through — the part
-            // that puts the arms back to neutral — so the layer faded out from a pose the
-            // animation never resolved, in the 0.08 s of upperFade, and that read as a
-            // snap. It was worst on the swings that LAND, because a connected hit halves
-            // the recovery (CombatConfig.HitRecoveryCutPermille) and a shorter phase
-            // loses a bigger share of the clip.
-            float within = Mathf.Clamp01(
-                (total - s.AttackTimer - 1 + player.Alpha) / Mathf.Max(1, total - 1));
+            // Ticks ALREADY SPENT plus the render alpha, over the whole phase. The tick
+            // counter says which tick we are in and the alpha says how far through it the
+            // drawn frame is, so this is simply where the phase has got to -- 0 at its
+            // first frame, 1 at the instant it ends.
+            //
+            // An earlier version divided by total-1 to try to make the last tick land on
+            // the clip's final frame. It cannot: at 60 fps against a 60 Hz tick the alpha
+            // is ~0 on every drawn frame, so that formula's last SAMPLE was (total-2) /
+            // (total-1) -- a three-tick recovery abandoned the clip at 80%, a two-tick one
+            // at 60%. Which is why it was worst on swings that land: a connected hit
+            // halves the recovery (CombatConfig.HitRecoveryCutPermille).
+            //
+            // No counter can land on the last frame, because the clip's final slice
+            // belongs to the moment the phase ENDS. That slice is played out properly by
+            // the tail hold in Arms and PickState rather than papered over here.
+            float within = Mathf.Clamp01((total - s.AttackTimer + player.Alpha) / total);
 
             float hit = Mathf.Clamp01(attackContactStart);
             float done = Mathf.Clamp(attackContactEnd, hit, 1f);

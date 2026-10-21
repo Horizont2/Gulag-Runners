@@ -453,8 +453,20 @@ namespace GulagRunners.Game
             return $"{seconds / 60}:{seconds % 60:00}";
         }
 
+        /// <summary>
+        /// A chest was just forced. The HUD listens so it can point at one opened off
+        /// screen: in a match where both fighters are looting at once, the one thing a
+        /// player cannot see and most wants to know is that the OTHER one just found
+        /// something, and roughly where.
+        /// </summary>
+        public event System.Action<int, int> ChestOpened;
+
         public void ReportOpened(int playerIndex, int chestIndex)
         {
+            // Raised before the log switch, which is a debugging convenience and has no
+            // business deciding whether the interface is told.
+            ChestOpened?.Invoke(playerIndex, chestIndex);
+
             if (!logOpenings) return;
 
             SimWorld world = worldBaker != null ? worldBaker.World : null;

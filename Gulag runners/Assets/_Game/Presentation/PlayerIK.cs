@@ -127,6 +127,23 @@ namespace GulagRunners.Game
 
         [Range(0f, 1f)] public float groundWeight = 0.8f;
 
+        [Tooltip("How high the clip has to lift a foot before this stops trying to put it " +
+                 "on the floor, as a share of the fighter's height.\n\n" +
+                 "THE one that matters for a run. Foot grounding exists to put a standing " +
+                 "man on the step he is standing on; a foot in mid-stride is off the floor " +
+                 "on purpose, and dragging it back down holds the swing leg behind the " +
+                 "hips, which reads as a leg thrown out backwards. A planted foot is at " +
+                 "zero and gets the full correction; one this far up gets none.")]
+        [Range(0.01f, 0.4f)] public float plantShare = 0.08f;
+
+        [Tooltip("Read the four distances above as metres on a 1.8 m fighter and scale " +
+                 "them to this one.\n\n" +
+                 "They were written against the rig the clips came off. These fighters are " +
+                 "0.91 m, so a 0.3 m limit on moving a foot is a THIRD of the body: no " +
+                 "stride a leg that short can take ever exceeds it, and every foot in the " +
+                 "run cycle was therefore pinned to the floor.")]
+        public bool scaleToBody = true;
+
         [Header("Head")]
         [Tooltip("Look at what matters: the rungs while climbing, the other fighter " +
                  "otherwise. Costs nothing and is most of what makes a figure look alive.")]
@@ -186,6 +203,18 @@ namespace GulagRunners.Game
         void OnAnimatorIK(int layer)
         {
             _calls++;
+
+            // ONE pass, not one per layer.
+            //
+            // Unity calls this once for every animator layer with IK Pass ticked, and the
+            // fighter controller has it on both. Everything below is per-frame work --
+            // blends stepped by deltaTime, springs integrated, goals read back out of the
+            // animator with GetIKPosition and written again -- so a second call a frame
+            // ran every blend at double rate and fed each goal back into itself. The goals
+            // set here survive into the later passes anyway, which is what makes ignoring
+            // them correct rather than merely cheaper.
+            if (layer != 0) return;
+
             if (_animator == null || player == null) return;
 
             PlayerSimState s = player.State;
@@ -425,19 +454,37 @@ namespace GulagRunners.Game
         {
             Vector3 at = _animator.GetIKPosition(goal);
 
-            FixVec2 from = new FixVec2(F(at.x), F(at.y + probeUp));
-            MoveConfig cfg = player.Config;
+            float body = Mathf.Max(0.2f, player.tuning.bodyHeight);
+            float k = scaleToBody ? body / 1.8f : 1f;
+            float up = probeUp * k, down = probeDown * k;
 
-            if (!PlayerMotor.TryFindGroundBelow(from, s.Depth, world, in cfg,
-                                                F(probeUp + probeDown), out Fix groundY))
+            // How far the CLIP has lifted this foot off the fighter's own floor, and
+            // therefore how much of a correction it has any business receiving. See the
+            // Plant Share tooltip: this is the difference between standing on a step and
+            // running with the feet nailed down.
+            float band = Mathf.Max(0.001f, body * plantShare);
+            float lift = at.y - M(s.Position.Y);
+            float planted = 1f - Mathf.SmoothStep(0f, 1f,
+                                Mathf.Clamp01((lift - band * 0.35f) / (band * 0.65f)));
+            if (planted <= 0.001f)
             {
                 Clear(goal);
                 return at;
             }
 
-            float want = M(groundY) + soleLift;
+            FixVec2 from = new FixVec2(F(at.x), F(at.y + up));
+            MoveConfig cfg = player.Config;
+
+            if (!PlayerMotor.TryFindGroundBelow(from, s.Depth, world, in cfg,
+                                                F(up + down), out Fix groundY))
+            {
+                Clear(goal);
+                return at;
+            }
+
+            float want = M(groundY) + soleLift * k;
             float shift = want - at.y;
-            if (Mathf.Abs(shift) > maxFootShift)
+            if (Mathf.Abs(shift) > maxFootShift * k)
             {
                 Clear(goal);
                 return at;
@@ -445,7 +492,7 @@ namespace GulagRunners.Game
 
             // Eased by how far it has to go, so a foot already in the right place is not
             // nudged and one well off is brought most of the way.
-            float w = groundWeight * _groundBlend;
+            float w = groundWeight * _groundBlend * planted;
             Vector3 target = new Vector3(at.x, want, at.z);
             Set(goal, target, w);
             return target;

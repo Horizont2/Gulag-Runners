@@ -121,6 +121,26 @@ def loops(clip_path):
     return m.group(1) == "1" if m else None
 
 
+def ik_passes(path):
+    """How many layers of this controller have IK Pass ticked, and their names."""
+    src = read(path)
+    block = re.search(r"m_AnimatorLayers:\n((?:.|\n)*?)(?=\n  m_[A-Z]|\Z)", src)
+    if not block:
+        return []
+    on = []
+    # The captured block already begins AT the first layer, so there is no header chunk
+    # to drop -- dropping one silently hid the base layer, which is the layer the rule is
+    # about. Chunks without an IK flag are not layers and are skipped by name.
+    for chunk in re.split(r"\n(?=  - serializedVersion)", block.group(1)):
+        ik = re.search(r"m_IKPass: (\d)", chunk)
+        if ik is None:
+            continue
+        name = re.search(r"m_Name: ([^\n]*)", chunk)
+        if ik.group(1) == "1":
+            on.append(name.group(1).strip() if name else "?")
+    return on
+
+
 def main():
     assets = by_guid()
     animator_cs = os.path.join(ASSETS, "_Game", "Presentation", "PlayerAnimator.cs")
@@ -178,6 +198,24 @@ def main():
         missing = sorted(s for s in wanted if s not in have)
         shown = ", ".join(os.path.basename(p) for p in sorted(controllers))
         print(f"  {name}: {len(wanted)} state(s) asked for, {len(have)} in {shown}")
+        # IK Pass on more than one layer calls OnAnimatorIK more than once a frame, and
+        # PlayerIK does a frame's work every call: blends stepped by deltaTime, springs
+        # integrated, goals read back out of the animator and written again. Two ticked
+        # layers halved every blend time and fed each goal into itself, and the symptom --
+        # feet that lag a running body -- looks nothing like a tick box.
+        for ctrl in sorted(controllers):
+            on = ik_passes(ctrl)
+            who = os.path.basename(ctrl)
+            if not on:
+                problems += 1
+                print(f"      PROBLEM - {who} has IK Pass on no layer, so OnAnimatorIK "
+                      f"is never called and PlayerIK runs no code at all")
+            elif len(on) > 1:
+                problems += 1
+                print(f"      PROBLEM - {who} has IK Pass on {len(on)} layers "
+                      f"({', '.join(on)}). PlayerIK does a frame's work every time it is "
+                      f"called, so every blend in it advances {len(on)}x too fast. Base "
+                      f"layer only.")
 
         for state in missing:
             problems += 1
