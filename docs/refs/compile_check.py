@@ -30,7 +30,7 @@ GAME = os.path.join(ROOT, "Gulag runners", "Assets", "_Game")
 
 # The folders that make up the two real assemblies: the engine-free simulation, and everything
 # in the default assembly that the game needs at runtime.
-FOLDERS = ("Sim", "Presentation", "Audio", "Input", "Meta")
+FOLDERS = ("Sim", "Presentation", "Audio", "Input", "Meta", "Menu")
 
 UNITY_PACKAGE = "UnityEngine.Modules"
 UNITY_VERSION = "2021.3.33"      # reference assemblies only: the API this project uses is old

@@ -110,6 +110,12 @@ namespace GulagRunners.Game
 
         public UnityEvent<string> playerNameChanged;
 
+        [Tooltip("Which league badge to show: the League enum's value, or -1 while the " +
+                 "player is still in their first five matches and has none.\n\n" +
+                 "An int and not the name, because the name would have to be parsed back " +
+                 "out of \"Platinum II\" and the parse is where the bug would live.")]
+        public UnityEvent<int> leagueBadgeChanged;
+
         [Header("Debug")]
         public string openPanel = "";
 
@@ -202,6 +208,10 @@ namespace GulagRunners.Game
                 ? $"{profile.protectedMatchesLeft} placement matches left"
                 : profile.league);
             leagueFilled?.Invoke(Mathf.Clamp01(profile.leagueProgress));
+            leagueBadgeChanged?.Invoke(progress != null && progress.matchesPlayed < 5
+                ? -1
+                : (int)GulagRunners.Meta.Ladder.LeagueOf(
+                      progress != null ? progress.rating : 1500.0));
 
             dailiesChanged?.Invoke($"{profile.dailiesDone}/{Mathf.Max(1, profile.dailiesTotal)}");
         }
