@@ -84,11 +84,22 @@ namespace GulagRunners.Game
         public GulagRunners.Meta.PlayerProgress progress;
 
         [Header("Panels — already in the scene, switched off")]
-        [Tooltip("One at a time. Opening any of these closes whatever was open.")]
+        [Tooltip("Optional, every one of them. One at a time: opening any closes whatever " +
+                 "was open, and a panel that does not exist yet simply cannot be opened. " +
+                 "The first screen works on its own and the depth behind it arrives panel " +
+                 "by panel.")]
         public GameObject profilePanel;
+
+        [Tooltip("Optional. Cosmetics, priced in gold. docs/09: it never sells power.")]
         public GameObject shopPanel;
+
+        [Tooltip("Optional. The three a day, and what each is asking for.")]
         public GameObject dailiesPanel;
+
+        [Tooltip("Optional. Sound, language, stick sensitivity, controls, account.")]
         public GameObject settingsPanel;
+
+        [Tooltip("Optional. Friends, and the private match docs/09's saved seed lives in.")]
         public GameObject friendsPanel;
 
         [Tooltip("Optional. Switched off while a panel is open, so the fighter and PLAY " +

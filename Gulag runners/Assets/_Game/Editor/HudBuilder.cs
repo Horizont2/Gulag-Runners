@@ -281,7 +281,38 @@ namespace GulagRunners.GameEditor
                 if (hit == null) { _unmatched.Add(path); continue; }
                 _found[hit.Value.Key] = path;
             }
+
+            Prepare();
         }
+
+        /// <summary>
+        /// Make every found file a Sprite BEFORE anything is measured off it.
+        ///
+        /// Unity imports a new PNG as a plain TEXTURE, and a plain texture has npotScale
+        /// set to ToNearest -- so a 96x96 icon is reported as 128x128 and a 1600x448
+        /// button as 2048x512. Measuring the export scale off tex.width then measures the
+        /// power of two Unity rounded it to rather than the file: eleven 96 px icons all
+        /// read 128/24 = 5.33 and voted the whole sheet to 5.25x, which put a 26 unit
+        /// corner on the name plate at 34 and stretched the art on its way in.
+        ///
+        /// Sprites are never NPOT-scaled, so one pass of this and tex.width is the file
+        /// again. It is also the import these assets want in the end, so nothing is wasted.
+        /// </summary>
+        void Prepare()
+        {
+            foreach (string path in _found.Values)
+            {
+                TextureImporter imp = (TextureImporter)AssetImporter.GetAtPath(path);
+                if (imp == null) continue;
+                if (imp.textureType == TextureImporterType.Sprite &&
+                    imp.npotScale == TextureImporterNPOTScale.None) continue;
+
+                imp.textureType = TextureImporterType.Sprite;
+                imp.npotScale = TextureImporterNPOTScale.None;
+                imp.SaveAndReimport();
+            }
+        }
+
 
         static string Relative(string path, string root) =>
             Normalise(Path.ChangeExtension(path.Substring(root.Length).TrimStart('/'), null),
@@ -366,6 +397,8 @@ namespace GulagRunners.GameEditor
 
             imp.textureType = TextureImporterType.Sprite;
             imp.spriteImportMode = SpriteImportMode.Single;
+            // Never rounded to a power of two -- see Prepare.
+            imp.npotScale = TextureImporterNPOTScale.None;
             imp.mipmapEnabled = false;
             imp.filterMode = FilterMode.Bilinear;
             imp.alphaIsTransparency = true;
