@@ -13,10 +13,23 @@ namespace GulagRunners.Sim
     ///   Chainmail  T2. -30% damage taken, and visible in the silhouette.
     ///   Bandage    T1. The one decision that is not about fighting: heal now, or keep looking.
     ///
+    /// Three worn kinds rather than one, because the fighter has a head and a waist and the
+    /// silhouette is read from across the arena. They are three different plans and not
+    /// three sizes of the same one: the chest is raw damage reduction, the helmet is the
+    /// hitstun of a string, the belt is how long a guard holds.
+    ///
     /// Static data, looked up by id. Nothing here allocates and nothing here is a float.
     /// </summary>
     public static class ItemTable
     {
+        /// <summary>
+        /// One past the highest id the table holds. Ids are spaced by kind — weapons from 1,
+        /// chest armour from 20, utility from 30, helmets from 40, belts from 50 — so that a
+        /// new item of a kind can be added without renumbering anything, and an id in a
+        /// replay always means what it meant (docs/06). The gaps cost one empty struct each.
+        /// </summary>
+        public const int Count = 64;
+
         static readonly ItemDef[] Items = Build();
 
         /// <summary>
@@ -63,7 +76,7 @@ namespace GulagRunners.Sim
 
         static ItemDef[] Build()
         {
-            ItemDef[] t = new ItemDef[32];
+            ItemDef[] t = new ItemDef[Count];
 
             t[(int)ItemId.None] = new ItemDef { Id = ItemId.None, Kind = ItemKind.None };
 
@@ -245,7 +258,7 @@ namespace GulagRunners.Sim
                 Weight = 100,
                 Kind = ItemKind.Armour,
                 Tier = 1,
-                DamageReduction = Fix.FromMilli(150)
+                DamageReductionPermille = 90
             };
 
             t[(int)ItemId.Chainmail] = new ItemDef
@@ -254,7 +267,7 @@ namespace GulagRunners.Sim
                 Weight = 100,
                 Kind = ItemKind.Armour,
                 Tier = 2,
-                DamageReduction = Fix.FromMilli(300)
+                DamageReductionPermille = 180
             };
 
             t[(int)ItemId.Plate] = new ItemDef
@@ -263,7 +276,7 @@ namespace GulagRunners.Sim
                 Weight = 90,
                 Kind = ItemKind.Armour,
                 Tier = 3,
-                DamageReduction = Fix.FromMilli(450)
+                DamageReductionPermille = 270
             };
 
             t[(int)ItemId.Bandage] = new ItemDef
@@ -273,6 +286,79 @@ namespace GulagRunners.Sim
                 Kind = ItemKind.Utility,
                 Tier = 1,
                 Heal = 30
+            };
+
+            // ---- helmets. Reduction small enough that the chest is still the armour you
+            // want, and stun resistance that nothing else in the table has: what a helmet
+            // buys is the SECOND hit of a string, where the combo decay has already shrunk
+            // the stun and a quarter off the rest is the frame or two you need to answer.
+            //
+            // Weights deliberately below their tier's weapons. Two new findable kinds in
+            // every tier dilute the chance of finding a weapon at all, and nobody should
+            // reach the fight in a great helm with his fists.
+            t[(int)ItemId.LeatherCap] = new ItemDef
+            {
+                Id = ItemId.LeatherCap,
+                Weight = 55,
+                Kind = ItemKind.Helmet,
+                Tier = 1,
+                DamageReductionPermille = 40,
+                StunResistPermille = 120
+            };
+
+            t[(int)ItemId.MailCoif] = new ItemDef
+            {
+                Id = ItemId.MailCoif,
+                Weight = 45,
+                Kind = ItemKind.Helmet,
+                Tier = 2,
+                DamageReductionPermille = 80,
+                StunResistPermille = 240
+            };
+
+            t[(int)ItemId.GreatHelm] = new ItemDef
+            {
+                Id = ItemId.GreatHelm,
+                Weight = 30,
+                Kind = ItemKind.Helmet,
+                Tier = 3,
+                DamageReductionPermille = 120,
+                StunResistPermille = 380
+            };
+
+            // ---- belts. The least reduction in the table and the only item that pays for
+            // STANDING there: a guard drains a charge every 0.8 s, and a war belt makes that
+            // 1.2 s, so a full pool holds 4.8 s instead of 3.2. docs/02 calls the parry the
+            // skill ceiling of the medieval mode, and a parry is something you have to be
+            // allowed to wait for.
+            t[(int)ItemId.RopeBelt] = new ItemDef
+            {
+                Id = ItemId.RopeBelt,
+                Weight = 50,
+                Kind = ItemKind.Belt,
+                Tier = 1,
+                DamageReductionPermille = 20,
+                GuardHoldPermille = 150
+            };
+
+            t[(int)ItemId.ToolBelt] = new ItemDef
+            {
+                Id = ItemId.ToolBelt,
+                Weight = 40,
+                Kind = ItemKind.Belt,
+                Tier = 2,
+                DamageReductionPermille = 40,
+                GuardHoldPermille = 300
+            };
+
+            t[(int)ItemId.WarBelt] = new ItemDef
+            {
+                Id = ItemId.WarBelt,
+                Weight = 25,
+                Kind = ItemKind.Belt,
+                Tier = 3,
+                DamageReductionPermille = 60,
+                GuardHoldPermille = 500
             };
 
             for (int i = 0; i < t.Length; i++) t[i].Id = (ItemId)i;

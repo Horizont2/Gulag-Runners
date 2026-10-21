@@ -4,7 +4,16 @@ import sim_motor_mirror as M
 import combat_mirror as K
 from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD, ATTACK
 from loot_mirror import (Inv, NONE, FISTS, CLUB, SPEAR, DAGGER, WARHAMMER, SWORD,
-                         CHAINMAIL, BANDAGE, ITEMS)
+                         CHAINMAIL, PLATE, LEATHER, BANDAGE, ITEMS,
+                         LEATHER_CAP, MAIL_COIF, GREAT_HELM,
+                         ROPE_BELT, TOOL_BELT, WAR_BELT)
+
+# docs/02 prices armour at -15/-30/-45% by rarity. That is what a full SET of one rarity
+# comes to now -- helmet, chest and belt share it out -- so these are what the old
+# single-slot tests have to be read against.
+COMMON_SET = (LEATHER, LEATHER_CAP, ROPE_BELT)
+RARE_SET = (CHAINMAIL, MAIL_COIF, TOOL_BELT)
+LEGENDARY_SET = (PLATE, GREAT_HELM, WAR_BELT)
 from combat_mirror import combat_step, resolve, hitbox, init, K as CFG
 from arena_geometry import world
 
@@ -19,12 +28,14 @@ def check(n, c, d=""):
 
 
 def fighter(x, facing=1, weapon=NONE, armour=NONE):
+    """`armour` is one worn item or a whole kit: the fighter has five slots now."""
     s = S(x, 0.9)
     s.inv = Inv()
     if weapon != NONE:
         s.inv.equip(weapon)
-    if armour != NONE:
-        s.inv.equip(armour)
+    for piece in (armour if isinstance(armour, (tuple, list)) else (armour,)):
+        if piece != NONE:
+            s.inv.equip(piece)
     init(s)
     s.facing = s.travel = facing
     for _ in range(180):
@@ -76,8 +87,8 @@ ttk = {}
 for weapon, armour, label in ((FISTS, NONE, "fists, no armour"),
                               (CLUB, NONE, "club, no armour"),
                               (SPEAR, NONE, "spear, no armour"),
-                              (CLUB, CHAINMAIL, "club vs chainmail"),
-                              (SPEAR, CHAINMAIL, "spear vs chainmail")):
+                              (CLUB, RARE_SET, "club vs a rare set"),
+                              (SPEAR, RARE_SET, "spear vs a rare set")):
     seconds, hits, hp = fight(weapon, armour)
     ttk[label] = seconds
     print(f"        {label:22s} {seconds:5.1f} s uncontested, {hits} hits"
@@ -88,9 +99,9 @@ check("a weapon kills in four to eight seconds uncontested",
       f"club {ttk['club, no armour']:.1f} s, spear {ttk['spear, no armour']:.1f} s")
 check("doubled for a real exchange, that lands in the 8-14 s docs/02 asks for",
       all(8.0 <= ttk[k] * 2 <= 16.0 for k in ("club, no armour", "spear, no armour")))
-check("armour buys most of a weapon tier",
-      ttk["club vs chainmail"] > ttk["club, no armour"] * 1.3,
-      f"{ttk['club, no armour']:.1f} s -> {ttk['club vs chainmail']:.1f} s")
+check("a full rare set buys most of a weapon tier",
+      ttk["club vs a rare set"] > ttk["club, no armour"] * 1.3,
+      f"{ttk['club, no armour']:.1f} s -> {ttk['club vs a rare set']:.1f} s")
 check("bare hands lose to anything, but are not a dead end",
       ttk["fists, no armour"] > ttk["club, no armour"] * 1.4 and ttk["fists, no armour"] < 12,
       f"{ttk['fists, no armour']:.1f} s against a club's "
@@ -210,21 +221,36 @@ for t in range(400):
 check("a guard held facing the wrong way is no guard at all", b.was_hit,
       "hit" if b.was_hit else "blocked")
 
-print("\n7. armour")
-a = fighter(-0.45, 1, CLUB)
-plain = fighter(0.45, -1)
-mailed = fighter(0.45, -1, NONE, CHAINMAIL)
-for victim, name in ((plain, "no armour"), (mailed, "chainmail")):
+print("\n7. armour: three worn pieces, one number")
+
+
+def first_hit(kit):
+    """What one club blow does to somebody wearing this."""
     atk = fighter(-0.45, 1, CLUB)
+    victim = fighter(0.45, -1, NONE, kit)
     for t in range(200):
         atk.x, victim.x = X(-0.45), X(0.45)
         tick([atk, victim], [ATTACK, 0])
         if victim.was_hit:
-            break
-    globals()["dmg_" + name.split()[0]] = victim.damage_taken
-check("chainmail takes 30% off, as docs/02 says",
-      dmg_chainmail == (dmg_no * 700) // 1000,
-      f"{dmg_no} -> {dmg_chainmail} ({(1 - dmg_chainmail / dmg_no) * 100:.0f}% off)")
+            return victim.damage_taken
+    return None
+
+
+dmg_no = first_hit(NONE)
+for label, kit, want in (("common", COMMON_SET, 150),
+                         ("rare", RARE_SET, 300),
+                         ("legendary", LEGENDARY_SET, 450)):
+    inv = Inv()
+    for piece in kit:
+        inv.equip(piece)
+    check(f"a full {label} set takes {want // 10}% off, as docs/02 says",
+          inv.reduction == want and first_hit(kit) == (dmg_no * (1000 - want)) // 1000,
+          f"{dmg_no} -> {first_hit(kit)}, kit sums to {inv.reduction}‰")
+
+# ...and the chest is most of it, because the chest is what a silhouette shows first.
+_chest = Inv(); _chest.equip(CHAINMAIL)
+check("the chest carries most of a set on its own", _chest.reduction * 100 // 300 >= 55,
+      f"chainmail is {_chest.reduction} of the rare set's 300‰")
 
 print("\n8. a hit is felt")
 a = fighter(-0.45, 1, CLUB)
@@ -643,11 +669,11 @@ def free(p):
             and p.stagger == 0 and not CM.reeling(p))
 
 
-def advantage(weapon_id, guard=False):
+def advantage(weapon_id, guard=False, kit=NONE):
     """Frames the attacker is free BEFORE the victim, counted from the blow landing."""
     reach = ITEMS[FISTS if weapon_id == NONE else weapon_id]["reach"] / 65536.0
     a = fighter(0.0, 1, weapon_id)
-    v = fighter(0.5 + reach * 0.5, -1)
+    v = fighter(0.5 + reach * 0.5, -1, NONE, kit)
     landed = af = vf = None
     for t in range(300):
         tick([a, v], [ATTACK if t == 0 else 0, DOD if guard else 0])
@@ -804,5 +830,95 @@ check("and blocking then answering beats the rush", sword_hp > fists_hp,
 _, _, _, fists_hp, sword_hp = rushed(SWORD, lambda b, t: DOD, seconds=20)
 check("while hiding behind it the whole round still loses", sword_hp < fists_hp,
       f"{sword_hp} against {fists_hp}")
+
+print("\n12. the head and the waist (docs/02: five slots, not three)")
+
+# A silhouette has a head and a waist. Folding both into one "armour" square meant a coif
+# and a breastplate competing for the same slot, so finding a helmet was a reason to throw
+# your plate away. Three worn slots, and each one a different PLAN rather than a different
+# size of the same one.
+
+
+def string_stun(kit, weapon=CLUB, blows=3):
+    """The hitstun each blow of a string buys, against somebody wearing this."""
+    reach = ITEMS[weapon]["reach"] / 65536.0
+    a = fighter(0.0, 1, weapon)
+    v = fighter(0.4 + reach * 0.5, -1, NONE, kit)
+    seen = []
+    for t in range(60 * 12):
+        a.x, v.x = X(0.0), X(0.4 + reach * 0.5)
+        a.vx = v.vx = 0
+        tick([a, v], [ATTACK, 0])
+        if v.was_hit:
+            seen.append(v.stun)
+            if len(seen) >= blows:
+                break
+        if v.dead:
+            break
+    return seen
+
+
+bare_stun = string_stun(NONE)
+helm_stun = string_stun(GREAT_HELM)
+print(f"        club string, bare {bare_stun} -> great helm {helm_stun}")
+
+check("a helmet does nothing to the blow that OPENS a string",
+      bare_stun[0] == helm_stun[0], f"{bare_stun[0]} frames either way")
+check("and takes real frames off every blow after it",
+      len(helm_stun) >= 3 and all(h < b for h, b in zip(helm_stun[1:], bare_stun[1:])),
+      f"{bare_stun[1:]} -> {helm_stun[1:]}")
+
+# Which is the whole reason the resistance is applied BEFORE the floor that guarantees an
+# attacker his turn. Applied after, a helmet would eat that floor and put every weapon in
+# the game at a minus on a clean hit -- the exact bug section 9 exists to catch, measured
+# at -3 to -12 frames across the table before it was fixed.
+helmed = {name: advantage(wid, kit=GREAT_HELM)
+          for name, wid in (("fists", NONE), ("club", CLUB), ("spear", SPEAR))}
+print("        against a great helm: " +
+      ", ".join(f"{n} {a:+d}" for n, a in helmed.items()))
+check("and a helmet never turns landing a blow into a disadvantage",
+      all(a is not None and a > 0 for a in helmed.values()),
+      f"worst {min(helmed.values()):+d}")
+
+check("a helmet is the answer to a hammer, not to jabs",
+      string_stun(GREAT_HELM, WARHAMMER)[1] <= string_stun(NONE, WARHAMMER)[1] * 0.6,
+      f"warhammer's second blow {string_stun(NONE, WARHAMMER)[1]} -> "
+      f"{string_stun(GREAT_HELM, WARHAMMER)[1]} frames")
+
+
+def guard_seconds(kit):
+    """How long a raised guard holds with nobody hitting it."""
+    s = fighter(0.0, 1, SWORD, kit)
+    held = 0
+    for t in range(60 * 30):
+        tick([s], [DOD])
+        if not s.blocking:
+            break
+        held += 1
+    return held / 60.0
+
+
+bare_guard = guard_seconds(NONE)
+belts = {name: guard_seconds(b) for name, b in
+         (("rope", ROPE_BELT), ("tool", TOOL_BELT), ("war", WAR_BELT))}
+print(f"        guard held: none {bare_guard:.2f} s, " +
+      ", ".join(f"{n} {v:.2f} s" for n, v in belts.items()))
+
+check("a belt is seconds of guard and nothing else",
+      all(belts[a] < belts[b] for a, b in (("rope", "tool"), ("tool", "war")))
+      and bare_guard < belts["rope"],
+      f"{bare_guard:.2f} s -> {belts['war']:.2f} s")
+check("and it is not a place to live either",
+      belts["war"] < bare_guard * 1.75, f"{belts['war']:.2f} s against {bare_guard:.2f} s")
+
+# The cap is a guard rail, not a clip: nothing in the shipped table reaches it.
+best = Inv()
+for piece in LEGENDARY_SET:
+    best.equip(piece)
+check("the best kit in the game stays under the cap",
+      best.reduction <= CFG["MAX_ARMOUR"],
+      f"{best.reduction}‰ against a cap of {CFG['MAX_ARMOUR']}‰")
+check("and it is exactly what docs/02 priced one armour slot at",
+      best.reduction == 450, f"{best.reduction}‰")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

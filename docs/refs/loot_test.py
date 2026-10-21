@@ -10,6 +10,9 @@ import collections
 from loot_mirror import (Chest, Inv, loot_step, frames_to_open, fresh, pool, step_ground,
                          drop_item, CRATE, LOCKER, SAFE, NONE, FISTS, CLUB, SPEAR, CHAINMAIL,
                          BANDAGE, ITEMS, CHEST_CFG, D, RESTING, FLYING,
+                         WEAPON, ARMOUR, UTILITY, HELMET, BELT, WORN,
+                         LEATHER, PLATE, LEATHER_CAP, MAIL_COIF, GREAT_HELM,
+                         ROPE_BELT, TOOL_BELT, WAR_BELT,
                          Rng, roll_chest, roll_tier, TIER_ODDS, deal,
                          WEAPON, ARMOUR, UTILITY)
 
@@ -372,6 +375,55 @@ for _ in range(240):
 g = GROUND[0]
 check("it fell through the hole rather than resting in mid-air",
       g.state == RESTING and F(g.y) < 1.0, f"y={F(g.y):.2f}, dropped from {floor_h + 0.5}")
+
+print("\n14b. five slots, and nothing shares one")
+# docs/02 started at three slots and three was one idea short. A silhouette has a head and
+# a waist, and folding both into "armour" meant a coif and a breastplate competing for the
+# same square -- so finding a helmet was a reason to throw your plate away.
+for kind, name in ((HELMET, "helmet"), (ARMOUR, "chest armour"), (BELT, "belt")):
+    rarities = sorted(i for i, v in ITEMS.items()
+                      if v["kind"] == kind and v.get("weight", 0) > 0)
+    tiers = sorted(ITEMS[i]["tier"] for i in rarities)
+    check(f"there are three {name}s, one per rarity", tiers == [1, 2, 3],
+          ", ".join(ITEMS[i]["name"] for i in rarities))
+
+reset_ground()
+s = spawn(-5.5, 0.9)
+for item in (PLATE, GREAT_HELM, WAR_BELT):
+    reset_ground()
+    T.launch(GROUND, item, X(-5.5), X(0.3), 0, 0, 0)
+    for _ in range(40):
+        tick(s, 0, [])
+check("a whole suit goes on without one piece displacing another",
+      (s.inv.armour, s.inv.helmet, s.inv.belt) == (PLATE, GREAT_HELM, WAR_BELT),
+      f"{ITEMS[s.inv.helmet]['name']} / {ITEMS[s.inv.armour]['name']} / "
+      f"{ITEMS[s.inv.belt]['name']}")
+check("and that is what docs/02 priced armour at, summed", s.inv.reduction == 450,
+      f"{s.inv.reduction}‰")
+
+# A full slot is still a decision, per slot and not per body.
+reset_ground()
+T.launch(GROUND, MAIL_COIF, X(-5.5), X(0.3), 0, 0, 0)
+for _ in range(40):
+    tick(s, 0, [])
+check("a worse helmet does not walk itself onto a full head", s.inv.helmet == GREAT_HELM,
+      f"still wearing {ITEMS[s.inv.helmet]['name']}")
+check("but the button knows it would swap", s.standing_on >= 0, f"index {s.standing_on}")
+
+# Two new findable kinds in every tier dilute the chance of finding a WEAPON, which is the
+# one thing a round must not stop handing out. Measured, not assumed.
+KINDS = [CRATE, CRATE, LOCKER, LOCKER, SAFE, CRATE]
+rounds, armed, worn_seen = 4000, 0, 0
+for seed in range(1, rounds + 1):
+    rng = Rng(seed)
+    items = [roll_chest(k, rng.fork(i + 1)) for i, k in enumerate(KINDS)]
+    if any(ITEMS[i]["kind"] == WEAPON for i in items):
+        armed += 1
+    worn_seen += sum(1 for i in items if ITEMS[i]["kind"] in WORN)
+check("a round of six chests still almost always holds a weapon", armed / rounds > 0.98,
+      f"{100 * armed / rounds:.1f}% of rounds")
+check("and now hands out most of a suit as well", 1.4 < worn_seen / rounds < 2.6,
+      f"{worn_seen / rounds:.2f} worn pieces per round")
 
 print("\n15. the same inputs give the same frames")
 r = []

@@ -35,9 +35,12 @@ namespace GulagRunners.Game
                  "about loot — the movement sandbox of docs/11, say.")]
         public ItemModel[] weapons;
 
-        [Tooltip("Armour models, parented to the body. Optional: the weapon pack this project " +
-                 "ships with has no armour meshes, so this is empty until there is art, and " +
-                 "armour reads through the stat line rather than the silhouette until then.")]
+        [Tooltip("CHEST armour models only, parented to the body, one mesh per item. The " +
+                 "older of the two armour paths and the narrower one: the fighter wears a " +
+                 "helmet and a belt as well, and those go through PlayerArmourView, which " +
+                 "dresses all three worn slots at once from a modular character's own part " +
+                 "categories. Fill one or the other, not both. Optional: the weapon pack " +
+                 "this project ships with has no armour meshes at all.")]
         public ItemModel[] armour;
 
 

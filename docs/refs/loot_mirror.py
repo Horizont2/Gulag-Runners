@@ -15,7 +15,13 @@ LEATHER, CHAINMAIL, PLATE = 20, 21, 22
 # is what a replay carries, and giving an old one to a new item rewrites a
 # saved round.
 BANDAGE = 30
-WEAPON, ARMOUR, UTILITY = 1, 2, 3
+LEATHER_CAP, MAIL_COIF, GREAT_HELM = 40, 41, 42
+ROPE_BELT, TOOL_BELT, WAR_BELT = 50, 51, 52
+WEAPON, ARMOUR, UTILITY, HELMET, BELT = 1, 2, 3, 4, 5
+
+# Helmet, chest and belt are three slots and one damage reduction: they SUM, and the
+# sum is capped by the combat config rather than in here.
+WORN = (HELMET, ARMOUR, BELT)
 
 
 def _w(name, tier, dmg, frames, reach, dur, pry, pierce=0, weight=0):
@@ -23,10 +29,20 @@ def _w(name, tier, dmg, frames, reach, dur, pry, pierce=0, weight=0):
                 pry=M(pry), dur=dur, pierce=pierce, weight=weight, name=name)
 
 
-def _a(name, tier, reduction, chip=0, parry=0, weight=0):
-    return dict(kind=ARMOUR, tier=tier, dmg=0, frames=0, reach=0, pry=0, dur=0,
+def _a(name, tier, reduction, chip=0, parry=0, weight=0, kind=ARMOUR, stun=0, hold=0):
+    return dict(kind=kind, tier=tier, dmg=0, frames=0, reach=0, pry=0, dur=0,
                 pierce=0, reduction=reduction, chip=chip, parry=parry, weight=weight,
-                name=name)
+                stun=stun, hold=hold, name=name)
+
+
+def _h(name, tier, reduction, stun, weight):
+    """A helmet: a little reduction, and the hitstun of the blows after the first."""
+    return _a(name, tier, reduction, weight=weight, kind=HELMET, stun=stun)
+
+
+def _b(name, tier, reduction, hold, weight):
+    """A belt: the least reduction in the table, and how long a guard holds."""
+    return _a(name, tier, reduction, weight=weight, kind=BELT, hold=hold)
 
 
 ITEMS = {
@@ -43,10 +59,16 @@ ITEMS = {
     SCYTHE:    _w("scythe", 2, 11, 29, 1850, 8, 1200, pierce=500, weight=70),
     FLANGED_MACE: _w("flanged mace", 3, 12, 21, 1300, 9, 1400, pierce=700, weight=100),
     WARHAMMER: _w("warhammer", 3, 21, 34, 1400, 6, 2600, pierce=450, weight=70),
-    LEATHER:   _a("leather vest", 1, 150, weight=100),
-    CHAINMAIL: _a("chainmail", 2, 300, weight=100),
-    PLATE:     _a("plate", 3, 450, weight=90),
+    LEATHER:   _a("leather vest", 1, 90, weight=100),
+    CHAINMAIL: _a("chainmail", 2, 180, weight=100),
+    PLATE:     _a("plate", 3, 270, weight=90),
     BANDAGE:   dict(kind=UTILITY, tier=1, pry=0, dur=0, heal=30, weight=110, name="bandage"),
+    LEATHER_CAP: _h("leather cap", 1, 40, 120, 55),
+    MAIL_COIF:   _h("mail coif", 2, 80, 240, 45),
+    GREAT_HELM:  _h("great helm", 3, 120, 380, 30),
+    ROPE_BELT:   _b("rope belt", 1, 20, 150, 50),
+    TOOL_BELT:   _b("tool belt", 2, 40, 300, 40),
+    WAR_BELT:    _b("war belt", 3, 60, 500, 25),
 }
 
 # ---------------------------------------------------------------- the deal (LootTable)
@@ -276,21 +298,66 @@ def fresh(chests):
 
 
 class Inv:
+    """Five slots: weapon, helmet, chest armour, belt, utility. docs/02 started at three
+    and three was one idea short -- a silhouette has a head and a waist, and folding both
+    into one armour square made finding a helmet a reason to throw your plate away."""
+
     def __init__(s):
         s.weapon, s.armour, s.utility = NONE, NONE, NONE
+        s.helmet, s.belt = NONE, NONE
         s.durability = 0
 
     @property
     def bare(s):
         return s.weapon == NONE
 
+    def slot(s, kind):
+        return {WEAPON: s.weapon, HELMET: s.helmet, ARMOUR: s.armour,
+                BELT: s.belt, UTILITY: s.utility}.get(kind, NONE)
+
+    # ---- what the three worn pieces come to. Sums, except the guard chip: zero means
+    # "the ordinary chip", so the best piece wins rather than three of them multiplying.
+    def _worn(s, key):
+        return sum(ITEMS[i].get(key, 0) for i in (s.helmet, s.armour, s.belt))
+
+    @property
+    def reduction(s):
+        return s._worn("reduction")
+
+    @property
+    def stun_resist(s):
+        return s._worn("stun")
+
+    @property
+    def guard_hold(s):
+        return s._worn("hold")
+
+    @property
+    def parry_bonus(s):
+        return s._worn("parry")
+
+    @property
+    def chip(s):
+        best = 0
+        for i in (s.helmet, s.armour, s.belt):
+            c = ITEMS[i].get("chip", 0)
+            if c > 0 and (best == 0 or c < best):
+                best = c
+        return best
+
     def equip(s, item):
         kind = ITEMS[item]["kind"]
         if kind == WEAPON:
             old, s.weapon, s.durability = s.weapon, item, ITEMS[item]["dur"]
             return old
+        if kind == HELMET:
+            old, s.helmet = s.helmet, item
+            return old
         if kind == ARMOUR:
             old, s.armour = s.armour, item
+            return old
+        if kind == BELT:
+            old, s.belt = s.belt, item
             return old
         if kind == UTILITY:
             old, s.utility = s.utility, item
@@ -361,8 +428,7 @@ def take_from_ground(s, pressed, ground, button_taken):
         box = (g.x - D["RADIUS"], g.y - D["RADIUS"], g.x + D["RADIUS"], g.y + D["RADIUS"])
         if not overlaps(b, box):
             continue
-        slot = {WEAPON: s.inv.weapon, ARMOUR: s.inv.armour, UTILITY: s.inv.utility}.get(
-            ITEMS[g.item]["kind"], NONE)
+        slot = s.inv.slot(ITEMS[g.item]["kind"])
         if slot == NONE:
             if free < 0:
                 free = i

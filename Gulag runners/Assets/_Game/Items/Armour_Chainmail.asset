@@ -22,7 +22,9 @@ MonoBehaviour:
   durability: 0
   prySpeed: 0
   blockPierce: 0
-  damageReduction: 0.299
+  damageReduction: 0.18
   blockChip: 0
   parryBonusFrames: 0
+  stunResist: 0
+  guardHold: 0
   heal: 0

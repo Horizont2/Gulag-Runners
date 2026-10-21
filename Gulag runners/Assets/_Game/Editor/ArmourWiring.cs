@@ -39,27 +39,6 @@ namespace GulagRunners.GameEditor
 
         const string HolderName = "Armour";
 
-        /// <summary>
-        /// THREE suits and no more, one per rarity, and which of the pack's numbered types
-        /// each one is cut from.
-        ///
-        /// The pack ships a wardrobe. A wardrobe is the wrong answer here: docs/02 and
-        /// docs/03 both want the armour slot readable from across the arena, because
-        /// knowing the other fighter is in plate decides whether you take the exchange at
-        /// all — and a dozen near-identical suits say nothing at a glance. Three say it in
-        /// one look, and they are the three the loot table already rolls.
-        ///
-        /// Types 1, 3 and 5 rather than 1, 2, 3: spread across the pack's range so the
-        /// three read as different kinds of protection rather than three shades of the
-        /// same one.
-        /// </summary>
-        static readonly (ItemId Item, Rarity Rarity, int Type)[] Mapping =
-        {
-            (ItemId.LeatherVest, Rarity.Common,    1),
-            (ItemId.Chainmail,   Rarity.Rare,      3),
-            (ItemId.Plate,       Rarity.Legendary, 5),
-        };
-
         /// <summary>One piece per category. Each is a whole garment, not a per-limb part.</summary>
         static readonly (string Folder, string Prefix)[] Categories =
         {
@@ -71,8 +50,54 @@ namespace GulagRunners.GameEditor
             ("FEET",   "Feet Armor"),
         };
 
-        /// <summary>What a bare fighter wears: the lightest trousers and boots, nothing above.</summary>
-        static readonly string[] Bare = { "Legs Armor", "Feet Armor" };
+        // The pack's categories ARE the slots, which is the happy part of this: a head
+        // garment, a chest-and-arms garment and a belt garment, cut apart along lines the
+        // artist already drew. Nothing overlaps, so the three can be worn at once.
+        static readonly string[] Head = { "HEADS" };
+        static readonly string[] Chest = { "CHESTS", "ARMS" };
+        static readonly string[] Waist = { "BELTS" };
+
+        /// <summary>What a bare fighter wears: the lightest trousers and boots, nothing above.
+        /// No slot in the game replaces these, so they are always on, under everything.</summary>
+        static readonly string[] BareBody = { "LEGS", "FEET" };
+
+        /// <summary>
+        /// THREE of each worn kind and no more, one per rarity, and which of the pack's
+        /// numbered types each one is cut from.
+        ///
+        /// The pack ships a wardrobe. A wardrobe is the wrong answer here: docs/02 and
+        /// docs/03 both want what a fighter is wearing readable from across the arena,
+        /// because knowing the other fighter is in plate decides whether you take the
+        /// exchange at all — and a dozen near-identical suits say nothing at a glance.
+        /// Three per slot say it in one look, and they are the three the loot table rolls.
+        ///
+        /// Types 1, 3 and 5 rather than 1, 2, 3: spread across the pack's range so the
+        /// three read as different kinds of protection rather than three shades of the
+        /// same one. A slot's three share the type ladder, so a fighter in the legendary
+        /// helm and the common vest is visibly mismatched — which he is.
+        /// </summary>
+        static readonly (ItemId Item, Rarity Rarity, int Type, string[] Folders)[] Mapping =
+        {
+            (ItemId.LeatherCap,  Rarity.Common,    1, Head),
+            (ItemId.MailCoif,    Rarity.Rare,      3, Head),
+            (ItemId.GreatHelm,   Rarity.Legendary, 5, Head),
+
+            (ItemId.LeatherVest, Rarity.Common,    1, Chest),
+            (ItemId.Chainmail,   Rarity.Rare,      3, Chest),
+            (ItemId.Plate,       Rarity.Legendary, 5, Chest),
+
+            (ItemId.RopeBelt,    Rarity.Common,    1, Waist),
+            (ItemId.ToolBelt,    Rarity.Rare,      3, Waist),
+            (ItemId.WarBelt,     Rarity.Legendary, 5, Waist),
+        };
+
+        /// <summary>The pack's file-name prefix for one of its category folders.</summary>
+        static string PrefixOf(string folder)
+        {
+            foreach ((string f, string prefix) in Categories)
+                if (f == folder) return prefix;
+            return folder;
+        }
 
         [MenuItem("Tools/Gulag Runners/Wire armour")]
         public static void Wire()
@@ -154,32 +179,40 @@ namespace GulagRunners.GameEditor
             List<GameObject> all = new List<GameObject>();
             List<ArmourSet> sets = new List<ArmourSet>();
             List<string> report = new List<string>();
-            Dictionary<string, GameObject> bare = new Dictionary<string, GameObject>();
 
-            foreach ((ItemId item, Rarity rarity, int type) in Mapping)
+            // The base body first, and keyed by None: the trousers and boots that stay on
+            // under every combination of the three slots. It goes in as its own pass rather
+            // than falling out of the common suit, because no slot owns the legs now.
+            List<GameObject> bareWorn = new List<GameObject>();
+            foreach (string folder in BareBody)
+            {
+                GameObject piece = Take(armourRoot, folder, PrefixOf(folder), 1, colour,
+                                        holder, source, target, slots, ItemId.None, report);
+                if (piece == null) continue;
+
+                bareWorn.Add(piece);
+                all.Add(piece);
+            }
+            sets.Add(new ArmourSet { item = ItemId.None, pieces = bareWorn.ToArray() });
+
+            foreach ((ItemId item, Rarity rarity, int type, string[] folders) in Mapping)
             {
                 List<GameObject> worn = new List<GameObject>();
                 report.Add($"{rarity}: {item} from the pack's type {type}, " +
-                           $"{Categories.Length} piece(s)");
+                           $"{folders.Length} piece(s)");
 
-                foreach ((string folder, string prefix) in Categories)
+                foreach (string folder in folders)
                 {
-                    GameObject piece = Take(armourRoot, folder, prefix, type, colour,
+                    GameObject piece = Take(armourRoot, folder, PrefixOf(folder), type, colour,
                                             holder, source, target, slots, item, report);
                     if (piece == null) continue;
 
                     worn.Add(piece);
                     all.Add(piece);
-
-                    if (item == ItemId.LeatherVest && System.Array.IndexOf(Bare, prefix) >= 0)
-                        bare[prefix] = piece;
                 }
 
                 sets.Add(new ArmourSet { item = item, pieces = worn.ToArray() });
             }
-
-            List<GameObject> bareWorn = new List<GameObject>(bare.Values);
-            sets.Insert(0, new ArmourSet { item = ItemId.None, pieces = bareWorn.ToArray() });
 
             PlayerArmourView view = fighter.GetComponent<PlayerArmourView>();
             if (view == null) view = Undo.AddComponent<PlayerArmourView>(fighter.gameObject);
@@ -189,7 +222,7 @@ namespace GulagRunners.GameEditor
             view.sets = sets.ToArray();
             view.allParts = all.ToArray();
             PrefabUtility.RecordPrefabInstancePropertyModifications(view);
-            view.Wear(ItemId.None);
+            view.Wear(ItemId.None, ItemId.None, ItemId.None);
 
             Debug.Log(
                 $"{fighter.name}: {all.Count} garment(s) in colour {colour}, " +

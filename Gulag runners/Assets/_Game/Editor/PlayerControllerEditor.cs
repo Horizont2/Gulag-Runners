@@ -62,7 +62,7 @@ namespace GulagRunners.GameEditor
             }
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Carrying (docs/02: three slots, no menu)",
+            EditorGUILayout.LabelField("Carrying (docs/02: five slots, no menu)",
                                        EditorStyles.boldLabel);
             using (new EditorGUI.DisabledScope(true))
             {
@@ -70,8 +70,17 @@ namespace GulagRunners.GameEditor
                     ? "fists"
                     : $"{s.Inventory.Weapon} ({s.Inventory.WeaponDurability} left)";
                 EditorGUILayout.TextField("Weapon", weapon);
+                EditorGUILayout.EnumPopup("Helmet", s.Inventory.Helmet);
                 EditorGUILayout.EnumPopup("Armour", s.Inventory.Armour);
+                EditorGUILayout.EnumPopup("Belt", s.Inventory.Belt);
                 EditorGUILayout.EnumPopup("Utility", s.Inventory.Utility);
+
+                // What the three worn pieces actually come to, since no one square says it.
+                EditorGUILayout.TextField("Worn kit",
+                    $"-{s.Inventory.ArmourPermille / 10f:0.#}% damage, " +
+                    $"-{s.Inventory.StunResistPermille / 10f:0.#}% hitstun, " +
+                    $"+{s.Inventory.GuardHoldPermille / 10f:0.#}% guard");
+
                 EditorGUILayout.IntField("Opening chest", s.OpeningChest);
             }
 

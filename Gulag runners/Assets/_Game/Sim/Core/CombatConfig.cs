@@ -149,6 +149,30 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix KnockbackLift;
 
+        // ---- what the worn kit is allowed to add up to
+        /// <summary>
+        /// The most all three worn pieces together may remove from a blow, in thousandths.
+        ///
+        /// docs/02 priced ARMOUR at -15/-30/-45% by rarity, back when armour was one slot.
+        /// It is three slots now, and that number is what a FULL SET of one rarity comes
+        /// to: the helmet, the chest and the belt share it out rather than each carrying
+        /// it. So the shipped table tops out at exactly the 450 docs/02 asks for, the
+        /// 8-14 s time to kill survives the best kit in the game, and this cap never
+        /// fires — which is the point of it. It is the guard rail for the day a fourth
+        /// worn piece is added and nobody re-adds the three numbers.
+        /// </summary>
+        public int MaxArmourPermille;
+
+        /// <summary>
+        /// The most the worn kit may take off the hitstun, in thousandths.
+        ///
+        /// Only the helmet carries any, so today this is a ceiling over one item rather than
+        /// a sum — and it stays a config knob for the same reason as the one above: the day
+        /// a second piece carries stun resistance, the question of what they add up to is
+        /// already answered.
+        /// </summary>
+        public int MaxStunResistPermille;
+
         // ---- blocking (docs/02: the medieval mode's answer to pressure)
         /// <summary>Damage that still gets through a block, in thousandths.</summary>
         public int ChipPermille;
@@ -294,6 +318,9 @@ namespace GulagRunners.Sim
             c.KnockbackSpeed = Fix.FromMilli(3200);
             c.HeavyKnockbackSpeed = Fix.FromMilli(6000);
             c.KnockbackLift = Fix.FromMilli(1600);
+
+            c.MaxArmourPermille = 500;     // the full legendary kit is 450; this never fires
+            c.MaxStunResistPermille = 400; // a great helm is 380 of it
 
             c.ChipPermille = 300;          // docs/02: a block absorbs 70%, not 85%
             c.BlockStaminaCost = 0;        // a jab does not break a guard; holding it still drains

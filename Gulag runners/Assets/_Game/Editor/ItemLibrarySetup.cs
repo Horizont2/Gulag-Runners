@@ -60,6 +60,20 @@ namespace GulagRunners.GameEditor
                 AssetDatabase.CreateAsset(library, LibraryPath);
             }
 
+            // A file for an item the table no longer has is the dangerous case, and the one
+            // that actually happened: the shield was deleted from ItemId and its data file
+            // stayed behind, so the library went on applying id 23 and a BUILD had an item
+            // no test and no mirror knew about. Re-running this used to rebuild the list
+            // from the live table and say nothing about the file left over.
+            List<string> stale = new List<string>();
+            foreach (string guid in AssetDatabase.FindAssets("t:ItemDefAsset", new[] { Folder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                ItemDefAsset asset = AssetDatabase.LoadAssetAtPath<ItemDefAsset>(path);
+                if (asset == null || all.Contains(asset)) continue;
+                stale.Add($"{path} (item {(int)asset.item})");
+            }
+
             library.items = all.ToArray();
             EditorUtility.SetDirty(library);
             AssetDatabase.SaveAssets();
@@ -72,7 +86,17 @@ namespace GulagRunners.GameEditor
                       $"{all.Count} in the library.\n" +
                       "Drop ItemLibrary on MatchState's Item Library slot to make the files " +
                       "the ones the game reads. Leave it empty and the table in ItemTable.cs " +
-                      "is used, exactly as before.", library);
+                      "is used, exactly as before.\n" +
+                      "This never overwrites a file that already exists — that would throw " +
+                      "away the tuning the files are for — so docs/refs/item_library_check.py " +
+                      "is what tells you the two have drifted apart.", library);
+
+            if (stale.Count > 0)
+                Debug.LogWarning(
+                    $"{stale.Count} data file(s) for items the simulation no longer has. " +
+                    "They are out of the library now, but delete them: a file left in this " +
+                    "folder is one \"create\" away from being applied again.\n  " +
+                    string.Join("\n  ", stale), library);
         }
     }
 }

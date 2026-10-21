@@ -840,3 +840,113 @@ Directional. А `useUnityRealtimeShadows: 1`, тож суцільна стеля
    саме питання ціни, і те саме: глобально.
 4. **UI в сцені ще нема** — Canvas відсутній. `MenuUI` чекає, кнопки підключаються до
    `Play / Profile / Shop / Dailies / Season / Settings / Friends / Back`.
+
+## HUD бою: фінальна розкладка, п'ять слотів
+
+Мокап HUD, який прийняли, мав **три** квадрати спорядження, бо в симуляції їх було три.
+Спорядження в грі — це шолом, зброя, броня, пояс і утиліта, тобто п'ять
+([02](02-combat-and-controls.md#слоти)), тож квадратів теж п'ять. Разом із цим силует
+зменшений: його робота — підписати, який квадрат до якого місця на тілі, а не бути
+картинкою.
+
+Порядок квадратів читається зверху вниз по тілу, а не зліва направо:
+
+```
+        ○ ШОЛОМ            (голова)
+   ЗБРОЯ ●   ● БРОНЯ       (рука / груди)
+        ○ ПОЯС             (пояс)
+        ○ УТИЛІТА          (сумка на поясі)
+```
+
+Порожній слот — тонкий контур квадрата, заповнений — предмет усередині з обведенням
+кольору рідкості (білий / синій / золотий). Нуль цифр, нуль назв: за тіром видно, чого
+воно варте, за силуетом — що це.
+
+Вісім елементів HUD і не більше, як вимагає docs/02: дві смуги HP, заряди стаміни,
+годинник, колонка спорядження, джойстик, кнопки праворуч, індикатор напрямку звуку.
+
+### Промт — фінальний HUD (v4: п'ять слотів, менший силует)
+
+```
+A gameplay screenshot of a mobile 3D side-view fighting game, 20:9
+ultrawide phone screen held horizontally, all important content inside
+the central 16:9.
+
+THE GAME FIRST. This is a real frame of play, not a UI illustration.
+
+A cutaway through a stone dungeon, seen strictly from the side like a
+doll's house with the front wall removed. Three floors stacked directly
+above each other, connected by wooden ladders. Narrow perspective, about
+a 30 degree field of view, camera tilted down by 12 degrees, so the
+floors have thickness and nothing is distorted.
+
+On the middle floor, two lean fighters face each other on the same flat
+line, mid-exchange, about two metres apart. Each is 18% of the screen
+height. The LEFT fighter is rimmed in cold cyan, barefoot, bare-headed,
+swinging a wooden club. The RIGHT fighter is rimmed in warm orange, in a
+mail coif and chainmail with a rope belt, guard raised. Both read as
+clean silhouettes first: the weapon's shape alone says what it is.
+
+The background is desaturated cold grey stone, slightly out of focus.
+Everything interactive is saturated and glows faintly: a wooden crate on
+the floor above, a dagger lying on the floor below in a soft white
+halo, a ladder in warm wood. Low poly, flat faceted shading, no
+textures, no text anywhere in the world.
+
+THE INTERFACE IS A THIN LIGHT OVERLAY, NOT FURNITURE.
+No wooden planks, no iron straps, no stone slabs, no rounded panel
+boxes, no frames behind anything. Every element is made of thin 2px
+lines, flat silhouettes and bare glyphs over the game, inset from every
+edge by 4% of the frame. Nothing overlaps the two fighters.
+
+TOP EDGE, one quiet row:
+  far left, a horizontal health bar in cold cyan, a thin unfilled
+  outline behind it, no number;
+  under it, four small cyan diamonds in a row, three lit, one dim:
+  stamina charges;
+  far right, the same mirrored in warm orange for the other fighter;
+  dead centre, the round clock as thin white digits, 1:24, small, with
+  no box around it.
+
+LEFT EDGE, lower third: a floating virtual joystick, just two thin white
+circles, a large ring and a small filled dot pushed to its upper right.
+Barely there, 60% opacity.
+
+RIGHT EDGE, lower third: four round buttons as thin white outlines, no
+fill, no panel, arranged in a cluster for the right thumb:
+  the largest, lowest right, a crossed-swords glyph: ATTACK;
+  above it, a smaller circle with a shield glyph: BLOCK;
+  to their left, a smaller circle with an open-hand glyph: ACTION;
+  above that, the smallest circle with a single up arrow: JUMP.
+
+LEFT EDGE, middle, the EQUIPMENT COLUMN: a small human figure drawn in
+thin white line art only, a wire mannequin, no fill, no face, only 22%
+of the screen height, standing upright. Five small square outlined slots
+are placed around it, each joined to the body by a short thin leader
+line:
+  one above the head: a mail coif, outlined in blue;
+  one at the right hand: a club, outlined in white;
+  one at the chest: chainmail, outlined in blue;
+  one at the waist: a rope belt, outlined in white;
+  one just below the waist: an empty slot, a bare square outline with
+  nothing in it.
+Each filled slot holds a tiny flat icon of the item and nothing else:
+no numbers, no names, no bars.
+
+LOWER LEFT, above the joystick: the sound direction indicator, a thin
+white arc segment pointing up and to the left, fading at its ends, with
+a small chest glyph at its tip: something was opened on the floor above,
+off screen.
+
+Palette: cold grey stone, cyan for player one, orange for player two,
+warm wood only where the world is interactive. The interface is white at
+80% opacity and nothing else.
+
+Crisp, readable at phone size, clean flat vector interface over low poly
+3D, no photoreal materials, no drop shadows, no gradients in the UI.
+```
+
+Негатив: `wooden UI panels, stone UI frames, iron rivets, ornate borders,
+rounded rectangle panels behind icons, large portrait of the character, inventory
+grid, numbers over health bars, damage numbers, item names, tooltips, minimap,
+isometric or three-quarter camera, text in the world`.

@@ -3,7 +3,9 @@ import sim_motor_mirror as M
 from sim_motor_mirror import C, ONE, mul, ATTACK, DOD
 from loot_mirror import (ITEMS, NONE, FISTS, CLUB, SPEAR, DAGGER, SWORD, AXE, FLANGED_MACE,
                          WARHAMMER, GLADIUS, MACE, SABER, SCYTHE,
-                         LEATHER, CHAINMAIL, PLATE, WEAPON, ARMOUR)
+                         LEATHER, CHAINMAIL, PLATE, WEAPON, ARMOUR,
+                         LEATHER_CAP, MAIL_COIF, GREAT_HELM,
+                         ROPE_BELT, TOOL_BELT, WAR_BELT, HELMET, BELT)
 
 # ---------------------------------------------------------------- CombatConfig.Default()
 K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
@@ -16,6 +18,7 @@ K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          WINDUP_SPEED=480, ACTIVE_SPEED=180, RECOVERY_SPEED=400,
          HIT_STOP=3, BLOCK_STOP=2, PARRY_STOP=7,
          PARRY=12, STAGGER=48, DEATH=90, GUARD_DRAIN=48,
+         MAX_ARMOUR=500, MAX_STUN_RESIST=400,
          DESPERATE_HP=300, DESPERATE_DMG=1400, SUDDEN_BARE=2000,
          FALL_SPEED=M.M(12500), FALL_PER_SPEED=8)
 
@@ -142,9 +145,13 @@ def combat_step(s, inp):
         s.guard_t += 1
     s.blocking = can_guard
 
-    # Holding the guard is an action, not a posture.
-    if s.blocking and K["GUARD_DRAIN"] > 0 and s.guard_t > 0 \
-            and s.guard_t % K["GUARD_DRAIN"] == 0:
+    # Holding the guard is an action, not a posture -- and the belt is what buys time
+    # here, and the only thing it buys: a war belt stretches 0.8 s a charge to 1.2 s.
+    drain = K["GUARD_DRAIN"]
+    if drain > 0 and s.inv.guard_hold > 0:
+        drain = scale(drain, 1000 + s.inv.guard_hold)
+
+    if s.blocking and drain > 0 and s.guard_t > 0 and s.guard_t % drain == 0:
         s.stam -= 1
         if s.stam <= 0:
             s.stam = 0
@@ -309,7 +316,7 @@ def land(atk, vic, sudden_death=False):
     facing_it = vic.facing != side
     if vic.blocking and facing_it:
         # A shield is what makes the parry worth hunting for (docs/02's skill ceiling).
-        window = K["PARRY"] + ITEMS[vic.inv.armour].get("parry", 0)
+        window = K["PARRY"] + vic.inv.parry_bonus
         if vic.guard_t < window:
             parry(atk, vic)
         else:
@@ -348,7 +355,7 @@ def block(atk, vic, dmg, side):
 
     # And what a shield is FOR: the hits you meet, not the hits you stand and take. 0 means
     # the ordinary chip, which is every other armour.
-    guard = ITEMS[vic.inv.armour].get("chip", 0)
+    guard = vic.inv.chip
     if guard > 0:
         chip = scale(chip, guard)
     chip = max(1, chip)
@@ -396,7 +403,11 @@ def hit(atk, vic, dmg, side, heavy):
         if getattr(p, "hitstop", 0) < K["HIT_STOP"]:
             p.hitstop = K["HIT_STOP"]
 
-    reduction = ITEMS[vic.inv.armour].get("reduction", 0) if vic.inv.armour != NONE else 0
+    # Three worn pieces, summed and then capped. A plain sum keeps each piece worth
+    # exactly what the table says; the cap is one number in the config rather than an
+    # emergent one.
+    reduction = min(vic.inv.reduction, K["MAX_ARMOUR"]) if K["MAX_ARMOUR"] > 0 \
+        else vic.inv.reduction
     if reduction:
         dmg = max(1, scale(dmg, 1000 - reduction))
 
@@ -405,6 +416,14 @@ def hit(atk, vic, dmg, side, heavy):
     vic.damage_taken = dmg
     vic.noise = 3
     stun = dmg * K["STUN_PER_DMG"]
+
+    # The helmet, and BEFORE the floor below on purpose: taken off afterwards it would eat
+    # the attacker's guaranteed turn and put every weapon at a minus on a clean hit.
+    resist = min(vic.inv.stun_resist, K["MAX_STUN_RESIST"]) if K["MAX_STUN_RESIST"] > 0 \
+        else vic.inv.stun_resist
+    if resist:
+        stun = scale(stun, 1000 - resist)
+
     if vic.stun_stack == 0:
         # The FIRST hit of a string confirms and buys the turn.
         stun = max(stun, owed(atk) + K["HIT_ADVANTAGE"])

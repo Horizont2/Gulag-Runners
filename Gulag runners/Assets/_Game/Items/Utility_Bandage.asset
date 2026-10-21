@@ -25,4 +25,6 @@ MonoBehaviour:
   damageReduction: 0
   blockChip: 0
   parryBonusFrames: 0
+  stunResist: 0
+  guardHold: 0
   heal: 30

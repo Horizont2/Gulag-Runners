@@ -163,6 +163,17 @@ namespace GulagRunners.Game
         public float guardDrainTime = 0.8f;
         public float staggerTime = 0.8f;
 
+        [Header("Worn kit")]
+        [Tooltip("The most helmet, chest armour and belt together may remove from a blow. " +
+                 "A full set of one rarity comes to docs/02's own 15/30/45%, so the table " +
+                 "tops out at 45% and this never fires — it is the guard rail for the day " +
+                 "a fourth worn piece is added.")]
+        [Range(0f, 1f)] public float maxArmour = 0.5f;
+
+        [Tooltip("The most the worn kit may take off the hitstun. Only the helmet carries " +
+                 "any today — a great helm is 38% of it.")]
+        [Range(0f, 1f)] public float maxStunResist = 0.4f;
+
         [Header("Death")]
         public float deathTime = 1.5f;
 
@@ -217,6 +228,8 @@ namespace GulagRunners.Game
             KnockbackSpeed = M(knockbackSpeed),
             HeavyKnockbackSpeed = M(heavyKnockbackSpeed),
             KnockbackLift = M(knockbackLift),
+            MaxArmourPermille = P(maxArmour),
+            MaxStunResistPermille = P(maxStunResist),
             ChipPermille = P(chip),
             BlockStaminaCost = Mathf.Max(0, blockStaminaCost),
             HeavyBlockStaminaCost = Mathf.Max(0, heavyBlockStaminaCost),
@@ -242,7 +255,7 @@ namespace GulagRunners.Game
         {
             ItemDef w = ItemTable.WeaponOrFists(weapon);
             float damage = w.Damage.ToMilli() / 1000f;
-            float reduction = ItemTable.Get(armour).DamageReduction.ToMilli() / 1000f;
+            float reduction = ItemTable.Get(armour).DamageReductionPermille / 1000f;
             damage *= 1f - reduction;
             if (damage <= 0.01f) return 0f;
 

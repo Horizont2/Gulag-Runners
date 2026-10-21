@@ -87,8 +87,16 @@ namespace GulagRunners.Sim
             // Holding the guard is an action, not a posture. Standing braced is slower (42%
             // of run speed) and that reads as the character mysteriously slowing down until
             // it also visibly runs out — so it runs out.
-            if (s.Blocking && cfg.GuardDrainFrames > 0 && s.GuardTimer > 0 &&
-                s.GuardTimer % cfg.GuardDrainFrames == 0)
+            //
+            // The belt is what buys time here, and time is the only thing it buys: a war
+            // belt stretches 0.8 s a charge to 1.2 s, so a full pool brackets a guard at
+            // 4.8 s instead of 3.2 s. Long enough to wait for the swing you mean to parry,
+            // nowhere near long enough to hide behind.
+            int drain = cfg.GuardDrainFrames;
+            if (drain > 0 && s.Inventory.GuardHoldPermille > 0)
+                drain = Scale(drain, 1000 + s.Inventory.GuardHoldPermille);
+
+            if (s.Blocking && drain > 0 && s.GuardTimer > 0 && s.GuardTimer % drain == 0)
             {
                 s.StaminaCharges--;
                 if (s.StaminaCharges <= 0)
@@ -413,7 +421,7 @@ namespace GulagRunners.Sim
             {
                 // A shield is what makes the parry worth hunting for (docs/02 calls it the
                 // skill ceiling of the medieval mode).
-                int window = cfg.ParryFrames + victim.Inventory.ArmourDef.ParryBonusFrames;
+                int window = cfg.ParryFrames + victim.Inventory.ParryBonusFrames;
                 if (victim.GuardTimer < window)
                 {
                     Parry(ref attacker, ref victim, in cfg);
@@ -457,7 +465,7 @@ namespace GulagRunners.Sim
             // And what a shield is FOR: the hits you meet, rather than the hits you stand and
             // take. Zero is "the ordinary chip", which is what every other armour wants and
             // what an unset field already is.
-            int guard = victim.Inventory.ArmourDef.BlockChipPermille;
+            int guard = victim.Inventory.BlockChipPermille;
             if (guard > 0) chip = Scale(chip, guard);
 
             if (chip < 1) chip = 1;
@@ -513,11 +521,18 @@ namespace GulagRunners.Sim
         static void Hit(ref PlayerSimState attacker, ref PlayerSimState victim, int damage,
                         int side, bool heavy, in CombatConfig cfg)
         {
-            // Armour is the one stat with no downside, so it is the one worth wearing (docs/03).
-            Fix reduction = victim.Inventory.ArmourDef.DamageReduction;
-            if (reduction > Fix.Zero)
+            // Armour is the one stat with no downside, so it is the one worth wearing
+            // (docs/03) — and there are three pieces of it now, so they SUM and the sum is
+            // capped. Three slots multiplying would have made a full kit take 70% off; a
+            // plain sum keeps each piece worth exactly what the table says it is, and the
+            // cap is one number in the inspector rather than an emergent one.
+            int reduction = victim.Inventory.ArmourPermille;
+            if (cfg.MaxArmourPermille > 0 && reduction > cfg.MaxArmourPermille)
+                reduction = cfg.MaxArmourPermille;
+
+            if (reduction > 0)
             {
-                int keep = 1000 - reduction.ToMilli();
+                int keep = 1000 - reduction;
                 if (keep < 0) keep = 0;
                 damage = Scale(damage, keep);
                 if (damage < 1) damage = 1;
@@ -540,6 +555,18 @@ namespace GulagRunners.Sim
             // always buys the next move -- and a heavy weapon still buys more, because its
             // damage clears the floor on its own.
             int stun = damage * cfg.HitstunPerDamage;
+
+            // The helmet, and BEFORE the floor below on purpose. Taken off afterwards it
+            // would eat the attacker's guaranteed turn and put every weapon in the game at
+            // a minus on a clean hit, which is the exact bug this floor exists to fix —
+            // measured at -3 to -12 frames across the table before it was there. Here the
+            // helmet does nothing to a light opening blow and a great deal to the second
+            // and third, stacked on top of the combo decay: what it buys is getting OUT of
+            // a string, not refusing to be hit.
+            int resist = victim.Inventory.StunResistPermille;
+            if (cfg.MaxStunResistPermille > 0 && resist > cfg.MaxStunResistPermille)
+                resist = cfg.MaxStunResistPermille;
+            if (resist > 0) stun = Scale(stun, 1000 - resist);
 
             if (victim.StunStack == 0)
             {

@@ -52,8 +52,18 @@ namespace GulagRunners.Sim
         public int BlockPierce;
 
         // ---- armour
-        /// <summary>Fraction of incoming damage removed. docs/02: T1/T2/T3 = 15/30/45%.</summary>
-        public Fix DamageReduction;
+        /// <summary>
+        /// Incoming damage removed, in thousandths. docs/02: T1/T2/T3 = 15/30/45%, which is
+        /// now what a full SET of that rarity comes to rather than one piece.
+        ///
+        /// An int and not a Fix, unlike the metres and the damage above. Every reader of it
+        /// wanted thousandths and called ToMilli() to get them, and that round trip is
+        /// lossy: Fix.FromMilli(270).ToMilli() is 269, because 0.270 has no exact Q16.16.
+        /// One piece could absorb that; three pieces summing could not, and the fixed-point
+        /// mirror in docs/refs would have been three thousandths out from the C# with
+        /// nothing to show which was right.
+        /// </summary>
+        public int DamageReductionPermille;
 
         /// <summary>
         /// What a raised guard lets through, in thousandths, for someone carrying this.
@@ -72,6 +82,29 @@ namespace GulagRunners.Sim
         /// </summary>
         public int ParryBonusFrames;
 
+        /// <summary>
+        /// How much of the hitstun this takes off, in thousandths. The helmet's stat.
+        ///
+        /// It is applied to the damage the blow earns, BEFORE the floor that guarantees the
+        /// attacker his turn on the first hit of a string — so a helmet never turns landing
+        /// a clean blow into a disadvantage, which is a bug this project has already had
+        /// once and measured at -3 to -12 frames across the whole weapon table. What it
+        /// shortens is the second hit and the third: stacked on top of the combo decay, a
+        /// great helm is the difference between being held in a string and getting out of
+        /// one.
+        /// </summary>
+        public int StunResistPermille;
+
+        /// <summary>
+        /// How much longer a raised guard holds before it costs a charge, in thousandths.
+        /// The belt's stat.
+        ///
+        /// Blocking drains a charge every GuardDrainFrames, so a full pool is 3.2 s of
+        /// standing braced; +500 makes it 4.8 s. That is the belt's whole plan — not
+        /// surviving the blow, but being allowed to wait for it.
+        /// </summary>
+        public int GuardHoldPermille;
+
         // ---- utility
         public int Heal;
 
@@ -84,6 +117,12 @@ namespace GulagRunners.Sim
                               : Rarity.Legendary;
 
         public bool IsWeapon => Kind == ItemKind.Weapon;
+
+        /// <summary>Worn rather than held: helmet, chest or belt. All three sum into one
+        /// damage reduction, so anything asking "is this armour" means all three.</summary>
+        public bool IsArmour => Kind == ItemKind.Armour || Kind == ItemKind.Helmet ||
+                                Kind == ItemKind.Belt;
+
         public bool Breakable => Durability > 0;
     }
 }
