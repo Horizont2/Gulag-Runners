@@ -170,33 +170,104 @@ namespace GulagRunners.GameEditor
 
             string[] files = AssetDatabase.FindAssets("t:Texture2D", new[] { root })
                                           .Select(AssetDatabase.GUIDToAssetPath)
-                                          .Distinct().ToArray();
+                                          .Distinct().OrderBy(p => p).ToArray();
+
+            // A bare tail is only safe when nothing else in the set ends the same way, and
+            // two things here do: hud/slot/frame and hud/bar/frame. Matching on the tail
+            // alone let bar/frame.png claim the slot square and then be overwritten by the
+            // real one, so the bar came out with no frame at all and nothing said why.
+            HashSet<string> ambiguous = new HashSet<string>(
+                Needed.Select(a => a.Key.Substring(a.Key.LastIndexOf('/') + 1))
+                      .GroupBy(t => t).Where(g => g.Count() > 1).Select(g => g.Key));
 
             Dictionary<string, int> bestScale = new Dictionary<string, int>();
+            List<string> unnamed = new List<string>();
+
+            // ---- first pass: the files that say what they are
             foreach (string path in files)
             {
                 string name = Normalise(Path.GetFileNameWithoutExtension(path), out int scale);
-                string relative = Normalise(
-                    Path.ChangeExtension(path.Substring(root.Length).TrimStart('/'), null), out _);
+                string relative = Relative(path, root);
 
-                Asset? hit = null;
+                string key = null;
                 foreach (Asset a in Needed)
                 {
                     string tail = a.Key.Substring(a.Key.LastIndexOf('/') + 1);
                     string withoutPrefix = a.Key.StartsWith("hud/") ? a.Key.Substring(4) : a.Key;
-                    if (name == tail || relative == withoutPrefix || relative == a.Key)
-                    { hit = a; break; }
+                    bool byPath = relative == withoutPrefix || relative == a.Key;
+                    bool byName = name == tail && !ambiguous.Contains(tail);
+                    if (byPath || byName) { key = a.Key; break; }
                 }
 
-                if (hit == null) { _unmatched.Add(path); continue; }
-
-                string key = hit.Value.Key;
+                if (key == null) { unnamed.Add(path); continue; }
                 if (!bestScale.TryGetValue(key, out int had) || scale > had)
                 {
                     bestScale[key] = scale;
                     _found[key] = path;
                 }
             }
+
+            // ---- second pass: the files Figma named after the vector inside them
+            foreach (string path in unnamed)
+            {
+                Asset? hit = ByShape(path, Relative(path, root));
+                if (hit == null) { _unmatched.Add(path); continue; }
+                _found[hit.Value.Key] = path;
+            }
+        }
+
+        static string Relative(string path, string root) =>
+            Normalise(Path.ChangeExtension(path.Substring(root.Length).TrimStart('/'), null),
+                      out _);
+
+        /// <summary>
+        /// A misnamed file worked out from the folder it sits in and the shape it has.
+        ///
+        /// Only consulted once the names have had their turn. An exported node can be
+        /// trimmed to its own ink rather than to the frame it was drawn in — the sound arc
+        /// comes out 444x213 where the frame is 210x62 — so proportions alone are not
+        /// enough. They settle it when they are close; when they are not, and the folder
+        /// has exactly one asset still spoken for by nobody, that is the answer by
+        /// elimination. Anything still ambiguous is left alone and reported.
+        /// </summary>
+        Asset? ByShape(string path, string relative)
+        {
+            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (tex == null || tex.height == 0) return null;
+
+            string folder = relative.Contains("/")
+                ? relative.Substring(0, relative.LastIndexOf('/')) : "";
+
+            List<Asset> open = new List<Asset>();
+            foreach (Asset a in Needed)
+            {
+                if (_found.ContainsKey(a.Key) || a.H <= 0) continue;
+                // The three drawn below are never guessed at. The halo exported as a hard
+                // 64 px square — Figma gave the rectangle inside the frame and left the
+                // blur behind — and a hard square is the right SHAPE and the wrong asset,
+                // so shape matching would take it and quietly replace a soft glow with a
+                // block. A correctly NAMED export still wins; only the guess is refused.
+                if (Generated.Contains(a.Key)) continue;
+                string group = a.Key.StartsWith("hud/") ? a.Key.Substring(4) : a.Key;
+                group = group.Contains("/") ? group.Substring(0, group.LastIndexOf('/')) : "";
+                if (group == folder) open.Add(a);
+            }
+            if (open.Count == 0) return null;
+
+            float ratio = tex.width / (float)tex.height;
+            Asset? best = null;
+            float bestError = 0.06f;
+            foreach (Asset a in open)
+            {
+                float want = a.W / a.H;
+                float error = Mathf.Abs(ratio - want) / want;
+                if (error >= bestError) continue;
+                bestError = error;
+                best = a;
+            }
+            if (best != null) return best;
+
+            return open.Count == 1 ? open[0] : (Asset?)null;
         }
 
         /// <summary>Lower-cased, hyphenated, with any @2x/@4x taken off and reported.</summary>
@@ -251,8 +322,120 @@ namespace GulagRunners.GameEditor
 
         // ---------------------------------------------------------------- build
 
+        // Three of these cannot survive a Figma export and all three are pure geometry, so
+        // they are drawn here instead of fought with. The halo loses its blur the moment
+        // Figma exports the rectangle inside the frame rather than the frame; the leader
+        // lines come out as whichever single path was selected. Neither is art — one is a
+        // distance field and the other is five straight lines — so generating them is both
+        // easier and sharper than a 4x raster of someone else's blur.
+        static readonly string[] Generated =
+            { "hud/slot/glow", "hud/leaders", "hud/leaders-mirrored" };
+
+        void GenerateMissing(string root, List<string> made)
+        {
+            foreach (string key in Generated)
+            {
+                if (_found.ContainsKey(key)) continue;
+                Asset asset = Needed.First(a => a.Key == key);
+                string dir = $"{root}/generated";
+                if (!AssetDatabase.IsValidFolder(dir))
+                    AssetDatabase.CreateFolder(root, "generated");
+
+                string file = key.Substring(key.LastIndexOf('/') + 1);
+                string path = $"{dir}/{file}.png";
+                Texture2D tex = key == "hud/slot/glow"
+                    ? DrawGlow((int)asset.W, (int)asset.H, 4)
+                    : DrawLeaders((int)asset.W, (int)asset.H, 4, key.EndsWith("mirrored"));
+
+                File.WriteAllBytes(path, tex.EncodeToPNG());
+                Object.DestroyImmediate(tex);
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+                _found[key] = path;
+                made.Add(file);
+            }
+        }
+
+        /// <summary>
+        /// A soft square halo as a distance field, which is what a blur of a rounded
+        /// rectangle is anyway — and sharper, because it is computed rather than sampled.
+        /// </summary>
+        static Texture2D DrawGlow(int w, int h, int scale)
+        {
+            int W = w * scale, H = h * scale;
+            Texture2D tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
+            Color[] px = new Color[W * H];
+
+            float half = 32f * scale;              // the 64 px square at the middle
+            float radius = 12f * scale;
+            float falloff = 46f * scale;
+            Vector2 centre = new Vector2(W * 0.5f, H * 0.5f);
+
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    Vector2 d = new Vector2(Mathf.Abs(x + 0.5f - centre.x),
+                                            Mathf.Abs(y + 0.5f - centre.y));
+                    Vector2 q = new Vector2(Mathf.Max(d.x - (half - radius), 0f),
+                                            Mathf.Max(d.y - (half - radius), 0f));
+                    float dist = Mathf.Max(q.magnitude - radius, 0f);
+                    float a = Mathf.Exp(-(dist / falloff) * (dist / falloff) * 2.2f);
+                    px[y * W + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(a));
+                }
+
+            tex.SetPixels(px);
+            tex.Apply();
+            return tex;
+        }
+
+        /// <summary>
+        /// The five leader lines, from the mannequin to the squares, in the 115x350 space
+        /// they were designed in. Mirrored is the same five with x flipped, which is what
+        /// the left-handed layout needs and what never reached the export at all.
+        /// </summary>
+        static Texture2D DrawLeaders(int w, int h, int scale, bool mirrored)
+        {
+            (float x1, float y1, float x2, float y2)[] lines =
+            {
+                (15, 30, 110, 28), (55, 192, 110, 104), (15, 110, 110, 180),
+                (15, 168, 110, 256), (15, 200, 110, 332),
+            };
+
+            int W = w * scale, H = h * scale;
+            Texture2D tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
+            Color[] px = new Color[W * H];
+            float halfWidth = 0.75f * scale;       // the 1.5 px stroke of the design
+
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    // Figma's y runs down the frame and a texture's runs up it.
+                    Vector2 p = new Vector2(x + 0.5f, (H - 1 - y) + 0.5f);
+                    float best = float.MaxValue;
+                    foreach (var l in lines)
+                    {
+                        float ax = (mirrored ? w - l.x1 : l.x1) * scale;
+                        float bx = (mirrored ? w - l.x2 : l.x2) * scale;
+                        Vector2 a = new Vector2(ax, (h - l.y1) * scale);
+                        Vector2 b = new Vector2(bx, (h - l.y2) * scale);
+                        Vector2 ab = b - a;
+                        float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(ab.sqrMagnitude, 1e-5f));
+                        best = Mathf.Min(best, Vector2.Distance(p, a + ab * t));
+                    }
+                    float alpha = Mathf.Clamp01(halfWidth + 0.5f - best);
+                    px[y * W + x] = new Color(1f, 1f, 1f, alpha);
+                }
+
+            tex.SetPixels(px);
+            tex.Apply();
+            return tex;
+        }
+
         void Build()
         {
+            List<string> generated = new List<string>();
+            string sourceFolder = AssetDatabase.GetAssetPath(_folder);
+            if (!string.IsNullOrEmpty(sourceFolder)) GenerateMissing(sourceFolder, generated);
+
             Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
             foreach (Asset a in Needed)
             {
@@ -298,7 +481,11 @@ namespace GulagRunners.GameEditor
             EditorUtility.SetDirty(view);
             Selection.activeGameObject = rootGo;
 
-            Debug.Log($"HUD: built from {sprites.Count} of {Needed.Length} sprites. " +
+            Debug.Log($"HUD: built from {sprites.Count} of {Needed.Length} sprites." +
+                      (generated.Count > 0
+                          ? $" Drew {generated.Count} Figma could not export cleanly " +
+                            $"({string.Join(", ", generated)}).\n"
+                          : " ") + " +
                       (fighters.Length >= 2
                           ? "Both fighters wired."
                           : $"{fighters.Length} fighter(s) in this scene — wire the rest by hand.") +
