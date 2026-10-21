@@ -62,7 +62,7 @@ namespace GulagRunners.GameEditor
         /// </summary>
         const float PackScale = 1f;
 
-        [MenuItem("Gulag Runners/Wire weapon models into the scene")]
+        [MenuItem("Tools/Gulag Runners/Setup/Wire weapon models into the scene")]
         public static void Wire()
         {
             Dictionary<ItemId, GameObject> prefabs = FindPrefabs(out List<string> missing);
@@ -105,7 +105,7 @@ namespace GulagRunners.GameEditor
                       "a stand-in cube rather than as nothing at all.");
         }
 
-        [MenuItem("Gulag Runners/Remove wired weapon models")]
+        [MenuItem("Tools/Gulag Runners/Setup/Remove wired weapon models")]
         public static void Unwire()
         {
             int gone = 0;

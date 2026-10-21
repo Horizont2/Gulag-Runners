@@ -29,7 +29,7 @@ namespace GulagRunners.GameEditor
     {
         const string LightName = "Rarity Glow";
 
-        [MenuItem("Tools/Gulag Runners/Light up the loot")]
+        [MenuItem("Tools/Gulag Runners/Setup/Light up the loot")]
         public static void Setup()
         {
             int lit = Lights();

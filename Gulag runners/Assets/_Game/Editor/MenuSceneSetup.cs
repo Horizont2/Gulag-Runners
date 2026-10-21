@@ -23,7 +23,7 @@ namespace GulagRunners.GameEditor
     {
         const string Controller = "Assets/_Game/Animation/GR_Player.controller";
 
-        [MenuItem("Tools/Gulag Runners/Set up the menu scene")]
+        [MenuItem("Tools/Gulag Runners/Setup/Set up the menu scene")]
         public static void Setup()
         {
             Scene scene = SceneManager.GetActiveScene();

@@ -56,7 +56,7 @@ namespace GulagRunners.GameEditor
 
         const int Lit = 3;
 
-        [MenuItem("Tools/Gulag Runners/Light the torches")]
+        [MenuItem("Tools/Gulag Runners/Setup/Light the torches")]
         public static void Setup()
         {
             Scene scene = SceneManager.GetActiveScene();

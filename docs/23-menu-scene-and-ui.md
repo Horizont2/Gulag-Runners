@@ -987,7 +987,7 @@ element, glowing buttons, glowing health bars, lens flare`.
 
 ## Банери: чому вони стали темно-синіми і не ворушились
 
-Після першого запуску `Tools > Gulag Runners > Set up banner cloth` банери в меню
+Після першого запуску `Tools > Gulag Runners > Setup > Set up banner cloth` банери в меню
 перемалювались у пласкі темно-сині дошки й не рухались узагалі. Два окремі дефекти,
 обидва виміряні, не вгадані.
 

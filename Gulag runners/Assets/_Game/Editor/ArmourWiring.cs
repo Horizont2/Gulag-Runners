@@ -99,7 +99,7 @@ namespace GulagRunners.GameEditor
             return folder;
         }
 
-        [MenuItem("Tools/Gulag Runners/Wire armour")]
+        [MenuItem("Tools/Gulag Runners/Setup/Wire armour")]
         public static void Wire()
         {
             PlayerController[] fighters =

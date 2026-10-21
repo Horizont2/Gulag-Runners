@@ -33,7 +33,7 @@ namespace GulagRunners.GameEditor
         const string KeyName = "Torch Key";
         const string FillName = "Gate Fill";
 
-        [MenuItem("Tools/Gulag Runners/Light the menu scene")]
+        [MenuItem("Tools/Gulag Runners/Setup/Light the menu scene")]
         public static void Setup()
         {
             Scene scene = SceneManager.GetActiveScene();

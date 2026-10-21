@@ -22,7 +22,7 @@ namespace GulagRunners.GameEditor
         const string Folder = "Assets/_Game/Items";
         const string LibraryPath = Folder + "/ItemLibrary.asset";
 
-        [MenuItem("Tools/Gulag Runners/Create item data files")]
+        [MenuItem("Tools/Gulag Runners/Setup/Create item data files")]
         public static void Create()
         {
             if (!AssetDatabase.IsValidFolder(Folder))

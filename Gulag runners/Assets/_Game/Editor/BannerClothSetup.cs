@@ -40,7 +40,7 @@ namespace GulagRunners.GameEditor
         const string ShaderName = "Gulag Runners/Banner Cloth";
         const string MaterialFolder = "Assets/_Game/Materials";
 
-        [MenuItem("Tools/Gulag Runners/Set up banner cloth")]
+        [MenuItem("Tools/Gulag Runners/Setup/Set up banner cloth")]
         public static void Setup()
         {
             Shader shader = Shader.Find(ShaderName);

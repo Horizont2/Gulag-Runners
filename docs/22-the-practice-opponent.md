@@ -9,7 +9,7 @@
 
 ## Як увімкнути
 
-`Tools > Gulag Runners > Add practice opponent` додає `FighterBrain` обом бійцям,
+`Tools > Gulag Runners > Setup > Add practice opponent` додає `FighterBrain` обом бійцям,
 **вимкненим**. Далі галочка **Take Over** на тому, кого віддаєш комп'ютеру (зазвичай
 Player 2). Її можна вмикати й вимикати **посеред раунду**, нічого не перезапускаючи.
 

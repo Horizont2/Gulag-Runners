@@ -38,7 +38,7 @@ namespace GulagRunners.GameEditor
         static readonly Vector3 Origin = new Vector3(-26f, 0f, -2f);
         static readonly Vector3 Size = new Vector3(52f, 20f, 48f);
 
-        [MenuItem("Tools/Gulag Runners/Create forest terrain")]
+        [MenuItem("Tools/Gulag Runners/Setup/Create forest terrain")]
         public static void Create()
         {
             if (!AssetDatabase.IsValidFolder(AssetFolder))

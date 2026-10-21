@@ -15,7 +15,7 @@ namespace GulagRunners.GameEditor
     /// </summary>
     public static class IKSetup
     {
-        [MenuItem("Tools/Gulag Runners/Set up IK")]
+        [MenuItem("Tools/Gulag Runners/Setup/Set up IK")]
         public static void Setup()
         {
             PlayerController[] fighters =

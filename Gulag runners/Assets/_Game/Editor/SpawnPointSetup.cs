@@ -18,7 +18,7 @@ namespace GulagRunners.GameEditor
     /// </summary>
     public static class SpawnPointSetup
     {
-        [MenuItem("Tools/Gulag Runners/Create spawn points")]
+        [MenuItem("Tools/Gulag Runners/Setup/Create spawn points")]
         public static void Create()
         {
             PlayerController[] fighters =

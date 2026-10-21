@@ -29,7 +29,7 @@ namespace GulagRunners.GameEditor
         const string MaterialPath = Folder + "/Particle Soft.mat";
         const string TexturePath = Folder + "/Particle Soft.png";
 
-        [MenuItem("Tools/Gulag Runners/Build hit effects")]
+        [MenuItem("Tools/Gulag Runners/Setup/Build hit effects")]
         public static void Build()
         {
             PlayerController[] fighters =

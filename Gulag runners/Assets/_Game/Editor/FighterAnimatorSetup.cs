@@ -109,7 +109,7 @@ namespace GulagRunners.GameEditor
             ("Block Hit",  "1Hand_Up_Shield_Block_Hit_1_InPlace"),
         };
 
-        [MenuItem("Tools/Gulag Runners/Build fighter animator")]
+        [MenuItem("Tools/Gulag Runners/Setup/Build fighter animator")]
         public static void Build() => Build(false);
 
         /// <summary>
@@ -120,7 +120,7 @@ namespace GulagRunners.GameEditor
         /// clip is from the WRONG SET — an unarmed idle holding a weapon-ready pose — which
         /// the plain build can only report.
         /// </summary>
-        [MenuItem("Tools/Gulag Runners/Build fighter animator (replace clips)")]
+        [MenuItem("Tools/Gulag Runners/Setup/Build fighter animator (replace clips)")]
         public static void Rebuild() => Build(true);
 
         static void Build(bool replace)

@@ -18,7 +18,7 @@ namespace GulagRunners.GameEditor
             "Assets/PolyOne/Free Stickman/Prefabs/Free Pack - Stick Man.prefab";
         const string VisualChildName = "Visual";
 
-        [MenuItem("Tools/Gulag Runners/Attach character model to all players", false, 10)]
+        [MenuItem("Tools/Gulag Runners/Setup/Attach character model to all players", false, 10)]
         public static void AttachToAll()
         {
             GameObject prefab = FindPrefab();
@@ -37,7 +37,7 @@ namespace GulagRunners.GameEditor
             Debug.Log($"Attached \"{prefab.name}\" to {players.Length} player(s).");
         }
 
-        [MenuItem("Tools/Gulag Runners/Remove character model from all players", false, 11)]
+        [MenuItem("Tools/Gulag Runners/Setup/Remove character model from all players", false, 11)]
         public static void DetachFromAll()
         {
             foreach (PlayerController p in

@@ -44,10 +44,10 @@ namespace GulagRunners.GameEditor
         const float Overshoot = 0.6f;        // past the top and bottom of the arena
         const float DepthMargin = 0.3f;      // past the front and back of the level
 
-        [MenuItem("Tools/Gulag Runners/Build closing walls")]
+        [MenuItem("Tools/Gulag Runners/Setup/Build closing walls")]
         public static void BuildSides() => Build(false);
 
-        [MenuItem("Tools/Gulag Runners/Build closing ceiling")]
+        [MenuItem("Tools/Gulag Runners/Setup/Build closing ceiling")]
         public static void BuildCeiling() => Build(true);
 
         static void Build(bool ceiling)
