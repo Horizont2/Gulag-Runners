@@ -54,17 +54,30 @@ namespace GulagRunners.GameEditor
         {
             public string Key;
             public float W, H;
+
+            /// <summary>Left, bottom, right, top, at 1x. Anything non-zero is drawn Sliced.</summary>
             public Vector4 Border;
+
+            public bool Sliced => Border != Vector4.zero;
+
             public Asset(string key, float w, float h, float b = 0f)
             { Key = key; W = w; H = h; Border = new Vector4(b, b, b, b); }
+
+            public Asset(string key, float w, float h, float l, float b, float r, float t)
+            { Key = key; W = w; H = h; Border = new Vector4(l, b, r, t); }
         }
 
         static readonly Asset[] Needed =
         {
             new Asset("search/button/close", 56, 56),
             new Asset("search/icon/close", 20, 20),
-            new Asset("search/bar/track", 120, 4, 2),
-            new Asset("search/bar/fill", 120, 4, 2),
+            // Left and right only. Both bars are capsules: the caps are the first and
+            // last 2 px and everything between them is a straight run, so the stretch is
+            // horizontal and there is nothing to slice vertically. A border on all four
+            // sides of a sprite 4 px tall leaves a middle slice zero pixels high, which
+            // is exact at this one height and garbage at any other.
+            new Asset("search/bar/track", 120, 4, 2, 0, 2, 0),
+            new Asset("search/bar/fill", 120, 4, 2, 0, 2, 0),
             new Asset("search/scrim", 8, 320),
         };
 
@@ -120,19 +133,36 @@ namespace GulagRunners.GameEditor
             string root = _folder != null ? AssetDatabase.GetAssetPath(_folder) : null;
             if (string.IsNullOrEmpty(root)) { _scale = 4f; return; }
 
-            foreach (string path in AssetDatabase.FindAssets("t:Texture2D", new[] { root })
-                                                 .Select(AssetDatabase.GUIDToAssetPath)
-                                                 .Distinct().OrderBy(p => p))
+            string[] files = AssetDatabase.FindAssets("t:Texture2D", new[] { root })
+                                          .Select(AssetDatabase.GUIDToAssetPath)
+                                          .Distinct().OrderBy(p => p).ToArray();
+
+            // Path first, for every key, and only then bare filenames -- in two passes,
+            // because TWO of the five are called close.png. One loop matching either way
+            // bound icon/close.png to the button key on the filename and left the icon to
+            // be drawn, with the export sitting right there in the folder.
+            foreach (string path in files)
             {
                 string relative = Relative(path, root);
-                string name = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
                 foreach (Asset a in Needed)
                 {
-                    string tail = a.Key.Substring(a.Key.LastIndexOf('/') + 1);
                     string bare = a.Key.StartsWith("search/") ? a.Key.Substring(7) : a.Key;
-                    if (relative == a.Key || relative == bare || name == tail)
-                    { _found[a.Key] = path; break; }
+                    if (relative == a.Key || relative == bare) { _found[a.Key] = path; break; }
                 }
+            }
+
+            foreach (Asset a in Needed)
+            {
+                if (_found.ContainsKey(a.Key)) continue;
+                string tail = a.Key.Substring(a.Key.LastIndexOf('/') + 1);
+
+                // Only when that name is unambiguous: among the files still spare, exactly
+                // one carries it. Two spare close.png and neither is guessed at.
+                string[] hits = files
+                    .Where(p => !_found.ContainsValue(p) &&
+                                Path.GetFileNameWithoutExtension(p).ToLowerInvariant() == tail)
+                    .ToArray();
+                if (hits.Length == 1) _found[a.Key] = hits[0];
             }
 
             Prepare();
@@ -608,12 +638,23 @@ namespace GulagRunners.GameEditor
             return label;
         }
 
+        /// <summary>
+        /// Sliced comes off the asset table, not off the call site. Both bars carry a
+        /// border and were being drawn Simple, which ignores it: a 120 px capsule
+        /// stretched across 1000 smears its two rounded caps over the whole length, and
+        /// the border declared beside it looked like the problem was already handled.
+        /// </summary>
         static Image Picture(GameObject go, Dictionary<string, Sprite> sprites, string key)
         {
             Image image = go.GetComponent<Image>();
             if (image == null) image = Undo.AddComponent<Image>(go);
             if (sprites.TryGetValue(key, out Sprite s)) image.sprite = s;
-            image.type = Image.Type.Simple;
+
+            bool sliced = false;
+            foreach (Asset a in Needed)
+                if (a.Key == key) { sliced = a.Sliced; break; }
+
+            image.type = sliced ? Image.Type.Sliced : Image.Type.Simple;
             image.raycastTarget = false;
             return image;
         }
