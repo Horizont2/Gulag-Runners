@@ -78,8 +78,14 @@ namespace GulagRunners.Game
             "A PARRY COSTS NOTHING\nAND BUYS SEVEN FRAMES.\nA BLOCK COSTS STAMINA.",
         };
 
-        [Tooltip("Seconds each tip is held.")]
-        [Range(2f, 12f)] public float tipSeconds = 5f;
+        [Tooltip("Seconds each tip is held. Long enough to read three lines twice.")]
+        [Range(2f, 12f)] public float tipSeconds = 6f;
+
+        [Tooltip("Seconds each still is held, separately from the tips.\n\n" +
+                 "Longer on purpose. A tip is a sentence somebody is reading and a still " +
+                 "is a picture they are not, and on one timer every change of picture " +
+                 "landed on the line they had just started.")]
+        [Range(3f, 20f)] public float backdropSeconds = 10f;
 
         [Header("Readouts")]
         [Tooltip("\"SEARCHING\", \"OPPONENT FOUND\", \"LOADING THE ARENA\"...")]
@@ -106,6 +112,7 @@ namespace GulagRunners.Game
         float _held;
         int _tip = -1;
         float _tipHeld;
+        float _stillHeld;
 
         /// <summary>No gate wired means nobody to wait for, and that is not a stub.</summary>
         bool OpponentReady => _gate == null || _gate.OpponentReady;
@@ -135,6 +142,7 @@ namespace GulagRunners.Game
             _held = 0f;
             _tip = -1;
             _tipHeld = float.MaxValue;      // forces the first tip on the first frame
+            _stillHeld = 0f;                // the backdrop already has one up
             Enter(SearchPhase.Searching);
             shownChanged?.Invoke(true);
         }
@@ -163,6 +171,7 @@ namespace GulagRunners.Game
 
             elapsed += Time.deltaTime;
             Tips();
+            Backdrops();
 
             switch (phase)
             {
@@ -234,6 +243,14 @@ namespace GulagRunners.Game
             if (director != null) director.Release();
         }
 
+        /// <summary>
+        /// The tip, top left, on its own clock.
+        ///
+        /// Its own, because a tip is three lines somebody is READING and a backdrop is a
+        /// picture they are not. Driven off one timer, every change of picture landed on
+        /// the sentence they had just started -- and the backdrop inherited the tip's
+        /// interval, which is half what its own push-in is tuned for.
+        /// </summary>
         void Tips()
         {
             if (tips == null || tips.Length == 0) return;
@@ -246,8 +263,17 @@ namespace GulagRunners.Game
             // somebody sees twenty times a session reads as the game being broken.
             _tip = (_tip + 1) % tips.Length;
             tipChanged?.Invoke(tips[_tip]);
+        }
 
-            if (backdrop != null) backdrop.Next();
+        void Backdrops()
+        {
+            if (backdrop == null) return;
+
+            _stillHeld += Time.deltaTime;
+            if (_stillHeld < Mathf.Max(1f, backdropSeconds)) return;
+
+            _stillHeld = 0f;
+            backdrop.Next();
         }
 
         void Enter(SearchPhase next)
