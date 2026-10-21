@@ -94,6 +94,8 @@ namespace GulagRunners.Game
         public float wornPulse = 3f;
 
         MaterialPropertyBlock _block;
+        MaterialPropertyBlock _armourBlock;
+        Renderer _armourRenderer;
         ItemId _weapon = ItemId.None;
         ItemId _armour = ItemId.None;
         GameObject _weaponRoot;
@@ -164,14 +166,20 @@ namespace GulagRunners.Game
             {
                 _armour = inv.Armour;
                 GameObject root = ItemModels.Show(armour, _armour);
-                MaterialPropertyBlock block = null;
-                if (root != null)
-                {
-                    Color worn = ItemModels.RarityGlow(tierColours, _armour, Time.time,
-                                                       glow, out float lit);
-                    ItemModels.Tint(root.GetComponentInChildren<Renderer>(), ref block,
-                                    worn, lit);
-                }
+                _armourRenderer = root != null
+                    ? root.GetComponentInChildren<Renderer>() : null;
+                _armourBlock = null;
+            }
+
+            // Every frame, not only on the frame it changed. Tinted once, a legendary suit
+            // was frozen at whatever phase of the breath it happened to be shown on, so the
+            // one item in the game that is supposed to be the only thing moving stood still
+            // — while the weapon in the same hand pulsed, from the same function.
+            if (_armourRenderer != null)
+            {
+                Color worn = ItemModels.RarityGlow(tierColours, _armour, Time.time, glow,
+                                                   out float lit);
+                ItemModels.Tint(_armourRenderer, ref _armourBlock, worn, lit);
             }
 
             if (_weaponRenderer == null) return;

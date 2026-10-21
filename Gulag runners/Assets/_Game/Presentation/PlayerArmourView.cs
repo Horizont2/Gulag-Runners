@@ -77,6 +77,20 @@ namespace GulagRunners.Game
                  "the hierarchy every time the slot changes.")]
         public GameObject[] allParts = Array.Empty<GameObject>();
 
+        [Header("Rarity")]
+        [Tooltip("The rarity ramp: nothing, common, rare, legendary. The same colours the " +
+                 "loot on the floor uses, so a helmet does not mean one thing lying there " +
+                 "and another on a head.")]
+        public Color[] tierColours = ItemModels.DefaultPalette();
+
+        [Tooltip("How brightly worn gear glows, against the floor loot's own strength.\n\n" +
+                 "Deliberately lower. Loot on the floor is SHOUTING — come and get me — and " +
+                 "a fighter is not: his gear only has to say what it is. Worn pieces also " +
+                 "do not pulse, because three breathing body parts on a moving character is " +
+                 "noise rather than information. 0 switches the whole thing off without a " +
+                 "code change, which is the setting to reach for if it reads as garish.")]
+        [Range(0f, 2f)] public float glow = 0.5f;
+
         [Tooltip("Log each change. Useful once, while wiring.")]
         public bool logChanges;
 
@@ -130,11 +144,47 @@ namespace GulagRunners.Game
                 if (part.activeSelf != on) part.SetActive(on);
             }
 
+            // What each worn piece is, in the one colour that reads across an arena. Set
+            // once per change rather than every frame: there is no pulse to drive, and a
+            // property block written to a skinned mesh every frame for nothing is a cost
+            // paid on a phone.
+            if (glow > 0f)
+            {
+                Paint(head, helmet);
+                Paint(torso, chest);
+                Paint(waist, belt);
+            }
+
             if (logChanges)
                 Debug.Log($"{name}: wearing {helmet} / {chest} / {belt}" +
                           (body == null ? " — and no base body set, so the legs are bare" : ""),
                           this);
         }
+
+        /// <summary>
+        /// Puts one item's rarity colour on the pieces worn for it.
+        ///
+        /// Time 0 on purpose: <see cref="ItemModels.RarityPulse"/> is a sine, and sin(0) is
+        /// zero, so a fixed zero is exactly the middle of the breath and never moves. That
+        /// is the one line of difference between gear on a body and loot on a floor.
+        /// </summary>
+        void Paint(ArmourSet set, ItemId item)
+        {
+            if (set?.pieces == null) return;
+
+            Color colour = ItemModels.RarityGlow(tierColours, item, 0f, glow,
+                                                 out float emission);
+            if (item == ItemId.None) emission = 0f;    // bare skin does not glow
+
+            for (int i = 0; i < set.pieces.Length; i++)
+            {
+                if (set.pieces[i] == null) continue;
+                foreach (Renderer r in set.pieces[i].GetComponentsInChildren<Renderer>(true))
+                    ItemModels.Tint(r, ref _paint, colour, emission);
+            }
+        }
+
+        MaterialPropertyBlock _paint;
 
         /// <summary>
         /// The set for one item, or null. An empty slot finds the base body set, which is

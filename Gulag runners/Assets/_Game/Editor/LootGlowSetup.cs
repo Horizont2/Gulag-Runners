@@ -114,6 +114,19 @@ namespace GulagRunners.GameEditor
                             if (m?.root != null) roots.Add(m.root);
             }
 
+            // And the worn kit. Without this the rarity colour PlayerArmourView writes
+            // goes into a property URP has compiled out, which is the same dead write the
+            // loot models had before this tool existed -- and five slots means five ways
+            // to hit it instead of one.
+            foreach (PlayerArmourView view in
+                     Object.FindObjectsByType<PlayerArmourView>(FindObjectsInactive.Include,
+                                                                 FindObjectsSortMode.None))
+            {
+                if (view.allParts == null) continue;
+                foreach (GameObject part in view.allParts)
+                    if (part != null) roots.Add(part);
+            }
+
             int switched = 0;
             foreach (GameObject root in roots)
             {

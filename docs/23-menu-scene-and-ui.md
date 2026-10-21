@@ -859,8 +859,15 @@ Directional. А `useUnityRealtimeShadows: 1`, тож суцільна стеля
 ```
 
 Порожній слот — тонкий контур квадрата, заповнений — предмет усередині з обведенням
-кольору рідкості (білий / синій / золотий). Нуль цифр, нуль назв: за тіром видно, чого
-воно варте, за силуетом — що це.
+кольору рідкості. Нуль цифр, нуль назв: за тіром видно, чого воно варте, за силуетом — що це.
+
+**Кольори рідкості — ті самі, що в самій грі**, і не «білий / синій / золотий», як було в
+першій версії промта: `ItemModels.DefaultPalette()` дає **зелений (common) / синій (rare) /
+фіолетовий (legendary)**. Три відтінки, які ніхто не переплутає на телефоні, і жоден з них
+не збігається з холодним сіро-зеленим туманом арени. Обведення слота ще й **світиться**
+своїм кольором — м'яке гало назовні на 2–3 пікселі, без пульсації: в HUD пульсує тільки те,
+що вимагає дії, а слот нічого не вимагає. Сила гало йде за тіром: common майже не світиться
+(це база, і якщо кричить усе — не кричить ніщо), rare помітно, legendary найяскравіше.
 
 Вісім елементів HUD і не більше, як вимагає docs/02: дві смуги HP, заряди стаміни,
 годинник, колонка спорядження, джойстик, кнопки праворуч, індикатор напрямку звуку.
@@ -924,14 +931,22 @@ thin white line art only, a wire mannequin, no fill, no face, only 22%
 of the screen height, standing upright. Five small square outlined slots
 are placed around it, each joined to the body by a short thin leader
 line:
-  one above the head: a mail coif, outlined in blue;
-  one at the right hand: a club, outlined in white;
-  one at the chest: chainmail, outlined in blue;
-  one at the waist: a rope belt, outlined in white;
-  one just below the waist: an empty slot, a bare square outline with
-  nothing in it.
+  one above the head: a mail coif, outlined in BLUE;
+  one at the right hand: a club, outlined in GREEN;
+  one at the chest: chainmail, outlined in BLUE;
+  one at the waist: a rope belt, outlined in GREEN;
+  one just below the waist: an empty slot, a bare thin grey square
+  outline with nothing in it.
 Each filled slot holds a tiny flat icon of the item and nothing else:
 no numbers, no names, no bars.
+
+The rarity outline is the only coloured thing in the whole interface and
+it GLOWS: a soft halo of its own colour bleeding 2 to 3 pixels outward
+from the square, brightest on the blue slots, barely there on the green
+ones, and none at all on the empty grey one. Green is a common find,
+blue is rare, violet would be legendary. The glow is soft and even, not
+a hard neon stroke, not a lens flare, and it does not light anything
+around it.
 
 LOWER LEFT, above the joystick: the sound direction indicator, a thin
 white arc segment pointing up and to the left, fading at its ends, with
@@ -949,4 +964,8 @@ Crisp, readable at phone size, clean flat vector interface over low poly
 Негатив: `wooden UI panels, stone UI frames, iron rivets, ornate borders,
 rounded rectangle panels behind icons, large portrait of the character, inventory
 grid, numbers over health bars, damage numbers, item names, tooltips, minimap,
-isometric or three-quarter camera, text in the world`.
+isometric or three-quarter camera, text in the world, neon glow on every UI
+element, glowing buttons, glowing health bars, lens flare`.
+
+Останні чотири — нові й важливі: світитись має **тільки** обведення рідкості. Щойно
+засвітяться ще й кнопки й смуги HP, рідкість перестає щось означати.

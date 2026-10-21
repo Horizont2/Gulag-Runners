@@ -250,7 +250,6 @@ namespace GulagRunners.Game
             _shown = ItemId.None;
             _shownRoot = null;
             if (rarityLight != null) rarityLight.intensity = 0f;   // or an empty slot burns
-            if (rarityLight != null) rarityLight.intensity = 0f;   // or an empty slot burns
             Visible = false;
         }
 
