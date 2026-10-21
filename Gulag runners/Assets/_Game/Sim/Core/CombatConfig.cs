@@ -289,7 +289,7 @@ namespace GulagRunners.Sim
             c.ComboPushPermille = 300;
             c.AttackerRecoilPermille = 400;
             c.RecoilFrames = 10;
-            c.AttackFramesPermille = 1300;   // 0.25 s to read the commonest wind-up
+            c.AttackFramesPermille = 1450;   // 0.28 s to read the commonest wind-up
 
             c.KnockbackSpeed = Fix.FromMilli(3200);
             c.HeavyKnockbackSpeed = Fix.FromMilli(6000);

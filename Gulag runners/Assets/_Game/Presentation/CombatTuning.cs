@@ -100,7 +100,7 @@ namespace GulagRunners.Game
                  "a player can SEE a blow coming: a dagger wound up in 0.15 s and fists in " +
                  "0.20, against a human reaction of about 0.25. Scaling here keeps the " +
                  "weapons' relationship to each other, which is the design.")]
-        [Range(0.5f, 2f)] public float attackPace = 1.3f;
+        [Range(0.5f, 2f)] public float attackPace = 1.45f;
 
         [Header("Moving through a swing")]
         [Tooltip("Speed through the three phases of a swing, against the run.\n\n" +

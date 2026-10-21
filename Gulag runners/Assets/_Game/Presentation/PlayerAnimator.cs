@@ -704,7 +704,14 @@ namespace GulagRunners.Game
         float SwingProgress(in PlayerSimState s)
         {
             int total = Mathf.Max(1, s.AttackPhaseFrames);
-            float within = Mathf.Clamp01(1f - s.AttackTimer / (float)total);
+
+            // Through the render alpha and a tick behind the counter, for the same reason
+            // the climb-out is: the body is drawn interpolated BETWEEN ticks, so a pose
+            // read straight off the tick counter steps at 60 Hz beside a body that flows,
+            // and runs a whole tick in front of it. On a wind-up that is a swing arriving
+            // before the arm does, in nineteen visible steps.
+            float within = Mathf.Clamp01(
+                (total - s.AttackTimer - 1 + player.Alpha) / total);
 
             float hit = Mathf.Clamp01(attackContactStart);
             float done = Mathf.Clamp(attackContactEnd, hit, 1f);
