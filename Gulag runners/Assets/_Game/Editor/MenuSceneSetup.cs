@@ -268,9 +268,9 @@ namespace GulagRunners.GameEditor
             EditorUtility.SetDirty(ui);
 
             said.AppendLine("  buttons: wire OnClick to MenuUI.Play, Profile, Shop, "
-                          + "Dailies, Season, Settings, Friends, Back");
+                          + "Dailies, Settings, Friends, Back");
             said.AppendLine("  readouts: wire GoldChanged / LeagueChanged to a text "
-                          + "setter, LeagueFilled / SeasonFilled to an Image.fillAmount");
+                          + "setter, LeagueFilled to an Image.fillAmount");
         }
     }
 }

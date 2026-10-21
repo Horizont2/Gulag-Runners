@@ -73,9 +73,7 @@ Directly under it, very small, thin grey letters: MEDIEVAL.
 
 TOP LEFT, stacked, all thin white lines, no boxes:
   a small shield-shaped league glyph with the words SILVER III beside it;
-  under them, a long thin horizontal progress bar, 60% filled, no number;
-  under that, an even smaller line: SEASON 1, and a second, shorter bar
-  with four small diamond milestones along it, two of them filled.
+  under them, a long thin horizontal progress bar, 60% filled, no number.
 
 TOP RIGHT, stacked, right-aligned:
   a small coin glyph and the number 1 240, the coin and the digits in
