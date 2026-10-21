@@ -145,6 +145,11 @@ namespace GulagRunners.GameEditor
             Vector3 hem = SetComponent(b.center, drop, anchorAtMax ? min : max);
             float length = Component(size, drop);
 
+            Vector3 sheetN = Vector3.Cross(hangAxis, widthAxis).normalized;
+            string wall;
+            Vector3 outAxis = Outward(renderer, mesh, b, sheetN, hangAxis, widthAxis,
+                                      Component(size, width), length, out wall);
+
             // The shader's own expression, run here on the far end of the cloth. It has to
             // come out at 1: if the axis is backwards every vertex saturates to 0 instead,
             // the displacement is multiplied by zero and the banner hangs dead still --
@@ -161,6 +166,7 @@ namespace GulagRunners.GameEditor
             Undo.RecordObject(material, "Set up banner cloth");
             material.SetVector("_HangAxis", hangAxis);
             material.SetVector("_WidthAxis", widthAxis);
+            material.SetVector("_OutAxis", outAxis);
             material.SetVector("_AnchorPoint", anchor);
             material.SetFloat("_HangLength", length);
             material.SetFloat("_HalfWidth", Component(size, width) * 0.5f);
@@ -189,8 +195,97 @@ namespace GulagRunners.GameEditor
             report.Add($"{renderer.name}: cloth is slot {slot} of {slots.Length} " +
                        $"({material.name}), hangs along {Pretty(hangAxis)}, " +
                        $"{length:0.####} long, {Component(size, width):0.####} wide, " +
-                       $"anchored at {anchor.ToString("0.####")}; {others} " +
-                       $"({mesh.vertexCount} verts)");
+                       $"anchored at {anchor.ToString("0.####")}, bellies towards " +
+                       $"{Pretty(outAxis)} ({wall}); {others} ({mesh.vertexCount} verts)");
+        }
+
+        /// <summary>
+        /// Which face of the cloth is the free one.
+        ///
+        /// A banner is nailed to a wall. It can lift off that wall but it cannot pass
+        /// through it, so the shader only ever bellies the cloth to one side -- and it
+        /// has no way to tell which side that is. Nor has the mesh: on this model the
+        /// cloth hangs at the BACK of the prop with a wooden canopy reaching out over it,
+        /// while plenty of banners are modelled the other way round, the cloth in front of
+        /// a plate bolted flat to the wall. A rule read off the model alone would be right
+        /// for one of those and wrong for the other.
+        ///
+        /// So it is read off the scene, which is where the wall actually is: three points
+        /// down the cloth, and on each side of it the nearest other renderer within one
+        /// cloth-width, measured as a slab so a wall whose box swallows the probe point
+        /// still counts. Whichever side is blocked is the wall; the cloth bellies the other
+        /// way. Renderers belonging to this banner's own prefab are not obstacles.
+        ///
+        /// Bounds, not colliders: a decorative wall tile has no collider and a raycast
+        /// would sail straight through the one thing being looked for.
+        /// </summary>
+        static Vector3 Outward(MeshRenderer banner, Mesh mesh, Bounds cloth, Vector3 sheetN,
+                               Vector3 hangAxis, Vector3 widthAxis, float width,
+                               float length, out string why)
+        {
+            Transform t = banner.transform;
+            Vector3 nWS = t.TransformDirection(sheetN).normalized;
+
+            float reach = t.TransformVector(widthAxis * width).magnitude;
+            float lateral = reach * 0.5f;
+
+            Vector3[] probes =
+            {
+                t.TransformPoint(cloth.center),
+                t.TransformPoint(cloth.center + hangAxis * (length * 0.3f)),
+                t.TransformPoint(cloth.center - hangAxis * (length * 0.3f)),
+            };
+
+            GameObject root = PrefabUtility.GetOutermostPrefabInstanceRoot(banner.gameObject);
+            Transform skip = root != null ? root.transform : banner.transform;
+
+            float plus = float.PositiveInfinity, minus = float.PositiveInfinity;
+            foreach (MeshRenderer r in Object.FindObjectsByType<MeshRenderer>(
+                         FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                if (r == banner || r.transform.IsChildOf(skip)) continue;
+
+                Bounds wb = r.bounds;
+                foreach (Vector3 p in probes)
+                {
+                    Vector3 v = wb.ClosestPoint(p) - p;
+                    if ((v - Vector3.Dot(v, nWS) * nWS).magnitude > lateral) continue;
+
+                    float lo = float.MaxValue, hi = float.MinValue;
+                    for (int c = 0; c < 8; c++)
+                    {
+                        Vector3 corner = new Vector3((c & 1) == 0 ? wb.min.x : wb.max.x,
+                                                     (c & 2) == 0 ? wb.min.y : wb.max.y,
+                                                     (c & 4) == 0 ? wb.min.z : wb.max.z);
+                        float d = Vector3.Dot(corner - p, nWS);
+                        lo = Mathf.Min(lo, d);
+                        hi = Mathf.Max(hi, d);
+                    }
+                    if (hi > 0f) plus = Mathf.Min(plus, Mathf.Max(lo, 0f));
+                    if (lo < 0f) minus = Mathf.Min(minus, Mathf.Max(-hi, 0f));
+                }
+            }
+            if (plus > reach) plus = float.PositiveInfinity;
+            if (minus > reach) minus = float.PositiveInfinity;
+
+            if (plus < minus)
+            {
+                why = $"wall {plus:0.###} behind it";
+                return -sheetN;
+            }
+            if (minus < plus)
+            {
+                why = $"wall {minus:0.###} behind it";
+                return sheetN;
+            }
+
+            // Nothing either side, or something both sides. Fall back to the model: the
+            // cloth hangs at one end of the prop and the ironmongery holding it up is at
+            // the other, so the rest of the prop is a fair guess at where the free air is.
+            why = float.IsInfinity(plus) ? "no wall within a cloth-width, read off the model"
+                                         : "walls both sides, read off the model";
+            return Vector3.Dot(mesh.bounds.center - cloth.center, sheetN) >= 0f
+                   ? sheetN : -sheetN;
         }
 
         /// <summary>

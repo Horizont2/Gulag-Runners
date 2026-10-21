@@ -41,6 +41,7 @@ Shader "Gulag Runners/Banner Cloth"
         [Header(Rig    measured by the setup tool)][Space(4)]
         _HangAxis("Hang axis (object space, anchor to hem)", Vector) = (0,-1,0,0)
         _WidthAxis("Width axis (object space)", Vector) = (1,0,0,0)
+        _OutAxis("Out of the wall (object space, 0 = use the sheet normal)", Vector) = (0,0,0,0)
         _AnchorPoint("Anchor point (object space)", Vector) = (0,0,0,0)
         _HangLength("Hang length", Float) = 1
         _HalfWidth("Half width", Float) = 0.5
@@ -89,6 +90,7 @@ Shader "Gulag Runners/Banner Cloth"
             half   _Smoothness;
             float4 _HangAxis;
             float4 _WidthAxis;
+            float4 _OutAxis;
             float4 _AnchorPoint;
             float  _HangLength;
             float  _HalfWidth;
@@ -137,7 +139,7 @@ Shader "Gulag Runners/Banner Cloth"
         // the hang, so the normal can be rebuilt from the surface that actually ends up
         // on screen rather than from the one the mesh was authored with.
         float3 ClothOffset(float along, float across, float edge, float seed, float gust,
-                           float3 windOS, float3 sheetN)
+                           float3 windOS, float3 outN)
         {
             float t = _Time.y * _Speed + seed;
             float phase = along * GR_TAU * _Waves + across * _Skew;
@@ -162,7 +164,14 @@ Shader "Gulag Runners/Banner Cloth"
             float swing = sin(_Time.y * _SwingSpeed + seed * 0.61);
 
             float3 offset = windOS * ((ripple * _Sway + swing * _Swing) * amount);
-            offset += sheetN * (bulge * _Billow * amount);
+
+            // Out of the sheet, never into it. A banner is nailed to a wall: it can lift
+            // off that wall but it cannot pass through it, and at the amplitudes that
+            // read on screen it was passing through it twice a cycle. Remapped to 0..1
+            // the cloth keeps the whole of its travel and spends all of it on the free
+            // side, resting a little off the wall the way a banner in a draught does.
+            float belly = bulge * 0.5 + 0.5;
+            offset += outN * (belly * _Billow * amount);
             return offset;
         }
 
@@ -178,6 +187,13 @@ Shader "Gulag Runners/Banner Cloth"
             float3 hangAxis = normalize(_HangAxis.xyz + float3(0, -1e-6, 0));
             float3 widthAxis = normalize(_WidthAxis.xyz + float3(1e-6, 0, 0));
             float3 sheetN = normalize(cross(hangAxis, widthAxis));
+
+            // Which face of the sheet is the free one. The setup tool looks for the wall
+            // in the scene and writes the answer here; left at zero -- an older material,
+            // or a banner hanging in open air -- the sheet's own normal is as good a
+            // guess as there is.
+            float3 outN = dot(_OutAxis.xyz, _OutAxis.xyz) > 1e-8
+                          ? normalize(_OutAxis.xyz) : sheetN;
 
             float len = max(_HangLength, 1e-4);
             float3 fromAnchor = positionOS - _AnchorPoint.xyz;
@@ -195,7 +211,14 @@ Shader "Gulag Runners/Banner Cloth"
             // straight down a hanging banner does not swing it, it just presses it flat.
             windOS = normalize(windOS - hangAxis * dot(windOS, hangAxis) + float3(1e-6, 0, 0));
 
-            float3 here = ClothOffset(along, across, edge, seed, gust, windOS, sheetN);
+            // And only the part of it ALONG THE SHEET pushes it sideways. The rest would
+            // drive the cloth straight at the wall; that half of the wind is the billow's
+            // work and the billow is one-sided. Not re-normalised, so a draught blowing
+            // square into the wall produces no sideways sway at all and shows up entirely
+            // as belly, which is what it does to a real banner.
+            windOS = windOS - outN * dot(windOS, outN);
+
+            float3 here = ClothOffset(along, across, edge, seed, gust, windOS, outN);
 
             // Two more samples: one a little further down the cloth, one a little further
             // across it. The vectors between the three displaced points ARE the tangent
@@ -207,12 +230,12 @@ Shader "Gulag Runners/Banner Cloth"
             float stepSide = max(_HalfWidth, 1e-4) * 0.25;
 
             float3 down = ClothOffset(saturate(along + stepDown / len), across, edge,
-                                      seed, gust, windOS, sheetN);
+                                      seed, gust, windOS, outN);
 
             float acrossSide = across + stepSide;
             float edgeSide = saturate(abs(acrossSide) / max(_HalfWidth, 1e-4));
             float3 side = ClothOffset(along, acrossSide, edgeSide,
-                                      seed, gust, windOS, sheetN);
+                                      seed, gust, windOS, outN);
 
             float3 downT = (hangAxis * stepDown + down) - here;
             float3 sideT = (widthAxis * stepSide + side) - here;
