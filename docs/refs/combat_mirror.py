@@ -441,8 +441,16 @@ def hit(atk, vic, dmg, side, heavy):
         vic.vy = K["LIFT"]
         vic.mode = "air"
     if vic.mode in ("ladder", "mount", "mantle"):
+        # A climb-out carries the body BETWEEN depth lanes, and breaking it off half way
+        # leaves it stranded between them -- which is what being thrown behind the level is.
+        # UpdateDepth gives up outright while airborne, on purpose, so nothing corrects it.
+        # The move's promise is kept even though the move is not.
+        if vic.mode == "mantle":
+            vic.depth = vic.script_to_depth
         vic.mode = "air"
         vic.ladder = -1
+        vic.script_t = 0
+        vic.script_frames = 0
 
 
 def wound(vic, dmg):

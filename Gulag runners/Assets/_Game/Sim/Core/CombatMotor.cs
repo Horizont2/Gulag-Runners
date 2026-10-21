@@ -610,8 +610,23 @@ namespace GulagRunners.Sim
             if (victim.Mode == MoveMode.Climbing || victim.Mode == MoveMode.Mounting ||
                 victim.Mode == MoveMode.Mantling)
             {
+                // A CLIMB-OUT CARRIES THE BODY BETWEEN DEPTH LANES, and breaking it off
+                // half way leaves it stranded between them -- which is what being thrown
+                // behind the level is. Every ladder in this arena stands in front of the
+                // floor it serves, so the move slides the body back onto that floor's lane
+                // as it rises; interrupt it and the depth is some value that is on no lane
+                // at all. Nothing then corrects it: UpdateDepth gives up outright while
+                // airborne, on purpose, because a body in mid-air keeps the slice it left.
+                //
+                // So the move's promise is kept even though the move is not: the landing
+                // lane is one a body can stand on by construction, and it is the one this
+                // body was already travelling towards.
+                if (victim.Mode == MoveMode.Mantling) victim.Depth = victim.ScriptToDepth;
+
                 victim.Mode = MoveMode.Airborne;
                 victim.LadderIndex = -1;
+                victim.ScriptTimer = 0;
+                victim.ScriptFrames = 0;
             }
         }
 

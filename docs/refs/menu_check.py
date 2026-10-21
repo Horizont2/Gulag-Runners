@@ -254,14 +254,18 @@ def lights_and_torches(path):
     # a row of torches where half are lit and half are not reads as the effect switching
     # itself off rather than as a lighting budget. An emissive ball at the flame costs no
     # light and blooms into a halo, so all six can have one.
-    glows = sum(1 for go, (nm, _) in by_id.items() if nm == "Torch Glow")
+    # The halo is the flame's own additive layer, widened -- not a mesh. An emissive sphere
+    # was tried and it reads as a ball: an opaque mesh has a hard silhouette and occludes
+    # what is behind it, which is the opposite of a glow however its colour is set.
+    glows = len(re.findall(r"propertyPath: m_LocalScale\.x\s*\n\s*value: 2\.6", text))
     if torches:
         print(f"      {glows} of {len(torches)} torch(es) carry a glow")
         if glows < len(torches):
             problems += 1
             print(f"      PROBLEM - {len(torches) - glows} torch(es) have no glow on them. "
-                  "Only three of six can afford a Light, so the rest need the emissive "
-                  "ball or they are dark sticks beside lit ones.")
+                  "Only three of six can afford a Light, so the rest rely on the flame's "
+                  "own additive layer being widened, or they are dark sticks beside lit "
+                  "ones.")
 
     # A steady lamp on a flame is the thing that made them read as props to begin with.
     for go in fires:
