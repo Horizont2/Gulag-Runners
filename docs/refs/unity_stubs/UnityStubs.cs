@@ -57,3 +57,19 @@ namespace UnityEngine.InputSystem
         public object dpad;
     }
 }
+
+// uGUI is a PACKAGE, not an engine module, so UnityEngine.Modules on NuGet does not carry
+// it and the real Graphic is not available here. Only HudView touches uGUI, and it touches
+// exactly one type: Graphic, the base of Image, RawImage, Text and TMP_Text alike, which is
+// why one field can accept whichever of them the HUD is eventually drawn with.
+//
+// Stubbed to the surface that file uses and no further, which is the rule for everything in
+// here: a stub that is larger than the code's real appetite stops being a check and starts
+// being a second, quieter engine.
+namespace UnityEngine.UI
+{
+    public class Graphic : MonoBehaviour
+    {
+        public Color color;
+    }
+}
