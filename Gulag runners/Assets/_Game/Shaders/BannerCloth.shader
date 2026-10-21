@@ -3,7 +3,7 @@
 // The tell of a fake cloth shader is a single sine: every point of the banner reaches
 // its extreme on the same frame, the hem never lags the rail, and the lighting stays
 // flat while the surface visibly ripples. All three are fixed here and none of them is
-// expensive on a 224-vertex mesh:
+// expensive on a 750-vertex mesh:
 //
 //   * the wave TRAVELS down the cloth, so the hem lags the rail by a real phase;
 //   * two waves at unrelated frequencies, so the loop is long enough not to be heard;
@@ -12,7 +12,10 @@
 //   * a per-instance phase taken from the object's world position, so two banners on
 //     one wall never move together;
 //   * edges flutter more than the middle, which is where a real banner looks alive;
-//   * the normal is rebuilt from the displaced surface, so the torch catches the
+//   * the belly out of the sheet lags the sideways sway by a quarter wave, so a point of
+//     the cloth travels a loop rather than sliding up and down one diagonal;
+//   * the normal is rebuilt from the displaced surface -- sampled both down the hang and
+//     across the width, so the twist shows up in the shading and the torch catches the
 //     ripples instead of lighting a flat sheet that happens to be moving;
 //   * the shadow caster displaces identically, so the shadow sways with the cloth;
 //   * and the sheet is pulled towards its anchor as it bends, so bending does not
@@ -22,6 +25,10 @@
 // measured off the mesh by Tools > Gulag Runners > Set up banner cloth, because this
 // mesh came out of Blender and whether the axis conversion was baked into the vertices
 // or left on the transform is not something the shader can know.
+//
+// And this shader belongs on the CLOTH sub-mesh alone. It replaces the vertex normal with
+// the normal of the sheet it is bending, so put it on a rail or a bracket and that solid
+// object gets one single normal for all of its faces and stops catching light entirely.
 Shader "Gulag Runners/Banner Cloth"
 {
     Properties
@@ -40,9 +47,9 @@ Shader "Gulag Runners/Banner Cloth"
 
         [Header(Wind)][Space(4)]
         _WindDir("Wind direction (world)", Vector) = (1,0,0.25,0)
-        _Sway("Sway, as a share of the hang length", Range(0,0.5)) = 0.055
-        _Billow("Billow out of the sheet, same share", Range(0,0.5)) = 0.035
-        _Swing("Slow swing of the whole sheet", Range(0,0.5)) = 0.03
+        _Sway("Sway across the wind, share of the hang length", Range(0,0.5)) = 0.055
+        _Billow("Billow out of the sheet, same share", Range(0,0.5)) = 0.09
+        _Swing("Slow swing of the whole sheet", Range(0,0.5)) = 0.035
 
         [Header(Shape of the motion)][Space(4)]
         _Stiffness("Stiffness near the rail", Range(0.5,4)) = 1.8
@@ -139,6 +146,13 @@ Shader "Gulag Runners/Banner Cloth"
             float w2 = sin(t * 1.618 - phase * 2.13 + 1.7) * 0.42;
             float ripple = (w1 + w2) * 0.704;
 
+            // The belly is NOT in step with the sideways sway. Driven by the same number,
+            // every point would slide along one fixed diagonal and back; a quarter wave
+            // behind it, the same points travel a loop, which is what a roll in cloth is.
+            float b1 = sin(t - phase - 1.5708);
+            float b2 = sin(t * 1.618 - phase * 2.13 + 0.13) * 0.42;
+            float bulge = (b1 + b2) * 0.704;
+
             // Nothing at the rail, everything at the hem, and not in a straight line:
             // a banner is stiff where it is nailed and loose where it is not.
             float hang = pow(saturate(along), _Stiffness);
@@ -148,7 +162,7 @@ Shader "Gulag Runners/Banner Cloth"
             float swing = sin(_Time.y * _SwingSpeed + seed * 0.61);
 
             float3 offset = windOS * ((ripple * _Sway + swing * _Swing) * amount);
-            offset += sheetN * (ripple * _Billow * amount);
+            offset += sheetN * (bulge * _Billow * amount);
             return offset;
         }
 
@@ -183,16 +197,25 @@ Shader "Gulag Runners/Banner Cloth"
 
             float3 here = ClothOffset(along, across, edge, seed, gust, windOS, sheetN);
 
-            // A second sample a little further down the cloth. The vector between the two
-            // displaced points IS the new tangent, which is the only honest way to get a
-            // normal out of a vertex displacement.
-            float step = len * 0.04;
-            float3 aheadOS = positionOS + hangAxis * step;
-            float alongA = saturate(along + step / len);
-            float3 there = ClothOffset(alongA, across, edge, seed, gust, windOS, sheetN);
+            // Two more samples: one a little further down the cloth, one a little further
+            // across it. The vectors between the three displaced points ARE the tangent
+            // and the bitangent of the surface that ends up on screen, which is the only
+            // honest way to get a normal out of a vertex displacement. Sampling only down
+            // the hang misses the twist the skew puts across the width, and the twist is
+            // most of what separates cloth from a plank swinging on a hinge.
+            float stepDown = len * 0.05;
+            float stepSide = max(_HalfWidth, 1e-4) * 0.25;
 
-            float3 tangent = normalize((aheadOS + there) - (positionOS + here)
-                                       + float3(0, 0, 1e-6));
+            float3 down = ClothOffset(saturate(along + stepDown / len), across, edge,
+                                      seed, gust, windOS, sheetN);
+
+            float acrossSide = across + stepSide;
+            float edgeSide = saturate(abs(acrossSide) / max(_HalfWidth, 1e-4));
+            float3 side = ClothOffset(along, acrossSide, edgeSide,
+                                      seed, gust, windOS, sheetN);
+
+            float3 downT = (hangAxis * stepDown + down) - here;
+            float3 sideT = (widthAxis * stepSide + side) - here;
 
             ClothVertex o;
             o.positionOS = positionOS + here;
@@ -202,7 +225,7 @@ Shader "Gulag Runners/Banner Cloth"
             float slack = dot(here, here) / (2.0 * len);
             o.positionOS -= hangAxis * (slack * _KeepLength);
 
-            float3 bent = normalize(cross(widthAxis, tangent) + float3(0, 0, 1e-6));
+            float3 bent = normalize(cross(sideT, downT) + float3(0, 0, 1e-6));
             bent *= (dot(bent, normalOS) < 0.0) ? -1.0 : 1.0;
             o.normalOS = normalize(lerp(normalOS, bent, saturate(_NormalStrength)));
             return o;
