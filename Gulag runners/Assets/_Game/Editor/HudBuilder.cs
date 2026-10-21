@@ -481,16 +481,18 @@ namespace GulagRunners.GameEditor
             EditorUtility.SetDirty(view);
             Selection.activeGameObject = rootGo;
 
-            Debug.Log($"HUD: built from {sprites.Count} of {Needed.Length} sprites." +
-                      (generated.Count > 0
-                          ? $" Drew {generated.Count} Figma could not export cleanly " +
-                            $"({string.Join(", ", generated)}).\n"
-                          : " ") + " +
-                      (fighters.Length >= 2
-                          ? "Both fighters wired."
-                          : $"{fighters.Length} fighter(s) in this scene — wire the rest by hand.") +
-                      "\nThe clock is a Text with no font if this project has no legacy font; " +
-                      "swap it for TMP and drop it back on HudView.Clock.", rootGo);
+            string drew = generated.Count > 0
+                ? $" Drew {generated.Count} Figma could not export cleanly " +
+                  $"({string.Join(", ", generated)})."
+                : "";
+            string wired = fighters.Length >= 2
+                ? "Both fighters wired."
+                : $"{fighters.Length} fighter(s) in this scene — wire the rest by hand.";
+
+            Debug.Log($"HUD: built from {sprites.Count} of {Needed.Length} sprites.{drew} " +
+                      wired +
+                      "\nThe clock is a Text with no font if this project has no legacy " +
+                      "font; swap it for TMP and drop it back on HudView.Clock.", rootGo);
         }
 
         // ---------------------------------------------------------------- pieces
