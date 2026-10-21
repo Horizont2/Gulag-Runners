@@ -606,10 +606,23 @@ glowing health bars, lens flare`.
 
 ## 10. Фазові сповіщення в бою
 
-Матч має п'ять фаз ([17](17-match-round-start-and-end.md)), і про три з них треба
-сказати. Це **не окремий екран** — це той самий HUD на три секунди. Ключове правило:
-сповіщення не має власної панелі й не перекриває бійців, бо фаза міняється тоді, коли
-гравець найменше може дозволити собі відвести очі.
+Матч має п'ять фаз ([17](17-match-round-start-and-end.md)). Це **не окремий екран** —
+це той самий HUD на три секунди. Сповіщення не має власної панелі й не перекриває
+бійців, бо фаза міняється тоді, коли гравець найменше може дозволити собі відвести очі.
+
+> **Сирена сповіщення НЕ отримує, і це не недогляд.** [18](18-the-last-minute.md) каже
+> прямо: «Сирена без UI». docs/01 хоче один імпульс на 0:25, який дає напрямок і ніколи
+> позицію, і просить стрілку на краю екрана, щоб у гру можна було грати глухим — але
+> стрілку, прибиту до краю, роблять **тілом**: світиться нашийник на горлі твого бійця,
+> повертається голова, хилиться камера. Уся інформаційна драбина docs/01 діегетична, і
+> стрілка в HUD була б єдиною рунгою, яка ні.
+>
+> Перша версія цього промта малювала `HE IS EAST` стрілкою в кадрі. Це було порушення
+> вже ухваленого рішення, і промт нижче описує **стулення**, а не сирену.
+>
+> Дуга в HUD (екран 9) — це інше: індикатор напрямку **загальних** звуків (скриню
+> відкрили поверхом вище), обов'язкове налаштування з [02](02-combat-and-controls.md).
+> Сирена через неї не йде.
 
 ```
 A gameplay screenshot of a mobile 3D side-view fighting game, 20:9
@@ -618,16 +631,16 @@ the central 16:9. The same cutaway stone dungeon as the main HUD, three
 floors, wooden ladders, 30 degree field of view, camera tilted down 12
 degrees.
 
-THIS IS THE MOMENT THE SIREN SOUNDS, 25 SECONDS IN.
+THIS IS THE MOMENT THE WALLS START CLOSING, 1:15 IN.
 
 One lean fighter, rimmed in cold cyan, stands alone on the middle floor,
 18% of the screen height, head turned to the right, caught mid-step. The
 other fighter is NOT in frame. An opened wooden crate lies beside him
 with its lid thrown back.
 
-Every stone surface in the room is washed with a faint warm amber pulse
-from the right hand side, as if a light had flared once off screen —
-stronger on the right walls, almost nothing on the left. The background
+Heavy iron shutters are descending across the far left and far right
+thirds of the cutaway, already two thirds down, sealing the outermost
+rooms. Those thirds are visibly darker than the middle. The background
 is otherwise desaturated cold grey, slightly out of focus. Low poly,
 flat faceted shading, no textures, no text anywhere in the world.
 
@@ -641,12 +654,11 @@ clock reading 0:25 dead centre, a thin joystick ring lower left, four
 thin-outlined buttons lower right, and the five-slot equipment column
 with its wire mannequin on the left edge.
 
-ONE new element, and it is the only thing at full brightness: a wide
-thin horizontal arrow glyph pointing RIGHT, drawn in white lines,
-floating just above the fighter's head at a third of the screen width,
-with two short motion lines trailing behind it. Under it, small white
-capitals with no box: HE IS EAST. Under that, in smaller grey letters:
-DIRECTION ONLY.
+ONE new element, and it is the only thing at full brightness: two thin
+white bracket glyphs, one at the left edge and one at the right edge of
+the central 16:9, each pointing inward, as if squeezing the frame. Under
+the centre of the frame, small white capitals with no box: THE WALLS ARE
+CLOSING.
 
 Nothing else is added. No full-screen flash, no vignette, no banner
 across the frame.
@@ -662,11 +674,8 @@ Crisp, readable at phone size, clean flat vector interface over low poly
 blood splatter vignette, minimap, enemy position marker, arrow pointing at an exact
 spot, wooden UI panels, ornate borders, lens flare`.
 
-> **Два інші сповіщення — той самий промт із заміненим центральним елементом:**
+> **Друге сповіщення — той самий промт із заміненим центральним елементом:**
 >
-> * **Стулення (1:15).** Арена: крайні кімнати перекриті залізними заслінками, що
->   опускаються, ліва й права третини кадру темніші. Елемент: дві тонкі білі дужки,
->   що сходяться до центру, і під ними `THE WALLS ARE CLOSING`.
 > * **Раптова смерть (2:20).** Арена: одна платформа, усе довкола — провал у туман,
 >   обидва бійці в кадрі впритул. Елемент: тонке біле коло, вписане в центр кадру, і
 >   `SUDDEN DEATH`, а на кнопці атаки — маленький гліф подвоєного кулака: кулаки б'ють
@@ -749,3 +758,34 @@ wooden UI panels, ornate borders, glowing buttons, lens flare`.
 | **Реклама між матчами** | пряма заборона docs/09 |
 | **Таблиця лідерів із MMR** | ліга показується, число — ні |
 | **Вибір режиму як вкладка** | вогнепальний режим буде пізніше (docs/07); поки це рядок під PLAY, а не вкладка |
+
+---
+
+## Макет у Figma
+
+Екран 9 (HUD бою) зібраний у Figma як справжні шари, а не картинка:
+**https://www.figma.com/design/KzuNxfvt9sA8cvEFfqu4Tp**
+
+Три кадри — звичайний бій, бій, що йде погано (усі стани одразу), і дзеркальна
+розкладка для ліворуких. Компоненти, змінні кольорів і стилі ефектів лежать у секції
+`Components — HUD`.
+
+| Що | Варіанти |
+|---|---|
+| `HUD / Equipment Slot` | Rarity (Common/Rare/Legendary/Empty) × State (Idle/Swap/Worn) = 12 |
+| `HUD / Control Button` | Action (Attack/Block/Hand/Jump) × State (Idle/Pressed/Disabled) = 12 |
+| `HUD / Health Bar` | Player (P1/P2) × State (Normal/Critical) = 4 |
+| `HUD / Stamina Pip` | Player × State (Full/Spent) = 4 |
+| `Icon / …` | 9 силуетів під instance-swap у слоті |
+
+Стани не вигадані — кожен має джерело в коді:
+
+| Стан у Figma | Що його вмикає в грі |
+|---|---|
+| Slot `Worn` | `PlayerLoadoutView.wornAt` — зброї лишилось ≤3 застосування |
+| Slot `Swap` | `GroundItemView.offeredGlow` — стоїш над предметом, слот зайнятий |
+| Button `Disabled` | `CombatConfig.GuardBreakFrames` — гард зламано, 0.7 с |
+| Health `Critical` | `CombatConfig.DesperationHealthPermille` — нижче 30%, кулаки +40% |
+
+Стиль ефектів `UI / Legibility` — темний ореол під кожною білою лінією. Без нього
+лінійний HUD зникає на блідій мряці й світлому камені, і це не смак, а функція.
