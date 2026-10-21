@@ -247,6 +247,22 @@ def lights_and_torches(path):
             print(f"      PROBLEM - {len(torches) - len(fires)} torch(es) carry no fire. "
                   "Run Tools/Gulag Runners/Light the torches.")
 
+    # Every torch glows, or half of them read as dark sticks.
+    #
+    # Only three of six can carry a Light -- the pipeline caps additional lights at four per
+    # object and the gate fill is one of them -- so the other three had no glow at all, and
+    # a row of torches where half are lit and half are not reads as the effect switching
+    # itself off rather than as a lighting budget. An emissive ball at the flame costs no
+    # light and blooms into a halo, so all six can have one.
+    glows = sum(1 for go, (nm, _) in by_id.items() if nm == "Torch Glow")
+    if torches:
+        print(f"      {glows} of {len(torches)} torch(es) carry a glow")
+        if glows < len(torches):
+            problems += 1
+            print(f"      PROBLEM - {len(torches) - glows} torch(es) have no glow on them. "
+                  "Only three of six can afford a Light, so the rest need the emissive "
+                  "ball or they are dark sticks beside lit ones.")
+
     # A steady lamp on a flame is the thing that made them read as props to begin with.
     for go in fires:
         comps = owner.get(go, [])
