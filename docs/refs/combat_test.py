@@ -608,7 +608,9 @@ check("and the feet take the aim back once the swipe is let go", s.facing == -1,
 # The aim has to survive until the blow lands, for the SLOWEST weapon in the game, with the
 # movement stick held the other way the whole time. Two things keep it alive -- the lock the
 # swipe buys, and the swing itself -- and this does not care which: it asks the only question
-# the player can feel. A warhammer's heavy windup is 51 frames, twice the lock, so a lock
+# the player can feel. A warhammer's heavy windup is 73 frames (34 base x 1.45 x 1.50 --
+# the comment said 51, which is the base x 1.50 and misses the knob), three times the lock,
+# so a lock
 # that quietly did all the work would fail here.
 WEAPON = 1
 slowest = max(ITEMS, key=lambda i: (ITEMS[i].get("frames") or 0)
