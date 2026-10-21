@@ -327,6 +327,13 @@ namespace GulagRunners.Game
                          upperLayer < animator.layerCount && !string.IsNullOrEmpty(arms) &&
                          (moving || !fullBodyWhenStill);
 
+            // A NEW blow replays the reaction even when it is the same clip. Play skips a
+            // state whose hash is already current, which is right for everything else and
+            // wrong for exactly this: a string of hits kept the FIRST reaction, let it run
+            // to its end and then held that frame, so being hit four times looked like
+            // being hit once. Clearing the current hash forces the clip to re-enter.
+            if (s.WasHit || s.WasBlocked || s.WasParried) _currentHash = 0;
+
             string state = PickState(in s, speed, split, out float playback, out float scrub,
                                      out float fade);
             Play(state, playback, scrub, fade);
@@ -345,6 +352,18 @@ namespace GulagRunners.Game
                 _heldFrames = 0;
             }
             _heldFrames++;
+
+            // THE FREEZE, SHOWN. The simulation stops both fighters dead for a few frames
+            // when a blow lands -- three on a hit, seven on a parry -- and that pause is
+            // half of what gives a blow its weight (docs/20). Nothing was showing it: the
+            // bodies stopped because the simulation stopped writing positions, while the
+            // clips played straight on through, so a hit read as a man sliding to a halt
+            // mid-swing rather than as an arm stopping against something.
+            //
+            // Set after Play, because Play writes the speed itself. A posed state is
+            // already at zero and its scrub cannot move either -- the timers it reads do
+            // not tick during a freeze.
+            if (s.HitStopTimer > 0) animator.speed = 0f;
 
             nowPlaying = state;
             nowOnArms = split && _upperWeight > 0.001f
