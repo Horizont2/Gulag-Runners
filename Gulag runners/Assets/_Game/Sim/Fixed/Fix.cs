@@ -62,6 +62,40 @@ namespace GulagRunners.Sim
         public static Fix Clamp(Fix v, Fix min, Fix max) =>
             v.Raw < min.Raw ? min : (v.Raw > max.Raw ? max : v);
 
+        /// <summary>
+        /// Square root, exact to the last bit on every device.
+        ///
+        /// sqrt of a Q16.16 is not sqrt of its raw: x.Raw is X * 65536, so sqrt(X) is
+        /// sqrt(x.Raw) / 256, and the result wants another 65536 on it. Shifting the raw
+        /// up by 16 first and taking an INTEGER root of the 64-bit value gives both at
+        /// once, with no float anywhere near it.
+        ///
+        /// The loop is Newton's, on integers, which terminates because each step of an
+        /// integer Newton root is non-increasing once it is above the answer. Negative
+        /// input returns zero rather than throwing: a length is never negative, and a
+        /// simulation that throws on one device and not another is worse than one that
+        /// is slightly wrong on both.
+        /// </summary>
+        public static Fix Sqrt(Fix v)
+        {
+            if (v.Raw <= 0) return Zero;
+
+            ulong n = (ulong)v.Raw << FracBits;
+
+            // Start at or above the answer, from the bit length, so Newton only descends.
+            int bits = 0;
+            for (ulong t = n; t != 0; t >>= 1) bits++;
+            ulong x = 1UL << ((bits + 1) >> 1);
+
+            while (true)
+            {
+                ulong next = (x + n / x) >> 1;
+                if (next >= x) break;
+                x = next;
+            }
+            return new Fix((int)x);
+        }
+
         /// <summary>Moves current towards target by at most maxDelta. No division, no float.</summary>
         public static Fix MoveTowards(Fix current, Fix target, Fix maxDelta)
         {
