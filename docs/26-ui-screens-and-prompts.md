@@ -789,3 +789,6 @@ wooden UI panels, ornate borders, glowing buttons, lens flare`.
 
 Стиль ефектів `UI / Legibility` — темний ореол під кожною білою лінією. Без нього
 лінійний HUD зникає на блідій мряці й світлому камені, і це не смак, а функція.
+
+Ассети, межі 9-slice, налаштування імпорту й розкладка Canvas — у
+[27](27-hud-export.md).
