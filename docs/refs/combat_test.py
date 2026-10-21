@@ -722,4 +722,42 @@ for t in range(60):
         break
 check("a light blow leaves them standing", air == 0, f"{air} airborne frame(s)")
 
+# ---------------------------------------------------------------- no infinites
+#
+# Knockback ends a string by taking the victim out of reach -- except against a wall, where
+# there is nowhere for them to go. Measured in the corner before the attacker was given a
+# recoil of his own: fists looped a spearman TWENTY hits to none, while the same pair on
+# open floor read one to two the other way.
+print("\n10. nobody can be hit for ever")
+
+WALL = 1.00            # the arena has a solid from here; back the defender onto it
+
+
+def pressure(ax, bx, aw, bw, seconds=8):
+    """Both hold attack. Returns (hits landed by A, hits landed by B)."""
+    a = fighter(ax, 1, aw)
+    b = fighter(bx, -1, bw)
+    ah = bh = 0
+    for _ in range(seconds * 60):
+        tick([a, b], [ATTACK, ATTACK])
+        ah += b.was_hit
+        bh += a.was_hit
+        if a.dead or b.dead:
+            break
+    return ah, bh
+
+
+worst = None
+for aw, an in ((NONE, "fists"), (DAGGER, "dagger")):
+    for bw, bn in ((SPEAR, "spear"), (WARHAMMER, "warhammer")):
+        corner = pressure(WALL - 0.95, WALL - 0.30, aw, bw)
+        open_floor = pressure(-6.0, -5.35, aw, bw)
+        print(f"        {an:7} vs {bn:10} corner {corner[0]}:{corner[1]}   "
+              f"open {open_floor[0]}:{open_floor[1]}")
+        if worst is None or corner[1] < worst:
+            worst = corner[1]
+
+check("the slowest weapon lands SOMETHING even cornered by the fastest", worst > 0,
+      f"best case {worst} hit(s) in eight seconds")
+
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

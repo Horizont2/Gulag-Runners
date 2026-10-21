@@ -194,8 +194,15 @@ namespace GulagRunners.Game
 
             bool onLadder = gripLadder && world != null &&
                             s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length;
-            bool onLedge = gripLedge && !onLadder &&
-                           s.Mode == MoveMode.Mantling && s.ScriptForward;
+            // EVERY climb-out, not only the ones that step straight forward.
+            //
+            // StartScripted clears LadderIndex, so onLadder goes false on the very frame
+            // the climb-out begins. Requiring ScriptForward as well meant a climb-out of a
+            // HATCH -- which travels 1.1 m sideways and is therefore not "forward" -- matched
+            // neither branch, so the hands were released from the rungs over the blend while
+            // the haul clip played. Hands peeling off the ladder on their own schedule,
+            // through the middle of the move, is exactly the leftover jerk at the top.
+            bool onLedge = gripLedge && !onLadder && s.Mode == MoveMode.Mantling;
 
             if (!onLadder) _held = false;
 

@@ -403,7 +403,7 @@ namespace GulagRunners.Sim
             // Knocked back: the body keeps what the blow gave it. Running the normal ground
             // deceleration over a hit would wipe the knockback in a tenth of a second, and a hit
             // that does not move anybody is a hit nobody can read.
-            if (s.HitstunTimer > 0 || s.StaggerTimer > 0)
+            if (s.HitstunTimer > 0 || s.StaggerTimer > 0 || s.RecoilTimer > 0)
             {
                 Fix drag = cfg.GroundDecel / 6;
                 s.Velocity.X = Fix.MoveTowards(s.Velocity.X, Fix.Zero, drag * Dt);

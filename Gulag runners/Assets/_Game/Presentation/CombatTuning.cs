@@ -58,9 +58,9 @@ namespace GulagRunners.Game
 
         [Tooltip("How long an attack press is still worth something when it cannot be used " +
                  "yet.\n\nWithout it a tap during recovery is thrown away and continuing a " +
-                 "string means pressing again on the exact frame the swing ends. 0.23 s " +
+                 "string means pressing again on the exact frame the swing ends. 0.30 s " +
                  "clears the longest recovery a landed swing leaves behind.")]
-        [Range(0f, 0.4f)] public float attackBuffer = 0.233f;
+        [Range(0f, 0.4f)] public float attackBuffer = 0.3f;
 
         [Tooltip("What a swing that CONNECTS gets back of its own recovery.\n\n" +
                  "Every weapon used to be at a frame disadvantage after landing a blow — " +
@@ -73,6 +73,46 @@ namespace GulagRunners.Game
                  "weapon. Hitstun is raised to at least what the attacker still owes plus " +
                  "this, so connecting is never punished. Damage can earn more.")]
         [Range(0f, 0.25f)] public float hitAdvantage = 0.067f;
+
+        [Tooltip("What each FURTHER hit of a string is worth against the one before.\n\n" +
+                 "Guaranteeing the turn on every hit is an infinite: measured, a bare-handed " +
+                 "fighter landed twenty blows in eight seconds and the man with a club " +
+                 "landed none at all.")]
+        [Range(0.2f, 1f)] public float comboStunDecay = 0.62f;
+
+        [Tooltip("Seconds without being hit that end a string.")]
+        [Range(0.2f, 3f)] public float comboStackTime = 1.25f;
+
+        [Tooltip("Extra knockback per hit already taken in this string. The second way a " +
+                 "string ends: the attacker runs out of reach and has to step back in.")]
+        [Range(0f, 2f)] public float comboPush = 0.3f;
+
+        [Tooltip("What the ATTACKER is thrown back by, against the victim's knockback.\n\n" +
+                 "Against a wall the victim has nowhere to go, so without this a string " +
+                 "never ends there -- measured in the corner, fists looped a spearman " +
+                 "twenty hits to none where open floor read one to two the other way.")]
+        [Range(0f, 1f)] public float attackerRecoil = 0.4f;
+
+        [Range(0f, 0.5f)] public float recoilTime = 0.167f;
+
+        [Tooltip("Every weapon's wind-up and recovery, against the table's own numbers.\n\n" +
+                 "One knob over the whole fight, because the question it answers is whether " +
+                 "a player can SEE a blow coming: a dagger wound up in 0.15 s and fists in " +
+                 "0.20, against a human reaction of about 0.25. Scaling here keeps the " +
+                 "weapons' relationship to each other, which is the design.")]
+        [Range(0.5f, 2f)] public float attackPace = 1.3f;
+
+        [Header("Moving through a swing")]
+        [Tooltip("Speed through the three phases of a swing, against the run.\n\n" +
+                 "These were not being passed to the simulation at all: Build() left them " +
+                 "out, so every scene ran them at zero, and zero is the motor's \"no cap\". " +
+                 "A fighter was travelling at FULL running speed through his own wind-up, " +
+                 "active frames and recovery, which is most of why a swing had no weight to " +
+                 "it. You gather while still moving, you plant for the blow, and you are " +
+                 "heavy on your feet afterwards.")]
+        [Range(0f, 1f)] public float windupSpeed = 0.48f;
+        [Range(0f, 1f)] public float activeSpeed = 0.18f;
+        [Range(0f, 1f)] public float recoverySpeed = 0.4f;
 
         public float knockbackSpeed = 3.2f;
         public float heavyKnockbackSpeed = 6f;
@@ -150,6 +190,15 @@ namespace GulagRunners.Game
             AttackBufferFrames = F(attackBuffer),
             HitRecoveryCutPermille = P(hitRecoveryKept),
             HitAdvantageFrames = F(hitAdvantage),
+            ComboStunDecayPermille = P(comboStunDecay),
+            ComboStackFrames = F(comboStackTime),
+            ComboPushPermille = P(comboPush),
+            AttackerRecoilPermille = P(attackerRecoil),
+            RecoilFrames = F(recoilTime),
+            AttackFramesPermille = P(attackPace),
+            WindupSpeedPermille = P(windupSpeed),
+            ActiveSpeedPermille = P(activeSpeed),
+            RecoverySpeedPermille = P(recoverySpeed),
             KnockbackSpeed = M(knockbackSpeed),
             HeavyKnockbackSpeed = M(heavyKnockbackSpeed),
             KnockbackLift = M(knockbackLift),

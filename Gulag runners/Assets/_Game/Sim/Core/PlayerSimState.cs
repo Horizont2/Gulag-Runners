@@ -131,6 +131,9 @@ namespace GulagRunners.Sim
         /// Hits taken in the current string, and the clock that ends it. What stops the
         /// fast weapon looping the slow one for ever.
         /// </summary>
+        /// <summary>Frames the attacker's own recoil coasts after landing a blow.</summary>
+        public int RecoilTimer;
+
         public byte StunStack;
         public int StunStackTimer;
 

@@ -8,11 +8,12 @@ from loot_mirror import (ITEMS, NONE, FISTS, CLUB, SPEAR, DAGGER, SWORD, AXE, FL
 # ---------------------------------------------------------------- CombatConfig.Default()
 K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          HEAVY_DMG=1700, HEAVY_TIME=1500, STUN_PER_DMG=1, MAX_STUN=34,
-         BUFFER=14, HIT_RECOVERY_CUT=500, HIT_ADVANTAGE=4,
-         COMBO_DECAY=620, COMBO_STACK_FRAMES=75, COMBO_PUSH=300,
+         BUFFER=18, HIT_RECOVERY_CUT=500, HIT_ADVANTAGE=4,
+         COMBO_DECAY=620, COMBO_STACK_FRAMES=75, COMBO_PUSH=300, ATTACK_FRAMES=1300,
+         RECOIL=400, RECOIL_FRAMES=10,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
          CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
-         WINDUP_SPEED=620, ACTIVE_SPEED=180, RECOVERY_SPEED=400,
+         WINDUP_SPEED=480, ACTIVE_SPEED=180, RECOVERY_SPEED=400,
          HIT_STOP=3, BLOCK_STOP=2, PARRY_STOP=7,
          PARRY=12, STAGGER=48, DEATH=90, GUARD_DRAIN=48,
          DESPERATE_HP=300, DESPERATE_DMG=1400, SUDDEN_BARE=2000,
@@ -30,6 +31,12 @@ def weapon(s):
     return W(s.inv.weapon)
 
 
+def windup(w):
+    """The weapon's wind-up after the one knob that paces the whole fight."""
+    n = scale(w["frames"], K["ATTACK_FRAMES"]) if K["ATTACK_FRAMES"] else w["frames"]
+    return max(1, n)
+
+
 def scale(v, permille):
     return (v * permille) // 1000
 
@@ -45,6 +52,7 @@ def init(s):
     s.atk_buf = 0
     s.stun_stack = 0
     s.stun_stack_t = 0
+    s.recoil_t = 0
     s.blocking = False
     s.guard_t = 0
     s.guard_break = 0
@@ -87,6 +95,8 @@ def combat_step(s, inp):
         s.stun_stack_t -= 1
         if s.stun_stack_t == 0:
             s.stun_stack = 0
+    if s.recoil_t > 0:
+        s.recoil_t -= 1
 
     for a in ("stun", "stagger", "guard_break"):
         if getattr(s, a) > 0:
@@ -152,10 +162,10 @@ def start_swing(s, inp):
         return
     s.atk_buf = 0
     heavy = s.combo >= K["MAX_COMBO"] - 1
-    windup = weapon(s)["frames"]
+    wind = windup(weapon(s))
     if heavy:
-        windup = scale(windup, K["HEAVY_TIME"])
-    s.attack, s.attack_t = WINDUP, max(1, windup)
+        wind = scale(wind, K["HEAVY_TIME"])
+    s.attack, s.attack_t = WINDUP, max(1, wind)
     s.swing_spent = False
     s.swing_connected = False
     s.atk_buf = 0
@@ -175,7 +185,7 @@ def advance(s):
         s.attack, s.attack_t = ACTIVE, max(1, K["ACTIVE"])
     elif s.attack == ACTIVE:
         heavy = s.combo >= K["MAX_COMBO"] - 1
-        rec = scale(weapon(s)["frames"], K["RECOVERY"])
+        rec = scale(windup(weapon(s)), K["RECOVERY"])
         if heavy:
             rec = scale(rec, K["HEAVY_TIME"])
         # Landed, so half of it is given back.
@@ -364,7 +374,7 @@ def owed(s):
     if s.attack != ACTIVE:
         return 0
     heavy = s.combo >= K["MAX_COMBO"] - 1
-    rec = scale(weapon(s)["frames"], K["RECOVERY"])
+    rec = scale(windup(weapon(s)), K["RECOVERY"])
     if heavy:
         rec = scale(rec, K["HEAVY_TIME"])
     if K["HIT_RECOVERY_CUT"] > 0:
@@ -412,6 +422,12 @@ def hit(atk, vic, dmg, side, heavy):
     if stacked > 0 and K["COMBO_PUSH"] > 0:
         push = (push * (1000 + K["COMBO_PUSH"] * stacked)) // 1000
     vic.vx = push * side
+
+    # And the attacker off the blow: against a wall the victim cannot go anywhere, so
+    # without this the string never ends there.
+    if K["RECOIL"] > 0 and K["RECOIL_FRAMES"] > 0:
+        atk.vx = -((push * K["RECOIL"]) // 1000) * side
+        atk.recoil_t = K["RECOIL_FRAMES"]
     # Only the finisher lifts; a light blow leaves them standing, which is the one change
     # that makes a second hit possible at all.
     if heavy and vic.mode == "ground" and K["LIFT"] > 0:

@@ -122,6 +122,7 @@ namespace GulagRunners.Sim
             // Long enough without being hit and the string is over: the next blow confirms
             // again and buys its owner the turn, as the first one of any string does.
             if (s.StunStackTimer > 0 && --s.StunStackTimer == 0) s.StunStack = 0;
+            if (s.RecoilTimer > 0) s.RecoilTimer--;
             if (s.HitstunTimer > 0) s.HitstunTimer--;
             if (s.StaggerTimer > 0) s.StaggerTimer--;
             if (s.GuardBreakTimer > 0) s.GuardBreakTimer--;
@@ -573,6 +574,17 @@ namespace GulagRunners.Sim
             }
 
             victim.Velocity.X = push * side;
+
+            // And the attacker off the blow. Against a wall the victim cannot go anywhere,
+            // so without this the string never ends there: measured in the corner, fists
+            // looped a spearman twenty hits to none, where the same pair on open floor read
+            // one to two the other way.
+            if (cfg.AttackerRecoilPermille > 0 && cfg.RecoilFrames > 0)
+            {
+                Fix back = new Fix((int)(((long)push.Raw * cfg.AttackerRecoilPermille) / 1000));
+                attacker.Velocity.X = Fix.Zero - back * side;
+                attacker.RecoilTimer = cfg.RecoilFrames;
+            }
 
             // Only the finisher lifts. A light blow leaves them standing, which is the one
             // change that makes a second hit possible: lifted, they slid away with no

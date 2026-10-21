@@ -36,7 +36,7 @@ class S:
         s.crouch = False; s.jump_held = False
         s.coyote = s.buf = s.dodge = s.dodge_rec = s.fallthru = s.stepn = 0
         s.ladder_cd = 0
-        s.hitstop = 0
+        s.hitstop = 0; s.recoil_t = 0
         s.script_t = 0; s.script_frames = 0; s.script_dir = 1; s.script_rises = False
         s.script_from = (0,0); s.script_to = (0,0)
         s.script_from_depth = s.script_to_depth = 0
@@ -478,7 +478,7 @@ def step_flat(s, inp, w):
     tgt = (C["CROUCH"] if s.crouch else C["RUN"]) * wx
     if s.speed_permille > 0:
         tgt = (tgt * s.speed_permille) // 1000
-    if s.stun > 0 or s.stagger > 0:
+    if s.stun > 0 or s.stagger > 0 or getattr(s, "recoil_t", 0) > 0:
         s.vx = move_towards(s.vx, 0, mul(C["GDEC"] // 6, DT))
     else:
         acc = (C["GACC"] if g else C["AACC"]) if wx else (C["GDEC"] if g else C["ADEC"])

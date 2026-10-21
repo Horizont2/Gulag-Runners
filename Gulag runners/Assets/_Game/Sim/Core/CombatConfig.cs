@@ -109,6 +109,21 @@ namespace GulagRunners.Sim
         public int AttackFramesPermille;
 
         /// <summary>
+        /// What the ATTACKER is thrown back by, in thousandths of the victim's knockback.
+        ///
+        /// Knockback ends a string by taking the victim out of reach -- except against a
+        /// wall, where there is nowhere for them to go. Measured in the corner, a
+        /// bare-handed fighter still looped a spearman twenty hits to none while the same
+        /// pair on open floor read one to two the other way. Pushing the attacker off
+        /// instead is the oldest answer in the genre: the separation happens either way,
+        /// and who moves is decided by who has room.
+        /// </summary>
+        public int AttackerRecoilPermille;
+
+        /// <summary>Frames the attacker's recoil coasts before the ground takes it back.</summary>
+        public int RecoilFrames;
+
+        /// <summary>
         /// The frames of initiative a clean hit is guaranteed to buy, whatever the weapon.
         ///
         /// Hitstun is raised to at least "what the attacker has left, plus this", so every
@@ -162,6 +177,15 @@ namespace GulagRunners.Sim
         ///
         /// The commitment is kept where it belongs — a swing still cannot be cancelled with
         /// a jump or a dodge. It is the walking that is given back, not the escape.
+        /// </summary>
+        /// <summary>
+        /// Gathering: you may still close or back off, at this share of the run.
+        ///
+        /// Cut from 620 when the wind-ups were lengthened by a third, because what matters
+        /// is the GROUND covered during one, not the speed: at 620 a slower club carried
+        /// its owner 0.59 m backwards before the blow went live, which is far enough out of
+        /// his own 1.25 m reach that a fighter walking away could no longer land the swing
+        /// he had aimed behind him. 480 keeps the distance where it was.
         /// </summary>
         public int WindupSpeedPermille;
         public int ActiveSpeedPermille;
@@ -234,13 +258,15 @@ namespace GulagRunners.Sim
             c.HitstunPerDamage = 1;
             c.MaxHitstunFrames = 34;   // was 26, which clipped the floor below off a warhammer
 
-            c.AttackBufferFrames = 14;     // 0.23 s: clears the longest connected recovery (11)
+            c.AttackBufferFrames = 18;     // 0.30 s: clears the longest connected recovery (15)
             c.HitRecoveryCutPermille = 500;
             c.HitAdvantageFrames = 4;      // +4 on the FIRST hit, more with the heavy
             c.ComboStunDecayPermille = 620;
             c.ComboStackFrames = 75;       // 1.25 s without being hit and the string is over
             c.ComboPushPermille = 300;
-            c.AttackFramesPermille = 1000;
+            c.AttackerRecoilPermille = 400;
+            c.RecoilFrames = 10;
+            c.AttackFramesPermille = 1300;   // 0.25 s to read the commonest wind-up
 
             c.KnockbackSpeed = Fix.FromMilli(3200);
             c.HeavyKnockbackSpeed = Fix.FromMilli(6000);
@@ -251,7 +277,7 @@ namespace GulagRunners.Sim
             c.GuardBreakFrames = 42;       // 0.7 s wide open
             c.BlockSpeedPermille = 420;
 
-            c.WindupSpeedPermille = 620;   // gathering: you may still close or back off
+            c.WindupSpeedPermille = 480;   // gathering: you may still close or back off
             c.ActiveSpeedPermille = 180;   // the blow itself; a crawl, not a stop
             c.RecoverySpeedPermille = 400; // heavy on your feet again
 
