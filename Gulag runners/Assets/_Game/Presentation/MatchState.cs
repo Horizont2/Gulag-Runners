@@ -94,6 +94,16 @@ namespace GulagRunners.Game
                  "left takes it; level pegging is a draw.")]
         public float suddenDeathSeconds = 10f;
 
+        [Header("Series")]
+        [Tooltip("Rounds a fighter has to take to win the MATCH. Two is best of three.\n\n" +
+                 "A round is one deal of the arena; the match is the series of them, and " +
+                 "until now nothing counted. Kept here rather than in MatchSimState " +
+                 "because that struct is re-made fresh for every round -- the series is " +
+                 "the thing that outlives it.\n\n" +
+                 "It stays deterministic all the same: both devices see the same JustEnded " +
+                 "on the same tick, so they count the same wins.")]
+        [Range(1, 5)] public int roundsToWin = 2;
+
         [Tooltip("Seconds the result stands before the next round deals. docs/01 puts \"Again\" " +
                  "straight after a loss rather than a lobby, so this is short — long enough to " +
                  "watch the body land. Set it to 0 to hold the result instead, which is what a " +
@@ -136,6 +146,33 @@ namespace GulagRunners.Game
         /// <summary>A round has just been dealt. The argument is which round, from 0.</summary>
         public event System.Action<int> RoundBegan;
 
+        /// <summary>The match is decided. The argument is the winner, or 2 for a draw.</summary>
+        public event System.Action<int> SeriesEnded;
+
+        readonly int[] _wins = new int[2];
+
+        /// <summary>Rounds this fighter has taken in the current match.</summary>
+        public int Wins(int player) =>
+            player >= 0 && player < _wins.Length ? _wins[player] : 0;
+
+        /// <summary>Longest the match can run: best of three is three.</summary>
+        public int RoundsInSeries => Mathf.Max(1, roundsToWin) * 2 - 1;
+
+        /// <summary>Somebody has taken enough rounds.</summary>
+        public bool SeriesOver =>
+            _wins[0] >= Mathf.Max(1, roundsToWin) || _wins[1] >= Mathf.Max(1, roundsToWin);
+
+        /// <summary>Who took the match, or -1 while it is still running.</summary>
+        public int SeriesWinner =>
+            _wins[0] >= Mathf.Max(1, roundsToWin) ? 0 :
+            _wins[1] >= Mathf.Max(1, roundsToWin) ? 1 : -1;
+
+        /// <summary>Back to nil-nil. The next round dealt is round one of a new match.</summary>
+        public void ResetSeries()
+        {
+            _wins[0] = _wins[1] = 0;
+        }
+
         PlayerSimState[] _scratch = System.Array.Empty<PlayerSimState>();
 
         PlayerController _tickOwner;
@@ -154,6 +191,9 @@ namespace GulagRunners.Game
             }
 
             Config = chests.ToConfig();
+            // A fresh scene is a fresh match, so the series starts at nil-nil. ResetRound
+            // on its own re-deals the SAME round and deliberately leaves the score alone.
+            ResetSeries();
             ResetRound();
         }
 
@@ -380,16 +420,26 @@ namespace GulagRunners.Game
 
             if (_match.JustEnded)
             {
+                // The series is counted here and nowhere else, on the one tick the round
+                // is decided -- not on the restart, which may never come, and not in the
+                // interface, which must be able to disappear without changing the game.
+                if (_match.Winner == 0 || _match.Winner == 1) _wins[_match.Winner]++;
+
                 if (logMatch) Debug.Log($"{name}: round {_match.Round} — {Result()} " +
-                                        $"at {Clock(_match.Frame)}", this);
+                                        $"at {Clock(_match.Frame)} " +
+                                        $"({_wins[0]}–{_wins[1]}, first to {roundsToWin})",
+                                        this);
                 Ended?.Invoke(_match.Winner);
+                if (SeriesOver) SeriesEnded?.Invoke(SeriesWinner);
             }
 
             // The result has stood long enough. Done here, from inside the tick, because the
             // alternative is a coroutine on a second clock: the restart would land on a
             // different tick on each device, and the round after it would deal from a chest
             // list the two of them no longer agreed about (docs/06).
-            if (_match.WantsRestart) NextRound();
+            // And no further round is dealt once the match is decided. Without this the
+            // arena simply re-deals for ever and "best of three" is a number on a label.
+            if (_match.WantsRestart && !SeriesOver) NextRound();
         }
 
         /// <summary>

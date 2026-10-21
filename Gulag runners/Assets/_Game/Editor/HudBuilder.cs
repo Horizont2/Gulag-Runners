@@ -57,8 +57,21 @@ namespace GulagRunners.GameEditor
         // 120 units -- the attack ring at 154 is 11.5 mm, jump and block at 130 are 9.8,
         // and shrinking them is how a HUD becomes pretty and unplayable.
         float _readoutScale = 0.85f;
-        float _columnScale = 0.65f;
+        float _slotScale = 0.9f;
         float _controlScale = 1f;
+
+        // Two pieces of the mock that are off by default now.
+        //
+        // The mannequin and its leader lines were a REVIEW drawing: they explain which
+        // square is which to somebody reading the sheet, and in a fight they are a wire
+        // man standing on the arena taking up a fifth of the screen. The squares say what
+        // they are themselves now, by carrying the icon of what belongs in them.
+        //
+        // The off-screen cue is off because its art is a direction, and a direction with
+        // nothing to point at is the grey shape above the joystick nobody could explain.
+        // Switch it on when there is a reason for it to be there.
+        bool _buildMannequin;
+        bool _buildSoundCue;
 
         [MenuItem("Tools/Gulag Runners/Build the combat HUD")]
         public static void Open()
@@ -85,7 +98,7 @@ namespace GulagRunners.GameEditor
         {
             new Asset("hud/slot/frame", 64, 64, 12),
             new Asset("hud/slot/frame-dashed", 64, 64, 12),
-            new Asset("hud/slot/glow", 100, 100),
+            new Asset("hud/slot/glow", 88, 88),
             new Asset("hud/slot/swap-arrow", 18, 18),
             new Asset("hud/bar/frame", 440, 32, 8),
             new Asset("hud/bar/fill", 424, 16, 4),
@@ -141,12 +154,20 @@ namespace GulagRunners.GameEditor
             _readoutScale = EditorGUILayout.Slider(
                 new GUIContent("Readouts", "Health bars, stamina, clock, sound arc."),
                 _readoutScale, 0.4f, 1.25f);
-            _columnScale = EditorGUILayout.Slider(
-                new GUIContent("Equipment column",
-                               "Mannequin, leader lines and the five squares. The mock " +
-                               "drew these large to be legible in review; at full size " +
-                               "they cover a fifth of the arena."),
-                _columnScale, 0.4f, 1.25f);
+            _slotScale = EditorGUILayout.Slider(
+                new GUIContent("Equipment slots",
+                               "The five squares along the bottom of the screen."),
+                _slotScale, 0.4f, 1.25f);
+            _buildMannequin = EditorGUILayout.Toggle(
+                new GUIContent("Mannequin + leaders",
+                               "The wire figure and the lines from it to the squares. It " +
+                               "belongs on the design sheet, not on the arena."),
+                _buildMannequin);
+            _buildSoundCue = EditorGUILayout.Toggle(
+                new GUIContent("Off-screen cue",
+                               "The arc that points at a chest the opponent just forced. " +
+                               "Invisible until one is, but it has to be built to appear."),
+                _buildSoundCue);
             _controlScale = EditorGUILayout.Slider(
                 new GUIContent("Controls",
                                "Joystick and the four buttons. 1 is the designed size, " +
@@ -401,6 +422,9 @@ namespace GulagRunners.GameEditor
         {
             foreach (string key in Generated)
             {
+                if (!_buildMannequin && key.StartsWith("hud/leaders")) continue;
+                if (!_buildSoundCue && key == "hud/sound/arc") continue;
+
                 Asset asset = Needed.First(a => a.Key == key);
                 string dir = $"{root}/generated";
                 if (!AssetDatabase.IsValidFolder(dir))
@@ -701,15 +725,68 @@ namespace GulagRunners.GameEditor
             view.bar2.fillRect = fill2;
             view.bar2.pips = Pips(bar, sprites, "Stamina / P2", 1346 + barWidth, 80, 1f);
 
-            RectTransform clockRt = Make("Round Clock", bar, 840, 30, 240, 50, 0.5f, 0f,
-                                         _readoutScale);
-            Text clock = Undo.AddComponent<Text>(clockRt.gameObject);
-            clock.text = "1:24";
-            clock.fontSize = Mathf.Max(8, Mathf.RoundToInt(40 * _readoutScale));
-            clock.alignment = TextAnchor.UpperCenter;
-            clock.raycastTarget = false;
-            clock.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            view.clock = clock;
+            view.clock = Label(bar, "Round Clock", "1:24", 840, 30, 240, 50,
+                               0.5f, TextAnchor.UpperCenter, 40);
+
+            // The names, outside each bar and pushed against the same edge it is. Which
+            // bar is blue already says who you are; the names say who the other one is.
+            view.name1 = Label(bar, "Name / P1", "RUNNER_1", 134, 104, 320, 30,
+                               0f, TextAnchor.UpperLeft, 24);
+            view.name2 = Label(bar, "Name / P2", "RUNNER_2", 1920 - 134 - 320, 104, 320, 30,
+                               1f, TextAnchor.UpperRight, 24);
+
+            // The series, grouped under the clock rather than scattered along the bars:
+            // one place that answers "how does the match stand", with each fighter's
+            // marks on their own side of it.
+            view.roundLabel = Label(bar, "Round Of", "ROUND 1 / 3", 800, 86, 320, 28,
+                                    0.5f, TextAnchor.UpperCenter, 22);
+
+            // Three marks wide, because three is the longest a best-of-three runs.
+            float pip = Size("hud/pip", 20, 20).x;
+            float marks = pip * 3f + 16f;
+            view.wins1 = Marks(bar, sprites, "Wins / P1", 800 - 24 - marks, 90, 0.5f);
+            view.wins2 = Marks(bar, sprites, "Wins / P2", 1120 + 24, 90, 0.5f);
+        }
+
+        /// <summary>One line of text at its design place.</summary>
+        Text Label(Transform parent, string name, string text, float x, float y,
+                   float w, float h, float anchor, TextAnchor align, float size)
+        {
+            RectTransform rt = Make(name, parent, x, y, w, h, anchor, 0f, _readoutScale);
+            Text label = Undo.AddComponent<Text>(rt.gameObject);
+            label.text = text;
+            label.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _readoutScale));
+            label.alignment = align;
+            label.raycastTarget = false;
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            return label;
+        }
+
+        /// <summary>
+        /// Rounds taken, as a short row of the same mark the stamina uses.
+        ///
+        /// Built at the longest a series can be rather than at what this match needs, so
+        /// changing MatchState.roundsToWin does not need the HUD rebuilding -- HudView
+        /// paints the ones past the limit to nothing.
+        /// </summary>
+        Graphic[] Marks(Transform parent, Dictionary<string, Sprite> sprites, string name,
+                        float x, float y, float anchor)
+        {
+            const int most = 3;
+            const float gap = 8f;
+            float size = Size("hud/pip", 20, 20).x;
+
+            RectTransform row = Make(name, parent, x, y,
+                                     most * size + (most - 1) * gap, size, anchor, 0f,
+                                     _readoutScale);
+            Graphic[] marks = new Graphic[most];
+            for (int i = 0; i < most; i++)
+            {
+                RectTransform m = Make($"win {i + 1}", row, i * (size + gap), 0,
+                                       size, size, 0f, 0f, _readoutScale);
+                marks[i] = Picture(m.gameObject, sprites, "hud/pip", false);
+            }
+            return marks;
         }
 
         HudBar Bar(Transform parent, Dictionary<string, Sprite> sprites, string name,
@@ -756,28 +833,34 @@ namespace GulagRunners.GameEditor
 
         void BuildColumn(Transform root, Dictionary<string, Sprite> sprites, HudView view)
         {
-            RectTransform column = Panel("Equipment Column", root);
-            float k = _columnScale;
+            RectTransform column = Panel("Equipment", root);
+            float k = _slotScale;
 
-            Vector2 manSize = Size("hud/mannequin", 150, 330);
-            RectTransform man = Make("Mannequin", column, 150, 180, manSize.x, manSize.y, 0f,
-                                     0f, k);
-            Picture(man.gameObject, sprites, "hud/mannequin", false);
-
-            Vector2 leadSize = Size("hud/leaders", 115, 350);
-            RectTransform lead = Make("Leader lines", column, 210, 180,
-                                      leadSize.x, leadSize.y, 0f, 0f, k);
-            Picture(lead.gameObject, sprites, "hud/leaders", false);
-
-            // The icon is the one the slot shows while it is EMPTY -- a ghost of what
-            // belongs there. HudView swaps in the real item's own icon on pickup.
-            (string name, ItemKind kind, string icon, float y)[] rows =
+            if (_buildMannequin)
             {
-                ("Slot / Helmet",  ItemKind.Helmet,  "hud/icon/coif",      176),
-                ("Slot / Weapon",  ItemKind.Weapon,  "hud/icon/club",      252),
-                ("Slot / Armour",  ItemKind.Armour,  "hud/icon/chainmail", 328),
-                ("Slot / Belt",    ItemKind.Belt,    "hud/icon/belt",      404),
-                ("Slot / Utility", ItemKind.Utility, "hud/icon/bandage",   480),
+                Vector2 manSize = Size("hud/mannequin", 150, 330);
+                RectTransform man = Make("Mannequin", column, 150, 180,
+                                         manSize.x, manSize.y, 0f, 0f, k);
+                Picture(man.gameObject, sprites, "hud/mannequin", false);
+
+                Vector2 leadSize = Size("hud/leaders", 115, 350);
+                RectTransform lead = Make("Leader lines", column, 210, 180,
+                                          leadSize.x, leadSize.y, 0f, 0f, k);
+                Picture(lead.gameObject, sprites, "hud/leaders", false);
+            }
+
+            // The icon is what the slot shows while it is EMPTY -- a ghost of the thing
+            // that belongs there, which is how a square says "helmet" without a label and
+            // without the wire man that used to say it.
+            //
+            // In the order a fighter is dressed, left to right along the bottom.
+            (string name, ItemKind kind, string icon)[] rows =
+            {
+                ("Slot / Helmet",  ItemKind.Helmet,  "hud/icon/coif"),
+                ("Slot / Armour",  ItemKind.Armour,  "hud/icon/chainmail"),
+                ("Slot / Weapon",  ItemKind.Weapon,  "hud/icon/club"),
+                ("Slot / Belt",    ItemKind.Belt,    "hud/icon/belt"),
+                ("Slot / Utility", ItemKind.Utility, "hud/icon/bandage"),
             };
 
             Vector2 square = Size("hud/slot/frame", 64, 64);
@@ -785,13 +868,28 @@ namespace GulagRunners.GameEditor
             Vector2 iconSize = Size("hud/icon/coif", 32, 32);
             Vector2 swapSize = Size("hud/slot/swap-arrow", 18, 18);
 
+            // Along the BOTTOM MIDDLE, not down the left.
+            //
+            // Down the left they sat on the arena, in the band a side-view fighter spends
+            // the whole match running through. The bottom middle is the one part of a
+            // landscape phone screen nothing else wants: the stick owns the bottom left,
+            // the four buttons the bottom right, and between them is a thumb's width of
+            // nothing, directly under where the eyes already are.
+            const float gap = 24f;
+            float row0 = -(rows.Length * square.x + (rows.Length - 1) * gap) * 0.5f;
+            const float fromBottom = 60f;
+            float top = DesignH - fromBottom - square.y;
+
             List<HudSlot> slots = new List<HudSlot>();
-            foreach (var row in rows)
+            for (int i = 0; i < rows.Length; i++)
             {
+                var row = rows[i];
                 // A container with no Image of its own. uGUI draws a parent BEFORE its
                 // children, so putting the square on the container would have left the
                 // halo — its own child — painted over the top of it.
-                RectTransform rt = Make(row.name, column, 320, row.y, square.x, square.y, 0f, 0f, k);
+                RectTransform rt = Make(row.name, column,
+                                        DesignW * 0.5f + row0 + i * (square.x + gap), top,
+                                        square.x, square.y, 0.5f, 1f, k);
 
                 // Sibling order is draw order: halo behind the square, square behind the
                 // item, swap arrow over all of it. The halo is centred on the square
@@ -845,7 +943,17 @@ namespace GulagRunners.GameEditor
             Vector2 knobSize = Size("hud/joystick/knob", 68, 68);
             knob = Knob("Knob", ring, knobSize, _controlScale);
 
-            RectTransform sound = Panel("Sound Direction", root);
+            view.lineArt = new[]
+            {
+                Picture(ring.gameObject, sprites, "hud/joystick/ring", false),
+                Picture(knob.gameObject, sprites, "hud/joystick/knob", false),
+                Existing(root, "Equipment/Mannequin"),
+                Existing(root, "Equipment/Leader lines"),
+            }.Where(g => g != null).ToArray();
+
+            if (!_buildSoundCue) return;
+
+            RectTransform sound = Panel("Off-screen cue", root);
 
             Vector2 arcSize = Size("hud/sound/arc", 210, 62);
             RectTransform arc = Make("Arc", sound, 140, 572, arcSize.x, arcSize.y, 0f, 1f,
@@ -886,14 +994,6 @@ namespace GulagRunners.GameEditor
             view.cueArc = Picture(arc.gameObject, sprites, "hud/sound/arc", false);
             view.cueIcon = Picture(src.gameObject, sprites, "hud/sound/source-chest", false);
             view.cuePivot = arc;
-
-            view.lineArt = new[]
-            {
-                Picture(ring.gameObject, sprites, "hud/joystick/ring", false),
-                Picture(knob.gameObject, sprites, "hud/joystick/knob", false),
-                Existing(root, "Equipment Column/Mannequin"),
-                Existing(root, "Equipment Column/Leader lines"),
-            }.Where(g => g != null).ToArray();
         }
 
         void BuildControls(Transform root, Dictionary<string, Sprite> sprites, HudView view)

@@ -220,10 +220,41 @@ namespace GulagRunners.Game
                  "as hard and the match is about to be decided on health.")]
         public Graphic clock;
 
+        [Header("Names and the series")]
+        [Tooltip("Optional. The fighter's name beside their bar. Which one is blue already " +
+                 "says who you are; the names say who the OTHER one is, which is the half " +
+                 "of a 1v1 the interface was not answering at all.")]
+        public Graphic name1;
+
+        [Tooltip("Optional. See Name 1.")]
+        public Graphic name2;
+
+        [Tooltip("What those labels read until there is an account to ask. Typed here so " +
+                 "they can be set per scene without a build.")]
+        public string player1Name = "RUNNER_1";
+        public string player2Name = "RUNNER_2";
+
+        [Tooltip("Optional. \"ROUND 1 / 3\", under the clock. A match is a series of " +
+                 "rounds and nothing on screen said which one this was.")]
+        public Graphic roundLabel;
+
+        [Tooltip("Optional. One mark per round a fighter has to take to win the match, " +
+                 "lit as they take them. MatchState.roundsToWin decides how many.")]
+        public Graphic[] wins1 = Array.Empty<Graphic>();
+
+        [Tooltip("Optional. See Wins 1.")]
+        public Graphic[] wins2 = Array.Empty<Graphic>();
+
         [Header("Equipment column")]
         [Tooltip("One entry per square. Order on screen is yours; which slot each reads " +
                  "is the Slot field, not the position in this list.")]
         public HudSlot[] slots = Array.Empty<HudSlot>();
+
+        [Tooltip("How faintly an EMPTY slot shows the icon of what belongs in it.\n\n" +
+                 "Zero -- which is what it was -- leaves five blank squares, and a blank " +
+                 "square does not say whether it is a helmet slot or a belt slot. A ghost " +
+                 "of the thing that goes there says it without claiming anything is worn.")]
+        [Range(0f, 1f)] public float emptyIconAlpha = 0.32f;
 
         [Tooltip("Hits left in a weapon at which the slot starts pulsing danger-red. The " +
                  "same number PlayerLoadoutView uses for the weapon in the hand, so the " +
@@ -354,6 +385,7 @@ namespace GulagRunners.Game
             PaintBar(bar1, player1, localPlayer == 0);
             PaintBar(bar2, player2, localPlayer == 1);
             PaintClock();
+            PaintSeries();
             PaintColumn();
             PaintControls();
             PaintCue();
@@ -433,6 +465,57 @@ namespace GulagRunners.Game
             }
         }
 
+        /// <summary>
+        /// The names, the round, and how the match stands.
+        ///
+        /// All of it optional: a HUD with none of these wired paints nothing and costs
+        /// nothing, which is what lets the builder lay out a cut-down one.
+        /// </summary>
+        void PaintSeries()
+        {
+            Label(name1, player1Name);
+            Label(name2, player2Name);
+            Tint(name1, localPlayer == 0 ? palette.self : palette.enemy);
+            Tint(name2, localPlayer == 1 ? palette.self : palette.enemy);
+
+            int need = matchState != null ? Mathf.Max(1, matchState.roundsToWin) : 2;
+            int total = matchState != null ? matchState.RoundsInSeries : 3;
+            int round = matchState != null && Application.isPlaying
+                ? Mathf.Clamp(matchState.Match.Round, 1, total) : 1;
+
+            if (roundLabel != null)
+            {
+                Label(roundLabel, $"ROUND {round} / {total}");
+                Tint(roundLabel, palette.line);
+            }
+
+            PaintWins(wins1, 0, need);
+            PaintWins(wins2, 1, need);
+        }
+
+        void PaintWins(Graphic[] marks, int player, int need)
+        {
+            if (marks == null || marks.Length == 0) return;
+
+            int won = matchState != null && Application.isPlaying
+                ? matchState.Wins(player) : 0;
+            bool mine = player == localPlayer;
+            Color accent = mine ? palette.self : palette.enemy;
+
+            for (int i = 0; i < marks.Length; i++)
+            {
+                // A mark past what this match needs is not a round nobody has won yet, it
+                // is a mark that should not be on screen at all.
+                if (i >= need) { Tint(marks[i], Fade(accent, 0f)); continue; }
+                Tint(marks[i], i < won ? accent : Fade(accent, palette.spentAlpha));
+            }
+        }
+
+        static void Label(Graphic target, string text)
+        {
+            if (target is Text label && label.text != text) label.text = text;
+        }
+
         /// <summary>m:ss left of the match, or the mock's own number outside play mode.</summary>
         string ClockText()
         {
@@ -489,7 +572,8 @@ namespace GulagRunners.Game
 
                 Tint(slot.frame, colour);
                 Tint(slot.glow, Fade(colour, glow));
-                Tint(slot.icon, item == ItemId.None ? Fade(palette.line, 0f) : palette.line);
+                Tint(slot.icon, item == ItemId.None
+                                ? Fade(palette.line, emptyIconAlpha) : palette.line);
 
                 bool wouldSwap = live && offered != ItemKind.None && offered == slot.slot;
                 if (slot.swapArrow != null && slot.swapArrow.activeSelf != wouldSwap)
@@ -579,7 +663,7 @@ namespace GulagRunners.Game
                     square.sprite = slot.dashed;
                 Tint(slot.frame, palette.empty);
                 Tint(slot.glow, Fade(palette.empty, 0f));
-                Tint(slot.icon, Fade(palette.line, 0f));
+                Tint(slot.icon, Fade(palette.line, emptyIconAlpha));
                 if (slot.swapArrow != null && slot.swapArrow.activeSelf)
                     slot.swapArrow.SetActive(false);
             }
