@@ -96,6 +96,19 @@ namespace GulagRunners.Sim
         public int ComboPushPermille;
 
         /// <summary>
+        /// Every weapon's wind-up and recovery, in thousandths of the table's own numbers.
+        ///
+        /// One knob over the whole table, because the question it answers is about the
+        /// whole fight: can a player SEE the blow coming? A dagger wound up in 9 frames and
+        /// a pair of fists in 12 -- 0.15 and 0.20 s -- and human reaction to a visual cue is
+        /// about 0.25. At those speeds there is nothing to read and nothing to answer with,
+        /// which is most of why the fight felt like a blur rather than an exchange. Scaling
+        /// here rather than editing twelve rows keeps the weapons' relationship to each
+        /// other -- which is the design -- and makes the pace one number to tune.
+        /// </summary>
+        public int AttackFramesPermille;
+
+        /// <summary>
         /// The frames of initiative a clean hit is guaranteed to buy, whatever the weapon.
         ///
         /// Hitstun is raised to at least "what the attacker has left, plus this", so every
@@ -227,6 +240,7 @@ namespace GulagRunners.Sim
             c.ComboStunDecayPermille = 620;
             c.ComboStackFrames = 75;       // 1.25 s without being hit and the string is over
             c.ComboPushPermille = 300;
+            c.AttackFramesPermille = 1000;
 
             c.KnockbackSpeed = Fix.FromMilli(3200);
             c.HeavyKnockbackSpeed = Fix.FromMilli(6000);

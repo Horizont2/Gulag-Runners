@@ -189,6 +189,18 @@ namespace GulagRunners.Sim
         /// </summary>
         public bool AllowDodge;
 
+        /// <summary>
+        /// How far below the top of a ladder the climb-out may begin.
+        ///
+        /// Because the top of a ladder box sits ABOVE the floor it serves -- measured on
+        /// this arena, 6.6 cm above -- a climb-out that waits for the top is a climb-out
+        /// that goes DOWN, under a clip of a man hauling himself up. Starting it this far
+        /// below the top turns it back into a climb: the body rises into the landing
+        /// instead of sinking onto it, which is both what the clip shows and what the
+        /// player pressed up for.
+        /// </summary>
+        public Fix MantleRise;
+
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
@@ -275,9 +287,10 @@ namespace GulagRunners.Sim
             c.LaneReach      = Fix.FromMilli(2000);
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
             c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
-            c.MantleMinFrames = 26;                  // 0.43 s: long enough to read as a haul
+            c.MantleMinFrames = 32;                  // 0.53 s: a haul, and long enough not to outrun a sprint
             c.ScriptRiseMargin = Fix.FromMilli(120);   // 12 cm: a step, not a storey
             c.AllowDodge = false;
+            c.MantleRise = Fix.FromMilli(450);
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 

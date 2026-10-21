@@ -147,7 +147,7 @@ namespace GulagRunners.Sim
             ItemDef weapon = s.Inventory.WeaponDef;
             bool heavy = s.ComboIndex >= cfg.MaxCombo - 1;
 
-            int windup = weapon.AttackFrames;
+            int windup = Windup(in weapon, in cfg);
             if (heavy) windup = Scale(windup, cfg.HeavyTimingPermille);
 
             s.Attack = AttackPhase.Windup;
@@ -181,7 +181,7 @@ namespace GulagRunners.Sim
                 {
                     ItemDef weapon = s.Inventory.WeaponDef;
                     bool heavy = s.ComboIndex >= cfg.MaxCombo - 1;
-                    int recovery = Scale(weapon.AttackFrames, cfg.RecoveryPermille);
+                    int recovery = Scale(Windup(in weapon, in cfg), cfg.RecoveryPermille);
                     if (heavy) recovery = Scale(recovery, cfg.HeavyTimingPermille);
 
                     // Landed, so half of it is given back. A blow that connects has already
@@ -616,7 +616,8 @@ namespace GulagRunners.Sim
             if (s.Attack != AttackPhase.Active) return 0;
 
             bool heavy = s.ComboIndex >= cfg.MaxCombo - 1;
-            int recovery = Scale(s.Inventory.WeaponDef.AttackFrames, cfg.RecoveryPermille);
+            ItemDef w = s.Inventory.WeaponDef;
+            int recovery = Scale(Windup(in w, in cfg), cfg.RecoveryPermille);
             if (heavy) recovery = Scale(recovery, cfg.HeavyTimingPermille);
             if (cfg.HitRecoveryCutPermille > 0)
             {
@@ -627,6 +628,15 @@ namespace GulagRunners.Sim
             int left = s.AttackTimer - 1;
             if (left < 0) left = 0;
             return left + recovery;
+        }
+
+        /// <summary>The weapon's wind-up, after the one knob that paces the whole fight.</summary>
+        static int Windup(in ItemDef weapon, in CombatConfig cfg)
+        {
+            int frames = cfg.AttackFramesPermille > 0
+                ? Scale(weapon.AttackFrames, cfg.AttackFramesPermille)
+                : weapon.AttackFrames;
+            return frames > 0 ? frames : 1;
         }
 
         static int Scale(int value, int permille) => (int)(((long)value * permille) / 1000);

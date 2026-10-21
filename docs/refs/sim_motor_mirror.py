@@ -20,7 +20,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
          BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
-         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=26, RISEMARGIN=M(120), ALLOW_DODGE=False,
+         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=32, RISEMARGIN=M(120), ALLOW_DODGE=False, MANTLE_RISE=M(450),
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
@@ -825,13 +825,22 @@ def climb(s, wx, wy, w):
     s.vy = C["CUP"] if wy > 0 else (-C["CDN"] if wy < 0 else 0)
     move_y(s, mul(s.vy, DT), w, s.ladder)
     ceiling = l[3] - C["LTOP"]
-    at_top = s.y >= ceiling
-    if at_top:
+    if s.y >= ceiling:
         s.y = ceiling
         if s.vy > 0: s.vy = 0
+
+    # The climb-out may begin a little BELOW the top, and has to: the top of a ladder box
+    # stands above the floor it serves, so waiting for it makes the climb-out descend -- 9.8
+    # cm down on this arena's top ladder -- under a clip of a man hauling himself upwards.
+    at_top = s.y >= ceiling
+    # ...but the lower band is for somebody CLIMBING only. Asking to get out sideways is a
+    # thing you do hanging at the very top, and allowing it half a metre down caught the
+    # fighter stepping into the hatch holding left to climb DOWN.
+    finishing = s.y >= ceiling - C["MANTLE_RISE"]
+
     # A direction on its own counts as asking to get out, not only up: edging off the rungs
     # instead walks the body out over the hole it came up through.
-    if at_top and (wy > 0 or wx) and try_mantle(s, wx, s.ladder, w):
+    if ((wy > 0 and finishing) or (wx and at_top)) and try_mantle(s, wx, s.ladder, w):
         return
     if wy < 0 and grounded(s, w, s.ladder):
         s.ladder = -1; s.ladder_cd = C["LREGRAB"]

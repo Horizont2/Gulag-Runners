@@ -249,6 +249,14 @@ namespace GulagRunners.Game
                  "starts.")]
         public string nowPlaying;
 
+        [Tooltip("The last few states, newest first, with the frames each was held for.\n\n" +
+                 "Watch it while the thing that looks wrong happens. A clip that flickers " +
+                 "shows up here as two names alternating with tiny frame counts beside " +
+                 "them, which is the difference between knowing and guessing.")]
+        public string stateTrail = "";
+
+        int _heldFrames;
+
         [Tooltip("And on the fight layer, with its weight. Empty means the whole body is " +
                  "playing what is above.")]
         public string nowOnArms;
@@ -309,7 +317,13 @@ namespace GulagRunners.Game
             // arms. The split is for the case it was built for — a body already going
             // somewhere, whose legs have something of their own to say.
             bool moving = speed > idleThreshold;
-            bool split = splitUpperBody && upperLayer > 0 &&
+            // A climb-out owns the whole body. Fight() already declines to speak during one,
+            // but the layer can still be carrying weight from the frame before, and a
+            // half-faded pair of arms over a haul is one of the things that reads as the
+            // clip changing its mind half way through.
+            bool scripted = s.Mode == MoveMode.Mantling || s.Mode == MoveMode.Mounting;
+
+            bool split = !scripted && splitUpperBody && upperLayer > 0 &&
                          upperLayer < animator.layerCount && !string.IsNullOrEmpty(arms) &&
                          (moving || !fullBodyWhenStill);
 
@@ -318,6 +332,19 @@ namespace GulagRunners.Game
             Play(state, playback, scrub, fade);
 
             Arms(split ? arms : null, armScrub);
+
+            if (state != nowPlaying)
+            {
+                // What ACTUALLY changed, in order, with how long each one lasted. Read this
+                // in the inspector while the thing that looks wrong is happening: a clip
+                // that flickers shows up here as two names alternating with tiny frame
+                // counts beside them, which is the difference between knowing and guessing.
+                if (!string.IsNullOrEmpty(nowPlaying))
+                    stateTrail = $"{nowPlaying}({_heldFrames}) <- {stateTrail}";
+                if (stateTrail.Length > 160) stateTrail = stateTrail.Substring(0, 160);
+                _heldFrames = 0;
+            }
+            _heldFrames++;
 
             nowPlaying = state;
             nowOnArms = split && _upperWeight > 0.001f

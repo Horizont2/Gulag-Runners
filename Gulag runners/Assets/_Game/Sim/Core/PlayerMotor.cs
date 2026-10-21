@@ -749,12 +749,25 @@ namespace GulagRunners.Sim
             // ladder with nothing underneath — the hatch is a hole — so it fell, touched the
             // ladder again, re-grabbed, and climbed back out. That loop was the juddering.
             Fix ceiling = ladder.MaxY - cfg.LadderTopMargin;
-            bool atTop = s.Position.Y >= ceiling;
-            if (atTop)
+            if (s.Position.Y >= ceiling)
             {
                 s.Position.Y = ceiling;
                 if (s.Velocity.Y > Fix.Zero) s.Velocity.Y = Fix.Zero;
             }
+
+            // The climb-out may begin a little below the top, and has to. The top of a
+            // ladder box stands ABOVE the floor it serves, so a climb-out that waits for
+            // the top is a climb-out that DESCENDS -- 9.8 cm down on this arena's top
+            // ladder -- while the clip over it hauls a man upwards. Half a metre lower and
+            // the move is a climb again: the body rises into the landing rather than
+            // sinking onto it.
+            bool atTop = s.Position.Y >= ceiling;
+
+            // ...but only for somebody CLIMBING. Asking to get out sideways is a thing you
+            // do hanging at the very top over a hole, and allowing it half a metre lower
+            // caught the fighter the moment he stepped into the hatch holding left to climb
+            // DOWN -- it hauled him straight back out onto the floor he came from.
+            bool finishing = s.Position.Y >= ceiling - cfg.MantleRise;
 
             // At the top, climbing out onto the floor beside the hatch is automatic. Asking the
             // player to nudge sideways while hanging over a hole is not a mechanic, it is a trap.
@@ -766,7 +779,7 @@ namespace GulagRunners.Sim
             // sideways means "get me out this way", and the climb-out is the move that does it:
             // edging off the rungs instead walks the body out over the hole it came up through,
             // which is how a fighter ends up standing on air beside a hatch.
-            if (atTop && (wishY > 0 || wishX != 0) &&
+            if (((wishY > 0 && finishing) || (wishX != 0 && atTop)) &&
                 TryStartMantle(ref s, wishX, s.LadderIndex, world, cfg))
                 return;
 
