@@ -17,10 +17,21 @@ namespace GulagRunners.Game
     public sealed class HudPalette
     {
         [Header("Fighters")]
-        [Tooltip("Player 1. docs/02 wants the cold accent, and the same colour on the " +
-                 "fighter's rim light, so a bar and a body are read as one thing.")]
-        public Color player1 = new Color(0.302f, 0.851f, 0.902f);
-        public Color player2 = new Color(0.949f, 0.635f, 0.298f);
+        [Tooltip("The bar belonging to whoever is holding this phone. Blue on BOTH " +
+                 "screens.\n\n" +
+                 "The question a player asks the top of the screen, every match, in half " +
+                 "a second, is \"which one is me\". If the answer is the seat the server " +
+                 "happened to give them it has to be learned again every match, and under " +
+                 "pressure it is read wrong. Keyed to the viewer instead, it is never read " +
+                 "wrong, at the cost of the two players seeing mirrored colours -- which " +
+                 "neither of them can tell, because neither sees the other's screen.")]
+        public Color self = new Color(0.28f, 0.60f, 1f);
+
+        [Tooltip("The other fighter's bar. Red on both screens, for the same reason.\n\n" +
+                 "Deliberately a deeper red than Danger, so that an opponent dropping into " +
+                 "desperation still visibly BRIGHTENS rather than staying the red it " +
+                 "already was.")]
+        public Color enemy = new Color(0.82f, 0.18f, 0.22f);
 
         [Header("Interface")]
         [Tooltip("Every line of the interface. Alpha is carried here, not per element.")]
@@ -162,8 +173,17 @@ namespace GulagRunners.Game
                  "MatchState.Instance when empty.")]
         public MatchState matchState;
 
-        [Tooltip("Which fighter's equipment column is drawn. 0 is player one.")]
+        [Tooltip("Which fighter is holding THIS phone. 0 is player one.\n\n" +
+                 "Everything keyed to a point of view reads this: whose equipment column " +
+                 "is drawn, which bar is blue, and whose stamina is hidden.")]
         [Range(0, 1)] public int localPlayer;
+
+        [Tooltip("Hide the opponent's stamina charges. Their health is public -- a fight " +
+                 "where neither side can see the damage is not a fight -- but what they " +
+                 "have left to spend is not.\n\n" +
+                 "The pips stay in the scene and are painted to nothing, so switching this " +
+                 "off puts them straight back without rebuilding the HUD.")]
+        public bool hideOpponentStamina = true;
 
         [Header("Palette")]
         public HudPalette palette = new HudPalette();
@@ -222,8 +242,8 @@ namespace GulagRunners.Game
             if (!Application.isPlaying && !paintInEditMode) return;
             if (matchState == null) matchState = MatchState.Instance;
 
-            PaintBar(bar1, player1, palette.player1);
-            PaintBar(bar2, player2, palette.player2);
+            PaintBar(bar1, player1, localPlayer == 0);
+            PaintBar(bar2, player2, localPlayer == 1);
             PaintClock();
             PaintColumn();
             PaintControls();
@@ -233,9 +253,11 @@ namespace GulagRunners.Game
 
         // ---------------------------------------------------------------- the top bar
 
-        void PaintBar(HudBar bar, PlayerController player, Color accent)
+        void PaintBar(HudBar bar, PlayerController player, bool mine)
         {
             if (bar == null) return;
+
+            Color accent = mine ? palette.self : palette.enemy;
 
             int max = MaxHealth;
             int health = max;
@@ -251,7 +273,16 @@ namespace GulagRunners.Game
             // Desperation is a MECHANIC, not a mood: below this share docs/02 makes bare
             // hands hit 40% harder. A player who is not shown it finds out by losing.
             bool critical = health * 1000 <= max * DesperationPermille;
-            Color barColour = critical ? palette.danger : accent;
+
+            // Pulsed rather than simply recoloured, because the enemy bar is ALREADY red
+            // and a red bar turning a different red says nothing. Movement does: whichever
+            // bar it is, the one that starts breathing is the one near the threshold.
+            Color barColour = accent;
+            if (critical)
+            {
+                float beat = 0.5f + 0.5f * Mathf.Sin(Time.time * wornPulse * Mathf.PI * 2f);
+                barColour = Color.Lerp(accent, palette.danger, Mathf.Lerp(0.45f, 1f, beat));
+            }
 
             Tint(bar.frame, barColour);
             Tint(bar.fill, barColour);
@@ -264,8 +295,14 @@ namespace GulagRunners.Game
                     bar.fillRect.localScale = new Vector3(share, scale.y, scale.z);
             }
 
+            // What the opponent has left to spend is THEIR information. Shown, it turns
+            // every exchange into arithmetic: wait for the fourth pip to go and walk in.
+            // Hidden, the same read has to be made off their body and their mistakes,
+            // which is the fight docs/02 describes.
+            float visible = !mine && hideOpponentStamina ? 0f : 1f;
             for (int i = 0; i < bar.pips.Length; i++)
-                Tint(bar.pips[i], i < charges ? accent : Fade(accent, palette.spentAlpha));
+                Tint(bar.pips[i], Fade(i < charges ? accent : Fade(accent, palette.spentAlpha),
+                                       visible));
         }
 
         void PaintClock()
@@ -375,8 +412,8 @@ namespace GulagRunners.Game
         [ContextMenu("Paint everything to the starting colours")]
         public void PaintStartingColours()
         {
-            PaintBarAtStart(bar1, palette.player1);
-            PaintBarAtStart(bar2, palette.player2);
+            PaintBarAtStart(bar1, localPlayer == 0);
+            PaintBarAtStart(bar2, localPlayer == 1);
             Tint(clock, palette.line);
 
             foreach (HudSlot slot in slots)
@@ -397,9 +434,10 @@ namespace GulagRunners.Game
             foreach (Graphic g in lineArt) Tint(g, Fade(palette.line, lineArtAlpha));
         }
 
-        void PaintBarAtStart(HudBar bar, Color accent)
+        void PaintBarAtStart(HudBar bar, bool mine)
         {
             if (bar == null) return;
+            Color accent = mine ? palette.self : palette.enemy;
             Tint(bar.frame, accent);
             Tint(bar.fill, accent);
             if (bar.fillRect != null)
@@ -407,7 +445,8 @@ namespace GulagRunners.Game
                 Vector3 s = bar.fillRect.localScale;
                 bar.fillRect.localScale = new Vector3(1f, s.y, s.z);
             }
-            foreach (Graphic pip in bar.pips) Tint(pip, accent);
+            float visible = !mine && hideOpponentStamina ? 0f : 1f;
+            foreach (Graphic pip in bar.pips) Tint(pip, Fade(accent, visible));
         }
 
         /// <summary>Copies the rarity ramp out of the simulation's own palette.</summary>

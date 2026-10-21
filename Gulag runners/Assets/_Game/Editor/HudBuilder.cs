@@ -4,6 +4,8 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using GulagRunners.Game;
 using GulagRunners.Sim;
 
@@ -37,6 +39,26 @@ namespace GulagRunners.GameEditor
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
         readonly List<string> _unmatched = new List<string>();
         bool _scanned;
+
+        // What multiple of the design this export came out at, and the size each sprite
+        // therefore IS. Both are measured per build rather than typed in; see MeasureScale.
+        float _scale = 1f;
+        readonly Dictionary<string, Vector2> _size = new Dictionary<string, Vector2>();
+
+        // How big each cluster is built, against the Figma sheet.
+        //
+        // The sheet is a MOCK-UP: it was drawn to be read on a monitor at a glance, and
+        // the equipment column in particular was drawn large so a reviewer could see what
+        // each square meant. On a phone, in a fight, that column is 22% of the width and
+        // half the height of the screen, sitting on top of the arena.
+        //
+        // So the readouts come down and the controls do not. A touch target wants 9 mm
+        // (48dp): on a 6.5" landscape phone the 864-unit height is about 65 mm, so 9 mm is
+        // 120 units -- the attack ring at 154 is 11.5 mm, jump and block at 130 are 9.8,
+        // and shrinking them is how a HUD becomes pretty and unplayable.
+        float _readoutScale = 0.85f;
+        float _columnScale = 0.65f;
+        float _controlScale = 1f;
 
         [MenuItem("Tools/Gulag Runners/Build the combat HUD")]
         public static void Open()
@@ -108,6 +130,30 @@ namespace GulagRunners.GameEditor
 
             using (new EditorGUI.DisabledScope(_folder == null))
                 if (GUILayout.Button("Scan the folder", GUILayout.Height(24))) Scan();
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Size on screen", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "Against the Figma sheet, which was drawn to be reviewed on a monitor " +
+                "rather than played on a phone. Each cluster keeps the corner it is " +
+                "pinned to, so nothing walks off the edge.",
+                EditorStyles.wordWrappedMiniLabel);
+            _readoutScale = EditorGUILayout.Slider(
+                new GUIContent("Readouts", "Health bars, stamina, clock, sound arc."),
+                _readoutScale, 0.4f, 1.25f);
+            _columnScale = EditorGUILayout.Slider(
+                new GUIContent("Equipment column",
+                               "Mannequin, leader lines and the five squares. The mock " +
+                               "drew these large to be legible in review; at full size " +
+                               "they cover a fifth of the arena."),
+                _columnScale, 0.4f, 1.25f);
+            _controlScale = EditorGUILayout.Slider(
+                new GUIContent("Controls",
+                               "Joystick and the four buttons. 1 is the designed size, " +
+                               "which is about 10 mm on a 6.5\" phone — the smallest a " +
+                               "thumb target should be. Going below this trades a fight " +
+                               "for a screenshot."),
+                _controlScale, 0.4f, 1.25f);
 
             if (_scanned)
             {
@@ -307,14 +353,20 @@ namespace GulagRunners.GameEditor
             imp.textureCompression = TextureImporterCompression.Uncompressed;
             imp.wrapMode = TextureWrapMode.Clamp;
 
-            if (asset.Border != Vector4.zero)
-            {
-                // The border is quoted at 1x and the file is whatever scale it exported at,
-                // so it is scaled by the file rather than typed in twice.
-                Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-                float scale = tex != null && asset.W > 0 ? tex.width / asset.W : 1f;
-                imp.spriteBorder = asset.Border * scale;
-            }
+            // Pixels per unit, which was being left at the default 100.
+            //
+            // A nine-slice border is quoted in TEXTURE pixels, and uGUI divides it by
+            // spritePPU / canvasReferencePPU before drawing. At 100 against the canvas's
+            // own 100 that divisor is 1, so the 12 px corner of a square exported at 4x
+            // drew as a 48 UNIT corner -- four times the design, on every bar frame and
+            // every equipment square, which is most of why the HUD looked heavy. Set from
+            // the export scale it draws at 12, and the sprite's native size becomes its
+            // design size into the bargain.
+            imp.spritePixelsPerUnit = 100f * Mathf.Max(0.01f, _scale);
+
+            // The border is quoted at 1x and the file is whatever scale it exported at,
+            // so it is scaled by the export rather than typed in twice.
+            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * _scale;
 
             imp.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
@@ -343,9 +395,10 @@ namespace GulagRunners.GameEditor
 
                 string file = key.Substring(key.LastIndexOf('/') + 1);
                 string path = $"{dir}/{file}.png";
+                int at = Mathf.Max(1, Mathf.RoundToInt(_scale));
                 Texture2D tex = key == "hud/slot/glow"
-                    ? DrawGlow((int)asset.W, (int)asset.H, 4)
-                    : DrawLeaders((int)asset.W, (int)asset.H, 4, key.EndsWith("mirrored"));
+                    ? DrawGlow((int)asset.W, (int)asset.H, at)
+                    : DrawLeaders((int)asset.W, (int)asset.H, at, key.EndsWith("mirrored"));
 
                 File.WriteAllBytes(path, tex.EncodeToPNG());
                 Object.DestroyImmediate(tex);
@@ -434,13 +487,33 @@ namespace GulagRunners.GameEditor
         {
             List<string> generated = new List<string>();
             string sourceFolder = AssetDatabase.GetAssetPath(_folder);
+
+            // Measured BEFORE anything is drawn, so the two sprites this tool draws itself
+            // come out at the same multiple as the ones Figma sent.
+            _scale = MeasureScale();
             if (!string.IsNullOrEmpty(sourceFolder)) GenerateMissing(sourceFolder, generated);
 
+            _size.Clear();
             Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
+            List<string> odd = new List<string>();
             foreach (Asset a in Needed)
             {
                 Sprite s = Import(a);
-                if (s != null) sprites[a.Key] = s;
+                if (s == null) continue;
+                sprites[a.Key] = s;
+
+                // The design size is what the layout was drawn against; the file is what
+                // actually turned up. Where the two disagree the FILE wins. Forced into
+                // the design rect, a 444x213 export of a 210x62 frame is not a thin arc
+                // any more, it is a grey slab -- which is exactly what the sound
+                // indicator rendered as. The disagreement is reported, not swallowed.
+                Vector2 native = new Vector2(s.rect.width, s.rect.height) / _scale;
+                _size[a.Key] = native;
+                if (a.W > 0f && a.H > 0f &&
+                    (Mathf.Abs(native.x - a.W) > a.W * 0.02f ||
+                     Mathf.Abs(native.y - a.H) > a.H * 0.02f))
+                    odd.Add($"{a.Key} is {native.x:0}x{native.y:0}, not the {a.W:0}x{a.H:0} " +
+                            "the layout expected");
             }
 
             GameObject old = GameObject.Find(RootName);
@@ -456,18 +529,25 @@ namespace GulagRunners.GameEditor
             CanvasScaler scaler = rootGo.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(DesignW, DesignH);
-            // Matched on HEIGHT, not on 0.5: landscape phones vary in width and not in
-            // height, so matching height keeps a thumb-sized button thumb-sized and lets
-            // a wider screen simply show more empty floor at the edges.
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 1f;
+            // EXPAND, not matched on height.
+            //
+            // The design is a 20:9 sheet. Matched on height, a 16:9 screen gets a canvas
+            // 1536 units wide while every number in this file was written against 1920 --
+            // so the left column and the right controls slide 192 units towards each
+            // other and the HUD is cramped on the commonest screen there is. Expand never
+            // lets the canvas be smaller than the design in EITHER direction: the layout
+            // stays the layout, and a screen with room to spare simply shows more floor
+            // between the two clusters. It only works because every piece below is pinned
+            // to the edge it belongs to rather than to the top-left corner.
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
 
             HudView view = Undo.AddComponent<HudView>(rootGo);
 
             Transform root = rootGo.transform;
             BuildTopBar(root, sprites, view);
             BuildColumn(root, sprites, view);
-            BuildSoundAndStick(root, sprites, view);
+            BuildSoundAndStick(root, sprites, view, out RectTransform ring,
+                               out RectTransform knob);
             BuildControls(root, sprites, view);
 
             PlayerController[] fighters = Object.FindObjectsByType<PlayerController>(
@@ -476,6 +556,8 @@ namespace GulagRunners.GameEditor
             if (fighters.Length > 0) view.player1 = fighters[0];
             if (fighters.Length > 1) view.player2 = fighters[1];
             view.matchState = Object.FindFirstObjectByType<MatchState>();
+
+            string input = WireInput(view, ring, knob);
 
             view.PaintStartingColours();
             EditorUtility.SetDirty(view);
@@ -488,12 +570,52 @@ namespace GulagRunners.GameEditor
             string wired = fighters.Length >= 2
                 ? "Both fighters wired."
                 : $"{fighters.Length} fighter(s) in this scene — wire the rest by hand.";
+            string sizes = odd.Count > 0
+                ? "\nSized from the files rather than the layout, because they disagree:\n  " +
+                  string.Join("\n  ", odd) +
+                  "\nRe-export those frames at the same scale as the rest to get the " +
+                  "designed size back."
+                : "";
 
-            Debug.Log($"HUD: built from {sprites.Count} of {Needed.Length} sprites.{drew} " +
-                      wired +
+            Debug.Log($"HUD: built from {sprites.Count} of {Needed.Length} sprites at " +
+                      $"{_scale:0.##}x.{drew} " + wired + "\n" + input + sizes +
                       "\nThe clock is a Text with no font if this project has no legacy " +
                       "font; swap it for TMP and drop it back on HudView.Clock.", rootGo);
         }
+
+        /// <summary>
+        /// At what multiple of the design this folder was exported.
+        ///
+        /// One number for the whole export, taken as the one the most assets AGREE on
+        /// rather than averaged. An average is dragged off by a single frame Figma cropped
+        /// tight to its stroke, and surviving exactly that is the point: of the 29 assets
+        /// here, 27 came out at a clean 4x and two did not.
+        /// </summary>
+        float MeasureScale()
+        {
+            Dictionary<float, int> votes = new Dictionary<float, int>();
+            foreach (Asset a in Needed)
+            {
+                if (a.W <= 0f || !_found.TryGetValue(a.Key, out string path)) continue;
+                Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (tex == null) continue;
+
+                float v = Mathf.Round(tex.width / a.W * 4f) / 4f;   // to the nearest quarter
+                if (v <= 0f) continue;
+                votes.TryGetValue(v, out int n);
+                votes[v] = n + 1;
+            }
+
+            float best = 1f;
+            int bestVotes = 0;
+            foreach (KeyValuePair<float, int> kv in votes)
+                if (kv.Value > bestVotes) { bestVotes = kv.Value; best = kv.Key; }
+            return best;
+        }
+
+        /// <summary>The size a sprite actually is, in design units, or the design size.</summary>
+        Vector2 Size(string key, float w, float h) =>
+            _size.TryGetValue(key, out Vector2 v) ? v : new Vector2(w, h);
 
         // ---------------------------------------------------------------- pieces
 
@@ -501,18 +623,25 @@ namespace GulagRunners.GameEditor
         {
             RectTransform bar = Panel("Top Bar", root);
 
+            // Both bars start at the same distance from their own edge of the screen, and
+            // each fighter's charges start from the same end as their bar does. The mock
+            // had player two's row stopping 104 units short of the end of their bar --
+            // which reads, at a glance in a fight, as an opponent already a charge down.
+            float barWidth = Size("hud/bar/frame", 440, 32).x;
+
             view.bar1 = Bar(bar, sprites, "Health / P1", 134, 36, 0f, out RectTransform fill1);
             view.bar1.fillRect = fill1;
             view.bar1.pips = Pips(bar, sprites, "Stamina / P1", 134, 80, 0f);
 
             view.bar2 = Bar(bar, sprites, "Health / P2", 1346, 36, 1f, out RectTransform fill2);
             view.bar2.fillRect = fill2;
-            view.bar2.pips = Pips(bar, sprites, "Stamina / P2", 1682, 80, 1f);
+            view.bar2.pips = Pips(bar, sprites, "Stamina / P2", 1346 + barWidth, 80, 1f);
 
-            RectTransform clockRt = Make("Round Clock", bar, 840, 30, 240, 50, 0.5f);
+            RectTransform clockRt = Make("Round Clock", bar, 840, 30, 240, 50, 0.5f, 0f,
+                                         _readoutScale);
             Text clock = Undo.AddComponent<Text>(clockRt.gameObject);
             clock.text = "1:24";
-            clock.fontSize = 40;
+            clock.fontSize = Mathf.Max(8, Mathf.RoundToInt(40 * _readoutScale));
             clock.alignment = TextAnchor.UpperCenter;
             clock.raycastTarget = false;
             clock.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -522,14 +651,20 @@ namespace GulagRunners.GameEditor
         HudBar Bar(Transform parent, Dictionary<string, Sprite> sprites, string name,
                    float x, float y, float anchor, out RectTransform fillRt)
         {
-            RectTransform rt = Make(name, parent, x, y, 440, 32, anchor);
+            float k = _readoutScale;
+            Vector2 frameSize = Size("hud/bar/frame", 440, 32);
+            Vector2 fillSize = Size("hud/bar/fill", 424, 16);
+            Vector2 inset = (frameSize - fillSize) * 0.5f;
+
+            RectTransform rt = Make(name, parent, x, y, frameSize.x, frameSize.y, anchor, 0f, k);
             Image frame = Picture(rt.gameObject, sprites, "hud/bar/frame", true);
 
-            fillRt = Make("Fill", rt, 8, 8, 424, 16, 0f);
+            fillRt = Make("Fill", rt, inset.x, inset.y, fillSize.x, fillSize.y, 0f, 0f, k);
             // The bar empties from the side it is anchored to, so the two drain towards
             // the middle of the screen rather than both towards the left.
             fillRt.pivot = new Vector2(anchor >= 0.5f ? 1f : 0f, 1f);
-            fillRt.anchoredPosition = new Vector2(anchor >= 0.5f ? 432 : 8, -8);
+            fillRt.anchoredPosition = new Vector2(
+                anchor >= 0.5f ? inset.x + fillSize.x : inset.x, -inset.y) * k;
             Image fill = Picture(fillRt.gameObject, sprites, "hud/bar/fill", true);
 
             return new HudBar { frame = frame, fill = fill };
@@ -538,14 +673,18 @@ namespace GulagRunners.GameEditor
         Graphic[] Pips(Transform parent, Dictionary<string, Sprite> sprites, string name,
                        float x, float y, float anchor)
         {
-            const int count = 4, size = 20, gap = 8;
+            float k = _readoutScale;
+            const int count = 4;
+            const float gap = 8f;
+            float size = Size("hud/pip", 20, 20).x;
             float width = count * size + (count - 1) * gap;
+
             RectTransform row = Make(name, parent, anchor >= 0.5f ? x - width : x, y,
-                                     width, size, anchor);
+                                     width, size, anchor, 0f, k);
             Graphic[] pips = new Graphic[count];
             for (int i = 0; i < count; i++)
             {
-                RectTransform p = Make($"pip {i + 1}", row, i * (size + gap), 0, size, size, 0f);
+                RectTransform p = Make($"pip {i + 1}", row, i * (size + gap), 0, size, size, 0f, 0f, k);
                 pips[i] = Picture(p.gameObject, sprites, "hud/pip", false);
             }
             return pips;
@@ -554,10 +693,16 @@ namespace GulagRunners.GameEditor
         void BuildColumn(Transform root, Dictionary<string, Sprite> sprites, HudView view)
         {
             RectTransform column = Panel("Equipment Column", root);
+            float k = _columnScale;
 
-            RectTransform man = Make("Mannequin", column, 150, 180, 150, 330, 0f);
+            Vector2 manSize = Size("hud/mannequin", 150, 330);
+            RectTransform man = Make("Mannequin", column, 150, 180, manSize.x, manSize.y, 0f,
+                                     0f, k);
             Picture(man.gameObject, sprites, "hud/mannequin", false);
-            RectTransform lead = Make("Leader lines", column, 210, 180, 115, 350, 0f);
+
+            Vector2 leadSize = Size("hud/leaders", 115, 350);
+            RectTransform lead = Make("Leader lines", column, 210, 180,
+                                      leadSize.x, leadSize.y, 0f, 0f, k);
             Picture(lead.gameObject, sprites, "hud/leaders", false);
 
             (string name, ItemKind kind, string icon, float y, bool empty)[] rows =
@@ -569,27 +714,38 @@ namespace GulagRunners.GameEditor
                 ("Slot / Utility", ItemKind.Utility, null,                 480, true),
             };
 
+            Vector2 square = Size("hud/slot/frame", 64, 64);
+            Vector2 halo = Size("hud/slot/glow", 160, 160);
+            Vector2 iconSize = Size("hud/icon/coif", 32, 32);
+            Vector2 swapSize = Size("hud/slot/swap-arrow", 18, 18);
+
             List<HudSlot> slots = new List<HudSlot>();
             foreach (var row in rows)
             {
                 // A container with no Image of its own. uGUI draws a parent BEFORE its
                 // children, so putting the square on the container would have left the
                 // halo — its own child — painted over the top of it.
-                RectTransform rt = Make(row.name, column, 320, row.y, 64, 64, 0f);
+                RectTransform rt = Make(row.name, column, 320, row.y, square.x, square.y, 0f, 0f, k);
 
                 // Sibling order is draw order: halo behind the square, square behind the
-                // item, swap arrow over all of it.
-                RectTransform glowRt = Make("Glow", rt, -48, -48, 160, 160, 0f);
+                // item, swap arrow over all of it. The halo is centred on the square
+                // whatever the two were exported at.
+                Vector2 off = (square - halo) * 0.5f;
+                RectTransform glowRt = Make("Glow", rt, off.x, off.y, halo.x, halo.y, 0f, 0f, k);
                 Image glow = Picture(glowRt.gameObject, sprites, "hud/slot/glow", false);
 
-                RectTransform frameRt = Make("Frame", rt, 0, 0, 64, 64, 0f);
+                RectTransform frameRt = Make("Frame", rt, 0, 0, square.x, square.y, 0f, 0f, k);
                 Image frame = Picture(frameRt.gameObject, sprites,
                                       row.empty ? "hud/slot/frame-dashed" : "hud/slot/frame", true);
 
-                RectTransform iconRt = Make("Icon", rt, 16, 16, 32, 32, 0f);
+                Vector2 icoOff = (square - iconSize) * 0.5f;
+                RectTransform iconRt = Make("Icon", rt, icoOff.x, icoOff.y,
+                                            iconSize.x, iconSize.y, 0f, 0f, k);
                 Image icon = Picture(iconRt.gameObject, sprites, row.icon, false);
 
-                RectTransform swapRt = Make("Swap arrow", rt, 44, -6, 18, 18, 0f);
+                RectTransform swapRt = Make("Swap arrow", rt, square.x - swapSize.x * 1.1f,
+                                            -swapSize.y / 3f, swapSize.x, swapSize.y,
+                                            0f, 0f, k);
                 Picture(swapRt.gameObject, sprites, "hud/slot/swap-arrow", false);
                 swapRt.gameObject.SetActive(false);
 
@@ -602,15 +758,46 @@ namespace GulagRunners.GameEditor
             view.slots = slots.ToArray();
         }
 
-        void BuildSoundAndStick(Transform root, Dictionary<string, Sprite> sprites, HudView view)
+        void BuildSoundAndStick(Transform root, Dictionary<string, Sprite> sprites,
+                                HudView view, out RectTransform ring, out RectTransform knob)
         {
-            RectTransform sound = Panel("Sound Direction", root);
-            RectTransform arc = Make("Arc", sound, 140, 572, 210, 62, 0f);
-            RectTransform src = Make("Source / chest", sound, 228, 558, 46, 46, 0f);
-
             RectTransform stick = Panel("Joystick", root);
-            RectTransform ring = Make("Ring", stick, 148, 648, 200, 200, 0f);
-            RectTransform knob = Make("Knob", stick, 256, 676, 68, 68, 0f);
+
+            // Pivot in the MIDDLE, unlike everything else here: VirtualJoystick measures
+            // the thumb against local zero, and local zero is the pivot. Left top-left,
+            // a stick pushed to its centre would read as pushed down and right.
+            Vector2 ringSize = Size("hud/joystick/ring", 200, 200);
+            ring = Centred(Make("Ring", stick, 148, 648, ringSize.x, ringSize.y, 0f, 1f,
+                                _controlScale));
+
+            Vector2 knobSize = Size("hud/joystick/knob", 68, 68);
+            knob = Knob("Knob", ring, knobSize, _controlScale);
+
+            RectTransform sound = Panel("Sound Direction", root);
+
+            Vector2 arcSize = Size("hud/sound/arc", 210, 62);
+            RectTransform arc = Make("Arc", sound, 140, 572, arcSize.x, arcSize.y, 0f, 1f,
+                                     _readoutScale);
+
+            // Then PUT BACK on the stick, because the two are pinned to the same bottom
+            // edge and scaled by different numbers: shrink the readouts alone and the arc
+            // walks down until it is sitting inside the joystick. Its place belongs to
+            // the stick, not to the design sheet — eight units left of it and fourteen
+            // above it, which is where the sheet had them.
+            float gap = 14f * _readoutScale;
+            float ringLeft = ring.anchoredPosition.x - ring.sizeDelta.x * 0.5f;
+            float ringTop = ring.anchoredPosition.y + ring.sizeDelta.y * 0.5f;
+            arc.anchoredPosition = new Vector2(ringLeft - 8f * _readoutScale,
+                                               ringTop + gap + arc.sizeDelta.y);
+
+            // The chest rides ON the arc at the fraction of it the design put it at —
+            // 42% along and a fifth of its height above — so the pair keeps its shape
+            // whatever scale the two were exported at, which for these two is not the
+            // scale everything else came out at.
+            Vector2 chestSize = Size("hud/sound/source-chest", 46, 46);
+            RectTransform src = Make("Source / chest", arc, arcSize.x * 0.419f,
+                                     -arcSize.y * 0.226f, chestSize.x, chestSize.y, 0f,
+                                     0f, _readoutScale);
 
             view.lineArt = new[]
             {
@@ -628,27 +815,115 @@ namespace GulagRunners.GameEditor
             RectTransform controls = Panel("Controls", root);
 
             view.jump = Button(controls, sprites, "Button / Jump", "hud/button/ring-130",
-                               "hud/button/glyph-jump", 1576, 558, 130, 56);
+                               "hud/button/glyph-jump", 1576, 558);
             view.block = Button(controls, sprites, "Button / Block", "hud/button/ring-130",
-                                "hud/button/glyph-block", 1715, 525, 130, 56);
+                                "hud/button/glyph-block", 1715, 525);
             view.action = Button(controls, sprites, "Button / Action", "hud/button/ring-101",
-                                 "hud/button/glyph-action", 1534, 698, 101, 44);
+                                 "hud/button/glyph-action", 1534, 698);
+            // Last, so it is drawn on top and wins the raycast where its square overlaps
+            // the jump ring's. A thumb that lands between them gets attack, which is the
+            // forgiving way round in a fight.
             view.attack = Button(controls, sprites, "Button / Attack", "hud/button/ring-154",
-                                 "hud/button/glyph-attack", 1687, 675, 154, 66);
+                                 "hud/button/glyph-attack", 1687, 675);
         }
 
         HudButton Button(Transform parent, Dictionary<string, Sprite> sprites, string name,
-                         string ringKey, string glyphKey, float x, float y, float size,
-                         float glyphSize)
+                         string ringKey, string glyphKey, float x, float y)
         {
-            RectTransform rt = Make(name, parent, x, y, size, size, 1f);
+            Vector2 size = Size(ringKey, 130, 130);
+            Vector2 glyphSize = Size(glyphKey, 48, 48);
+
+            RectTransform rt = Make(name, parent, x, y, size.x, size.y, 1f, 1f,
+                                    _controlScale);
             Image ring = Picture(rt.gameObject, sprites, ringKey, false);
 
-            float inset = (size - glyphSize) * 0.5f;
-            RectTransform g = Make("Glyph", rt, inset, inset, glyphSize, glyphSize, 0f);
+            Vector2 inset = (size - glyphSize) * 0.5f;
+            RectTransform g = Make("Glyph", rt, inset.x, inset.y,
+                                   glyphSize.x, glyphSize.y, 0f, 0f, _controlScale);
             Image glyph = Picture(g.gameObject, sprites, glyphKey, false);
 
             return new HudButton { ring = ring, glyph = glyph };
+        }
+
+        // ---------------------------------------------------------------- the controls work
+
+        /// <summary>
+        /// Makes the four rings and the stick actually DO something.
+        ///
+        /// Until this existed the HUD was a painting of a HUD: every Image had
+        /// raycastTarget off, the scene had no EventSystem, and the TouchInputSource that
+        /// both fighter prefabs already carry had all five of its slots empty. No control
+        /// could be pressed, even in principle, and nothing said so.
+        ///
+        /// Nothing new is invented here. VirtualJoystick, VirtualButton and
+        /// TouchInputSource are the components of docs/02; this hangs two of them on the
+        /// objects that were drawn for them and fills in the third, on the fighter the
+        /// HUD is being drawn FOR. Player two's own TouchInputSource is left alone: on a
+        /// phone the opponent is on their own device with their own HUD, and in the
+        /// editor they are driven by the keyboard half of DeviceInputSource.
+        /// </summary>
+        string WireInput(HudView view, RectTransform ring, RectTransform knob)
+        {
+            EnsureEventSystem();
+
+            PlayerController owner = view.localPlayer == 0 ? view.player1 : view.player2;
+            if (owner == null)
+                return "No local fighter in this scene, so the stick and the buttons are " +
+                       "drawn but not read. Drop one on HudView and run this again.";
+
+            TouchInputSource touch = owner.GetComponentInChildren<TouchInputSource>(true);
+            if (touch == null)
+                return $"{owner.name} has no TouchInputSource. The stick and the buttons " +
+                       "are drawn but nothing reads them — add one to the fighter prefab " +
+                       "and run this again.";
+
+            Undo.RecordObject(touch, "Build HUD");
+
+            if (ring != null)
+            {
+                VirtualJoystick js = Undo.AddComponent<VirtualJoystick>(ring.gameObject);
+                js.knob = knob;
+                // Full push when the KNOB reaches the ring, not when the thumb does, so
+                // the thing on screen agrees with the number being read.
+                js.radius = Mathf.Max(1f, (ring.sizeDelta.x - (knob != null
+                                           ? knob.sizeDelta.x : 0f)) * 0.5f);
+                js.floating = false;
+                Graphic g = ring.GetComponent<Graphic>();
+                if (g != null) g.raycastTarget = true;
+                touch.stick = js;
+            }
+
+            touch.attackButton = Hit(view.attack);
+            // The block ring drives DODGE, and that is not a slip: docs/02 gives the
+            // fighter one defensive button, and that one flag is a guard standing still
+            // and a dodge with a direction held.
+            touch.dodgeButton = Hit(view.block);
+            touch.actionButton = Hit(view.action);
+            touch.jumpButton = Hit(view.jump);
+            EditorUtility.SetDirty(touch);
+
+            return $"Stick and four buttons wired into {owner.name}'s TouchInputSource.";
+        }
+
+        static VirtualButton Hit(HudButton button)
+        {
+            if (button == null || button.ring == null) return null;
+            button.ring.raycastTarget = true;
+            return Undo.AddComponent<VirtualButton>(button.ring.gameObject);
+        }
+
+        /// <summary>
+        /// A canvas with no EventSystem in the scene receives no taps at all, and says
+        /// nothing about it: the buttons simply never fire. This project is on the Input
+        /// System package, so the module has to be its own — StandaloneInputModule reads
+        /// the old UnityEngine.Input and throws the moment it is touched.
+        /// </summary>
+        static void EnsureEventSystem()
+        {
+            if (Object.FindFirstObjectByType<EventSystem>() != null) return;
+            GameObject go = new GameObject("EventSystem", typeof(EventSystem),
+                                           typeof(InputSystemUIInputModule));
+            Undo.RegisterCreatedObjectUndo(go, "Build HUD");
         }
 
         // ---------------------------------------------------------------- plumbing
@@ -668,21 +943,73 @@ namespace GulagRunners.GameEditor
         /// <summary>
         /// One rect at the coordinates it has in the design.
         ///
-        /// Pivot top-left and anchor top-left-ish, so the Figma number goes in unchanged:
-        /// the canvas is matched on height, so only X ever moves, and anchorX is which
-        /// edge this piece belongs to — 0 for the left of the screen, 1 for the right.
+        /// The design is a 1920x864 sheet with its origin top-left; the canvas it lands on
+        /// is at least that and usually bigger. So a Figma number only means anything as a
+        /// distance from an EDGE: anchorX says which side of the screen the piece belongs
+        /// to (0 left, 0.5 centre, 1 right) and vAnchor which end (0 top, 1 bottom), and
+        /// the design coordinate becomes a distance from it.
+        ///
+        /// Everything used to hang off the top. That was invisible while the canvas was
+        /// exactly 864 units tall and wrong the moment it was not — the joystick and the
+        /// four buttons would float in the middle of a taller screen with a hand's width
+        /// of nothing underneath them, which is where the canvas change above puts them.
+        ///
+        /// Children pass anchorX 0 and vAnchor 0 and are simply offset from their parent's
+        /// top-left, which is what the subtraction below degenerates to.
         /// </summary>
         static RectTransform Make(string name, Transform parent, float fx, float fy,
-                                  float w, float h, float anchorX)
+                                  float w, float h, float anchorX, float vAnchor = 0f,
+                                  float k = 1f)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
             Undo.RegisterCreatedObjectUndo(go, "Build HUD");
             RectTransform rt = (RectTransform)go.transform;
             rt.SetParent(parent, false);
-            rt.anchorMin = rt.anchorMax = new Vector2(anchorX, 1f);
+            rt.anchorMin = rt.anchorMax = new Vector2(anchorX, 1f - vAnchor);
             rt.pivot = new Vector2(0f, 1f);
-            rt.sizeDelta = new Vector2(w, h);
-            rt.anchoredPosition = new Vector2(fx - anchorX * DesignW, -fy);
+
+            // Scaling the offset AND the size by the same number is all a cluster scale
+            // needs, whichever corner it is pinned to -- because the offset is already
+            // measured from that corner. The far edge of a right-anchored piece sits at
+            // -(offset + width) from the screen edge, so scaling both scales that too;
+            // the same holds for a bottom-anchored one, and a centred one keeps its
+            // distance from the middle. localScale would have done it as well and would
+            // have scaled the children twice, since each child is scaled here already.
+            rt.sizeDelta = new Vector2(w, h) * k;
+            rt.anchoredPosition = new Vector2(fx - anchorX * DesignW,
+                                              vAnchor > 0.5f ? DesignH - fy : -fy) * k;
+            return rt;
+        }
+
+        /// <summary>Moves a top-left rect onto a centre pivot without moving it on screen.</summary>
+        static RectTransform Centred(RectTransform rt)
+        {
+            Vector2 size = rt.sizeDelta;
+            Vector2 p = rt.anchoredPosition;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(p.x + size.x * 0.5f, p.y - size.y * 0.5f);
+            return rt;
+        }
+
+        /// <summary>
+        /// The thumb, centred in the ring and a child of it.
+        ///
+        /// Both matter. VirtualJoystick drives the knob by writing anchoredPosition, so
+        /// the knob has to be anchored to the ring's centre or every push is measured from
+        /// the wrong place; and the mock had it drawn up and to the right, which is a
+        /// stick already being held.
+        /// </summary>
+        static RectTransform Knob(string name, RectTransform ring, Vector2 size,
+                                  float k)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            Undo.RegisterCreatedObjectUndo(go, "Build HUD");
+            RectTransform rt = (RectTransform)go.transform;
+            rt.SetParent(ring, false);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = size * k;
+            rt.anchoredPosition = Vector2.zero;
             return rt;
         }
 
@@ -701,9 +1028,12 @@ namespace GulagRunners.GameEditor
 
             if (key != null && sprites.TryGetValue(key, out Sprite s)) image.sprite = s;
             image.type = sliced ? Image.Type.Sliced : Image.Type.Simple;
-            // Nothing in the HUD art takes touches: the controls are driven by the input
-            // components of docs/02, and an Image that eats a tap is a button that stops
-            // working the day somebody drags it over the joystick.
+            // Art never decides its own shape: every rect is sized from the sprite now, so
+            // preserveAspect would only letterbox something already the right shape.
+            image.preserveAspect = false;
+            // Off by default. WireInput switches it back on for the five things that are
+            // actually controls — an Image that eats a tap is a button that stops working
+            // the day somebody drags a decoration over it.
             image.raycastTarget = false;
             return image;
         }
