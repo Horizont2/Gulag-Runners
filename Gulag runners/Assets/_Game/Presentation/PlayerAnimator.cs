@@ -729,8 +729,20 @@ namespace GulagRunners.Game
             // read straight off the tick counter steps at 60 Hz beside a body that flows,
             // and runs a whole tick in front of it. On a wind-up that is a swing arriving
             // before the arm does, in nineteen visible steps.
+            //
+            // Over total-1 and not over total, which is the whole of why swings used to
+            // jump at the end. A phase of N ticks is sampled at its tick boundaries, so
+            // there are N-1 intervals between the first pose and the last; dividing by N
+            // leaves the last one unspent and the clip stops short of its final frame.
+            // Measured: a four-tick recovery ended at 90% of the clip, an eight-tick one
+            // at 95%. What sits in that missing tail is the follow-through — the part
+            // that puts the arms back to neutral — so the layer faded out from a pose the
+            // animation never resolved, in the 0.08 s of upperFade, and that read as a
+            // snap. It was worst on the swings that LAND, because a connected hit halves
+            // the recovery (CombatConfig.HitRecoveryCutPermille) and a shorter phase
+            // loses a bigger share of the clip.
             float within = Mathf.Clamp01(
-                (total - s.AttackTimer - 1 + player.Alpha) / total);
+                (total - s.AttackTimer - 1 + player.Alpha) / Mathf.Max(1, total - 1));
 
             float hit = Mathf.Clamp01(attackContactStart);
             float done = Mathf.Clamp(attackContactEnd, hit, 1f);
