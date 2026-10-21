@@ -20,7 +20,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
          BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
-         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=32, RISEMARGIN=M(120), ALLOW_DODGE=False, MANTLE_RISE=M(450),
+         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=32, RISEMARGIN=M(120), ALLOW_DODGE=False, MANTLE_RISE=M(450), LADDER_JUMP=False,
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
@@ -38,6 +38,7 @@ class S:
         s.ladder_cd = 0
         s.hitstop = 0; s.recoil_t = 0
         s.script_t = 0; s.script_frames = 0; s.script_dir = 1; s.script_rises = False
+        s.script_rise_share = ONE//2
         s.script_from = (0,0); s.script_to = (0,0)
         s.script_from_depth = s.script_to_depth = 0
         s.script_forward = False
@@ -649,6 +650,8 @@ def try_mount(s, wy, w):
     return True
 
 def step_scripted(s, w):
+    if s.mode == "mount" and s.buf > 0 and not C["LADDER_JUMP"]:
+        s.buf = 0
     if s.mode == "mount" and s.buf > 0:
         s.buf = 0; s.script_t = 0; s.ladder = -1; s.ladder_cd = C["LREGRAB"]
         s.mode = "air"; s.vx = 0; s.vy = C["JUMP"]; s.noise = 1
@@ -671,17 +674,18 @@ def step_scripted(s, w):
     t = (ONE*done)//total
     def ss(v):
         v = max(0, min(ONE, v)); return mul(mul(v,v), 3*ONE - 2*v)
+    def eo(v):
+        v = max(0, min(ONE, v)); left = ONE - v; return ONE - mul(left, left)
     if s.mode == "mount":
         xT = ss(t); yT = xT
     else:
-        # The axis that actually TRAVELS gets the whole window; the other leads inside it.
-        # Fixed at "Y over the first two thirds, X over the last seven tenths" the top
-        # hatch climb-out crept for ten frames under 0.4 m/s then slid 1.1 m at 4.71 m/s.
-        across = abs(s.script_to[0]-s.script_from[0]) >= abs(s.script_to[1]-s.script_from[1])
-        wide = ss(t)
-        lead = ss(t*10//7)
-        xT = wide if across else ss((t - M(300))*10//7)
-        yT = lead if across else wide
+        # UP FIRST, ALL THE WAY, THEN ACROSS. The halves may not overlap: a scripted move
+        # writes the position straight out with no collision behind it, so sideways travel
+        # taken before the body has cleared the floor goes THROUGH the slab beside the
+        # hatch -- checked across every ladder, 54 climb-out paths did exactly that.
+        rise = min(max(s.script_rise_share, M(50)), M(950))
+        yT = eo(min(ONE, max(0, (ONE*t)//rise)))          # ease OUT: already moving upward
+        xT = 0 if t <= rise else ss(min(ONE, max(0, (ONE*(t-rise))//(ONE-rise))))
     s.x = s.script_from[0] + mul(s.script_to[0]-s.script_from[0], xT)
     s.y = s.script_from[1] + mul(s.script_to[1]-s.script_from[1], yT)
     # Depth rides with the height: the fighter leans back onto the next floor as they come up
@@ -748,6 +752,12 @@ def step_out(s, ladder, w):
     if top is None: return None
     return (s.x, top+SKIN, lane)
 
+def frames_at(distance, speed):
+    """Frames to cover a distance at a speed."""
+    if speed <= 0: return 1
+    return max(1, ((ONE*distance)//speed * 60) // ONE)
+
+
 def start_scripted(s, landing, side, to_depth=None):
     s.script_from=(s.x,s.y); s.script_to=(landing[0], landing[1])
     s.script_from_depth = s.depth
@@ -761,12 +771,18 @@ def start_scripted(s, landing, side, to_depth=None):
     # flush to it, so a climb-out raises the body ~4 cm and moves it ~45 cm backwards. Timed
     # on x and y alone that is 4 cm of travel, which lands on the ten-frame minimum: a sixth
     # of a second for 0.45 m, faster than a run, with an 0.83 s haul clip crammed into it.
-    span_z = abs(s.script_to_depth - s.script_from_depth)*3//2
-    frames = frames_for(max(span_z, span_x, span_y)) or C["SMINF"]
-    # And a haul is not a step: the minimum it shared with the reach onto a ladder is too
-    # short to read as one.
-    frames = max(frames, C["MANTLE_MINF"])
+    # EACH PHASE IS SIZED BY THE SPEED IT HAS TO MEET. The rise runs straight out of a
+    # climb, which is a CONSTANT 2 m/s; eased in from rest the body went 2.00 m/s on its
+    # last climbing tick and 0.22 on its first hauling one. An ease-OUT opens at twice its
+    # average, so two spans' worth of climb time opens it at exactly the climb's own speed.
+    climb = C["CUP"] if C["CUP"] > 0 else C["RUN"]
+    rise_frames = frames_at(abs(s.script_to[1]-s.script_from[1])*2, climb)
+    across = max(abs(s.script_to[0]-s.script_from[0]),
+                 abs(s.script_to_depth - s.script_from_depth))
+    across_frames = frames_at(across*3//2, C["RUN"])
+    frames = max(rise_frames + across_frames, C["MANTLE_MINF"])
     s.script_frames=frames; s.script_t=frames
+    s.script_rise_share = (ONE*rise_frames)//frames if frames else ONE//2
     # Does this climb-out actually go UP? A ladder whose head is flush with its platform
     # leaves the body slightly ABOVE the floor it steps onto, so the move descends, and a
     # haul clip over a descent is a man pulling himself up while he sinks.
@@ -807,6 +823,9 @@ def ground_below(x, y, maxd, w, depth):
     return best
 
 def climb(s, wx, wy, w):
+    # Jump does not leave a ladder: see MoveConfig.AllowLadderJump.
+    if s.buf > 0 and not C["LADDER_JUMP"]: s.buf = 0
+
     if s.buf > 0:
         s.buf = 0; s.mode = "air"; s.ladder = -1; s.ladder_cd = C["LREGRAB"]
         s.vx = C["RUN"]*wx; s.vy = C["JUMP"]; s.noise = 1; return

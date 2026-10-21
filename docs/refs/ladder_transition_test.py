@@ -16,7 +16,7 @@ to check that the first and last ticks of a move are much smaller than its middl
 Run against the exact geometry ArenaBuilder generates (arena_geometry)."""
 import sim_motor_mirror as M
 from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, JMP
-from arena_geometry import floor_h, ladder_x, world
+from arena_geometry import floor_h, ladder_x, world, floors
 
 W = world()
 RUN_STEP = F(M.mul(C["RUN"], M.DT))          # the body's own top walking step
@@ -150,10 +150,15 @@ peak = worst(ticks) * 60
 check("the climb-out never outruns a sprint", peak <= RUN * 1.15,
       f"peak {peak:.2f} m/s against a run of {RUN:.2f}")
 
-mantle = [(dx * dx + dy * dy) ** 0.5 for dx, dy, mode in ticks if mode == "mantle"]
-still = sum(1 for d in mantle if d * 60 < 0.5)
-check("and does not stall inside itself either", still <= 3,
-      f"{still} near-still tick(s) in the move")
+# What reads as a jerk is not slowness, it is a sudden CHANGE of speed -- and the worst one
+# was at the seam, where the body left a 2.00 m/s climb and began the haul at 0.22. A
+# climb-out turns from rising to stepping across, so it passes through nearly nothing in the
+# middle on purpose; what it must not do is jump.
+speeds = [(dx * dx + dy * dy) ** 0.5 * 60 for dx, dy, mode in ticks
+          if mode in ("ladder", "mantle")]
+worst_jump = max(abs(speeds[i + 1] - speeds[i]) for i in range(len(speeds) - 1))
+check("and never changes speed abruptly, the seam included", worst_jump <= 0.6,
+      f"biggest change between ticks {worst_jump:.2f} m/s")
 
 print("\n7. nothing flickers")
 s = settle(ladder_x(0), 0.9)
@@ -166,12 +171,18 @@ ticks, modes = record(s, UP, 120)
 check("holding up beside a hatch does not grab the ladder you just left",
       modes == ["ground"], f"modes={modes}")
 
-print("\n8. a ladder is never a trap")
+# Jump used to launch a climbing fighter off the rungs at full jump speed, on the rule that
+# a player must never be trapped on a ladder. They are not trapped: a direction at the top
+# climbs out, a direction in the middle steps off to whichever side has floor, and down at
+# the bottom lets go. What jump did was neither something anybody presses on purpose half
+# way up a ladder nor something that reads as anything but a glitch.
+print("\n8. jump does not leave a ladder, and a ladder is still not a trap")
 s = settle(ladder_x(0) + 0.45, 0.9)
 record(s, UP, 3)                                 # mid-grab
 check("mid-grab", s.mode == "mount", f"mode={s.mode}")
 ticks, modes = record(s, UP | JMP, 10)
-check("a jump during the grab lets go, and stays gone", modes == ["mount", "air"], f"modes={modes}")
+check("a jump during the grab is ignored: the rungs keep him",
+      "air" not in modes, f"modes={modes}")
 check("and no tick on foot during that is a jump", worst(ticks) <= JERK,
       f"worst {worst(ticks):.3f} m/tick")
 
@@ -179,7 +190,7 @@ s = settle(ladder_x(0), 0.9)
 record(s, UP, 60)                                # well up the ladder
 check("climbing", s.mode == "ladder", f"mode={s.mode}")
 ticks, modes = record(s, UP | JMP, 12)
-check("jumping off a ladder with up still held does not re-grab it", modes == ["ladder", "air"],
+check("and jumping mid-climb is ignored too", "air" not in modes,
       f"modes={modes}")
 
 print("\n9. the same inputs give the same frames")
@@ -287,5 +298,62 @@ for i in range(len(AW["ladder"])):
           f"{ticks} tick(s) = {seconds:.2f} s, a {CLIP:.2f} s clip at {CLIP / seconds:.1f}x")
 
 check("and that section actually ran", measured > 0, f"{measured} climb-out(s)")
+
+# ---------------------------------------------------------------- not through the level
+#
+# A scripted move writes the position straight out with NO collision behind it. Nothing
+# catches a body that leaves the level during one, so the move itself has to be shaped not
+# to: it rises clear of the floor FIRST and steps across afterwards, and the two phases may
+# not overlap. Both halves of that are checked -- the ordering, which is the rule, and the
+# body against the level, which is what the rule is for.
+print("\n10. a climb-out never passes through the level")
+
+HALF = M.C["W"] // 2
+BODY = M.C["H"]
+
+
+def inside_solid(x, y):
+    for x0, y0, x1, y1 in W["solid"]:
+        if x - HALF < x1 and x + HALF > x0 and y < y1 and y + BODY > y0:
+            return (F(x0), F(y0), F(x1), F(y1))
+    return None
+
+
+through = []
+walked = 0
+for f in range(floors - 1):
+    for name, inp in (("up", UP), ("up+left", UP | L), ("up+right", UP | R),
+                      ("left", L), ("right", R)):
+        s = settle(ladder_x(f), f * floor_h + 0.9)
+        for _ in range(600):
+            record(s, UP, 1)
+            if s.mode == "mantle":
+                break
+        if s.mode != "mantle":
+            record(s, inp, 1)
+        if s.mode != "mantle":
+            continue
+        walked += 1
+        rose = False
+        last_y, last_x = s.y, s.x
+        for _ in range(s.script_frames + 2):
+            record(s, 0, 1)
+            if s.mode != "mantle":
+                break
+            if inside_solid(s.x, s.y):
+                through.append((f, name, "inside the level"))
+                break
+            # The rise is done once the body stops climbing; nothing may have moved
+            # sideways before that.
+            if not rose and abs(s.y - last_y) < X(0.002):
+                rose = True
+            if not rose and abs(s.x - last_x) > X(0.002):
+                through.append((f, name, "stepped across before it had risen"))
+                break
+            last_y, last_x = s.y, s.x
+
+check("no climb-out puts the body inside the level", not through and walked >= 4,
+      f"{walked} climb-out(s) walked, {len(through)} through the level"
+      + (f": {through[:2]}" if through else ""))
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

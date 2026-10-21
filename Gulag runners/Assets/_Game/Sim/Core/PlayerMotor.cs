@@ -701,7 +701,11 @@ namespace GulagRunners.Sim
 
         static void StepClimb(ref PlayerSimState s, int wishX, int wishY, SimWorld world, in MoveConfig cfg)
         {
-            // Jumping off a ladder is always allowed: never trap the player on one.
+            // Jumping off a ladder, when the game allows it at all. The player is not
+            // trapped either way: a direction at the top climbs out, a direction in the
+            // middle steps off to whichever side has floor, and down at the bottom lets go.
+            if (s.JumpBufferTimer > 0 && !cfg.AllowLadderJump) s.JumpBufferTimer = 0;
+
             if (s.JumpBufferTimer > 0)
             {
                 s.JumpBufferTimer = 0;
@@ -991,7 +995,25 @@ namespace GulagRunners.Sim
             // "the climb-out is jerky and switches to something else" is.
             Fix spanZ = Fix.Abs(s.ScriptToDepth - s.ScriptFromDepth) * 3 / 2;
 
-            int frames = FramesFor(Fix.Max(spanZ, Fix.Max(spanX, spanY)), in cfg);
+            // EACH PHASE IS SIZED BY THE SPEED IT HAS TO MEET, not by a shared guess.
+            //
+            // The rise runs straight out of a climb, and a climb is a CONSTANT 2 m/s. Eased
+            // in from rest the body went 2.00 m/s on its last climbing tick and 0.22 on its
+            // first hauling one -- a full stop and a fresh start, which is the small jerk
+            // left at the top. An ease-OUT leaves at the speed it arrived at and slows from
+            // there; its opening speed is twice its average, so giving it two spans' worth
+            // of climb time makes that opening speed exactly the climb's own.
+            Fix climb = cfg.ClimbUpSpeed > Fix.Zero ? cfg.ClimbUpSpeed : cfg.RunSpeed;
+            int riseFrames = FramesAt(Fix.Abs(s.ScriptTo.Y - s.ScriptFrom.Y) * 2, climb);
+
+            // The step across starts from rest and ends at rest, so it is a smooth step, and
+            // a smooth step peaks at one and a half times its average. Held to the run speed
+            // so a climb-out can never outrun a sprint.
+            Fix across = Fix.Max(Fix.Abs(s.ScriptTo.X - s.ScriptFrom.X),
+                                 Fix.Abs(s.ScriptToDepth - s.ScriptFromDepth));
+            int acrossFrames = FramesAt(across * 3 / 2, cfg.RunSpeed);
+
+            int frames = riseFrames + acrossFrames;
             if (frames <= 0) frames = cfg.ScriptMinFrames;
 
             // And a haul is not a step. The minimum is shared with the reach onto a ladder,
@@ -1001,6 +1023,9 @@ namespace GulagRunners.Sim
 
             s.ScriptFrames = frames;
             s.ScriptTimer = frames;
+            s.ScriptRiseShare = frames > 0
+                ? new Fix((int)(((long)riseFrames * Fix.RawOne) / frames))
+                : Fix.FromMilli(500);
             s.ScriptRises = s.ScriptTo.Y > s.ScriptFrom.Y + cfg.ScriptRiseMargin;
             s.ScriptDir = (sbyte)(side >= 0 ? 1 : -1);
             s.Mode = MoveMode.Mantling;
@@ -1169,6 +1194,9 @@ namespace GulagRunners.Sim
             // reach for one. The climb-out is deliberately not cancellable: it is already
             // committed to a landing, and breaking it off leaves the body over the hole it was
             // leaving.
+            if (s.Mode == MoveMode.Mounting && s.JumpBufferTimer > 0 && !cfg.AllowLadderJump)
+                s.JumpBufferTimer = 0;
+
             if (s.Mode == MoveMode.Mounting && s.JumpBufferTimer > 0)
             {
                 s.JumpBufferTimer = 0;
@@ -1223,23 +1251,30 @@ namespace GulagRunners.Sim
             }
             else
             {
-                // Height leads and the step across follows -- but the axis that actually
-                // TRAVELS gets the whole window, and the other one leads inside it.
+                // UP FIRST, ALL THE WAY, THEN ACROSS -- and each phase gets the share of the
+                // window its own distance is worth.
                 //
-                // Fixed at "Y over the first two thirds, X over the last seven tenths" this
-                // was measured climbing out of the top hatch of the arena, where the step is
-                // 1.10 m sideways and 0.10 m of height: the body crept for ten frames at
-                // under 0.4 m/s, then slid 1.1 m at a peak of 4.71 m/s -- half again the run
-                // speed -- while the haul clip scrubbed at one flat rate over the whole
-                // thing. A stall and then a bolt, under an animation pacing neither.
-                bool across = Fix.Abs(s.ScriptTo.X - s.ScriptFrom.X) >=
-                              Fix.Abs(s.ScriptTo.Y - s.ScriptFrom.Y);
+                // The two halves may not overlap, and that is not a matter of taste. A
+                // scripted move writes the position straight out with no collision behind
+                // it, so any sideways travel taken before the body has cleared the floor
+                // goes THROUGH the slab beside the hatch: checked across every ladder and
+                // every height, 54 climb-out paths passed through solid geometry, which is
+                // what being dropped out of the level looks like from the inside.
+                //
+                // Splitting by distance rather than at a fixed fraction is what keeps it
+                // smooth anyway. A fixed "two thirds, then seven tenths" gave the axis with
+                // 0.10 m of travel most of the window and the one with 1.10 m what was
+                // left: ten frames creeping under 0.4 m/s, then a bolt at 4.71 m/s. Equal
+                // shares of distance per share of time is one steady speed throughout.
+                Fix rise = s.ScriptRiseShare;
+                if (rise < Fix.FromMilli(50)) rise = Fix.FromMilli(50);
+                if (rise > Fix.FromMilli(950)) rise = Fix.FromMilli(950);
 
-                Fix wide = SmoothStep(t);                              // the whole window
-                Fix lead = SmoothStep(Clamp01(t * 10 / 7));            // in front of it
-
-                xT = across ? wide : SmoothStep(Clamp01((t - Fix.FromMilli(300)) * 10 / 7));
-                yT = across ? lead : wide;
+                // Ease OUT, not in: the body is already moving upwards when this begins.
+                yT = EaseOut(Clamp01(Divide(t, rise)));
+                xT = t <= rise
+                    ? Fix.Zero
+                    : SmoothStep(Clamp01(Divide(t - rise, Fix.One - rise)));
             }
 
             s.Position = new FixVec2(
@@ -1255,7 +1290,27 @@ namespace GulagRunners.Sim
 
         static Fix Clamp01(Fix v) => Fix.Clamp(v, Fix.Zero, Fix.One);
 
+        /// <summary>a / b, where b is known positive. Kept here so the split reads as maths.</summary>
+        static Fix Divide(Fix a, Fix b) =>
+            b.Raw == 0 ? Fix.Zero : new Fix((int)(((long)a.Raw * Fix.RawOne) / b.Raw));
+
         static Fix SmoothStep(Fix t) => t * t * (Fix.FromInt(3) - t * 2);
+
+        /// <summary>Full speed at the start, nothing left at the end.</summary>
+        static Fix EaseOut(Fix t)
+        {
+            Fix left = Fix.One - t;
+            return Fix.One - left * left;
+        }
+
+        /// <summary>Frames to cover a distance at a speed, within the scripted bounds.</summary>
+        static int FramesAt(Fix distance, Fix speed)
+        {
+            if (speed <= Fix.Zero) return 1;
+            Fix seconds = Divide(distance, speed);
+            int frames = (seconds * PlayerMotor.TicksPerSecond).ToInt();
+            return frames > 0 ? frames : 1;
+        }
 
         // ---------------------------------------------------------------- collision
 

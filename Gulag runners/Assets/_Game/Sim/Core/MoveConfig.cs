@@ -201,6 +201,18 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix MantleRise;
 
+        /// <summary>
+        /// Whether jump leaves a ladder. OFF.
+        ///
+        /// It was always allowed, on the rule that a player must never be trapped on one.
+        /// They are not: a direction at the top climbs out, a direction in the middle steps
+        /// off to whichever side has floor, and holding down at the bottom lets go. What
+        /// jump actually did was launch a climbing fighter off the rungs at full jump
+        /// speed, which is neither something anybody presses on purpose half way up a
+        /// ladder nor something that reads as anything but a glitch when it happens.
+        /// </summary>
+        public bool AllowLadderJump;
+
         public Fix BodyHeight;
         public Fix CrouchHeight;
 
@@ -287,10 +299,11 @@ namespace GulagRunners.Sim
             c.LaneReach      = Fix.FromMilli(2000);
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
             c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
-            c.MantleMinFrames = 32;                  // 0.53 s: a haul, and long enough not to outrun a sprint
+            c.MantleMinFrames = 40;                  // 0.67 s: the two phases no longer share, so each needs its own
             c.ScriptRiseMargin = Fix.FromMilli(120);   // 12 cm: a step, not a storey
             c.AllowDodge = false;
             c.MantleRise = Fix.FromMilli(450);
+            c.AllowLadderJump = false;
             c.BodyHeight  = Fix.FromMilli(1800);
             c.CrouchHeight = Fix.FromMilli(1100);
 

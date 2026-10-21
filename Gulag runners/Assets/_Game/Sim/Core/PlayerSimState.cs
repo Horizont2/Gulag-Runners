@@ -137,6 +137,14 @@ namespace GulagRunners.Sim
         public byte StunStack;
         public int StunStackTimer;
 
+        /// <summary>
+        /// Where the rise ends and the step across begins, as a fraction of the window.
+        ///
+        /// Worked out when the move starts rather than per tick, because it is sized from
+        /// the speed the body is ALREADY travelling at, which only the start knows.
+        /// </summary>
+        public Fix ScriptRiseShare;
+
         public bool ScriptRises;
 
         public bool SwingSpent;
