@@ -78,6 +78,7 @@ Shader "Gulag Runners/Banner Cloth"
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
             half4  _BaseColor;
+            half4  _SpecColor;
             half   _Smoothness;
             float4 _HangAxis;
             float4 _WidthAxis;
@@ -226,7 +227,6 @@ Shader "Gulag Runners/Banner Cloth"
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile _ LIGHTMAP_ON
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
 
@@ -240,7 +240,6 @@ Shader "Gulag Runners/Banner Cloth"
                 float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
                 float2 uv         : TEXCOORD0;
-                float2 lightmapUV : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -252,7 +251,6 @@ Shader "Gulag Runners/Banner Cloth"
                 float3 normalWS   : TEXCOORD2;
                 float  fogCoord   : TEXCOORD3;
                 float  mask       : TEXCOORD4;
-                DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 5);
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -279,12 +277,11 @@ Shader "Gulag Runners/Banner Cloth"
                 output.mask = saturate(dot(fromAnchor, normalize(_HangAxis.xyz +
                                            float3(0, -1e-6, 0))) / max(_HangLength, 1e-4));
 
-                OUTPUT_LIGHTMAP_UV(input.lightmapUV, unity_LightmapST, output.lightmapUV);
-                OUTPUT_SH(output.normalWS, output.vertexSH);
                 return output;
             }
 
-            half4 ClothFrag(Varyings input, half facing : VFACE) : SV_Target
+            half4 ClothFrag(Varyings input,
+                            FRONT_FACE_TYPE cullFace : FRONT_FACE_SEMANTIC) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
 
@@ -297,7 +294,10 @@ Shader "Gulag Runners/Banner Cloth"
                 half4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
                 half3 albedo = tex.rgb * _BaseColor.rgb;
 
-                float3 normalWS = normalize(input.normalWS) * (facing >= 0 ? 1.0 : -1.0);
+                // A banner is a sheet: the back of it is the banner too, and has to be lit
+                // as a back rather than as a hole.
+                float3 normalWS = normalize(input.normalWS) *
+                                  IS_FRONT_VFACE(cullFace, 1.0, -1.0);
 
                 InputData lighting = (InputData)0;
                 lighting.positionWS = input.positionWS;
@@ -306,7 +306,7 @@ Shader "Gulag Runners/Banner Cloth"
                 lighting.viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
                 lighting.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 lighting.fogCoord = input.fogCoord;
-                lighting.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, normalWS);
+                lighting.bakedGI = SampleSH(normalWS);
                 lighting.normalizedScreenSpaceUV =
                     GetNormalizedScreenSpaceUV(input.positionCS);
                 lighting.shadowMask = half4(1, 1, 1, 1);
@@ -460,7 +460,6 @@ Shader "Gulag Runners/Banner Cloth"
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareNormalsTexture.hlsl"
 
             struct Attributes
             {
@@ -487,9 +486,10 @@ Shader "Gulag Runners/Banner Cloth"
                 return output;
             }
 
-            half4 DepthNormalsFrag(Varyings input, half facing : VFACE) : SV_Target
+            half4 DepthNormalsFrag(Varyings input,
+                                   FRONT_FACE_TYPE cullFace : FRONT_FACE_SEMANTIC) : SV_Target
             {
-                float3 n = normalize(input.normalWS) * (facing >= 0 ? 1.0 : -1.0);
+                float3 n = normalize(input.normalWS) * IS_FRONT_VFACE(cullFace, 1.0, -1.0);
                 return half4(NormalizeNormalPerPixel(n), 0.0);
             }
             ENDHLSL
