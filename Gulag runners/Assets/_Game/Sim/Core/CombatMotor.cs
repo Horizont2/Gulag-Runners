@@ -470,7 +470,18 @@ namespace GulagRunners.Sim
             victim.Noise = NoiseLevel.Medium;
             victim.Velocity.X = cfg.KnockbackSpeed / 2 * side;
 
-            victim.StaminaCharges -= cfg.BlockStaminaCost;
+            // The attacker off a braced guard, harder than off a body. A rush that cannot
+            // stand in your face is a rush you can answer with a longer weapon.
+            if (cfg.BlockRecoilPermille > 0 && cfg.RecoilFrames > 0)
+            {
+                Fix back = new Fix((int)(((long)cfg.KnockbackSpeed.Raw *
+                                          cfg.BlockRecoilPermille) / 1000));
+                attacker.Velocity.X = Fix.Zero - back * side;
+                attacker.RecoilTimer = cfg.RecoilFrames;
+            }
+
+            bool heavy = attacker.ComboIndex >= cfg.MaxCombo - 1;
+            victim.StaminaCharges -= heavy ? cfg.HeavyBlockStaminaCost : cfg.BlockStaminaCost;
             if (victim.StaminaCharges > 0) return;
 
             // Out of stamina: the guard breaks and they are wide open. This is what stops a

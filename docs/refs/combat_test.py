@@ -3,7 +3,7 @@ a time to kill of 8 to 14 seconds of ACTIVE fighting."""
 import sim_motor_mirror as M
 import combat_mirror as K
 from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD, ATTACK
-from loot_mirror import (Inv, NONE, FISTS, CLUB, SPEAR, DAGGER, WARHAMMER,
+from loot_mirror import (Inv, NONE, FISTS, CLUB, SPEAR, DAGGER, WARHAMMER, SWORD,
                          CHAINMAIL, BANDAGE, ITEMS)
 from combat_mirror import combat_step, resolve, hitbox, init, K as CFG
 from arena_geometry import world
@@ -759,5 +759,50 @@ for aw, an in ((NONE, "fists"), (DAGGER, "dagger")):
 
 check("the slowest weapon lands SOMETHING even cornered by the fastest", worst > 0,
       f"best case {worst} hit(s) in eight seconds")
+
+# ---------------------------------------------------------------- the guard answers a rush
+#
+# A player with a weapon has to have a move against somebody simply pressing attack. At one
+# stamina charge per blow absorbed there was none: measured against bare hands mashing, a
+# swordsman's guard broke after 1.2 SECONDS and left him open for another 0.7, so the only
+# answer the game offers to being rushed was also the fastest way to lose. Holding the
+# guard still runs a fighter down by the second; a flurry of jabs no longer does.
+print("\n11. a guard answers a rush")
+
+
+def rushed(defender_weapon, defender, seconds=12, close=True):
+    """Bare hands mashing (and walking in) against somebody with a real weapon."""
+    a = fighter(-6.0, 1, NONE)
+    b = fighter(-5.35, -1, defender_weapon)
+    hits = taken = 0
+    broke = None
+    for t in range(seconds * 60):
+        chase = R if close and (b.x - a.x) > X(0.7) else 0
+        tick([a, b], [ATTACK | chase, defender(b, t)])
+        taken += b.was_hit
+        hits += a.was_hit
+        if b.guard_break > 0 and broke is None:
+            broke = t / 60.0
+        if a.dead or b.dead:
+            break
+    return hits, taken, broke, a.health, b.health
+
+
+_, _, broke, _, _ = rushed(SWORD, lambda b, t: DOD, seconds=4)
+check("a held guard survives four seconds of being rushed", broke is None,
+      "never broke" if broke is None else f"broke at {broke:.1f} s")
+
+hits, taken, _, fists_hp, sword_hp = rushed(SWORD,
+                                            lambda b, t: DOD if (t // 45) % 2 == 0 else ATTACK)
+print(f"        blocking and answering: sword landed {hits}, took {taken}, "
+      f"health {sword_hp} against {fists_hp}")
+check("and blocking then answering beats the rush", sword_hp > fists_hp,
+      f"{sword_hp} against {fists_hp}")
+
+# ...but turtling is not a strategy. Chip still kills, which is what keeps the guard a move
+# rather than a place to stand.
+_, _, _, fists_hp, sword_hp = rushed(SWORD, lambda b, t: DOD, seconds=20)
+check("while hiding behind it the whole round still loses", sword_hp < fists_hp,
+      f"{sword_hp} against {fists_hp}")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

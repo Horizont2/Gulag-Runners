@@ -12,7 +12,7 @@ K = dict(HP=100, ACTIVE=3, RECOVERY=700, COMBO_WINDOW=20, MAX_COMBO=3,
          COMBO_DECAY=620, COMBO_STACK_FRAMES=75, COMBO_PUSH=300, ATTACK_FRAMES=1300,
          RECOIL=400, RECOIL_FRAMES=10,
          KNOCK=M.M(3200), HEAVY_KNOCK=M.M(6000), LIFT=M.M(1600),
-         CHIP=300, BLOCK_STAM=1, GUARD_BREAK=42, BLOCK_SPEED=420,
+         CHIP=300, BLOCK_STAM=0, HEAVY_BLOCK_STAM=2, BLOCK_RECOIL=900, GUARD_BREAK=42, BLOCK_SPEED=420,
          WINDUP_SPEED=480, ACTIVE_SPEED=180, RECOVERY_SPEED=400,
          HIT_STOP=3, BLOCK_STOP=2, PARRY_STOP=7,
          PARRY=12, STAGGER=48, DEATH=90, GUARD_DRAIN=48,
@@ -358,7 +358,14 @@ def block(atk, vic, dmg, side):
     vic.was_blocked = True
     vic.noise = 2
     vic.vx = (K["KNOCK"] // 2) * side
-    vic.stam -= K["BLOCK_STAM"]
+    # The attacker off a braced guard, harder than off a body: a rush that cannot stand in
+    # your face is a rush a longer weapon can answer.
+    if K["BLOCK_RECOIL"] > 0 and K["RECOIL_FRAMES"] > 0:
+        atk.vx = -((K["KNOCK"] * K["BLOCK_RECOIL"]) // 1000) * side
+        atk.recoil_t = K["RECOIL_FRAMES"]
+
+    heavy = atk.combo >= K["MAX_COMBO"] - 1
+    vic.stam -= K["HEAVY_BLOCK_STAM"] if heavy else K["BLOCK_STAM"]
     if vic.stam > 0:
         return
     vic.stam = 0

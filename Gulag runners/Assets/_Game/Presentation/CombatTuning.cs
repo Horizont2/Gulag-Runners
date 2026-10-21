@@ -127,9 +127,24 @@ namespace GulagRunners.Game
         [Tooltip("Damage that still gets through a block.")]
         [Range(0f, 0.5f)] public float chip = 0.3f;
 
-        [Tooltip("Stamina spent per hit absorbed. It has to outrun the stamina regen, or holding " +
-                 "the guard is free — which is the one thing a guard must never be.")]
-        public int blockStaminaCost = 1;
+        [Tooltip("Stamina spent for every LIGHT hit absorbed. Zero, and deliberately.\n\n" +
+                 "At one charge a blow it was four blows and out: measured against bare hands " +
+                 "mashing, a swordsman's guard broke after 1.2 SECONDS and left him open for " +
+                 "another 0.7, so the only answer the game offers to being rushed was also the " +
+                 "fastest way to lose. Holding the guard still runs a fighter down by the " +
+                 "second; a flurry of jabs no longer does.")]
+        public int blockStaminaCost = 0;
+
+        [Tooltip("What the heavy finisher costs the man behind the guard. This is what a guard " +
+                 "is broken BY: one committed blow, read and answered, not four jabs.")]
+        public int heavyBlockStaminaCost = 2;
+
+        [Tooltip("What the attacker is thrown back by when the guard eats it, against the " +
+                 "victim's knockback. Larger than off a body: meeting a braced shield is the " +
+                 "one thing that should put the man swinging back on his heels, and it is what " +
+                 "stops a rush standing in your face.")]
+        [Range(0f, 2f)] public float blockRecoil = 0.9f;
+
 
         public float guardBreakTime = 0.7f;
         [Tooltip("Walking speed with the guard up, as a share of the run speed.")]
@@ -204,6 +219,8 @@ namespace GulagRunners.Game
             KnockbackLift = M(knockbackLift),
             ChipPermille = P(chip),
             BlockStaminaCost = Mathf.Max(0, blockStaminaCost),
+            HeavyBlockStaminaCost = Mathf.Max(0, heavyBlockStaminaCost),
+            BlockRecoilPermille = P(blockRecoil),
             GuardBreakFrames = F(guardBreakTime),
             BlockSpeedPermille = P(blockSpeed),
             ParryFrames = F(parryWindow),

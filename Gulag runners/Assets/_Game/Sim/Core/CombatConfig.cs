@@ -157,7 +157,30 @@ namespace GulagRunners.Sim
         /// Stamina spent for every hit absorbed. It has to outrun the stamina regen or holding
         /// the guard is free, which is the one thing a guard must never be.
         /// </summary>
+        /// <summary>
+        /// Stamina spent for every LIGHT hit absorbed. Zero, and deliberately.
+        ///
+        /// At one charge a blow it was four blows and out: measured against a bare-handed
+        /// fighter mashing, a swordsman's guard broke after 1.2 SECONDS and left him wide
+        /// open for another 0.7. The only answer the game offers to being rushed was
+        /// therefore the fastest way to lose, which is why a player with a weapon felt he
+        /// had no move at all. Holding the guard still costs -- GuardDrainFrames charges it
+        /// by the second, so a braced fighter still runs down -- but absorbing a jab no
+        /// longer does. What breaks a guard is a committed blow, not a flurry.
+        /// </summary>
         public int BlockStaminaCost;
+
+        /// <summary>What the heavy finisher costs the man behind the guard. This is what a
+        /// guard is broken BY: one committed swing, read and answered, not four jabs.</summary>
+        public int HeavyBlockStaminaCost;
+
+        /// <summary>
+        /// What the attacker is thrown back by when the guard eats it, against the victim's
+        /// own knockback. Larger than on a clean hit: meeting a braced shield is the one
+        /// thing in a fight that should put the man swinging back on his heels, and it is
+        /// what stops a rush simply standing in your face.
+        /// </summary>
+        public int BlockRecoilPermille;
 
         /// <summary>Frames the guard is down for after it is broken.</summary>
         public int GuardBreakFrames;
@@ -273,7 +296,9 @@ namespace GulagRunners.Sim
             c.KnockbackLift = Fix.FromMilli(1600);
 
             c.ChipPermille = 300;          // docs/02: a block absorbs 70%, not 85%
-            c.BlockStaminaCost = 1;        // one of the three charges docs/02 gives a fighter
+            c.BlockStaminaCost = 0;        // a jab does not break a guard; holding it still drains
+            c.HeavyBlockStaminaCost = 2;   // a committed blow does
+            c.BlockRecoilPermille = 900;
             c.GuardBreakFrames = 42;       // 0.7 s wide open
             c.BlockSpeedPermille = 420;
 
