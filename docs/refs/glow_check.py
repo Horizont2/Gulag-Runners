@@ -169,6 +169,29 @@ def main():
                             f"threshold of {threshold:g}: the baseline find would halo as "
                             f"loudly as a rare, and if everything shouts then nothing does")
 
+    # ---- one ramp, everywhere. A chest and the item that comes out of it may not have
+    # two ideas of what "rare" looks like, and the serialised arrays in prefabs and scenes
+    # are a copy of the C# default that nothing keeps honest.
+    want = [tuple(round(float(v), 3) for v in m)
+            for m in re.findall(r"new Color\(([\d.]+)f, ([\d.]+)f, ([\d.]+)f\)",
+                                re.search(r"DefaultPalette\(\)(.*?)\};", models,
+                                          re.S).group(1))]
+    for folder in ("Prefabs", "Scenes", "_Game"):
+        root = os.path.join(ASSETS, folder)
+        for dirpath, _, files in os.walk(root):
+            for f in files:
+                if not (f.endswith(".prefab") or f.endswith(".unity")):
+                    continue
+                src = read(os.path.join(dirpath, f))
+                for block in re.findall(r"tierColours:\n((?:  - \{r: [^\n]*\n)+)", src):
+                    got = [tuple(round(float(x), 3) for x in m)
+                           for m in re.findall(r"r: (-?[\d.]+), g: (-?[\d.]+), "
+                                               r"b: (-?[\d.]+)", block)]
+                    if want and got != want:
+                        problems.append(f"{f}: a tierColours array that is not the one in "
+                                        f"ItemModels.DefaultPalette() -- {got} against "
+                                        f"{want}")
+
     for n in notes:
         print(f"  note - {n}")
     for p in problems:
