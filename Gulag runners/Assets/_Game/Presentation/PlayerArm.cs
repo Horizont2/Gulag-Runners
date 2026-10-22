@@ -20,8 +20,19 @@ namespace GulagRunners.Game
     /// to the tick while the body flows between ticks reads as the weapon lagging a frame
     /// behind its owner, which is exactly the complaint this whole rewrite exists to fix.
     /// </summary>
+    /// <remarks>
+    /// There is deliberately NO [RequireComponent(typeof(Animator))] here, although this
+    /// component does nothing without one. RequireComponent does not check -- it CREATES.
+    /// Dropped on the fighter's root by hand, it silently added a second, empty Animator
+    /// there, and PlayerAnimator's fallback is GetComponentInChildren, which searches the
+    /// object itself first. So the whole rig bound to the empty Animator and every clip
+    /// in the game stopped playing while the body still moved. An attribute that invents
+    /// the thing that breaks you is worse than no attribute.
+    ///
+    /// Let the tool place it: Tools > Gulag Runners > Setup > Set up IK puts this on the
+    /// Animator's own object, which is the only place OnAnimatorIK is ever called.
+    /// </remarks>
     [DisallowMultipleComponent]
-    [RequireComponent(typeof(Animator))]
     public sealed class PlayerArm : MonoBehaviour
     {
         [Header("Wiring")]
@@ -72,6 +83,16 @@ namespace GulagRunners.Game
         {
             if (player == null) player = GetComponentInParent<PlayerController>();
             if (animator == null) animator = GetComponent<Animator>();
+
+            // Said out loud, because the failure is otherwise invisible: no Animator on
+            // THIS object means Unity never calls OnAnimatorIK on it, so the arm is
+            // simply never drawn where the simulation is swinging it.
+            if (animator == null)
+                Debug.LogError(
+                    $"{name}: PlayerArm is not on the object that owns the Animator, so " +
+                    "Unity will never call OnAnimatorIK here and the drawn arm will not " +
+                    "be the one that hits people. Run Tools > Gulag Runners > Setup > " +
+                    "Set up IK, which puts it in the right place.", this);
         }
 
         void OnAnimatorIK(int layer)

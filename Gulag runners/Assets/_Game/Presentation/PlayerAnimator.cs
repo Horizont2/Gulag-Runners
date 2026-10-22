@@ -22,6 +22,27 @@ namespace GulagRunners.Game
         public PlayerController player;
         public Animator animator;
 
+        /// <summary>
+        /// The Animator that is actually driving something, searched over all of them.
+        ///
+        /// GetComponentInChildren alone takes the FIRST, and it searches the object
+        /// itself before its children -- so one stray Animator on the fighter's root,
+        /// with no controller on it, takes over and every clip in the game stops. That
+        /// happened: a RequireComponent on a component dropped in the wrong place
+        /// created exactly such an Animator, and the symptom was a body that moved
+        /// perfectly and never animated.
+        ///
+        /// An Animator with no controller cannot play anything, so it is never the one
+        /// meant. Preferring a controller makes the search say what it means.
+        /// </summary>
+        static Animator Rig(GameObject root)
+        {
+            Animator[] all = root.GetComponentsInChildren<Animator>(true);
+            foreach (Animator a in all)
+                if (a != null && a.runtimeAnimatorController != null) return a;
+            return all.Length > 0 ? all[0] : null;
+        }
+
         [Header("State names in the Animator controller")]
         [Tooltip("Standing still.")]                       public string idleState = "Idle";
         [Tooltip("Moving slowly on the ground.")]          public string walkState = "Walk";
@@ -288,13 +309,13 @@ namespace GulagRunners.Game
         void Reset()
         {
             player = GetComponent<PlayerController>();
-            animator = GetComponentInChildren<Animator>();
+            animator = Rig(gameObject);
         }
 
         void Awake()
         {
             if (player == null) player = GetComponent<PlayerController>();
-            if (animator == null) animator = GetComponentInChildren<Animator>();
+            if (animator == null) animator = Rig(gameObject);
 
             if (player == null || animator == null)
             {

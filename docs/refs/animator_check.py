@@ -141,6 +141,40 @@ def ik_passes(path):
     return on
 
 
+def strays():
+    """Animators with no controller, anywhere a fighter lives.
+
+    One of these cannot play a thing, but it can still be FOUND: PlayerAnimator's
+    fallback is GetComponentInChildren, which searches the object itself before its
+    children, so a stray on the fighter's root takes the rig's place and every clip in
+    the game stops while the body goes on moving perfectly. Nothing is logged, because
+    from Unity's point of view everything was wired.
+
+    It happened for a reason worth keeping written down: a [RequireComponent(Animator)]
+    on a component dropped by hand in the wrong place. RequireComponent does not check,
+    it CREATES.
+    """
+    found = 0
+    for folder in (os.path.join(ASSETS, "Scenes"), os.path.join(ASSETS, "Prefabs")):
+        if not os.path.isdir(folder):
+            continue
+        for name in sorted(os.listdir(folder)):
+            if not name.endswith((".unity", ".prefab")):
+                continue
+            text = read(os.path.join(folder, name))
+            for fid, (cls, body) in documents(text).items():
+                if cls != 95:                       # Animator
+                    continue
+                m = re.search(r"m_Controller: \{fileID: (-?\d+)", body)
+                if m is None or m.group(1) != "0":
+                    continue
+                print(f"  {name}: an Animator with no controller (fileID {fid}). It "
+                      "cannot play anything, and it can take the rig's place in a "
+                      "GetComponentInChildren -- which stops every clip in the game.")
+                found += 1
+    return found
+
+
 def main():
     assets = by_guid()
     animator_cs = os.path.join(ASSETS, "_Game", "Presentation", "PlayerAnimator.cs")
@@ -242,6 +276,8 @@ def main():
     if checked == 0:
         print("animator_check: no PlayerAnimator in the scene — nothing checked.")
         return 1
+
+    problems += strays()
 
     print(f"animator_check: {checked} fighter(s), {problems} problem(s)")
     return 1 if problems else 0
