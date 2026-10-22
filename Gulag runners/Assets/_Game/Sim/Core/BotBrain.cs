@@ -295,17 +295,26 @@ namespace GulagRunners.Sim
         /// the middle of it -- the blade should be fastest where the target is, not where
         /// it turns around.
         /// </summary>
+        /// <summary>
+        /// Where the bot puts its arm, in the SAME FRAME the player's stick is read in:
+        /// forward means at him, up means over him, down means under him.
+        ///
+        /// It used to aim in world terms -- AimX = towards * 1000 -- which is wrong for
+        /// exactly the reason the frame exists. ArmMotor.Assist then turned that by the
+        /// direction to the foe, which is the same direction, so the two cancelled: a
+        /// bot standing to its foe's RIGHT held its guard to the right, away from him,
+        /// and its high swings came out low. Only one of the two may know which way he
+        /// is, and the frame is the one that does.
+        /// </summary>
         static void Aim(ref BotState bot, in PlayerSimState self, in PlayerSimState foe,
                         in BotConfig cfg)
         {
-            int towards = foe.Position.X >= self.Position.X ? 1 : -1;
-
             if (bot.SwingHold > 0)
             {
                 bot.SwingHold--;
                 if (bot.SwingHold == 0) bot.SwingHigh = !bot.SwingHigh;
 
-                bot.AimX = (short)(towards * 500);
+                bot.AimX = 500;
                 bot.AimY = (short)(bot.SwingHigh ? 866 : -866);
                 return;
             }
@@ -313,7 +322,7 @@ namespace GulagRunners.Sim
             if (bot.GuardHold > 0)
             {
                 bot.GuardHold--;
-                bot.AimX = (short)(towards * 1000);
+                bot.AimX = 1000;
                 bot.AimY = 0;
                 return;
             }

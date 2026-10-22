@@ -325,6 +325,14 @@ def main():
     # somebody is an attack by itself.
     held = A.Fighter(-2.0, 1, "club")
     foe = A.Fighter(0.0, -1, "club")
+
+    # Let the arm ARRIVE first. A fighter spawns in the carry pose, so the first few
+    # ticks of a held stick are the arm travelling from carry to where it was told to
+    # go -- which is the arm obeying, not the frame drifting, and measuring from tick
+    # one counts it as 23 degrees of drift.
+    for _ in range(20):
+        A.step(held, (A.ONE, 0), foe)
+
     first = None
     drift = 0.0
     for t in range(120):
@@ -403,6 +411,66 @@ def main():
           not overgrown,
           f"ceiling is {height * A.CFG['max_blade_pm'] / 1000.0:.2f} m on a "
           f"{height:.2f} m fighter; over it: {overgrown or 'none'}")
+
+    # ------------------------------------------ 10. the stick means what it says
+    #
+    # docs/31 promises four things about the attack stick: forward is at him, up is over
+    # him, down is under him, back is away. The frame used to be measured from MY
+    # SHOULDER to HIS CHEST -- the same anatomical point on nobody -- which on flat
+    # ground is a quarter of a metre downhill whatever the distance. Pushing right put
+    # the arm 17 degrees down at sparring range, 40 at half a metre, and STRAIGHT DOWN
+    # when the two of you touched, because at zero gap the only direction left between a
+    # shoulder and a chest is the drop between them. Up and down swapped places as you
+    # walked in and nothing in this file noticed.
+    print("\n10. forward on the stick is at him, from any distance and either side")
+
+    def points(stick, gap, lift=0.0, side=1):
+        me = A.Fighter(0.0, side, "club")
+        foe = A.Fighter(gap * side, -side, "club")
+        foe.y = F.from_f(lift)
+        got = A.assist(me, stick, foe)
+        return math.degrees(math.atan2(F.to_f(got[1]), F.to_f(got[0])))
+
+    GAPS = (1.5, 1.0, 0.7, 0.5, 0.3, 0.15, 0.0)
+
+    def worst(stick, wanted, side=1):
+        """Furthest any gap lands from the angle the player asked for."""
+        off = [(g, abs(((points(stick, g, side=side) - wanted) + 180) % 360 - 180))
+               for g in GAPS]
+        return max(off, key=lambda p: p[1])
+
+    g, miss = worst((A.ONE, 0), 0.0)
+    check("forward points at him, whatever the range", miss < 1.0,
+          f"worst is {miss:.1f} deg out, at {g} m")
+
+    g, miss = worst((A.ONE, 0), 180.0, side=-1)
+    check("and it still does with him on the other side", miss < 1.0,
+          f"worst is {miss:.1f} deg out, at {g} m")
+
+    g_up, up = worst((0, A.ONE), 90.0)
+    g_dn, dn = worst((0, -A.ONE), -90.0)
+    check("up is over him and down is under him, and they do not trade places",
+          up < 1.0 and dn < 1.0,
+          f"up {up:.1f} deg out at {g_up} m, down {dn:.1f} deg out at {g_dn} m")
+
+    # A fighter on a ledge directly overhead is the case the floor and the cap are for:
+    # without them the line to him goes vertical and the whole stick turns a quarter.
+    overhead = abs(points((A.ONE, 0), 0.05, lift=1.2))
+    cap = math.degrees(math.atan(A.CFG["aim_tilt_pm"] / 1000.0))
+    # Against 60 degrees as well as against the cap, deliberately. Checked only against
+    # the cap, loosening the cap loosens the test with it and the assertion says nothing
+    # -- 60 is the point past which up and down stop being usable directions and is a
+    # claim about the design rather than about the number.
+    check("and a man on a ledge overhead cannot turn the stick under your thumb",
+          overhead <= min(cap, 60.0) + 1.0,
+          f"frame leaned {overhead:.0f} deg, cap {cap:.0f}, and 60 is the most that is "
+          "still a usable stick")
+
+    # And the pose a fighter who has touched nothing is in.
+    fresh = A.Fighter(0, 1, "club")
+    rest = math.degrees(math.atan2(F.to_f(fresh.arm[1]), F.to_f(fresh.arm[0])))
+    check("a fighter spawns with the blade carried low, not held level",
+          rest < -5.0, f"arm starts at {rest:.0f} deg")
 
     print()
     print(f"{PASS} passed, {FAIL} failed")

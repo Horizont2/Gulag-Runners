@@ -88,13 +88,6 @@ namespace GulagRunners.Sim
                                       in ArmConfig cfg) =>
             move.BodyHeight * Fix.FromMilli(cfg.BladeRadiusPermille);
 
-        /// <summary>Mid-chest, which is what a swing is helped toward.</summary>
-        public static FixVec2 Chest(in PlayerSimState s, in MoveConfig move)
-        {
-            Fix height = s.Crouching ? move.CrouchHeight : move.BodyHeight;
-            return new FixVec2(s.Position.X, s.Position.Y + height / 2);
-        }
-
         /// <summary>The body, as the segment a capsule is built around.</summary>
         public static void BodySegment(in PlayerSimState s, in MoveConfig move,
                                        out FixVec2 feet, out FixVec2 head)
@@ -146,7 +139,7 @@ namespace GulagRunners.Sim
         /// <summary>
         /// As above, but knowing where the other fighter is, so the aim can be helped.
         /// </summary>
-        public static void Step(ref PlayerSimState s, FixVec2 aim, FixVec2 foeChest,
+        public static void Step(ref PlayerSimState s, FixVec2 aim, FixVec2 foeShoulder,
                                 bool hasFoe, in MoveConfig move, in ArmConfig cfg)
         {
             FixVec2 want;
@@ -154,7 +147,7 @@ namespace GulagRunners.Sim
             Fix dead = Fix.FromMilli(cfg.DeadzonePermille);
 
             if (push > dead * dead)
-                want = Assist(ref s, aim, foeChest, hasFoe, in move, in cfg);
+                want = Assist(ref s, aim, foeShoulder, hasFoe, in move, in cfg);
             else
             {
                 want = Carry(in s, in cfg);
@@ -224,7 +217,7 @@ namespace GulagRunners.Sim
         /// and a block are the same number fighting each other. Measured, a held guard
         /// stopped taking any damage off at all.
         /// </summary>
-        static FixVec2 Assist(ref PlayerSimState s, FixVec2 aim, FixVec2 foeChest,
+        static FixVec2 Assist(ref PlayerSimState s, FixVec2 aim, FixVec2 foeShoulder,
                               bool hasFoe, in MoveConfig move, in ArmConfig cfg)
         {
             FixVec2 want = aim.Normalized;
@@ -248,7 +241,36 @@ namespace GulagRunners.Sim
 
             if (!hasFoe || cfg.AimRelativePermille <= 0) return want;
 
-            FixVec2 toFoe = (foeChest - Shoulder(in s, in move, in cfg)).Normalized;
+            // Shoulder to SHOULDER, and that is the whole of the bug this used to have.
+            // It measured from my shoulder to his chest -- the same anatomical point on
+            // nobody -- so on flat ground the frame leaned 0.26 m downhill at every
+            // distance. Pushing the stick right put the arm 17 degrees down at sparring
+            // range, 40 degrees down at half a metre, and straight DOWN when the two of
+            // you touched, because at zero gap the only direction left between a
+            // shoulder and a chest is the drop between them. Up and down swapped places
+            // as you closed. Between two shoulders on flat ground, "at him" is level,
+            // which is what the player means by it.
+            FixVec2 mine = Shoulder(in s, in move, in cfg);
+            Fix dx = foeShoulder.X - mine.X;
+            Fix dy = foeShoulder.Y - mine.Y;
+
+            // Nearer than this and the frame stops asking exactly where he is: two
+            // fighters on one spot have no direction between them, and just short of
+            // that the direction is the difference of two nearly equal numbers.
+            Fix near = move.BodyHeight * Fix.FromMilli(cfg.AimFloorPermille);
+            if (Fix.Abs(dx) < near)
+            {
+                int side = dx.Raw > 0 ? 1 : dx.Raw < 0 ? -1 : (s.Facing == 0 ? 1 : s.Facing);
+                dx = near * Fix.FromInt(side);
+            }
+
+            // And it never leans past its cap, so a man on a ledge overhead cannot
+            // rotate the stick out from under the player's thumb.
+            Fix lean = Fix.Abs(dx) * Fix.FromMilli(cfg.AimTiltPermille);
+            if (dy > lean) dy = lean;
+            else if (dy < -lean) dy = -lean;
+
+            FixVec2 toFoe = new FixVec2(dx, dy).Normalized;
             if (toFoe.LengthSq.Raw == 0) return want;
 
             // The frame's forward axis: the line to him, blended back toward the way the

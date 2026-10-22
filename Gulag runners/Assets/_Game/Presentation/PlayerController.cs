@@ -376,7 +376,8 @@ namespace GulagRunners.Game
                 position.Y = groundY;
             }
 
-            _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
+            _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config,
+                                          ArmSettings);
             _state.Depth = depth;
 
             if (keepLoadout)
@@ -527,16 +528,21 @@ namespace GulagRunners.Game
             // The arm moves BEFORE the body, so the tip speed this tick is measured
             // against where the shoulder was when the swing was asked for. After the
             // body, a fighter who merely ran forwards would read as having swung.
-            // The other fighter, so a roughly-aimed swing can be pulled onto him. Only
-            // within a cone -- a blade sent deliberately high, low or the other way is
-            // left exactly where it was put (ArmMotor.Assist).
+            // The other fighter, so that "forward" on the attack stick means AT HIM
+            // rather than at world right. Nothing is steered: the direction asked for is
+            // kept exactly, and only the zero it is measured from moves (ArmMotor.Assist).
+            //
+            // His SHOULDER, and the same anatomical point as the one it is measured
+            // from. It used to be his chest, which sits a quarter of a metre lower, so
+            // the frame leaned downhill at every range and tipped a quarter turn as the
+            // two of you closed.
             PlayerController foe = matchState != null ? matchState.Opponent(this) : null;
             bool hasFoe = foe != null;
-            FixVec2 foeChest = hasFoe
-                ? ArmMotor.Chest(foe.State, in _config)
+            FixVec2 foeShoulder = hasFoe
+                ? ArmMotor.Shoulder(foe.State, in _config, in armCfg)
                 : FixVec2.Zero;
 
-            ArmMotor.Step(ref _state, intent.Aim, foeChest, hasFoe, in _config, in armCfg);
+            ArmMotor.Step(ref _state, intent.Aim, foeShoulder, hasFoe, in _config, in armCfg);
 
             PlayerMotor.Step(ref _state, moveInput, _world, in _config);
 

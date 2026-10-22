@@ -98,6 +98,22 @@ namespace GulagRunners.Game
                  "value away.")]
         [Range(0f, 1f)] public float aimRelative = 1f;
 
+        [Tooltip("How close he may get, horizontally, before the aim frame stops " +
+                 "measuring exactly where he is — as a share of body height.\n\n" +
+                 "Two fighters standing on one spot have no direction between them, and " +
+                 "just short of that the direction is the difference between two nearly " +
+                 "equal numbers, which is near enough to anything. The floor stops the " +
+                 "frame spinning under a held thumb as you close.")]
+        [Range(0.1f, 2f)] public float aimFloor = 0.5f;
+
+        [Tooltip("The most the aim frame may lean away from level, as a SLOPE. 1 is 45 " +
+                 "degrees.\n\n" +
+                 "The frame says which way \"at him\" is in a side-view fight, and past " +
+                 "about 45 degrees up and down stop meaning anything a thumb can use. " +
+                 "Uncapped, a fighter on a ledge overhead rotates the whole stick a " +
+                 "quarter turn.")]
+        [Range(0f, 4f)] public float aimTilt = 1f;
+
         [Tooltip("Tip speed below this share of the weapon's OWN maximum does nothing.\n\n" +
                  "The most important number in the fight. Too low and holding the blade " +
                  "out while walking is a strategy; too high and only a windmill counts. " +
@@ -317,6 +333,8 @@ namespace GulagRunners.Game
             DeadzonePermille = P(aimDeadzone),
             CarryDropPermille = P(carryDrop),
             AimRelativePermille = P(aimRelative),
+            AimFloorPermille = P(aimFloor),
+            AimTiltPermille = P(aimTilt),
             MinSwingPermille = P(minSwing),
             BodyRadiusPermille = P(bodyRadius),
             BladeRadiusPermille = P(bladeRadius),

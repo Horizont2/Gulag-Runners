@@ -303,7 +303,8 @@ namespace GulagRunners.Sim
 
         public bool OnGround => Mode == MoveMode.Grounded;
 
-        public static PlayerSimState Spawn(FixVec2 position, sbyte facing, in MoveConfig config)
+        public static PlayerSimState Spawn(FixVec2 position, sbyte facing, in MoveConfig config,
+                                           in ArmConfig arm)
         {
             PlayerSimState s = default;
             s.Position = position;
@@ -320,7 +321,13 @@ namespace GulagRunners.Sim
             s.StaminaCharges = config.StaminaMax;
             s.Health = 100;
             s.Noise = NoiseLevel.Silent;
-            s.Arm = new FixVec2(Fix.FromInt(s.Facing), Fix.Zero);
+            // In the carry pose, which is the pose a fighter who is not asking for
+            // anything is in. Straight out was the OLD rest pose, and docs/31 took it
+            // out for a measured reason: an arm held level is a perfect guard, free and
+            // permanent, so two fighters who had not touched a stick clashed for ever.
+            // Spawning into it meant every round opened in the pose the design removed,
+            // and the arm then visibly dropped once the first tick ran.
+            s.Arm = ArmMotor.Carry(in s, in arm);
             s.TipPrimed = false;
             return s;
         }

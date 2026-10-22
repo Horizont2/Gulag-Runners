@@ -17,6 +17,7 @@ ARM = dict(
     shoulder=780, arm_length_pm=350,
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
+    aim_relative=1000, aim_floor_pm=500, aim_tilt_pm=1000,
     haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
     body_radius_pm=180, blade_radius_pm=60,
     hit_lock=18, clash_deflect=700, clash_lock=10,
@@ -57,8 +58,13 @@ def init(s):
     s.health = K["hp"]
     s.dead = False
     s.stun = s.stagger = s.hitstop = 0
-    s.arm = ((s.facing or 1) * ONE, 0)
+    # Carried low, not held level: level is the old rest pose docs/31 removed, and
+    # spawning into it opens every round holding a free perfect guard.
+    s.arm = carry(s)
     s.tip_prev = (0, 0)
+    s.aim_prev = (0, 0)
+    s.assist_dir = (0, 0)
+    s.assist_held = False
     s.tip_primed = False
     s.tip_speed = 0
     s.swing_share = 0
@@ -72,11 +78,58 @@ def init(s):
 
 
 def body_height(s):
-    # The movement mirror carries its own body size (C["H"]), which is not the same
-    # number as MoveConfig.BodyHeight -- a pre-existing divergence, left alone here.
-    # arm_test is where the real scale is argued about; this file is about whether the
-    # BOT behaves, so what matters is that it is self-consistent.
     return C["CH"] if s.crouch else C["H"]
+
+
+def assist(s, aim, foe):
+    """ArmMotor.Assist: the stick read in the other fighter's frame, not the world's.
+
+    This file used to take `aim` as a world direction and skip the frame entirely, on
+    the grounds that it is about whether the BOT behaves. That was the gap that hid a
+    real bug for a whole pass: the bot aims in world terms (AimX = towards * 1000) and
+    the frame then turns that by the SAME direction, so the two cancelled and a bot
+    standing to its foe's right guarded to its right -- away from him -- while its high
+    swings came out low. The mirror could not see it because the mirror had no frame.
+    """
+    want = normalized(aim)
+
+    moved = F.length_sq(F.sub(aim, s.aim_prev))
+    if s.assist_held and moved <= F.mul(F.milli(20), F.milli(20)):
+        return s.assist_dir
+
+    s.aim_prev = aim
+    s.assist_held = True
+    s.assist_dir = want
+
+    if foe is None or ARM["aim_relative"] <= 0:
+        return want
+
+    mine = shoulder(s)
+    dx = shoulder(foe)[0] - mine[0]
+    dy = shoulder(foe)[1] - mine[1]
+
+    near = F.mul(C["H"], F.milli(ARM["aim_floor_pm"]))
+    if abs(dx) < near:
+        dx = near * (1 if dx > 0 else (-1 if dx < 0 else (s.facing or 1)))
+
+    lean = F.mul(abs(dx), F.milli(ARM["aim_tilt_pm"]))
+    dy = max(-lean, min(lean, dy))
+
+    to_foe = normalized((dx, dy))
+    if F.length_sq(to_foe) == 0:
+        return want
+
+    ahead = ((s.facing or 1) * ONE, 0)
+    axis = normalized(F.add(ahead, F.scale(F.sub(to_foe, ahead),
+                                           F.milli(ARM["aim_relative"]))))
+    if F.length_sq(axis) == 0:
+        return want
+
+    turned = (F.mul(want[0], axis[0]) - F.mul(want[1], axis[1]),
+              F.mul(want[0], axis[1]) + F.mul(want[1], axis[0]))
+    if F.length_sq(turned) != 0:
+        s.assist_dir = normalized(turned)
+    return s.assist_dir
 
 
 def shoulder(s):
@@ -144,7 +197,7 @@ def swing_permille(s):
     return 0 if share <= ARM["min_swing"] else min(1000, share)
 
 
-def combat_step(s, inp, aim=(0, 0)):
+def combat_step(s, inp, aim=(0, 0), foe=None):
     """CombatMotor.Step then ArmMotor.Step. Returns the input the motor may act on."""
     s.was_hit = s.was_parried = s.just_died = False
     s.damage_taken = 0
@@ -167,7 +220,11 @@ def combat_step(s, inp, aim=(0, 0)):
     # The arm, every tick, whatever else is happening.
     push = F.length_sq(aim)
     dead = F.milli(ARM["deadzone"])
-    want = normalized(aim) if push > F.mul(dead, dead) else carry(s)
+    if push > F.mul(dead, dead):
+        want = assist(s, aim, foe)
+    else:
+        want = carry(s)
+        s.assist_held = False
     if s.dead or s.hitstop > 0 or s.stun > 0 or s.stagger > 0:
         want = carry(s)
 

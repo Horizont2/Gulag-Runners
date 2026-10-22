@@ -106,6 +106,28 @@ namespace GulagRunners.Sim
         public int AimRelativePermille;
 
         /// <summary>
+        /// How close he may get, horizontally, before the aim frame stops measuring
+        /// exactly where he is -- as a share of body height.
+        ///
+        /// Without a floor the frame spins under a held stick as you close. Two fighters
+        /// standing on the same spot have no direction between them, and just short of
+        /// that the direction is whatever the small difference between two numbers says,
+        /// which near enough to anything.
+        /// </summary>
+        public int AimFloorPermille;
+
+        /// <summary>
+        /// The most the aim frame may lean away from level, as a SLOPE in thousandths.
+        /// 1000 is 45 degrees.
+        ///
+        /// The frame's job is to say which way "at him" is in a side-view fight, and
+        /// past about 45 degrees up and down stop meaning anything the player can use.
+        /// A fighter on a ledge directly overhead would otherwise rotate the whole stick
+        /// a quarter turn.
+        /// </summary>
+        public int AimTiltPermille;
+
+        /// <summary>
         /// Tip speed below this share of the weapon's own maximum does no damage at all.
         ///
         /// The single most important number here. Too low and holding the blade out
@@ -191,6 +213,8 @@ namespace GulagRunners.Sim
             c.DeadzonePermille = 220;
             c.CarryDropPermille = 700;     // about 35 degrees below level: a lowered blade
             c.AimRelativePermille = 1000;  // forward on the stick means at him
+            c.AimFloorPermille = 500;      // half his height: closer than that is "ahead"
+            c.AimTiltPermille = 1000;      // and the frame never leans past 45 degrees
 
             // A quarter of the weapon's own top speed. Measured against a 3.6 m/s run:
             // a walk-in with a dagger reaches 15% and a spear 9%, so neither pays.

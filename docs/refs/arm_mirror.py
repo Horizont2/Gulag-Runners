@@ -37,7 +37,7 @@ CFG = dict(
     shoulder=780, arm_length_pm=350,
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
-    aim_relative=1000,
+    aim_relative=1000, aim_floor_pm=500, aim_tilt_pm=1000,
     haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
     body_radius_pm=180, blade_radius_pm=60,
     hit_lock=18, clash_deflect=700, clash_lock=10,
@@ -69,7 +69,10 @@ class Fighter:
         self.y = 0
         self.facing = facing
         self.weapon = weapon
-        self.arm = (facing * ONE, 0)
+        # The carry pose, not straight out. Straight out is the OLD rest pose, and
+        # docs/31 removed it because an arm held level is a free permanent guard --
+        # spawning into it opened every round in the pose the design deleted.
+        self.arm = carry(self)
         self.tip_prev = (0, 0)
         self.tip_primed = False
         self.aim_prev = (0, 0)
@@ -168,10 +171,6 @@ def carry(f):
     return normalized(((f.facing or 1) * ONE, -F.milli(CFG["carry_drop"])))
 
 
-def chest(f):
-    return (f.x, f.y + F.cdiv(BODY_HEIGHT, 2))
-
-
 def assist(f, aim, foe):
     """Read the stick in the other fighter's frame rather than the world's.
 
@@ -197,7 +196,22 @@ def assist(f, aim, foe):
 
     if foe is None or CFG["aim_relative"] <= 0:
         return want
-    to_foe = normalized(F.sub(chest(foe), f.shoulder()))
+    # Shoulder to SHOULDER. Measured to his CHEST it leaned 0.26 m downhill at every
+    # range -- stick right put the arm 17 deg down at sparring distance, 40 deg at half
+    # a metre, and straight DOWN when the two of you touched.
+    mine = f.shoulder()
+    dx = foe.shoulder()[0] - mine[0]
+    dy = foe.shoulder()[1] - mine[1]
+
+    near = F.mul(BODY_HEIGHT, F.milli(CFG["aim_floor_pm"]))
+    if abs(dx) < near:
+        side = 1 if dx > 0 else (-1 if dx < 0 else (f.facing or 1))
+        dx = near * side
+
+    lean = F.mul(abs(dx), F.milli(CFG["aim_tilt_pm"]))
+    dy = max(-lean, min(lean, dy))
+
+    to_foe = normalized((dx, dy))
     if F.length_sq(to_foe) == 0:
         return want
 

@@ -49,8 +49,10 @@ def fighter(x, facing=1, weapon=NONE, armour=NONE):
 
 def tick(players, inputs, aims=None):
     aims = aims or [(0, 0)] * len(players)
-    for p, inp, aim in zip(players, inputs, aims):
-        step(p, combat_step(p, inp, aim), W)
+    for i, (p, inp, aim) in enumerate(zip(players, inputs, aims)):
+        # The other one, because the attack stick is read in HIS frame (arm_combat.assist).
+        foe = next((q for j, q in enumerate(players) if j != i), None)
+        step(p, combat_step(p, inp, aim, foe), W)
     resolve(players)
 
 
@@ -177,7 +179,9 @@ for t in range(60 * 20):
     # above the guard never builds enough tip speed to count -- which is the rule
     # working, and was the first version of this test measuring nothing.
     tick([h_bot, h_man], [f, 0],
-         [aim_of(*aim), aim_of(-500, 866 if (t // 27) % 2 else -866)])
+         # In the FRAME, like the bot's own aim and like the player's stick: forward
+         # is at him, so +500 whichever side of him this man is standing on.
+         [aim_of(*aim), aim_of(500, 866 if (t // 27) % 2 else -866)])
     if h_bot.was_hit:
         took += 1
 check("and it takes damage like anything else", took > 0 or h_bot.health < 100,
@@ -208,7 +212,7 @@ print("\n6. it aims the weapon, which is the whole of attacking now")
 # blade moving, so measuring its guard against a man standing still measures nothing --
 # and correctly reported zero when this was first written that way.
 r = spar(weapon=CLUB, foe_weapon=CLUB, ticks=60 * 40, seed=13,
-         foe_aim=lambda t: (-500, 866 if (t // 15) % 2 else -866))
+         foe_aim=lambda t: (500, 866 if (t // 15) % 2 else -866))
 
 swinging = sum(1 for a in r["aims"] if a[1] != 0)
 check("it throws the blade through an arc rather than holding it out",
@@ -217,6 +221,28 @@ check("it throws the blade through an arc rather than holding it out",
 carried = sum(1 for a in r["aims"] if a == (0, 0))
 check("and it carries the blade low the rest of the time, not guarding for free",
       carried > 0, f"{carried} carrying frame(s)")
+
+# Either side of him, and this is the one that caught a real bug. The bot used to aim
+# in WORLD terms (aim_x = towards * 1000) while ArmMotor.Assist turned its aim by that
+# same direction, so the two cancelled: a bot standing to its foe's RIGHT guarded to
+# the right, away from him, and swung high when it meant low. Nothing saw it, because
+# this mirror had no frame in it and every spar in this file put the bot on the left.
+print()
+for side, where in ((1, "to his left"), (-1, "to his right")):
+    s_bot = fighter(-0.6 * side, side, CLUB)
+    s_man = fighter(0.0, -side, CLUB)
+    s_brain = Bot(3)
+    s_brain.guard_hold = 600
+    s_brain.think = 0
+    decide(s_brain, s_bot, s_man, W, config(SPARRING))
+    for _ in range(30):
+        tick([s_bot, s_man], [0, 0], [aim_of(s_brain.aim_x, s_brain.aim_y), (0, 0)])
+    toward = (s_man.x - s_bot.x) > 0
+    points = X(s_bot.arm[0]) > 0
+    check(f"a bot guarding {where} points the blade AT him",
+          toward == points,
+          f"he is {'right' if toward else 'left'} of it, the blade points "
+          f"{'right' if points else 'left'}")
 
 # The guard rule, checked directly rather than waited for in a spar.
 #
