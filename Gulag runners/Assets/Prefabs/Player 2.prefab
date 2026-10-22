@@ -21,8 +21,6 @@ GameObject:
   - component: {fileID: 7255233928553458986}
   - component: {fileID: 7720000000000000001}
   - component: {fileID: 7720000000000000002}
-  - component: {fileID: 4792959179692223678}
-  - component: {fileID: -1085216629079608312}
   m_Layer: 0
   m_Name: Player 2
   m_TagString: Untagged
@@ -532,47 +530,6 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!95 &4792959179692223678
-Animator:
-  serializedVersion: 7
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 562406978992994357}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 0}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 0
-  m_WriteDefaultValuesOnDisable: 0
---- !u!114 &-1085216629079608312
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 562406978992994357}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dc2d511ad0c57ba4cb720238a4605236, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.PlayerArm
-  player: {fileID: 0}
-  animator: {fileID: 4792959179692223678}
-  rightHanded: 1
-  handWeight: 1
-  rotationWeight: 0.85
-  bodyFollow: 0.22
-  drawGizmo: 1
 --- !u!1 &1218326599498418885
 GameObject:
   m_ObjectHideFlags: 0
