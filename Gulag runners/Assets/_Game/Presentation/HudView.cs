@@ -162,6 +162,14 @@ namespace GulagRunners.Game
     /// <summary>Which palette colour a button's glyph takes.</summary>
     public enum GlyphInk { Attack, Block, Action, Jump }
 
+    /// <summary>The ring and knob of a thumb stick, for painting.</summary>
+    [System.Serializable]
+    public class HudStick
+    {
+        public Graphic ring;
+        public Graphic knob;
+    }
+
     /// <summary>
     /// Paints the combat HUD from the simulation, and nothing else.
     ///
@@ -265,11 +273,18 @@ namespace GulagRunners.Game
         [Range(0.5f, 8f)] public float wornPulse = 3f;
 
         [Header("Touch controls")]
-        public HudButton attack = new HudButton();
+        /// <summary>
+        /// The attack stick (docs/31). There is no attack button any more: a blow is
+        /// the weapon's tip moving into somebody, so the right thumb POINTS THE ARM
+        /// rather than asking for an animation.
+        ///
+        /// The block button is gone with it. A weapon is stopped by another weapon, so
+        /// the guard is a place you hold this stick, not a ring you press.
+        /// </summary>
+        public HudStick aim = new HudStick();
 
-        [Tooltip("Dimmed for the 0.7 s after the guard breaks — the one moment the player " +
-                 "has to be told they cannot defend.")]
-        public HudButton block = new HudButton();
+        /// <summary>The old block ring, now purely the dodge (docs/31).</summary>
+        public HudButton dodge = new HudButton();
         public HudButton action = new HudButton();
         public HudButton jump = new HudButton();
 
@@ -607,10 +622,22 @@ namespace GulagRunners.Game
             // The guard-break warning is gone with the guard button. A weapon is stopped
             // by another weapon now (docs/31), and what used to flash here is a thing the
             // player can simply SEE: their own blade knocked aside.
-            PaintButton(attack, GlyphInk.Attack, false);
-            PaintButton(block, GlyphInk.Block, false);
+            PaintStick(aim);
+            PaintButton(dodge, GlyphInk.Block, false);
             PaintButton(action, GlyphInk.Action, false);
             PaintButton(jump, GlyphInk.Jump, false);
+        }
+
+        /// <summary>
+        /// The attack stick, tinted like the old attack ring was. Red, because it is
+        /// the thing that hurts people, and the one control a new player should find
+        /// first.
+        /// </summary>
+        void PaintStick(HudStick stick)
+        {
+            if (stick == null) return;
+            Tint(stick.ring, Fade(palette.line, lineArtAlpha));
+            Tint(stick.knob, Fade(palette.attackGlyph, 0.92f));
         }
 
         void PaintButton(HudButton button, GlyphInk ink, bool disabled)
@@ -666,8 +693,8 @@ namespace GulagRunners.Game
                     slot.swapArrow.SetActive(false);
             }
 
-            PaintButton(attack, GlyphInk.Attack, false);
-            PaintButton(block, GlyphInk.Block, false);
+            PaintStick(aim);
+            PaintButton(dodge, GlyphInk.Block, false);
             PaintButton(action, GlyphInk.Action, false);
             PaintButton(jump, GlyphInk.Jump, false);
 

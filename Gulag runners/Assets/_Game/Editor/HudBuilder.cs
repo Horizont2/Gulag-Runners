@@ -106,7 +106,6 @@ namespace GulagRunners.GameEditor
             new Asset("hud/button/ring-154", 154, 154),
             new Asset("hud/button/ring-130", 130, 130),
             new Asset("hud/button/ring-101", 101, 101),
-            new Asset("hud/button/glyph-attack", 56, 56),
             new Asset("hud/button/glyph-block", 48, 48),
             new Asset("hud/button/glyph-action", 44, 44),
             new Asset("hud/button/glyph-jump", 46, 46),
@@ -670,6 +669,8 @@ namespace GulagRunners.GameEditor
             BuildSoundAndStick(root, sprites, view, out RectTransform ring,
                                out RectTransform knob);
             BuildControls(root, sprites, view);
+            BuildAimStick(root, sprites, view,
+                          out RectTransform aimRing, out RectTransform aimKnob);
 
             PlayerController[] fighters = Object.FindObjectsByType<PlayerController>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -678,7 +679,7 @@ namespace GulagRunners.GameEditor
             if (fighters.Length > 1) view.player2 = fighters[1];
             view.matchState = Object.FindFirstObjectByType<MatchState>();
 
-            string input = WireInput(view, ring, knob);
+            string input = WireInput(view, ring, knob, aimRing, aimKnob);
 
             view.PaintStartingColours();
             EditorUtility.SetDirty(view);
@@ -1033,17 +1034,69 @@ namespace GulagRunners.GameEditor
         {
             RectTransform controls = Panel("Controls", root);
 
+            // Jump and action only. The attack ring is now a STICK, built below, and
+            // the block ring is gone entirely: a weapon is stopped by another weapon
+            // (docs/31), so there is nothing left for a guard button to do.
+            //
+            // They move up and left into the space the two dead rings leave, so the
+            // right thumb has the whole bottom corner for the thing it actually does.
             view.jump = Button(controls, sprites, "Button / Jump", "hud/button/ring-130",
-                               "hud/button/glyph-jump", 1576, 558);
-            view.block = Button(controls, sprites, "Button / Block", "hud/button/ring-130",
-                                "hud/button/glyph-block", 1715, 525);
+                               "hud/button/glyph-jump", 1576, 468);
             view.action = Button(controls, sprites, "Button / Action", "hud/button/ring-101",
-                                 "hud/button/glyph-action", 1534, 698);
-            // Last, so it is drawn on top and wins the raycast where its square overlaps
-            // the jump ring's. A thumb that lands between them gets attack, which is the
-            // forgiving way round in a fight.
-            view.attack = Button(controls, sprites, "Button / Attack", "hud/button/ring-154",
-                                 "hud/button/glyph-attack", 1687, 675);
+                                 "hud/button/glyph-action", 1430, 540);
+
+            // The old block ring, doing the one job that survived. docs/02 gave the
+            // fighter a single defensive button carrying both the guard and the dodge;
+            // the guard is the weapon's job now, so this is purely the dodge -- and the
+            // dodge is switched on for the first time since the movement pass.
+            view.dodge = Button(controls, sprites, "Button / Dodge", "hud/button/ring-130",
+                                "hud/button/glyph-block", 1430, 390);
+        }
+
+        /// <summary>
+        /// The attack stick: the right thumb, and the whole of the fight.
+        ///
+        /// Same parts as the movement stick, mirrored into the other corner, and that
+        /// symmetry is the point -- a player who has understood the left thumb has
+        /// understood this one. It is built the larger of the two (the attack ring's
+        /// 154 against the stick's 200 is close enough to read as a pair) because it is
+        /// the control that decides matches.
+        /// </summary>
+        void BuildAimStick(Transform root, Dictionary<string, Sprite> sprites, HudView view,
+                           out RectTransform ring, out RectTransform knob)
+        {
+            RectTransform holder = Panel("Attack stick", root);
+
+            Vector2 ringSize = Size("hud/joystick/ring", 200, 200);
+            ring = Centred(Make("Ring", holder, DesignW - 148 - ringSize.x, 648,
+                                ringSize.x, ringSize.y, 1f, 1f, _controlScale));
+
+            Vector2 knobSize = Size("hud/joystick/knob", 68, 68);
+            knob = Knob("Knob", ring, knobSize, _controlScale);
+
+            view.aim = new HudStick
+            {
+                ring = Picture(ring.gameObject, sprites, "hud/joystick/ring", false),
+                knob = Picture(knob.gameObject, sprites, "hud/joystick/knob", false),
+            };
+        }
+
+        /// <summary>A ring and a knob, made into something a thumb can push.</summary>
+        static VirtualJoystick Stick(RectTransform ring, RectTransform knob)
+        {
+            if (ring == null) return null;
+
+            VirtualJoystick js = Undo.AddComponent<VirtualJoystick>(ring.gameObject);
+            js.knob = knob;
+            // Full push when the KNOB reaches the ring, not when the thumb does, so the
+            // thing on screen agrees with the number being read.
+            js.radius = Mathf.Max(1f, (ring.sizeDelta.x - (knob != null
+                                       ? knob.sizeDelta.x : 0f)) * 0.5f);
+            js.floating = false;
+
+            Graphic g = ring.GetComponent<Graphic>();
+            if (g != null) g.raycastTarget = true;
+            return js;
         }
 
         HudButton Button(Transform parent, Dictionary<string, Sprite> sprites, string name,
@@ -1081,7 +1134,8 @@ namespace GulagRunners.GameEditor
         /// phone the opponent is on their own device with their own HUD, and in the
         /// editor they are driven by the keyboard half of DeviceInputSource.
         /// </summary>
-        string WireInput(HudView view, RectTransform ring, RectTransform knob)
+        string WireInput(HudView view, RectTransform ring, RectTransform knob,
+                         RectTransform aimRing, RectTransform aimKnob)
         {
             EnsureEventSystem();
 
@@ -1098,25 +1152,12 @@ namespace GulagRunners.GameEditor
 
             Undo.RecordObject(touch, "Build HUD");
 
-            if (ring != null)
-            {
-                VirtualJoystick js = Undo.AddComponent<VirtualJoystick>(ring.gameObject);
-                js.knob = knob;
-                // Full push when the KNOB reaches the ring, not when the thumb does, so
-                // the thing on screen agrees with the number being read.
-                js.radius = Mathf.Max(1f, (ring.sizeDelta.x - (knob != null
-                                           ? knob.sizeDelta.x : 0f)) * 0.5f);
-                js.floating = false;
-                Graphic g = ring.GetComponent<Graphic>();
-                if (g != null) g.raycastTarget = true;
-                touch.stick = js;
-            }
+            touch.stick = Stick(ring, knob);
+            touch.aimStick = Stick(aimRing, aimKnob);
 
-            touch.attackButton = Hit(view.attack);
-            // The block ring drives DODGE, and that is not a slip: docs/02 gives the
-            // fighter one defensive button, and that one flag is a guard standing still
-            // and a dodge with a direction held.
-            touch.dodgeButton = Hit(view.block);
+            // The dodge is the action ring's neighbour now rather than the block ring,
+            // because there is no block ring: a weapon is stopped by another weapon.
+            touch.dodgeButton = Hit(view.dodge);
             touch.actionButton = Hit(view.action);
             touch.jumpButton = Hit(view.jump);
             EditorUtility.SetDirty(touch);
@@ -1126,9 +1167,9 @@ namespace GulagRunners.GameEditor
             // button that silently does nothing on a phone an hour from now.
             List<string> live = new List<string>();
             List<string> dead = new List<string>();
-            (touch.stick != null ? live : dead).Add("stick");
-            (touch.attackButton != null ? live : dead).Add("attack");
-            (touch.dodgeButton != null ? live : dead).Add("block/dodge");
+            (touch.stick != null ? live : dead).Add("move stick");
+            (touch.aimStick != null ? live : dead).Add("attack stick");
+            (touch.dodgeButton != null ? live : dead).Add("dodge");
             (touch.actionButton != null ? live : dead).Add("action");
             (touch.jumpButton != null ? live : dead).Add("jump");
 
