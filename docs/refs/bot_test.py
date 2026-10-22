@@ -13,12 +13,12 @@ A bot that re-decides every tick at 60 Hz does not look fast, it looks broken. T
 hard to see by eye in a fight and trivial to count here, which is the whole reason this file
 exists."""
 import bot_mirror as B
-import combat_mirror as K
+import arm_combat as K
 import sim_motor_mirror as M
 from bot_mirror import Bot, config, decide, DUMMY, SPARRING, HUNTER
-from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, DOD, ATTACK, AIM_L, AIM_R
+from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, DOD
 from loot_mirror import Inv, NONE, CLUB, SPEAR, CHAINMAIL
-from combat_mirror import combat_step, resolve, init
+from arm_combat import combat_step, resolve, init, aim_of
 from arena_geometry import world
 
 W = world()
@@ -47,14 +47,15 @@ def fighter(x, facing=1, weapon=NONE, armour=NONE):
     return s
 
 
-def tick(players, inputs):
-    for p, inp in zip(players, inputs):
-        step(p, combat_step(p, inp), W)
+def tick(players, inputs, aims=None):
+    aims = aims or [(0, 0)] * len(players)
+    for p, inp, aim in zip(players, inputs, aims):
+        step(p, combat_step(p, inp, aim), W)
     resolve(players)
 
 
 def spar(skill=SPARRING, weapon=CLUB, foe_weapon=NONE, ticks=60 * 20, seed=7,
-         foe_input=lambda t: 0, spacing=None):
+         foe_input=lambda t: 0, foe_aim=lambda t: (0, 0), spacing=None):
     """One bot against one dummy human, and everything that happened."""
     bot_s = fighter(-1.0, 1, weapon)
     man = fighter(1.0, -1, foe_weapon)
@@ -65,21 +66,25 @@ def spar(skill=SPARRING, weapon=CLUB, foe_weapon=NONE, ticks=60 * 20, seed=7,
     last = None
     gaps = []
 
+    aims = []
     for t in range(ticks):
-        flags = decide(brain, bot_s, man, W, cfg)
+        flags, aim = decide(brain, bot_s, man, W, cfg)
         pressed.append(flags)
+        aims.append(aim)
         if last is not None and flags != last:
             changes += 1
         last = flags
 
-        tick([bot_s, man], [flags, foe_input(t)])
+        tick([bot_s, man], [flags, foe_input(t)],
+             [aim_of(*aim), aim_of(*foe_aim(t))])
 
-        if bot_s.swing_started: swings += 1
+        if bot_s.swing_share > 0: swings += 1
         if man.was_hit: hits_dealt += 1
         if bot_s.was_hit: hits_taken += 1
         gaps.append(abs(F(man.x) - F(bot_s.x)))
 
-    return dict(bot=bot_s, man=man, brain=brain, pressed=pressed, changes=changes,
+    return dict(bot=bot_s, man=man, brain=brain, pressed=pressed, aims=aims,
+                changes=changes,
                 swings=swings, dealt=hits_dealt, taken=hits_taken, gaps=gaps,
                 ticks=ticks, cfg=cfg)
 
@@ -121,10 +126,13 @@ for offset in range(cfg["react"] + cfg["jitter"]):
     for _ in range(offset + 1):                        # land on a different phase each time
         decide(brain, bot_s, man, W, cfg)
 
-    before = decide(brain, bot_s, man, W, cfg)
+    before, _ = decide(brain, bot_s, man, W, cfg)
     man.x = X(-4.0)                                    # now he is the OTHER way
     for d in range(1, 120):
-        if decide(brain, bot_s, man, W, cfg) != before:
+        # The FLAGS only. The arm is re-pointed every tick by design (it has to be, or
+        # nothing could swing), so comparing the whole intent would measure the arm
+        # rather than the decision the reaction time is about.
+        if decide(brain, bot_s, man, W, cfg)[0] != before:
             delays.append(d)
             break
 
@@ -151,28 +159,88 @@ check("it hits the other fighter without being steered", r["dealt"] > 0,
       f"{r['dealt']} hit(s), {r['swings']} swing(s)")
 
 # And the other way: a man who only attacks must be able to hurt it.
-r2 = spar(weapon=CLUB, foe_weapon=SPEAR, ticks=60 * 40, seed=5,
-          foe_input=lambda t: ATTACK | (L if t % 90 < 45 else 0))
-check("and it takes damage like anything else", r2["taken"] > 0 or r2["bot"].health < 100,
-      f"health {r2['bot'].health}, hit {r2['taken']} time(s)")
+# And the other way: a bot's body is hittable like anything else.
+#
+# Stood in reach and left there, rather than walked in. Walking the man at the bot was
+# two bugs' worth of indirection -- he strolls straight past it, and after that his
+# blade points away -- and none of that is what this line is trying to find out.
+h_bot = fighter(-0.6, 1, CLUB)
+h_man = fighter(0.0, -1, SPEAR)
+h_brain, h_cfg = Bot(5), config(DUMMY)
+took = 0
+for t in range(60 * 20):
+    f, aim = decide(h_brain, h_bot, h_man, W, h_cfg)
+    # A full arc, high to low, THROUGH the level where the body is. A narrow waggle
+    # above the guard never builds enough tip speed to count -- which is the rule
+    # working, and was the first version of this test measuring nothing.
+    tick([h_bot, h_man], [f, 0],
+         [aim_of(*aim), aim_of(-500, 866 if (t // 27) % 2 else -866)])
+    if h_bot.was_hit:
+        took += 1
+check("and it takes damage like anything else", took > 0 or h_bot.health < 100,
+      f"health {h_bot.health}, hit {took} time(s)")
 
 print("\n5. the harmless one is harmless")
 r = spar(skill=DUMMY, weapon=CLUB, ticks=60 * 20, seed=9)
-check("a dummy never swings", r["swings"] == 0, f"{r['swings']} swing(s)")
+# Its first few ticks raise the blade from the spawn pose into the guard, and that IS a
+# swing -- correctly, because a moving blade is the only thing that can hurt anybody.
+# What "harmless" means is that it never does it again.
+settled = sum(1 for a in r["aims"][30:] if a[1] != 0)
+check("a dummy never swings", settled == 0,
+      f"{settled} swinging frame(s) after the first half second")
 check("and never walks off", abs(F(r["bot"].x) - (-1.0)) < 0.6,
       f"moved {abs(F(r['bot'].x) - (-1.0)):.2f} m")
-check("but it does raise its guard", any(f & DOD for f in r["pressed"]),
-      "never guarded" if not any(f & DOD for f in r["pressed"]) else "")
+# It holds its weapon level at the man, which IS the guard now -- no button, and
+# nothing for the player to practise against except getting round a held blade.
+# Carrying is (0, 0) -- stick centred, blade low. Guarding is a real push with no
+# vertical component. The first version of this counted "aim_y == 0", which is true of
+# both, so it passed on a bot that never lifted its weapon at all.
+carried = sum(1 for a in r["aims"] if a == (0, 0))
+check("and it carries its weapon low rather than guarding for free",
+      carried > len(r["aims"]) * 0.5,
+      f"{carried} carrying frame(s) of {len(r['aims'])}")
 
-print("\n6. it uses the aim split, which is the point of having one")
-r = spar(weapon=CLUB, ticks=60 * 40, seed=13)
-aimed = sum(1 for f in r["pressed"] if f & (AIM_L | AIM_R))
-check("it aims deliberately rather than letting its feet decide", aimed > 0,
-      f"{aimed} aimed frame(s) of {r['ticks']}")
+print("\n6. it aims the weapon, which is the whole of attacking now")
+# Against somebody who actually swings. The bot only raises its guard when it can see a
+# blade moving, so measuring its guard against a man standing still measures nothing --
+# and correctly reported zero when this was first written that way.
+r = spar(weapon=CLUB, foe_weapon=CLUB, ticks=60 * 40, seed=13,
+         foe_aim=lambda t: (-500, 866 if (t // 15) % 2 else -866))
+
+swinging = sum(1 for a in r["aims"] if a[1] != 0)
+check("it throws the blade through an arc rather than holding it out",
+      swinging > 0, f"{swinging} swinging frame(s) of {r['ticks']}")
+
+carried = sum(1 for a in r["aims"] if a == (0, 0))
+check("and it carries the blade low the rest of the time, not guarding for free",
+      carried > 0, f"{carried} carrying frame(s)")
+
+# The guard rule, checked directly rather than waited for in a spar.
+#
+# Two attempts at the emergent version both read zero, and both for real reasons worth
+# writing down. A bot that is WINNING never guards, because its opponent is stunned and
+# never gets a blade moving. And TipSpeed is zeroed on the tick its owner is hit, so a
+# foe the bot is successfully beating has no tell to read at all. Neither is a bug --
+# they are the rule working -- but they mean emergent play measures the matchup.
+g_cfg = config(SPARRING)
+raised = 0
+for seed in range(40):
+    # Inside its own preferred range, or it takes the "close the distance" branch and
+    # never reaches the guard decision at all.
+    g_bot = fighter(-0.35, 1, CLUB)
+    g_man = fighter(0.35, -1, CLUB)
+    g_brain = Bot(seed)
+    g_man.tip_speed = X(0.2)              # his blade is moving, and the bot can see it
+    g_brain.think = 0                     # and it is allowed to decide this tick
+    decide(g_brain, g_bot, g_man, W, g_cfg)
+    if g_brain.guard_hold > 0:
+        raised += 1
+check("and it raises a guard when it can see a blade moving", raised > 0,
+      f"{raised} of 40 seeds guarded; the roll is {g_cfg['guard'] * 3} permille")
 
 # Backing off with the blade still on the man: travel one way, aim the other.
-withdrew = sum(1 for f in r["pressed"]
-               if (f & L and f & AIM_R) or (f & R and f & AIM_L))
+withdrew = sum(1 for f, a in zip(r["pressed"], r["aims"])
+               if (f & L and a[0] > 0) or (f & R and a[0] < 0))
 check("and some of that is a fighting withdrawal", withdrew > 0,
       f"{withdrew} frame(s) going one way and aiming the other")
 
@@ -183,10 +251,10 @@ him = fighter(1.0, -1, CLUB)
 cfg = config(SPARRING)
 same = 0
 for t in range(60 * 20):
-    fa = decide(a, me, him, W, cfg)
-    fb = decide(b, him, me, W, cfg)
+    fa, aa = decide(a, me, him, W, cfg)
+    fb, ab = decide(b, him, me, W, cfg)
     if a.think == b.think: same += 1
-    tick([me, him], [fa, fb])
+    tick([me, him], [fa, fb], [aim_of(*aa), aim_of(*ab)])
 check("their clocks drift apart", same < 60 * 20 * 0.6,
       f"in step on {same} of {60 * 20} ticks")
 
@@ -196,10 +264,10 @@ man = fighter(0.6, -1, CLUB)
 brain, cfg = Bot(4), config(SPARRING)
 pressed_while_down = 0
 for t in range(60 * 20):
-    f = decide(brain, bot_s, man, W, cfg)
+    f, aim = decide(brain, bot_s, man, W, cfg)
     if (bot_s.dead or B.reeling(bot_s)) and f != 0:
         pressed_while_down += 1
-    tick([bot_s, man], [f, ATTACK])
+    tick([bot_s, man], [f, 0], [aim_of(*aim), aim_of(-1000, 0)])
 check("it holds nothing while reeling or dead", pressed_while_down == 0,
       f"{pressed_while_down} frame(s)")
 

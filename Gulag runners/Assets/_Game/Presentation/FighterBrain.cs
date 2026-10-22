@@ -101,9 +101,9 @@ namespace GulagRunners.Game
             }
         }
 
-        public InputFlags Read()
+        public TickInput Read()
         {
-            if (!TakingOver) { pressing = ""; return InputFlags.None; }
+            if (!TakingOver) { pressing = ""; return TickInput.None; }
 
             if (!_seeded) Seed();
             if (tuningFromSkill && skill != _tuned)
@@ -116,17 +116,17 @@ namespace GulagRunners.Game
             if (foe == null || self.World == null)
             {
                 pressing = "no opponent";
-                return InputFlags.None;
+                return TickInput.None;
             }
 
             PlayerSimState me = self.State;
             PlayerSimState him = foe.State;
 
-            InputFlags flags = BotBrain.Decide(ref _bot, in me, in him, self.World,
+            TickInput intent = BotBrain.Decide(ref _bot, in me, in him, self.World,
                                                in tuning, self.Config);
 
-            pressing = $"{flags}  ({_bot.Think})";
-            return flags;
+            pressing = $"{intent.Flags} aim({intent.AimX},{intent.AimY})  ({_bot.Think})";
+            return intent;
         }
 
         /// <summary>

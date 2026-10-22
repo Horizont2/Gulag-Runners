@@ -280,6 +280,18 @@ namespace GulagRunners.Sim
         public int FallDamagePerSpeed;
         public int StaggerFrames;
 
+        /// <summary>
+        /// Extra frames of hit stop per point of damage, in thousandths of a frame.
+        /// Weight you can feel, instead of one constant for every blow in the game.
+        /// </summary>
+        public int HitStopPerDamagePermille;
+
+        /// <summary>
+        /// Ceiling on it. Past about a sixth of a second a freeze stops reading as
+        /// weight and starts reading as the game having dropped frames.
+        /// </summary>
+        public int MaxHitStopFrames;
+
         public int DeathFrames;
 
         public static CombatConfig Default()
@@ -301,6 +313,14 @@ namespace GulagRunners.Sim
             c.HitStopFrames = 3;
             c.BlockStopFrames = 2;
             c.ParryStopFrames = 7;
+
+            // And the part that was missing: hit stop that knows what hit. Three flat
+            // frames meant a 4-damage jab and a 21-damage warhammer froze the screen for
+            // the same 50 ms, so nothing in the game felt heavier than anything else.
+            // A third of a frame per point of damage puts a jab at 4 frames and a full
+            // hammer at the cap, which is the 2-to-10 range docs/30 asked for.
+            c.HitStopPerDamagePermille = 330;
+            c.MaxHitStopFrames = 10;
 
             c.HitstunPerDamage = 1;
             c.MaxHitstunFrames = 34;   // was 26, which clipped the floor below off a warhammer

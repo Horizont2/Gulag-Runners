@@ -6,12 +6,12 @@ spot, and no amount of tuning the choices fixes it, because the fault is the rat
 not something you can see reliably by eye in a fight, and it is trivial to count here.
 
 Mirrors Gulag runners/Assets/_Game/Sim/Core/BotBrain.cs and BotConfig.cs."""
-from sim_motor_mirror import M, F, C, L, R, UP, DN, JMP, DOD, ATTACK, AIM_L, AIM_R
+from sim_motor_mirror import M, F, C, L, R, UP, DN, JMP, DOD
 from loot_mirror import Rng, ITEMS
 
 DUMMY, SPARRING, HUNTER = 0, 1, 2
 
-# Attack phases, as combat_mirror numbers them.
+# No attack phases any more (docs/31): a blow is a moving tip, not a state.
 NONE_P, WINDUP, ACTIVE, RECOVERY = 0, 1, 2, 3
 
 
@@ -38,6 +38,11 @@ class Bot:
         s.held = 0
         s.rng = Rng(seed)
         s.ladder = -1
+        s.aim_x = 0
+        s.aim_y = 0
+        s.swing_hold = 0
+        s.swing_high = False
+        s.guard_hold = 0
 
 
 def scale(v, permille):
@@ -49,19 +54,61 @@ def roll(bot, permille):
 
 
 def decide(bot, me, foe, w, cfg):
-    """BotBrain.Decide: the clock, and the thought it gates."""
+    """BotBrain.Decide: the clock, the thought it gates, and the arm it does not.
+
+    Returns (flags, aim). The ARM is re-pointed every tick, outside the reaction gate:
+    a bot that moved its weapon once every fourteen frames would not be a slow bot, it
+    would be one that cannot swing at all, because tip speed is damage now.
+    """
+    aim(bot, me, foe)
+    intent = (bot.aim_x, bot.aim_y)
+
     if me.dead or reeling(me) or me.mode in ("mount", "mantle"):
         bot.held = 0
         bot.think = 0
-        return 0
+        bot.swing_hold = 0
+        return 0, intent
 
     if bot.think > 0:
         bot.think -= 1
-        return bot.held
+        return bot.held, intent
 
     bot.think = cfg["react"] + (bot.rng.below(cfg["jitter"]) if cfg["jitter"] > 0 else 0)
     bot.held = think(bot, me, foe, w, cfg)
-    return bot.held
+    return bot.held, (bot.aim_x, bot.aim_y)
+
+
+def aim(bot, me, foe):
+    """Two poses: guard (blade level at them) and swing (throw it high to low)."""
+    towards = 1 if foe.x >= me.x else -1
+
+    if bot.swing_hold > 0:
+        bot.swing_hold -= 1
+        if bot.swing_hold == 0:
+            bot.swing_high = not bot.swing_high
+        bot.aim_x = towards * 500
+        bot.aim_y = 866 if bot.swing_high else -866
+        return
+
+    if bot.guard_hold > 0:
+        bot.guard_hold -= 1
+        bot.aim_x = towards * 1000
+        bot.aim_y = 0
+        return
+
+    # Carrying: stick centred, blade low, open. Which is what makes it beatable -- the
+    # first version guarded whenever it was not swinging, which is a free perfect block.
+    bot.aim_x = 0
+    bot.aim_y = 0
+
+
+def swing(bot, me):
+    """Commit to one end of the arc, held long enough for the arm to get there."""
+    if bot.swing_hold > 0:
+        return
+    bot.guard_hold = 0
+    frames = ITEMS[me.inv.weapon]["frames"]
+    bot.swing_hold = max(4, frames)
 
 
 def reeling(s):
@@ -87,7 +134,7 @@ def think(bot, me, foe, w, cfg):
             return to_ladder
 
     if cfg["skill"] == DUMMY:
-        return DOD if roll(bot, cfg["guard"]) else 0
+        return 0
 
     reach = C["W"] // 2 + ITEMS[me.inv.weapon]["reach"]
     want = scale(reach, cfg["range_pm"])
@@ -104,13 +151,14 @@ def think(bot, me, foe, w, cfg):
     if flat < too_close:
         flags |= L if towards > 0 else R
         if roll(bot, cfg["withdraw"]):
-            flags |= AIM_R if towards > 0 else AIM_L
             if roll(bot, cfg["aggression"]):
-                flags |= ATTACK
+                swing(bot, me)
         return flags
 
-    if foe.attack == WINDUP and roll(bot, cfg["guard"] * 3):
-        return DOD
+    if foe.tip_speed > 0 and roll(bot, cfg["guard"] * 3):
+        bot.swing_hold = 0
+        bot.guard_hold = cfg["react"] * 2
+        return 0
 
     if roll(bot, cfg["dodge"]) and me.stam > 1:
         flags |= L if towards > 0 else R
@@ -118,8 +166,7 @@ def think(bot, me, foe, w, cfg):
         return flags
 
     if roll(bot, cfg["aggression"]):
-        flags |= ATTACK
-        flags |= AIM_R if towards > 0 else AIM_L
+        swing(bot, me)
         return flags
 
     if flat > scale(want, 900):

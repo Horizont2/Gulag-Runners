@@ -130,6 +130,12 @@ namespace GulagRunners.Game
         public ChestConfig Config { get; private set; }
         public DropConfig Drops { get; private set; }
         public CombatConfig Combat { get; private set; }
+
+        /// <summary>
+        /// The arm: how fast it swings, how long it is, and what counts as a blow
+        /// (docs/31). Tuned in the inspector on CombatTuning like everything else.
+        /// </summary>
+        public ArmConfig Arm { get; private set; } = ArmConfig.Default();
         public MatchConfig MatchRules { get; private set; }
 
         /// <summary>Where the match has got to. Read it; only the tick moves it.</summary>
@@ -265,6 +271,7 @@ namespace GulagRunners.Game
             Config = chests.ToConfig();
             Drops = drops.ToConfig();
             Combat = combat.ToConfig();
+            Arm = combat.ToArmConfig();
             MatchRules = BuildRules();
 
             if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
@@ -458,10 +465,11 @@ namespace GulagRunners.Game
                 _scratch[i] = fighters[i].State;
             }
 
-            // docs/01: on the last platform, bare hands hit twice as hard. The fight has to be
-            // told which minute it is in; nothing else about it changes.
-            CombatMotor.Resolve(_scratch, Combat, fighters[0].Config,
-                                _match.Phase == MatchPhase.SuddenDeath);
+            // Weapons against weapons first, then weapons against bodies -- that order
+            // IS the block, and ArmMotor owns it because it owns the geometry.
+            // docs/01: on the last platform, bare hands hit twice as hard.
+            ArmMotor.Resolve(_scratch, fighters[0].Config, Arm, Combat,
+                             _match.Phase == MatchPhase.SuddenDeath);
 
             for (int i = 0; i < fighters.Count; i++) fighters[i].OverwriteState(in _scratch[i]);
         }
@@ -480,6 +488,7 @@ namespace GulagRunners.Game
             Config = chests.ToConfig();
             Drops = drops.ToConfig();
             Combat = combat.ToConfig();
+            Arm = combat.ToArmConfig();
             MatchRules = BuildRules();
         }
 

@@ -230,6 +230,13 @@ namespace GulagRunners.Game
             ? matchState.Combat.MaxHealth
             : 100;
         public MoveConfig Config => _config;
+
+        /// <summary>
+        /// The arm's tuning, for whatever is drawing it. Off the match when there is one
+        /// so the view and the simulation cannot be looking at two different arms.
+        /// </summary>
+        public ArmConfig ArmSettings =>
+            matchState != null ? matchState.Arm : ArmConfig.Default();
         public SimWorld World => _world;
 
         /// <summary>
@@ -256,8 +263,8 @@ namespace GulagRunners.Game
         float _alpha = 1f;
         float _tilt;
         float _tiltRoll, _tiltLean;
-        InputFlags _held;             // what is held right now
-        InputFlags _pending;          // held, plus anything tapped since the last tick
+        TickInput _held;              // what is held right now, and where the arm is asked to point
+        TickInput _pending;           // held, plus anything tapped since the last tick
         Vector3 _baseVisualScale = Vector3.one;
         Vector2 _spawnPoint;
         bool _warnedEmptyWorld;
@@ -430,7 +437,7 @@ namespace GulagRunners.Game
             if (_input != null)
             {
                 _held = _input.Read();
-                _pending |= _held;
+                _pending = TickInput.Merge(_pending, _held);
             }
 
             _accumulator += Time.deltaTime;
@@ -450,8 +457,9 @@ namespace GulagRunners.Game
             Render(Mathf.Clamp01(_accumulator / TickSeconds));
         }
 
-        void Tick(InputFlags input)
+        void Tick(TickInput intent)
         {
+            InputFlags input = intent.Flags;
             _previous = _state;
             if (worldBaker != null && worldBaker.World != null) _world = worldBaker.World;
 
@@ -511,8 +519,15 @@ namespace GulagRunners.Game
             // The fight decides what the body is allowed to do before it moves: a swing is a
             // commitment to where you are standing, and that is what makes reach matter.
             InputFlags moveInput = input;
+            ArmConfig armCfg = matchState != null ? matchState.Arm : ArmConfig.Default();
             if (matchState != null)
-                moveInput = CombatMotor.Step(ref _state, input, matchState.Combat, in _config);
+                moveInput = CombatMotor.Step(ref _state, input, matchState.Combat,
+                                             in _config, in armCfg);
+
+            // The arm moves BEFORE the body, so the tip speed this tick is measured
+            // against where the shoulder was when the swing was asked for. After the
+            // body, a fighter who merely ran forwards would read as having swung.
+            ArmMotor.Step(ref _state, intent.Aim, in _config, in armCfg);
 
             PlayerMotor.Step(ref _state, moveInput, _world, in _config);
 
@@ -520,7 +535,6 @@ namespace GulagRunners.Game
             // one tick each, and a frame that happens to run two ticks or none would double
             // them or lose them.
             if (_state.WasHit) Hurt?.Invoke(_state.DamageTaken);
-            if (_state.WasBlocked) Blocked?.Invoke(_state.DamageTaken);
             if (_state.WasParried) Parried?.Invoke();
             if (_state.JustDied) Died?.Invoke();
 

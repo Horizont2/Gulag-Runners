@@ -24,7 +24,7 @@ namespace GulagRunners.Game
             if (source != null && !_sources.Contains(source)) _sources.Add(source);
         }
 
-        public InputFlags Read()
+        public TickInput Read()
         {
             // One source may take the fighter over -- a bot, a replay. Merging it with a
             // keyboard would give a fighter two drivers, and the symptom of that is a
@@ -33,9 +33,21 @@ namespace GulagRunners.Game
                 if (_sources[i] is IInputTakeover takeover && takeover.TakingOver)
                     return _sources[i].Read();
 
+            // Buttons from everything at once; the aim from whichever source is actually
+            // pushing its stick hardest. Summing two aims would point the arm at the
+            // average of a touch stick resting at zero and a pad being used, which is
+            // half as far as asked -- so they compete rather than add.
             InputFlags flags = InputFlags.None;
-            for (int i = 0; i < _sources.Count; i++) flags |= _sources[i].Read();
-            return flags;
+            int bestX = 0, bestY = 0, bestPush = 0;
+            for (int i = 0; i < _sources.Count; i++)
+            {
+                TickInput t = _sources[i].Read();
+                flags |= t.Flags;
+
+                int push = t.AimX * t.AimX + t.AimY * t.AimY;
+                if (push > bestPush) { bestPush = push; bestX = t.AimX; bestY = t.AimY; }
+            }
+            return new TickInput(flags, bestX, bestY);
         }
     }
 }

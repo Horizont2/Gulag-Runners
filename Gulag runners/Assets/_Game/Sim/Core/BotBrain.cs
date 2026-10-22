@@ -15,6 +15,34 @@ namespace GulagRunners.Sim
         /// <summary>The ladder it is walking to, or -1. Hunter only.</summary>
         public int Ladder;
 
+        /// <summary>Where it is pointing the weapon, in thousandths. See BotBrain.Aim.</summary>
+        public short AimX;
+        public short AimY;
+
+        /// <summary>
+        /// Ticks left on the current end of a swing. The bot attacks by throwing its arm
+        /// from one end of an arc to the other, and it has to HOLD each end long enough
+        /// for the arm to actually travel -- flipping every tick would just vibrate the
+        /// blade on the spot and never build any tip speed, which is now the only thing
+        /// that does damage.
+        /// </summary>
+        public int SwingHold;
+
+        /// <summary>Which end of the arc it is heading for.</summary>
+        public bool SwingHigh;
+
+        /// <summary>
+        /// Ticks left holding the blade level at the other fighter.
+        ///
+        /// A guard it has to DECIDE to hold, because the first version simply guarded
+        /// whenever it was not swinging -- a perfect, free, permanent block that nothing
+        /// could get through. Measured: a spearman walking straight into it and swinging
+        /// for twenty seconds landed nothing at all. The carry pose had the same bug for
+        /// the same reason, and it is the same fix: a guard costs you the swing you are
+        /// not making, so it has to be asked for.
+        /// </summary>
+        public int GuardHold;
+
         public static BotState Seeded(uint seed)
         {
             BotState b = default;
@@ -46,10 +74,17 @@ namespace GulagRunners.Sim
     /// </summary>
     public static class BotBrain
     {
-        public static InputFlags Decide(ref BotState bot, in PlayerSimState self,
-                                        in PlayerSimState foe, SimWorld world,
-                                        in BotConfig cfg, in MoveConfig move)
+        public static TickInput Decide(ref BotState bot, in PlayerSimState self,
+                                       in PlayerSimState foe, SimWorld world,
+                                       in BotConfig cfg, in MoveConfig move)
         {
+            // The arm is re-aimed EVERY tick, outside the reaction gate below. A bot that
+            // only moved its weapon once every fourteen frames would not be a slow bot, it
+            // would be a bot that cannot swing at all: tip speed is damage now, and an arm
+            // that jumps and then sits still for thirteen ticks has an average speed of
+            // nearly nothing. What the reaction time still gates is DECISIONS -- where to
+            // stand, whether to commit -- which is what it was always for.
+            Aim(ref bot, in self, in foe, in cfg);
             // Dead, reeling, or being carried along by a scripted move: nothing to decide,
             // and pressing anything during a mount or a climb-out is pressing into a wall.
             if (self.Dead || self.Reeling ||
@@ -57,19 +92,20 @@ namespace GulagRunners.Sim
             {
                 bot.Held = InputFlags.None;
                 bot.Think = 0;
-                return InputFlags.None;
+                bot.SwingHold = 0;
+                return new TickInput(InputFlags.None, bot.AimX, bot.AimY);
             }
 
             if (bot.Think > 0)
             {
                 bot.Think--;
-                return bot.Held;
+                return new TickInput(bot.Held, bot.AimX, bot.AimY);
             }
 
             bot.Think = cfg.ReactionFrames +
                         (cfg.ReactionJitter > 0 ? bot.Rng.Below(cfg.ReactionJitter) : 0);
             bot.Held = Think(ref bot, in self, in foe, world, in cfg, in move);
-            return bot.Held;
+            return new TickInput(bot.Held, bot.AimX, bot.AimY);
         }
 
         static InputFlags Think(ref BotState bot, in PlayerSimState self,
@@ -98,8 +134,10 @@ namespace GulagRunners.Sim
                 if (toLadder != InputFlags.None) return toLadder;
             }
 
-            if (cfg.Skill == BotSkill.Dummy)
-                return Roll(ref bot, cfg.GuardPermille) ? InputFlags.Dodge : InputFlags.None;
+            // A dummy holds its weapon up and does nothing else, which is now a useful
+            // thing to practise against rather than a post: walking into a held blade
+            // still does nothing, so the player has to actually swing past it.
+            if (cfg.Skill == BotSkill.Dummy) return InputFlags.None;
 
             // Where it wants to stand, measured off its OWN weapon: a spear bot that stands
             // at a club's distance has thrown away the only thing a spear is for.
@@ -124,19 +162,29 @@ namespace GulagRunners.Sim
                 // off with its guard up has to be chased rather than walked after.
                 flags |= towards > 0 ? InputFlags.Left : InputFlags.Right;
 
-                if (Roll(ref bot, cfg.FightingWithdrawalPermille))
-                {
-                    flags |= towards > 0 ? InputFlags.AimRight : InputFlags.AimLeft;
-                    if (Roll(ref bot, cfg.AggressionPermille)) flags |= InputFlags.Attack;
-                }
+                // Backing off with the blade still on them, which is the thing a weapon
+                // that is always live makes possible: something retreating behind its own
+                // guard has to be gone round, not walked after.
+                if (Roll(ref bot, cfg.FightingWithdrawalPermille) &&
+                    Roll(ref bot, cfg.AggressionPermille))
+                    Swing(ref bot, in self);
 
                 return flags;
             }
 
-            // In range. Guard against a wind-up it can see, swing otherwise -- in that order,
-            // because a bot that only ever attacks teaches the player to only ever attack.
-            if (foe.Attack == AttackPhase.Windup && Roll(ref bot, cfg.GuardPermille * 3))
-                return InputFlags.Dodge;                 // standing still, this is the guard
+            // In range. There is no wind-up to read any more, so what it reads instead is
+            // the one thing that replaced it: a weapon already MOVING. That is strictly
+            // more honest -- the old tell was a state flag no player could see, and this
+            // one is the blade itself.
+            if (foe.TipSpeed > Fix.Zero && Roll(ref bot, cfg.GuardPermille * 3))
+            {
+                // Hold the blade level between them for a moment. Weapons stop weapons,
+                // so standing still with the arm out IS the guard -- but only for as
+                // long as it chose to, not for ever.
+                bot.SwingHold = 0;
+                bot.GuardHold = cfg.ReactionFrames * 2;
+                return InputFlags.None;
+            }
 
             if (Roll(ref bot, cfg.DodgePermille) && self.StaminaCharges > 1)
             {
@@ -149,8 +197,7 @@ namespace GulagRunners.Sim
 
             if (Roll(ref bot, cfg.AggressionPermille))
             {
-                flags |= InputFlags.Attack;
-                flags |= towards > 0 ? InputFlags.AimRight : InputFlags.AimLeft;
+                Swing(ref bot, in self);
                 return flags;
             }
 
@@ -219,6 +266,68 @@ namespace GulagRunners.Sim
                 return up ? InputFlags.Up : InputFlags.Down;
 
             return offset > Fix.Zero ? InputFlags.Right : InputFlags.Left;
+        }
+
+        /// <summary>
+        /// Where the bot points its weapon this tick.
+        ///
+        /// Two poses and nothing else, which is all a fight of this kind needs:
+        ///
+        ///   guard   blade level, straight at them. It does not attack, it does not have
+        ///           to be timed, and it stops anything that arrives, because weapons
+        ///           stop weapons. Standing still with the arm out is a real defence now.
+        ///   swing   throw the arm from high to low, or low to high, through the level
+        ///           where the body is. The flip is what builds tip speed, and tip speed
+        ///           is the whole of damage.
+        ///
+        /// The arc is 120 degrees rather than a full windmill because the body sits at
+        /// the middle of it -- the blade should be fastest where the target is, not where
+        /// it turns around.
+        /// </summary>
+        static void Aim(ref BotState bot, in PlayerSimState self, in PlayerSimState foe,
+                        in BotConfig cfg)
+        {
+            int towards = foe.Position.X >= self.Position.X ? 1 : -1;
+
+            if (bot.SwingHold > 0)
+            {
+                bot.SwingHold--;
+                if (bot.SwingHold == 0) bot.SwingHigh = !bot.SwingHigh;
+
+                bot.AimX = (short)(towards * 500);
+                bot.AimY = (short)(bot.SwingHigh ? 866 : -866);
+                return;
+            }
+
+            if (bot.GuardHold > 0)
+            {
+                bot.GuardHold--;
+                bot.AimX = (short)(towards * 1000);
+                bot.AimY = 0;
+                return;
+            }
+
+            // Carrying. The stick is centred, so the arm falls to the low pose and the
+            // bot is open -- which is what makes it beatable.
+            bot.AimX = 0;
+            bot.AimY = 0;
+        }
+
+        /// <summary>
+        /// Commit to one end of the arc, and hold it long enough for the arm to get there.
+        ///
+        /// The dwell is the weapon's own AttackFrames, which is exactly the number of
+        /// ticks ArmMotor gives it to sweep half a circle. A shorter hold and the heavy
+        /// weapons would be ordered to reverse before they had travelled, which reads as
+        /// a bot waving a warhammer like a flag and doing no damage with it.
+        /// </summary>
+        static void Swing(ref BotState bot, in PlayerSimState self)
+        {
+            if (bot.SwingHold > 0) return;
+
+            bot.GuardHold = 0;
+            int frames = self.Inventory.WeaponDef.AttackFrames;
+            bot.SwingHold = frames < 4 ? 4 : frames;
         }
 
         static bool Roll(ref BotState bot, int permille) =>

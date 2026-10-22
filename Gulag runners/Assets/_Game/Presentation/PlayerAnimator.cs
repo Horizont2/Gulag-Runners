@@ -349,7 +349,7 @@ namespace GulagRunners.Game
             // wrong for exactly this: a string of hits kept the FIRST reaction, let it run
             // to its end and then held that frame, so being hit four times looked like
             // being hit once. Clearing the current hash forces the clip to re-enter.
-            if (s.WasHit || s.WasBlocked || s.WasParried) _currentHash = 0;
+            if (s.WasHit || s.WasParried) _currentHash = 0;
 
             string state = PickState(in s, speed, split, out float playback, out float scrub,
                                      out float fade);
@@ -401,26 +401,21 @@ namespace GulagRunners.Game
             scrub = -1f;
 
             if (!splitUpperBody) return null;
-            if (s.Dead || s.StaggerTimer > 0 || s.GuardBreakTimer > 0 ||
+            if (s.Dead || s.StaggerTimer > 0 ||
                 s.HitstunTimer > 0 || s.OpeningChest >= 0) return null;
             if (s.Mode != MoveMode.Grounded && s.Mode != MoveMode.Airborne) return null;
 
-            if (s.Attack != AttackPhase.None)
-            {
-                string chained = ComboSwing(s.ComboIndex);
-                string swing = s.Attack == AttackPhase.Windup
-                        ? First(attackWindupState, chained)
-                        : s.Attack == AttackPhase.Recovery
-                            ? First(attackRecoverState, chained)
-                            : chained;
-
-                if (string.IsNullOrEmpty(swing)) return null;
-                if (poseAttackByPhase && swing == chained) scrub = SwingProgress(in s);
-                return swing;
-            }
-
-            if (s.Blocking) return First(blockIdleState);
-
+            // NOTHING. The arms are not a clip any more.
+            //
+            // docs/31 moved the weapon onto a stick: the arm points where the thumb
+            // points, every tick, and PlayerArm drives the shoulder and elbow from the
+            // simulation's own arm vector through IK. A swing clip played on top of that
+            // would be an animation fighting the thing it is supposed to be showing, and
+            // the player would watch their blade arrive somewhere they did not put it.
+            //
+            // The swing, block and combo clips stay in the controller and stay unwired.
+            // They are what a scripted move would use if one ever comes back -- an
+            // execution, a cutscene -- and deleting them would lose work for nothing.
             return null;
         }
 
@@ -561,46 +556,19 @@ namespace GulagRunners.Game
             if (s.Dead)
                 return First(deathState, staggerState, hitState) ?? idleState;
 
-            if (s.StaggerTimer > 0 || s.GuardBreakTimer > 0)
+            if (s.StaggerTimer > 0)
                 return First(staggerState, hitState) ?? idleState;
 
             if (s.HitstunTimer > 0)
             {
                 // A hit the guard ate is not a hit the body took. docs/02 wants the difference
                 // readable from across the arena: it is the whole reason to hold the guard up.
-                string hurt = s.Blocking
-                    ? First(blockImpactState, blockIdleState, hitState)
-                    : First(hitState, staggerState);
+                string hurt = First(hitState, staggerState);
                 if (!string.IsNullOrEmpty(hurt)) return hurt;
             }
 
-            // Unless the upper-body layer has taken it. Two layers both playing the swing is
-            // the swing applied twice, and the legs never get to run.
-            if (s.Attack != AttackPhase.None && !armsBusy)
-            {
-                string chained = ComboSwing(s.ComboIndex);
-                string swing = s.Attack == AttackPhase.Windup
-                        ? First(attackWindupState, chained)
-                        : s.Attack == AttackPhase.Recovery
-                            ? First(attackRecoverState, chained)
-                            : chained;
-
-                if (!string.IsNullOrEmpty(swing))
-                {
-                    // Posed, the one clip spans the whole swing: the wind-up over its opening
-                    // frames, the active window across its middle, the recovery to the end.
-                    // That puts the frame the hitbox goes live on at the same place in the
-                    // animation every time, which is what makes a wind-up readable at all.
-                    if (poseAttackByPhase && swing == chained)
-                    {
-                        scrub = SwingProgress(in s);
-                        playback = 0f;
-                        _bodyTail = swingTail;
-                        _bodyTailState = swing;
-                    }
-                    return swing;
-                }
-            }
+            // No swing clip on the legs either, for the same reason: the arms are IK now
+            // and the legs should keep walking, standing or falling while they move.
 
             // The blow is over for the simulation and the clip is still mid follow-through.
             // Left posed it would be abandoned at the frame the counter reached; crossfaded
@@ -705,19 +673,10 @@ namespace GulagRunners.Game
                         return Stance(in s, crouchMoveState, armedCrouchMoveState);
                     }
 
-                    // A raised guard is a pose, and it has to be one the opponent can read:
-                    // it is the difference between walking into a fighter and walking into a
-                    // parry (docs/02 wants the silhouette to carry the information).
-                    if (s.Blocking && !armsBusy)
-                    {
-                        if (speed <= idleThreshold && !string.IsNullOrEmpty(blockIdleState))
-                            return blockIdleState;
-                        if (speed > idleThreshold && !string.IsNullOrEmpty(blockMoveState))
-                        {
-                            playback = Scale(speed, referenceWalkSpeed);
-                            return blockMoveState;
-                        }
-                    }
+                    // The raised-guard pose is gone with the guard button. What the
+                    // opponent reads now is the weapon itself, held wherever the thumb is
+                    // holding it -- which carries more than a pose ever did, because it
+                    // is also literally where the blade will stop theirs.
 
                     if (speed <= idleThreshold)
                         return Stance(in s, idleState, armedIdleState);
@@ -766,53 +725,6 @@ namespace GulagRunners.Game
         /// shares a swing reads with: the wind-up the first two fifths, the active window a
         /// fifth, the recovery the rest.
         /// </summary>
-        /// <summary>
-        /// How far through the attack CLIP the swing is, given how far through the swing the
-        /// simulation is.
-        ///
-        /// The three phases are stretched onto the clip around its own contact window, so the
-        /// frame the hitbox goes live on is the frame the weapon is drawn at the target. The
-        /// window is a pair of inspector fields rather than the 0.40/0.60 it used to be,
-        /// because where a clip connects is a property of that clip and this project has
-        /// already changed character twice.
-        /// </summary>
-        float SwingProgress(in PlayerSimState s)
-        {
-            int total = Mathf.Max(1, s.AttackPhaseFrames);
-
-            // Through the render alpha and a tick behind the counter, for the same reason
-            // the climb-out is: the body is drawn interpolated BETWEEN ticks, so a pose
-            // read straight off the tick counter steps at 60 Hz beside a body that flows,
-            // and runs a whole tick in front of it. On a wind-up that is a swing arriving
-            // before the arm does, in nineteen visible steps.
-            //
-            // Ticks ALREADY SPENT plus the render alpha, over the whole phase. The tick
-            // counter says which tick we are in and the alpha says how far through it the
-            // drawn frame is, so this is simply where the phase has got to -- 0 at its
-            // first frame, 1 at the instant it ends.
-            //
-            // An earlier version divided by total-1 to try to make the last tick land on
-            // the clip's final frame. It cannot: at 60 fps against a 60 Hz tick the alpha
-            // is ~0 on every drawn frame, so that formula's last SAMPLE was (total-2) /
-            // (total-1) -- a three-tick recovery abandoned the clip at 80%, a two-tick one
-            // at 60%. Which is why it was worst on swings that land: a connected hit
-            // halves the recovery (CombatConfig.HitRecoveryCutPermille).
-            //
-            // No counter can land on the last frame, because the clip's final slice
-            // belongs to the moment the phase ENDS. That slice is played out properly by
-            // the tail hold in Arms and PickState rather than papered over here.
-            float within = Mathf.Clamp01((total - s.AttackTimer + player.Alpha) / total);
-
-            float hit = Mathf.Clamp01(attackContactStart);
-            float done = Mathf.Clamp(attackContactEnd, hit, 1f);
-
-            switch (s.Attack)
-            {
-                case AttackPhase.Windup: return within * hit;
-                case AttackPhase.Active: return hit + within * (done - hit);
-                default: return done + within * (1f - done);
-            }
-        }
 
         /// <summary>
         /// How fast this fighter opens things, against bare hands. The weapon is the crowbar

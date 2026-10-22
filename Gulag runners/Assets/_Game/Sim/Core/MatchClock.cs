@@ -286,7 +286,6 @@ namespace GulagRunners.Sim
             s.StandingOn = -1;
             s.ScriptTimer = 0;
             s.ScriptFrames = 0;
-            s.Attack = AttackPhase.None;
 
             // Staggered, not merely moved. Being put somewhere you did not walk to has to read
             // as something that happened to you, and the window is what makes the shove a risk

@@ -151,8 +151,6 @@ namespace GulagRunners.Sim
         /// makes the whole feature feel broken rather than absent. Long enough to cover a
         /// windup and the swing it starts, and no longer: an aim that outlives its swing is
         /// a fighter who will not turn round.
-        /// </summary>
-        public int AimLockFrames;
 
         /// <summary>
         /// The shortest a CLIMB-OUT may be, in frames, whatever its distance.
@@ -298,10 +296,9 @@ namespace GulagRunners.Sim
             c.LaneLookahead  = Fix.FromMilli(1200);
             c.LaneReach      = Fix.FromMilli(2000);
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
-            c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
             c.MantleMinFrames = 40;                  // 0.67 s: the two phases no longer share, so each needs its own
             c.ScriptRiseMargin = Fix.FromMilli(120);   // 12 cm: a step, not a storey
-            c.AllowDodge = false;
+            c.AllowDodge = true;     // docs/31: the one defensive button, and it works now
             c.MantleRise = Fix.FromMilli(450);
             c.AllowLadderJump = false;
             c.BodyHeight  = Fix.FromMilli(1800);

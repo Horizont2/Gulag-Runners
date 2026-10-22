@@ -146,8 +146,7 @@ namespace GulagRunners.Game
         public bool logEvents;
 
         MoveMode _mode = MoveMode.Grounded;
-        AttackPhase _attack = AttackPhase.None;
-        int _guardBreak;
+        bool _swinging;
         bool _subscribed;
 
         void Reset()
@@ -213,20 +212,21 @@ namespace GulagRunners.Game
                 _mode = s.Mode;
             }
 
-            // The frame the hitbox goes live, which is the frame the swing has to be seen.
-            if (s.Attack != _attack)
-            {
-                if (s.Attack == AttackPhase.Active) Fire(swing, "swing");
-                _attack = s.Attack;
-            }
+            // There are no phases to watch for any more. A swing is the tip actually
+            // moving fast enough to hurt somebody, which is the same threshold the damage
+            // uses -- so the sound fires exactly when the blade became dangerous, rather
+            // than when a state machine said so.
+            bool swinging = s.SwingShare > 0;
+            if (swinging && !_swinging) Fire(swing, "swing");
+            _swinging = swinging;
 
-            // The trail runs for the whole swing, wind-up included: the arc is what makes the
-            // wind-up readable as a wind-up rather than as a pause.
+            // The trail runs for as long as the blade is live, which is now a real
+            // statement about the weapon rather than a window around an animation.
             if (swingTrail != null)
-                swingTrail.emitting = s.Attack != AttackPhase.None && s.HitStopTimer == 0;
+                swingTrail.emitting = swinging && s.HitStopTimer == 0;
 
-            if (s.GuardBreakTimer > 0 && _guardBreak == 0) Fire(guardBroken, "guard broken");
-            _guardBreak = s.GuardBreakTimer;
+            // A clash: two blades met. The old guard-break sound is the right one for it.
+            if (s.WasParried) Fire(guardBroken, "weapons clashed");
 
             // Held, not fired: the point of this one is that it lasts as long as the work does.
             chestWorking.Hold(s.OpeningChest >= 0);

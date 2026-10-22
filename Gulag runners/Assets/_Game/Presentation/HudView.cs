@@ -604,13 +604,11 @@ namespace GulagRunners.Game
 
         void PaintControls()
         {
-            bool guardBroken = false;
-            PlayerController owner = localPlayer == 0 ? player1 : player2;
-            if (owner != null && Application.isPlaying)
-                guardBroken = owner.State.GuardBreakTimer > 0;
-
+            // The guard-break warning is gone with the guard button. A weapon is stopped
+            // by another weapon now (docs/31), and what used to flash here is a thing the
+            // player can simply SEE: their own blade knocked aside.
             PaintButton(attack, GlyphInk.Attack, false);
-            PaintButton(block, GlyphInk.Block, guardBroken);
+            PaintButton(block, GlyphInk.Block, false);
             PaintButton(action, GlyphInk.Action, false);
             PaintButton(jump, GlyphInk.Jump, false);
         }

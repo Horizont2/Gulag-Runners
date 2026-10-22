@@ -192,17 +192,11 @@ namespace GulagRunners.Sim
         {
             if (wishX != 0) s.Travel = (sbyte)wishX;
 
-            int aimX = input.AimX();
-            if (aimX != 0)
-            {
-                s.Facing = (sbyte)aimX;
-                s.AimLockTimer = cfg.AimLockFrames;
-                return;
-            }
-
-            if (s.AimLockTimer > 0) s.AimLockTimer--;
-            if (s.AimLockTimer > 0 || s.Swinging) return;
-
+            // The aim no longer comes through here. ArmMotor turns the body to follow the
+            // attack stick on the tick it is pushed, because the stick IS the aim now and
+            // there is nothing to hold a facing against: the lock existed because a swipe
+            // was a single frame of input and a held movement stick would steal the facing
+            // back before the windup finished. There is no windup to outlast.
             if (wishX != 0) s.Facing = (sbyte)wishX;
         }
 
@@ -359,7 +353,7 @@ namespace GulagRunners.Sim
 
             // Nothing comes back while the guard is up: a brace you can hold and recover
             // through is a brace you never have to drop.
-            if (s.StaminaCharges < cfg.StaminaMax && !s.Blocking)
+            if (s.StaminaCharges < cfg.StaminaMax )
             {
                 s.StaminaTimer++;
                 if (s.StaminaTimer >= cfg.StaminaRecoverFrames)
@@ -1035,7 +1029,6 @@ namespace GulagRunners.Sim
             // looks where he is going.
             s.Facing = (sbyte)(side >= 0 ? 1 : -1);
             s.Travel = s.Facing;
-            s.AimLockTimer = 0;
             s.Noise = NoiseLevel.Quiet;
         }
 

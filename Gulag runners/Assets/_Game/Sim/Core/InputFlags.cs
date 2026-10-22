@@ -3,17 +3,17 @@ using System;
 namespace GulagRunners.Sim
 {
     /// <summary>
-    /// One tick of player intent, packed into two bytes.
+    /// The BUTTONS of one tick. Where the weapon points is not in here -- that is two
+    /// signed thousandths on <see cref="TickInput"/>, which carries this alongside it.
     ///
-    /// It was one byte, and docs/06-tech-and-netcode.md budgeted exactly that: 60 Hz plus
-    /// redundancy is about 2 KB/s on mobile data. WHERE A FIGHTER AIMS cost the ninth bit.
-    /// A side-view fighter has two thumbs doing two independent things — the left one says
-    /// which way the body travels, the right one which way the blade goes — and once those
-    /// can disagree there is no eighth bit left to say so. Two bytes is 4 KB/s, which is the
-    /// honest price and still a rounding error on any connection the game can be played on.
+    /// There is no Attack bit any more, and that is the whole of docs/31 in one deletion.
+    /// A blow is not a press; it is the tip of a weapon moving into somebody. There are no
+    /// AimLeft/AimRight bits either: they were a one-trit stand-in for a stick, and now
+    /// there is a stick.
     ///
-    /// The aim bits are OPTIONAL, which is what makes this cost nothing anywhere else: no
-    /// aim bit means the aim follows the travel, exactly as it did when there were eight.
+    /// Six bits, which fits a byte again. docs/06 budgeted one byte for intent at 60 Hz;
+    /// the aim costs two more, and 3 bytes a tick is about 3 KB/s with redundancy -- still
+    /// a rounding error on any connection the game can be played on.
     /// </summary>
     [Flags]
     public enum InputFlags : ushort
@@ -25,24 +25,13 @@ namespace GulagRunners.Sim
         Down   = 1 << 3,   // crouch / descend / drop through a one-way platform
         Jump   = 1 << 4,
         /// <summary>
-        /// The one defensive button. docs/02 gives the medieval fighter a block and no roll
-        /// button, and one bit has to carry both: pressed with a direction held it is a dodge,
-        /// pressed standing still it raises the guard, and in the air it is neither.
+        /// The one defensive button, and now it only has one job. It used to carry both
+        /// the dodge and the guard; the guard is the weapon's job now -- a blade is
+        /// stopped by another blade -- so this is purely the dodge, and the dodge is
+        /// switched on, which it had not been since the movement pass.
         /// </summary>
         Dodge  = 1 << 5,
         Action = 1 << 6,   // pick up, open a chest, grab
-        Attack = 1 << 7,
-
-        /// <summary>
-        /// Aim the blow this way, whichever way the body is travelling.
-        ///
-        /// This is the swipe, not the stick. Holding left and striking right is a fighter
-        /// backing away while he keeps the other one off, and it is most of what separates
-        /// a fight from two people taking turns walking into each other. Neither bit set
-        /// means what it has always meant: the blow goes where the body is going.
-        /// </summary>
-        AimLeft  = 1 << 8,
-        AimRight = 1 << 9
     }
 
     public static class InputFlagsExtensions
@@ -55,18 +44,6 @@ namespace GulagRunners.Sim
             int x = 0;
             if (f.Has(InputFlags.Left)) x -= 1;
             if (f.Has(InputFlags.Right)) x += 1;
-            return x;
-        }
-
-        /// <summary>
-        /// -1, 0 or +1: which way the blow is aimed, or 0 for "wherever the body is going".
-        /// Both at once cancels out, the same way the movement bits do.
-        /// </summary>
-        public static int AimX(this InputFlags f)
-        {
-            int x = 0;
-            if (f.Has(InputFlags.AimLeft)) x -= 1;
-            if (f.Has(InputFlags.AimRight)) x += 1;
             return x;
         }
 

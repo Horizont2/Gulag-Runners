@@ -17,6 +17,60 @@ namespace GulagRunners.Game
         [Header("Health")]
         public int maxHealth = 100;
 
+        // ----------------------------------------------------------------- the arm
+        [Header("The arm (docs/31)")]
+        [Tooltip("Shoulder height, as a share of the body. The arm hangs from here.")]
+        [Range(0.5f, 0.95f)] public float shoulderHeight = 0.78f;
+
+        [Tooltip("Arm length in metres. The weapon's reach is added past the hand.")]
+        [Range(0.2f, 0.9f)] public float armLength = 0.45f;
+
+        [Tooltip("Seconds for the arm to sweep half a circle, carrying a weapon whose " +
+                 "AttackFrames equals Reference Frames below.\n\n" +
+                 "This is where a weapon's AttackFrames went. It is no longer a timer " +
+                 "you wait out; it is how fast that weapon can be MOVED, which is the " +
+                 "same statement about the weapon made in a way the player can see.")]
+        [Range(0.08f, 0.8f)] public float sweepTime = 0.25f;
+
+        [Tooltip("The weapon that sweeps in exactly Sweep Time. The club, at 15 frames, " +
+                 "is the middle of the table and what the feel was tuned on.")]
+        public int referenceFrames = 15;
+
+        [Tooltip("How far the attack stick must be pushed before the arm leaves its " +
+                 "carry pose.")]
+        [Range(0.05f, 0.6f)] public float aimDeadzone = 0.22f;
+
+        [Tooltip("How low the weapon is carried when the stick is centred.\n\n" +
+                 "Not cosmetic. Carried level, every fighter holds a free permanent " +
+                 "guard without touching the stick, and two of them standing still " +
+                 "clash for ever. Carried low, a guard is something you ASK for by " +
+                 "pushing the stick at them -- and pay for with the swing you are not " +
+                 "making.")]
+        [Range(0f, 2f)] public float carryDrop = 0.70f;
+
+        [Tooltip("Tip speed below this share of the weapon's OWN maximum does nothing.\n\n" +
+                 "The most important number in the fight. Too low and holding the blade " +
+                 "out while walking is a strategy; too high and only a windmill counts. " +
+                 "A 3.6 m/s run moves a dagger tip at 15% of its top speed, so a walk-in " +
+                 "lands well under this and pays nothing.")]
+        [Range(0.05f, 0.6f)] public float minSwing = 0.25f;
+
+        [Tooltip("Body radius for the hit capsule, in metres.")]
+        [Range(0.1f, 0.6f)] public float bodyRadius = 0.30f;
+
+        [Tooltip("Half-width of a blade, for weapon-on-weapon contact.")]
+        [Range(0.02f, 0.25f)] public float bladeRadius = 0.07f;
+
+        [Tooltip("Seconds before the same weapon may hurt the same fighter again. " +
+                 "One arc, one hit.")]
+        [Range(0.05f, 0.8f)] public float hitLock = 0.30f;
+
+        [Tooltip("How hard a clash throws the slower arm aside.")]
+        [Range(0f, 2f)] public float clashDeflect = 0.70f;
+
+        [Tooltip("Seconds a fighter whose weapon was beaten aside cannot land a blow.")]
+        [Range(0f, 0.6f)] public float clashLock = 0.17f;
+
         [Header("Swing")]
         [Tooltip("Seconds the hitbox is live. Short on purpose: a long active window hits round " +
                  "corners and makes reach meaningless.")]
@@ -199,6 +253,23 @@ namespace GulagRunners.Game
         static int P(float share) => Mathf.RoundToInt(share * 1000f);
         static Fix M(float metres) => Fix.FromMilli(Mathf.RoundToInt(metres * 1000f));
 
+        /// <summary>The arm, as the simulation wants it.</summary>
+        public ArmConfig ToArmConfig() => new ArmConfig
+        {
+            ShoulderPermille = P(shoulderHeight),
+            ArmLength = M(armLength),
+            SweepFrames = Mathf.Max(1, F(sweepTime)),
+            ReferenceFrames = Mathf.Max(1, referenceFrames),
+            DeadzonePermille = P(aimDeadzone),
+            CarryDropPermille = P(carryDrop),
+            MinSwingPermille = P(minSwing),
+            BodyRadius = M(bodyRadius),
+            BladeRadius = M(bladeRadius),
+            HitLockFrames = Mathf.Max(1, F(hitLock)),
+            ClashDeflectPermille = P(clashDeflect),
+            ClashLockFrames = Mathf.Max(0, F(clashLock)),
+        };
+
         public CombatConfig ToConfig() => new CombatConfig
         {
             MaxHealth = Mathf.Max(1, maxHealth),
@@ -213,7 +284,6 @@ namespace GulagRunners.Game
             ParryStopFrames = F(parryStop),
             HitstunPerDamage = Mathf.Max(0, Mathf.RoundToInt(hitstunPerDamage)),
             MaxHitstunFrames = F(maxHitstun),
-            AttackBufferFrames = F(attackBuffer),
             HitRecoveryCutPermille = P(hitRecoveryKept),
             HitAdvantageFrames = F(hitAdvantage),
             ComboStunDecayPermille = P(comboStunDecay),
