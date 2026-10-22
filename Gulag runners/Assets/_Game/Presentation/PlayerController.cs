@@ -527,7 +527,16 @@ namespace GulagRunners.Game
             // The arm moves BEFORE the body, so the tip speed this tick is measured
             // against where the shoulder was when the swing was asked for. After the
             // body, a fighter who merely ran forwards would read as having swung.
-            ArmMotor.Step(ref _state, intent.Aim, in _config, in armCfg);
+            // The other fighter, so a roughly-aimed swing can be pulled onto him. Only
+            // within a cone -- a blade sent deliberately high, low or the other way is
+            // left exactly where it was put (ArmMotor.Assist).
+            PlayerController foe = matchState != null ? matchState.Opponent(this) : null;
+            bool hasFoe = foe != null;
+            FixVec2 foeChest = hasFoe
+                ? ArmMotor.Chest(foe.State, in _config)
+                : FixVec2.Zero;
+
+            ArmMotor.Step(ref _state, intent.Aim, foeChest, hasFoe, in _config, in armCfg);
 
             PlayerMotor.Step(ref _state, moveInput, _world, in _config);
 

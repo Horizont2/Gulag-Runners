@@ -220,17 +220,12 @@ def _clash(a, b):
         return
     touch = shrink(ARM["blade_radius"]) * 2
     touching = F.segment_distance_sq(hand(a), tip(a), hand(b), tip(b)) <= F.mul(touch, touch)
-    was = getattr(a, "in_contact", False) and getattr(b, "in_contact", False)
     a.in_contact = b.in_contact = touching
     if not touching:
         return
-    # An edge, not a state: a clash is blades MEETING. Blades resting against each other
-    # is two people standing close, which at any real range is most of the time -- and
-    # re-locking them every tick for it froze the fight for good. Measured at 899 clashed
-    # ticks out of 900 before this line existed.
-    if was:
-        return
     if swing_permille(a) <= 0 and swing_permille(b) <= 0:
+        return
+    if a.clash_lock > 0 or b.clash_lock > 0:
         return
 
     a.was_clash = b.was_clash = True

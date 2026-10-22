@@ -48,6 +48,19 @@ namespace GulagRunners.Game
                  "making.")]
         [Range(0f, 2f)] public float carryDrop = 0.70f;
 
+        [Tooltip("How far the attack stick is read relative to the OTHER FIGHTER " +
+                 "instead of to the world.\n\n" +
+                 "At 1 pushing forward always means at him, up means over him, down " +
+                 "means under him, wherever he is standing -- so a blow never has to be " +
+                 "traced onto a moving man with a thumb. At 0 the stick is world " +
+                 "directions, which is exact and was the thing that felt like work.\n\n" +
+                 "It steers nothing: the direction asked for is kept, only measured " +
+                 "from a different zero. That is why it is a frame and not an aim " +
+                 "assist -- pulling a blade toward him pulls it off the line the other " +
+                 "man is guarding, and a measured version of that took a guard's whole " +
+                 "value away.")]
+        [Range(0f, 1f)] public float aimRelative = 1f;
+
         [Tooltip("Tip speed below this share of the weapon's OWN maximum does nothing.\n\n" +
                  "The most important number in the fight. Too low and holding the blade " +
                  "out while walking is a strategy; too high and only a windmill counts. " +
@@ -262,6 +275,7 @@ namespace GulagRunners.Game
             ReferenceFrames = Mathf.Max(1, referenceFrames),
             DeadzonePermille = P(aimDeadzone),
             CarryDropPermille = P(carryDrop),
+            AimRelativePermille = P(aimRelative),
             MinSwingPermille = P(minSwing),
             BodyRadius = M(bodyRadius),
             BladeRadius = M(bladeRadius),

@@ -76,6 +76,8 @@ namespace GulagRunners.GameEditor
                 Undo.RecordObject(arm, "Set up IK");
                 arm.player = fighter;
                 arm.animator = animator;
+                if (arm.socket == null)
+                    arm.socket = fighter.GetComponentInChildren<WeaponSocket>(true);
                 PrefabUtility.RecordPrefabInstancePropertyModifications(arm);
 
                 // And anything that wandered onto the root, which is the shape of the

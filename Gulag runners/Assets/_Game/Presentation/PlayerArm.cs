@@ -63,6 +63,12 @@ namespace GulagRunners.Game
                  "too much and the legs skate, because the hips come with it.")]
         [Range(0f, 0.6f)] public float bodyFollow = 0.22f;
 
+        [Tooltip("The hand's weapon socket. Found under this object when empty.\n\n" +
+                 "Used to MEASURE which way the weapon points, so the hand can be turned " +
+                 "to put it on the arm's line without anyone typing an axis per weapon " +
+                 "pack. Empty, or bare-handed, and the hand's rotation is left to the clip.")]
+        public WeaponSocket socket;
+
         [Header("Debug")]
         [Tooltip("Draw the simulated arm and the weapon segment in the scene view. This " +
                  "is the hitbox, exactly: if the gizmo is not on the blade, nothing else " +
@@ -83,6 +89,7 @@ namespace GulagRunners.Game
         {
             if (player == null) player = GetComponentInParent<PlayerController>();
             if (animator == null) animator = GetComponent<Animator>();
+            if (socket == null) socket = GetComponentInChildren<WeaponSocket>(true);
 
             // Said out loud, because the failure is otherwise invisible: no Animator on
             // THIS object means Unity never calls OnAnimatorIK on it, so the arm is
@@ -110,16 +117,7 @@ namespace GulagRunners.Game
             animator.SetIKPositionWeight(goal, handWeight);
             animator.SetIKPosition(goal, grip);
 
-            if (rotationWeight > 0f)
-            {
-                Vector3 along = tip - grip;
-                if (along.sqrMagnitude > 1e-6f)
-                {
-                    animator.SetIKRotationWeight(goal, rotationWeight);
-                    animator.SetIKRotation(goal,
-                        Quaternion.LookRotation(along.normalized, Vector3.up));
-                }
-            }
+            if (rotationWeight > 0f) Twist(goal, grip, tip);
 
             if (bodyFollow > 0f)
             {
@@ -129,6 +127,43 @@ namespace GulagRunners.Game
                 animator.SetLookAtWeight(bodyFollow, bodyFollow, 1f, 0f, 0f);
                 animator.SetLookAtPosition(tip);
             }
+        }
+
+        /// <summary>
+        /// Turns the hand so the WEAPON lies along the arm the simulation is swinging.
+        ///
+        /// By the smallest rotation that does it, applied on top of whatever the clip
+        /// and the grip already produced -- so the fist keeps holding the thing the way
+        /// it was authored to, and only swings onto the right line.
+        ///
+        /// It used to be a world LookRotation down the arm, which forced the hand's own
+        /// +Z onto the blade line. A hand bone's forward is not the direction anything
+        /// is held in, so the weapon sat crooked in the fist, and it went wrong in a
+        /// different way for every clip because the correction ignored the pose entirely.
+        ///
+        /// The blade direction is MEASURED by WeaponSocket off the model's own mesh, so
+        /// nothing here has to know which axis a given weapon pack points down.
+        /// </summary>
+        void Twist(AvatarIKGoal goal, Vector3 grip, Vector3 tip)
+        {
+            Vector3 want = tip - grip;
+            if (want.sqrMagnitude <= 1e-6f) return;
+            want.Normalize();
+
+            Transform hand = animator.GetBoneTransform(
+                rightHanded ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand);
+            if (hand == null) return;
+
+            if (socket == null) socket = GetComponentInChildren<WeaponSocket>(true);
+
+            // Bare hands have no blade to line up: the fist is the weapon and the clip's
+            // own wrist is better than anything computed here.
+            if (socket == null || !socket.TryBladeDirection(out Vector3 blade)) return;
+            if (blade.sqrMagnitude <= 1e-8f) return;
+
+            Quaternion swing = Quaternion.FromToRotation(blade.normalized, want);
+            animator.SetIKRotationWeight(goal, rotationWeight);
+            animator.SetIKRotation(goal, swing * hand.rotation);
         }
 
         /// <summary>Grip and tip in world space, interpolated like the body is.</summary>

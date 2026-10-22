@@ -74,6 +74,26 @@ namespace GulagRunners.Sim
         public int CarryDropPermille;
 
         /// <summary>
+        /// How far the attack stick is read RELATIVE TO THE OTHER FIGHTER rather than to
+        /// the world, in thousandths. 1000 means pushing the stick "forward" always
+        /// means "at him", wherever he is standing.
+        ///
+        /// This is the answer to having to trace a moving man with a thumb, and it is a
+        /// FRAME rather than a pull. Nothing is dragged toward him and no blow is
+        /// steered: the stick's own direction is kept exactly, measured from the line to
+        /// him instead of from world right. Push forward and the blade goes at him; push
+        /// up and it goes over the top of him; push down and it goes under his guard --
+        /// all of which are the things a player actually means.
+        ///
+        /// An earlier version pulled the blade toward him inside a cone, and it had to
+        /// go: pulling the blade is pulling it off the line the OTHER man is holding his
+        /// weapon on, so aim assist and blocking are the same number. Measured, a guard
+        /// stopped taking any damage off at all. A frame costs blocking nothing, because
+        /// it moves nobody's blade anywhere.
+        /// </summary>
+        public int AimRelativePermille;
+
+        /// <summary>
         /// Tip speed below this share of the weapon's own maximum does no damage at all.
         ///
         /// The single most important number here. Too low and holding the blade out
@@ -122,6 +142,7 @@ namespace GulagRunners.Sim
 
             c.DeadzonePermille = 220;
             c.CarryDropPermille = 700;     // about 35 degrees below level: a lowered blade
+            c.AimRelativePermille = 1000;  // forward on the stick means at him
 
             // A quarter of the weapon's own top speed. Measured against a 3.6 m/s run:
             // a walk-in with a dagger reaches 15% and a spear 9%, so neither pays.

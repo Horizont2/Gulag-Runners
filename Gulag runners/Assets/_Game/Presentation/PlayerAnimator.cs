@@ -580,13 +580,15 @@ namespace GulagRunners.Game
             if (s.StaggerTimer > 0)
                 return First(staggerState, hitState) ?? idleState;
 
-            if (s.HitstunTimer > 0)
-            {
-                // A hit the guard ate is not a hit the body took. docs/02 wants the difference
-                // readable from across the arena: it is the whole reason to hold the guard up.
-                string hurt = First(hitState, staggerState);
-                if (!string.IsNullOrEmpty(hurt)) return hurt;
-            }
+            // No clip for being hit. The KNOCKBACK is the reaction -- the body is shoved,
+            // and with a weapon live on the other thumb the reader already has plenty to
+            // look at. A reaction clip on top of it took the legs away from a fighter who
+            // was being pushed, so a hit read as a stumble the player did not ask for and
+            // could not steer out of. The hitstun still stops them acting; it just no
+            // longer stops them being drawn doing what they were doing.
+            //
+            // staggerState survives above: the closing gate's shove still sets
+            // StaggerTimer (MatchClock), and that one IS a scripted loss of footing.
 
             // No swing clip on the legs either, for the same reason: the arms are IK now
             // and the legs should keep walking, standing or falling while they move.
