@@ -69,6 +69,12 @@ namespace GulagRunners.Game
 
             GroundItem[] items = matchState.GroundItems;
 
+            // Sized from here rather than from each view's own Start, because the rule is
+            // the simulation's -- a weapon on the floor is the same length as the one in a
+            // hand, and both are ArmMotor.BladeLength. A view cannot reach the match's arm
+            // tuning on its own; this already holds it. Each view does it once.
+            FitViews();
+
             if (planeFromFighters)
                 for (int p = 0; p < matchState.fighters.Count; p++)
                     if (matchState.fighters[p] != null)
@@ -110,5 +116,31 @@ namespace GulagRunners.Game
                 else view.Hide();
             }
         }
+
+        /// <summary>
+        /// Hands every view the arm tuning this match is running, once each.
+        ///
+        /// Off a fighter when there is one, because that is where the body height a blade
+        /// is a share of comes from. With no fighter in the scene the defaults are the
+        /// right answer and no longer a wrong one: MoveConfig's used to describe a 1.8 m
+        /// man nobody plays.
+        /// </summary>
+        void FitViews()
+        {
+            if (_fitted) return;
+            _fitted = true;
+
+            PlayerController fighter = null;
+            for (int p = 0; p < matchState.fighters.Count && fighter == null; p++)
+                fighter = matchState.fighters[p];
+
+            MoveConfig move = fighter != null ? fighter.Config : MoveConfig.Default();
+            ArmConfig arm = fighter != null ? fighter.ArmSettings : matchState.Arm;
+
+            for (int i = 0; i < views.Length; i++)
+                if (views[i] != null) views[i].FitModels(in move, in arm);
+        }
+
+        bool _fitted;
     }
 }

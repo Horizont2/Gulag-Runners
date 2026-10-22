@@ -250,7 +250,7 @@ namespace GulagRunners.Sim
         public static MoveConfig Default()
         {
             MoveConfig c;
-            c.RunSpeed    = Fix.FromMilli(3600);
+            c.RunSpeed    = Fix.FromMilli(3000);   // what the prefabs run at, not 3.6
             c.CrouchSpeed = Fix.FromMilli(1600);
             c.GroundAccel = Fix.FromMilli(40000);
             c.GroundDecel = Fix.FromMilli(50000);
@@ -290,7 +290,18 @@ namespace GulagRunners.Sim
                                            // was retuned to in the movement pass
             c.StaminaRecoverFrames  = 72;  // 1.2 s a charge, straight from docs/02
 
-            c.BodyWidth   = Fix.FromMilli(600);
+            // The fighter who actually ships, read off Player 1.prefab and Player 2.prefab.
+            //
+            // These used to say 1.8 m and 0.6 m wide, which is a man nobody in this project
+            // has ever played: every prefab, every scene and every movement mirror says
+            // 0.91 m. A default that disagrees with all of them is not a harmless fallback,
+            // it is a trap, and combat fell in it -- the arm was written in metres against
+            // THIS number while being worn by the 0.91 m one, so it came out half his own
+            // height and bent his spine out to reach the IK goal. Everything proportional
+            // is a share now, and the share has to be a share OF something true.
+            c.BodyHeight  = Fix.FromMilli(910);
+            c.CrouchHeight = Fix.FromMilli(682);
+            c.BodyWidth   = Fix.FromMilli(300);
             c.BodyDepth   = Fix.FromMilli(600);
             c.DepthSnapSpeed = Fix.FromMilli(4000);
             c.LaneLookahead  = Fix.FromMilli(1200);
@@ -301,8 +312,6 @@ namespace GulagRunners.Sim
             c.AllowDodge = true;     // docs/31: the one defensive button, and it works now
             c.MantleRise = Fix.FromMilli(450);
             c.AllowLadderJump = false;
-            c.BodyHeight  = Fix.FromMilli(1800);
-            c.CrouchHeight = Fix.FromMilli(1100);
 
             c.StepUpHeight  = Fix.FromMilli(300);
             c.ClamberHeight = Fix.FromMilli(550);   // one crate of this location's staircases

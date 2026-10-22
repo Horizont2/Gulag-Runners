@@ -34,11 +34,12 @@ WEAPONS = {
 
 # ----------------------------------------------------------------- ArmConfig.Default
 CFG = dict(
-    shoulder=780, arm_length=F.milli(450),
+    shoulder=780, arm_length_pm=350,
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
     aim_relative=1000,
-    body_radius=F.milli(300), blade_radius=F.milli(70),
+    haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
+    body_radius_pm=180, blade_radius_pm=60,
     hit_lock=18, clash_deflect=700, clash_lock=10,
 )
 
@@ -50,9 +51,16 @@ COMBAT = dict(
     desperate_hp=300, desperate_dmg=1400, sudden_bare=2000,
 )
 
-BODY_HEIGHT = F.milli(1800)
-BODY_WIDTH = F.milli(600)
-RUN_SPEED = F.milli(3600)
+# The fighter who actually ships, read off Player 1.prefab and Player 2.prefab, NOT off
+# MoveConfig.Default(). Those two numbers disagree -- the default says 1.8 m and 3.6 m/s,
+# every fighter in the project says 0.91 m and 3.0 -- and this file used to model the
+# default. Every measurement docs/31 argued from was therefore taken on a man twice the
+# size of the one in the game, which was survivable only while arm length was an absolute
+# 0.45 m. It is a share of body height now, so the whole of combat is proportional to this
+# number and modelling the wrong one is modelling a different game.
+BODY_HEIGHT = F.milli(910)
+BODY_WIDTH = F.milli(300)
+RUN_SPEED = F.milli(3000)
 
 
 class Fighter:
@@ -90,14 +98,45 @@ class Fighter:
         return (self.x, self.y + F.mul(BODY_HEIGHT, F.milli(CFG["shoulder"])))
 
     def reach(self):
+        """What the ITEM says, which is reach from the middle of the body."""
         return F.milli(int(round(WEAPONS[self.weapon][2] * 1000)))
 
+    def blade(self):
+        """What hangs past the hand: the weapon that is DRAWN. ArmMotor.BladeLength.
+
+        Not the item's reach. Reach is measured from the body's middle and already
+        contains half a torso and an arm, so running it out from the hand gave every
+        weapon about 1.5x the steel of the model and gave bare fists 0.60 m of blade out
+        of an empty hand.
+        """
+        bare = F.milli(int(round(WEAPONS["fists"][2] * 1000)))
+        reach = self.reach()
+        if reach <= bare:
+            return 0
+        want = (F.mul(BODY_HEIGHT, F.milli(CFG["haft_pm"]))
+                + F.mul(reach - bare, F.milli(CFG["reach_to_blade_pm"])))
+        floor = F.mul(BODY_HEIGHT, F.milli(CFG["min_blade_pm"]))
+        ceiling = F.mul(BODY_HEIGHT, F.milli(CFG["max_blade_pm"]))
+        return max(floor, min(ceiling, want))
+
+    def height(self):
+        return BODY_HEIGHT
+
+    def arm_length(self):
+        return F.mul(self.height(), F.milli(CFG["arm_length_pm"]))
+
+    def body_radius(self):
+        return F.mul(self.height(), F.milli(CFG["body_radius_pm"]))
+
+    def blade_radius(self):
+        return F.mul(self.height(), F.milli(CFG["blade_radius_pm"]))
+
     def hand(self):
-        return F.add(self.shoulder(), F.scale(self.arm, CFG["arm_length"]))
+        return F.add(self.shoulder(), F.scale(self.arm, self.arm_length()))
 
     def tip(self):
         return F.add(self.shoulder(),
-                     F.scale(self.arm, CFG["arm_length"] + self.reach()))
+                     F.scale(self.arm, self.arm_length() + self.blade()))
 
     def body_segment(self):
         half = F.cdiv(BODY_WIDTH, 2)
@@ -109,7 +148,7 @@ class Fighter:
         return F.cdiv(PI, ticks)
 
     def top_tip_speed(self):
-        return F.mul(self.slew(), CFG["arm_length"] + self.reach())
+        return F.mul(self.slew(), self.arm_length() + self.blade())
 
 
 def clamp_length(v, mx):
@@ -145,12 +184,14 @@ def assist(f, aim, foe):
     walking forward.
     """
     want = normalized(aim)
+    # Since the last time the frame was TAKEN, not since the last tick: a thumb sliding
+    # round the ring moves ~0.01 a tick, so tick-to-tick never crosses and the arm froze.
     moved = F.length_sq(F.sub(aim, f.aim_prev))
     steady = f.assist_held and moved <= F.mul(F.milli(20), F.milli(20))
-    f.aim_prev = aim
     if steady:
         return f.assist_dir
 
+    f.aim_prev = aim
     f.assist_held = True
     f.assist_dir = want
 
@@ -196,7 +237,7 @@ def step(f, aim, foe=None):
         f.arm = ((f.facing or 1) * ONE, 0)
 
     # Tip speed in the fighter's OWN frame: how far it moved around the shoulder.
-    local = F.scale(f.arm, CFG["arm_length"] + f.reach())
+    local = F.scale(f.arm, f.arm_length() + f.blade())
     if not f.tip_primed:
         f.tip_prev = local
         f.tip_primed = True
@@ -259,7 +300,11 @@ def resolve(fighters, sudden=False):
 def clash(a, b):
     if a.dead or b.dead:
         return
-    touch = CFG["blade_radius"] * 2
+    # Two bare fists have no blade between them to catch: fists meet bodies and nothing
+    # else, which is also what gets drawn.
+    if a.blade() <= 0 and b.blade() <= 0:
+        return
+    touch = a.blade_radius() * 2
     touching = F.segment_distance_sq(a.hand(), a.tip(), b.hand(), b.tip()) <= F.mul(touch, touch)
     a.in_contact = b.in_contact = touching
     if not touching:
@@ -299,7 +344,7 @@ def deflect(loser, winner, shove):
     loser.clash_lock = CFG["clash_lock"]
     loser.tip_speed = 0
     # The deflection must not read as a swing of theirs next tick.
-    loser.tip_prev = F.scale(loser.arm, CFG["arm_length"] + loser.reach())
+    loser.tip_prev = F.scale(loser.arm, loser.arm_length() + loser.blade())
 
 
 def strike(att, vic, sudden=False):
@@ -315,8 +360,8 @@ def strike(att, vic, sudden=False):
         return
 
     feet, head = vic.body_segment()
-    if F.segment_distance_sq(att.hand(), att.tip(), feet, head) > \
-       F.mul(CFG["body_radius"], CFG["body_radius"]):
+    r = vic.body_radius()
+    if F.segment_distance_sq(att.hand(), att.tip(), feet, head) > F.mul(r, r):
         return
 
     att.dealt = share

@@ -17,7 +17,7 @@ namespace GulagRunners.Game
     {
         [Header("Ground (m/s, m/s^2)")]
         [Tooltip("A room is ~7.2 m wide and docs/03 budgets ~2 s to cross it.")]
-        public float runSpeed = 3.6f;
+        public float runSpeed = 3f;
         public float crouchSpeed = 1.6f;
         public float groundAccel = 40f;
         public float groundDecel = 50f;
@@ -102,12 +102,12 @@ namespace GulagRunners.Game
         [Header("Body")]
         [Tooltip("Collision width. Match it to the character's silhouette, not to its T-pose " +
                  "bounds: those span both outstretched arms and are useless as a body width.")]
-        public float bodyWidth = 0.45f;
-        public float bodyHeight = 1.8f;
+        public float bodyWidth = 0.3f;
+        public float bodyHeight = 0.91f;
         [Tooltip("Height while crouching. Clamped to 75% of the body height on conversion: a " +
                  "crouch taller than the character makes the hitbox GROW when you duck, which " +
                  "inverts every ceiling check that depends on it.")]
-        public float crouchHeight = 1.1f;
+        public float crouchHeight = 0.682f;
 
         [Header("Depth (docs/02: the arena is 3D, the fight is not)")]
         [Tooltip("How much of the level's DEPTH the body occupies, in metres. Never moved " +

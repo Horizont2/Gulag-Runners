@@ -39,8 +39,20 @@ namespace GulagRunners.Sim
         /// </summary>
         public int ShoulderPermille;
 
-        /// <summary>Arm length in metres. The weapon's reach is added beyond the hand.</summary>
-        public Fix ArmLength;
+        /// <summary>
+        /// Arm length as a share of body height, in thousandths. The weapon's reach is
+        /// added beyond the hand.
+        ///
+        /// A SHARE and not metres, which is the whole bug this field used to carry. It
+        /// was 0.45 m, written against the 1.8 m fighter in MoveConfig's defaults -- and
+        /// the fighter in the prefabs is 0.91 m tall. So the arm was half the height of
+        /// its owner, the IK goal sat far outside anything the shoulder could reach, and
+        /// Unity did the only thing it can: dragged the spine out to meet it. That is
+        /// the body bending itself into knots at some angles.
+        ///
+        /// 350 is roughly where a human arm is, and it is right at any size.
+        /// </summary>
+        public int ArmLengthPermille;
 
         /// <summary>
         /// Ticks for the arm to sweep half a circle, with a weapon whose AttackFrames is
@@ -103,14 +115,50 @@ namespace GulagRunners.Sim
         public int MinSwingPermille;
 
         /// <summary>
-        /// Body radius for the hit capsule, in metres. The body is a segment from the
-        /// feet to the head with this around it -- a capsule, the cheapest shape with no
-        /// corners for a blade to catch on.
+        /// How long a blade IS, given the reach its item says it has. The hitbox and the
+        /// model have to be the same object, and these four numbers are the rule that
+        /// makes them one: a haft as a share of body height, plus the reach the weapon
+        /// adds over bare hands, held between a floor and a ceiling.
+        ///
+        /// It is not a new rule. PlayerLoadoutView has drawn weapons this way all along,
+        /// and the comment there says why: reach is measured from the MIDDLE OF THE BODY,
+        /// so it already contains half a torso and an arm, and a weapon is only the part
+        /// it adds. What is new is the simulation using it. Before this, the blade the
+        /// sim swung ran the full Reach from the hand -- an extra arm and half a torso of
+        /// invisible steel past the tip of the model. Measured on the shipping fighter it
+        /// came out at 1.5x the weapon on screen for every one of the twelve, and bare
+        /// fists swung a 0.60 m blade out of a hand that holds nothing.
+        ///
+        /// That one error is most of why the fight played badly. Blades longer than the
+        /// gap between two fighters are crossed nearly all the time, every crossing is a
+        /// clash, and a clash locks both arms: two people swinging at each other could
+        /// stand there for forty seconds without landing a blow. It also made every blow
+        /// land from somewhere the player could not see it coming.
+        ///
+        /// Bare hands get no blade at all. The fist IS the weapon, so the damaging part
+        /// is the hand, and that is also exactly what gets drawn: nothing.
         /// </summary>
-        public Fix BodyRadius;
+        public int HaftPermille;
 
-        /// <summary>Half-width of a weapon for weapon-on-weapon contact.</summary>
-        public Fix BladeRadius;
+        /// <summary>Of the reach a weapon adds over bare hands, how much is blade.</summary>
+        public int ReachToBladePermille;
+
+        /// <summary>Shortest and longest a blade may be, as shares of body height.</summary>
+        public int MinBladePermille;
+        public int MaxBladePermille;
+
+        /// <summary>
+        /// Body radius for the hit capsule, as a share of body height. The body is a
+        /// segment from the feet to the head with this around it -- a capsule, the
+        /// cheapest shape with no corners for a blade to catch on.
+        ///
+        /// A share, for the same reason as the arm: 0.30 m was a third of the way up a
+        /// 0.91 m fighter.
+        /// </summary>
+        public int BodyRadiusPermille;
+
+        /// <summary>Half-width of a weapon for weapon-on-weapon contact, likewise.</summary>
+        public int BladeRadiusPermille;
 
         /// <summary>
         /// Ticks before the same weapon may hurt the same fighter again. One hit per
@@ -133,7 +181,7 @@ namespace GulagRunners.Sim
         {
             ArmConfig c;
             c.ShoulderPermille = 780;      // just below the head on a 1.8 m body
-            c.ArmLength = Fix.FromMilli(450);
+            c.ArmLengthPermille = 350;     // about where a human arm is
 
             // A reference weapon sweeps 180 degrees in its own AttackFrames. The club,
             // at 15, is the middle of the table and the one the feel was tuned on.
@@ -148,8 +196,16 @@ namespace GulagRunners.Sim
             // a walk-in with a dagger reaches 15% and a spear 9%, so neither pays.
             c.MinSwingPermille = 250;
 
-            c.BodyRadius = Fix.FromMilli(300);
-            c.BladeRadius = Fix.FromMilli(70);
+            // The same four numbers PlayerLoadoutView draws a weapon with, so the blade
+            // that is swung is the blade that is seen. Its own defaults are in metres
+            // against a 0.91 m fighter: a 0.246 m haft, a 0.28 m floor, a 1.30 m ceiling.
+            c.HaftPermille = 270;
+            c.ReachToBladePermille = 730;
+            c.MinBladePermille = 310;
+            c.MaxBladePermille = 1430;
+
+            c.BodyRadiusPermille = 180;    // a bit wider than the collision box
+            c.BladeRadiusPermille = 60;
 
             c.HitLockFrames = 18;          // 0.30 s, so one arc is one hit
             c.ClashDeflectPermille = 700;

@@ -148,10 +148,13 @@ for weapon, name in ((CLUB, "club"), (SPEAR, "spear")):
     r = spar(weapon=weapon, ticks=60 * 30, seed=11)
     settled = r["gaps"][len(r["gaps"]) // 3:]          # ignore the walk-in
     mean = sum(settled) / len(settled)
-    reach = F(C["W"] // 2 + B.ITEMS[weapon]["reach"])
+    # How far the weapon actually goes -- arm plus the blade that is drawn -- and not the
+    # item's Reach, which is a number in a table measured from the middle of the body and
+    # is 0.37 m longer than a spear on a 0.91 m fighter.
+    reach = F(K.arm_length() + K.blade(fighter(0, 1, weapon)))
     check(f"a {name} bot holds about its own reach",
           0.35 * reach <= mean <= 1.25 * reach,
-          f"stood at {mean:.2f} m, reach {reach:.2f} m")
+          f"stood at {mean:.2f} m, the weapon goes {reach:.2f} m")
 
 print("\n4. it can land a hit, and it can be hit")
 r = spar(weapon=CLUB, ticks=60 * 40, seed=5)
@@ -226,9 +229,12 @@ g_cfg = config(SPARRING)
 raised = 0
 for seed in range(40):
     # Inside its own preferred range, or it takes the "close the distance" branch and
-    # never reaches the guard decision at all.
-    g_bot = fighter(-0.35, 1, CLUB)
-    g_man = fighter(0.35, -1, CLUB)
+    # never reaches the guard decision at all. Half the band, computed rather than
+    # written down: at a hard-coded 0.35 m each this sat a centimetre outside the band
+    # the moment the blade became the one that is drawn, and read as "never guards".
+    g_half = F(K.arm_length() + K.blade(fighter(0, 1, CLUB))) * 0.65 / 2
+    g_bot = fighter(-g_half, 1, CLUB)
+    g_man = fighter(g_half, -1, CLUB)
     g_brain = Bot(seed)
     g_man.tip_speed = X(0.2)              # his blade is moving, and the bot can see it
     g_brain.think = 0                     # and it is allowed to decide this tick

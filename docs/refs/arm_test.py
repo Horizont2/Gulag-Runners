@@ -37,6 +37,20 @@ def aim_at(deg):
     return (F.from_f(math.cos(r)), F.from_f(math.sin(r)))
 
 
+def stand_off(weapon, share=0.75):
+    """Where to stand so this weapon's arc arrives, as a share of its own reach.
+
+    The distances in this file were plain metres for a while -- 0.9 for a club, 0.6 for a
+    dagger -- picked by hand while the mirror modelled a 1.8 m fighter. The fighter in the
+    prefabs is 0.91 m, so each of them was about twice the right number, and most of the
+    file was measuring two men standing inside each other. Everything in combat is a share
+    of the fighter's own size now, and so is this.
+    """
+    f = A.Fighter(0, 1, weapon)
+    return (F.to_f(f.arm_length() + f.blade()) * share
+            + F.to_f(f.body_radius()))
+
+
 def swing_cycle(f, foe, ticks, hold=None, foe_aim=(0, 0)):
     """Throw the arm high/low through the horizontal, like the bot does."""
     hold = hold or A.WEAPONS[f.weapon][0]
@@ -60,7 +74,7 @@ def main():
     print("1. a carried blade, which is the test the whole design dies on")
     worst = []
     for name in A.WEAPONS:
-        att = A.Fighter(-1.0, 1, name)
+        att = A.Fighter(-(stand_off(name) + 0.5), 1, name)
         vic = A.Fighter(0.0, -1, "fists")
 
         # Get the arm out FIRST and let it stop. Raising it from the carry pose is a
@@ -87,14 +101,14 @@ def main():
 
     # ------------------------------------------------------- 2. a swing hurts
     print("\n2. a swing does damage, and more of it the harder it is swung")
-    att = A.Fighter(-0.9, 1, "club")
+    att = A.Fighter(-stand_off("club"), 1, "club")
     vic = A.Fighter(0.0, -1, "fists")
     hits = swing_cycle(att, vic, 180)
     check("swinging a club at somebody in reach lands blows", hits > 0,
           f"{hits} hits in 3 s, victim at {vic.health} hp")
 
     # Half speed: hold each end twice as long, so the arm crawls.
-    att2 = A.Fighter(-0.9, 1, "club")
+    att2 = A.Fighter(-stand_off("club"), 1, "club")
     vic2 = A.Fighter(0.0, -1, "fists")
     slow = swing_cycle(att2, vic2, 180, hold=A.WEAPONS["club"][0] * 4)
     check("and a lazier swing of the same weapon does less",
@@ -115,13 +129,14 @@ def main():
     check("a warhammer's arm is slower than a dagger's",
           rows[-1][2] < rows[0][2],
           f"{rows[-1][2]:.1f} m/s against {rows[0][2]:.1f}")
+    run = F.to_f(A.RUN_SPEED)
     check("and every weapon can still be swung fast enough to hurt",
-          all(r[2] > 3.6 for r in rows),
-          "all top speeds clear the 3.6 m/s a body can run at")
+          all(r[2] > run for r in rows),
+          f"all top speeds clear the {run} m/s a body can run at")
 
     # ------------------------------------------------------- 4. the block
     print("\n4. weapons stop weapons, which is the block and it has no button")
-    att = A.Fighter(-0.9, 1, "club")
+    att = A.Fighter(-stand_off("club"), 1, "club")
     vic = A.Fighter(0.0, -1, "club")
     clashes = hits = 0
     high = True
@@ -141,24 +156,23 @@ def main():
             clashes += 1
     check("a held blade produces clashes", clashes > 0, f"{clashes} in 5 s")
 
-    # The same fight with the defender NOT guarding. The first version left their stick
-    # centred and called that open -- but the carry pose then pointed the blade straight
-    # at the attacker, so "open" was a perfect guard too and both columns read 61. In the
-    # aim frame, away from him is -X.
     # Measured as TIME TO KILL, not damage over a fixed number of ticks, and the
     # difference is not pedantry. Hit stop freezes both fighters, so a defender who is
     # being hit a lot spends real seconds frozen -- over a fixed tick count that LOOKS
     # like taking less damage, and the first version of this test read exactly backwards
     # because of it: guarding came out worse than standing there.
     #
-    # And the guard is held where the blade DWELLS, at the end of its arc, rather than
-    # where it is fastest. That is the mechanic rather than a trick: a blade at the top
-    # of its swing is slow and can be met; the same blade through the middle is doing
-    # 17 m/s and a guard in its way is a formality. Measured across guard angles against
-    # a +-60 arc: no guard dies at 386 ticks, guarding into the fast middle dies at 271,
-    # and guarding the end survives past 2400.
-    def ticks_to_kill(guard):
-        att = A.Fighter(-0.9, 1, "club")
+    # What is asserted here used to be a NAMED ANGLE: hold the blade at the end of the
+    # arc, where it dwells and is slow, rather than through the fast middle. That was
+    # measured and it was real -- on the 1.8 m fighter the mirror used to model. At the
+    # size the game actually ships, with the blade the model actually has, the winning
+    # angle is a different one and moves with the arc, so naming one is fitting a test to
+    # a number rather than to the design.
+    #
+    # The design's two claims survive the change, and they are what is pinned instead:
+    # a guard is worth holding, and no guard is safe against everything.
+    def ticks_to_kill(guard, lo=-60, hi=60):
+        att = A.Fighter(-stand_off("club"), 1, "club")
         vic = A.Fighter(0.0, -1, "club")
         high, t, n = True, 0, 0
         while n < 60 * 40 and not vic.dead:
@@ -167,22 +181,48 @@ def main():
                 t = A.WEAPONS["club"][0]
             t -= 1
             n += 1
-            A.tick([att, vic], [aim_at(60 if high else -60), guard])
+            A.tick([att, vic], [aim_at(hi if high else lo), guard])
         return n if vic.dead else None
 
-    open_ticks = ticks_to_kill((0, 0))
-    met_ticks = ticks_to_kill(aim_at(60))
-    check("meeting the blade where it dwells keeps you alive much longer",
-          met_ticks is None or (open_ticks is not None and met_ticks > open_ticks * 1.4),
-          f"no guard {open_ticks} ticks, guard on the arc's end "
-          f"{met_ticks if met_ticks else 'survived 40 s'}")
+    ARCS = [(-60, 60), (-30, 30), (-45, 45), (0, 60), (-20, 70)]
+    GUARDS = list(range(-90, 91, 15))
+    ALIVE = 10 ** 9                       # survived the forty seconds
+
+    grid = {}
+    for lo, hi in ARCS:
+        for g in GUARDS:
+            grid[(lo, hi, g)] = ticks_to_kill(aim_at(g), lo, hi) or ALIVE
+
+    # 1. There is always SOME guard that greatly outlasts standing open. Note that
+    #    standing open is not standing defenceless: the carry pose is a lowered blade and
+    #    it catches part of a low swing by itself, which is why the margin is measured
+    #    against it rather than against a man with no arms.
+    worst = None
+    for lo, hi in ARCS:
+        open_n = ticks_to_kill((0, 0), lo, hi) or ALIVE
+        best = max(grid[(lo, hi, g)] for g in GUARDS)
+        ratio = best / float(open_n)
+        if worst is None or ratio < worst[0]:
+            worst = (ratio, lo, hi, open_n, best)
+    check("holding the blade in the way is worth doing, against every arc",
+          worst[0] > 1.1,
+          f"the arc it helps least against is {worst[1]} to {worst[2]}: "
+          f"{worst[3]} ticks open against "
+          f"{'past 40 s' if worst[4] >= ALIVE else str(worst[4]) + ' guarded'}")
+
+    # 2. And no single angle is safe: whichever one the defender picks, some arc goes
+    #    round it. A guard that answered everything would be a block button with extra
+    #    steps, which is the thing docs/31 took out.
+    safest = max(min(grid[(lo, hi, g)] for lo, hi in ARCS) for g in GUARDS)
+    check("but no one angle answers every arc", safest < ALIVE,
+          f"the best angle to be caught holding still dies in {safest} ticks")
 
     # ------------------------------------------------------- 5. time to kill
     print("\n5. time to kill, against docs/02's 8 to 14 seconds of active fighting")
     print("        weapon        seconds   hits")
     ttk = {}
     for name in A.WEAPONS:
-        att = A.Fighter(-(0.45 + A.WEAPONS[name][2] * 0.5), 1, name)
+        att = A.Fighter(-stand_off(name, 0.7), 1, name)
         vic = A.Fighter(0.0, -1, "fists")
         hold = A.WEAPONS[name][0]
         high, t, hits, frames = True, 0, 0, 0
@@ -210,7 +250,7 @@ def main():
 
     # ------------------------------------------------------- 6. one arc, one hit
     print("\n6. one arc is one hit, so a blade laid on somebody does not bill them")
-    att = A.Fighter(-0.6, 1, "dagger")
+    att = A.Fighter(-stand_off("dagger", 0.6), 1, "dagger")
     vic = A.Fighter(0.0, -1, "fists")
 
     # Let the arm travel from its carry pose to straight ahead first. Raising it IS a
@@ -229,7 +269,7 @@ def main():
     print("\n7. bare hands below a third of health, and on the last platform")
 
     def punch(hp, sudden):
-        att = A.Fighter(-0.9, 1, "fists")
+        att = A.Fighter(-stand_off("fists", 0.6), 1, "fists")
         att.health = hp
         vic = A.Fighter(0.0, -1, "fists")
         high, t = True, 0
@@ -238,7 +278,9 @@ def main():
                 high = not high
                 t = A.WEAPONS["fists"][0]
             t -= 1
-            A.tick([att, vic], [aim_at(60 if high else -60), (A.ONE, 0)], sudden)
+            # Centred, NOT (1, 0). Forward on the stick means AT HIM in the aim frame,
+            # so the victim was being handed a perfect guard in a test about damage.
+            A.tick([att, vic], [aim_at(60 if high else -60), (0, 0)], sudden)
             if vic.was_hit:
                 return vic.damage_taken
         return 0
@@ -254,13 +296,54 @@ def main():
           punch(25, True) == last,
           f"desperate AND sudden death is {punch(25, True)}, the larger of the two")
 
+    # ------------------------------------------------------- 7b. the stick
+    print("\n7b. the arm answers the stick, and only the stick")
+
+    def swept(ticks, span_deg):
+        """How far the arm travels while the thumb slides smoothly across span_deg."""
+        f = A.Fighter(0, 1, "club")
+        foe = A.Fighter(2.0, -1, "club")
+        travelled, last = 0.0, None
+        for t in range(ticks):
+            deg = -span_deg / 2 + span_deg * t / float(ticks)
+            A.step(f, aim_at(deg), foe)
+            ang = math.degrees(math.atan2(F.to_f(f.arm[1]), F.to_f(f.arm[0])))
+            if last is not None:
+                travelled += abs(ang - last)
+            last = ang
+        return travelled
+
+    # A thumb sliding round the ring moves about a hundredth of the stick per tick, and
+    # the frame used to compare tick to tick -- so it never counted as movement, and the
+    # arm stopped answering the stick entirely for as long as you moved it smoothly.
+    # This is that bug, pinned.
+    slow = swept(90, 180)
+    check("a slowly sliding thumb moves the arm", slow > 90,
+          f"thumb swept 180 deg over 1.5 s, arm travelled {slow:.0f} deg")
+
+    # And the other half: a stick held still must NOT walk the arm round, or closing on
+    # somebody is an attack by itself.
+    held = A.Fighter(-2.0, 1, "club")
+    foe = A.Fighter(0.0, -1, "club")
+    first = None
+    drift = 0.0
+    for t in range(120):
+        held.x += A.RUN_SPEED // 60
+        A.step(held, (A.ONE, 0), foe)
+        ang = math.degrees(math.atan2(F.to_f(held.arm[1]), F.to_f(held.arm[0])))
+        if first is None:
+            first = ang
+        drift = max(drift, abs(ang - first))
+    check("and a stick held still does not walk the arm round while you close",
+          drift < 20, f"arm drifted {drift:.1f} deg over two seconds of walking in")
+
     # ------------------------------------------------------- 8. armour
     # Ported from combat_test, which this file replaces: the hit machinery past the
     # point of contact did not change, but it has to keep being checked somewhere.
     print("\n8. armour, which is the one stat docs/03 gives no downside")
 
     def hit_through(armour_permille):
-        att = A.Fighter(-0.9, 1, "club")
+        att = A.Fighter(-stand_off("club"), 1, "club")
         vic = A.Fighter(0.0, -1, "fists")
         vic.armour = armour_permille
         high, t = True, 0
@@ -269,7 +352,7 @@ def main():
                 high = not high
                 t = A.WEAPONS["club"][0]
             t -= 1
-            A.tick([att, vic], [aim_at(60 if high else -60), (A.ONE, 0)])
+            A.tick([att, vic], [aim_at(60 if high else -60), (0, 0)])
             if vic.was_hit:
                 return vic.damage_taken
         return 0
@@ -280,6 +363,46 @@ def main():
           0 < kit_hit < bare_hit, f"{bare_hit} bare, {kit_hit} in 450 permille of armour")
     check("and the cap stops armour ever reaching zero damage",
           hit_through(900) >= 1, f"{hit_through(900)} through 900 permille")
+
+    # --------------------------------------------- 9. the blade is the model
+    #
+    # The hitbox has to be the weapon you can see, and for a long time it was not. The
+    # simulation ran the item's whole Reach out from the hand, which came to about 1.5x
+    # the drawn model on all twelve weapons and gave bare fists 0.60 m of steel out of an
+    # empty hand. Nothing caught it, because every OTHER test placed its fighters in
+    # metres picked to suit whatever the geometry happened to be.
+    #
+    # Reach is not a distance any more and should not be read as one. It is measured from
+    # the middle of the body, so it already contains half a torso and an arm; what it
+    # still does, and all it does, is RANK the weapons.
+    print("\n9. the blade the sim swings is the blade that gets drawn")
+
+    blades = {n: F.to_f(A.Fighter(0, 1, n).blade()) for n in A.WEAPONS}
+    height = F.to_f(A.BODY_HEIGHT)
+
+    check("bare hands have no blade -- the fist is the weapon",
+          blades["fists"] == 0,
+          f"{blades['fists']:.2f} m of steel out of an empty hand")
+
+    longer = [n for n, b in blades.items() if b >= A.WEAPONS[n][2]]
+    check("and no blade is as long as the reach its item claims",
+          not longer,
+          f"reach carries half a torso and an arm; offenders: {longer or 'none'}")
+
+    armed = sorted((A.WEAPONS[n][2], n) for n in A.WEAPONS if blades[n] > 0)
+    ordered = all(blades[armed[i][1]] <= blades[armed[i + 1][1]]
+                  for i in range(len(armed) - 1))
+    check("but reach still ranks them, which is the one job it has left",
+          ordered,
+          f"shortest {armed[0][1]} at {blades[armed[0][1]]:.2f} m, "
+          f"longest {armed[-1][1]} at {blades[armed[-1][1]]:.2f} m")
+
+    overgrown = [n for n, b in blades.items()
+                 if b > height * A.CFG["max_blade_pm"] / 1000.0 + 0.001]
+    check("and the cap holds, so nobody swings a flagpole",
+          not overgrown,
+          f"ceiling is {height * A.CFG['max_blade_pm'] / 1000.0:.2f} m on a "
+          f"{height:.2f} m fighter; over it: {overgrown or 'none'}")
 
     print()
     print(f"{PASS} passed, {FAIL} failed")

@@ -14,10 +14,11 @@ from sim_motor_mirror import C, ONE
 from loot_mirror import ITEMS, NONE, FISTS
 
 ARM = dict(
-    shoulder=780, arm_length=F.milli(450),
+    shoulder=780, arm_length_pm=350,
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
-    body_radius=F.milli(300), blade_radius=F.milli(70),
+    haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
+    body_radius_pm=180, blade_radius_pm=60,
     hit_lock=18, clash_deflect=700, clash_lock=10,
 )
 
@@ -30,18 +31,10 @@ K = dict(
 
 PI = F.milli(3142)
 
-# sim_motor_mirror's fighter is 0.91 m tall. MoveConfig's is 1.8. That divergence is
-# older than this file and the movement tests are all tuned around the smaller one, so
-# it is not something to "fix" here -- but it could not be ignored either, because the
-# arm model makes reach GEOMETRIC. At true scale a spear is 1.85 m of blade on a 0.91 m
-# body: an arm two and a half times the height of its owner, whose tip spends half the
-# swing underground. Everything with a length is scaled into the mirror's world so the
-# proportions are right, and arm_test keeps the argument about real numbers.
-SCALE = F.div(C["H"], F.milli(1800))
-
-
-def shrink(v):
-    return F.mul(v, SCALE)
+# This file used to carry a SCALE factor, because sim_motor_mirror's fighter is 0.91 m
+# and MoveConfig's defaults said 1.8, and the arm model makes every length geometric.
+# It is gone: MoveConfig now describes the fighter in the prefabs, every length in the
+# arm is a share of his height, and the two mirrors agree without a fudge between them.
 
 
 def aim_of(x_permille, y_permille):
@@ -91,11 +84,24 @@ def shoulder(s):
 
 
 def arm_length():
-    return shrink(ARM["arm_length"])
+    return F.mul(C["H"], F.milli(ARM["arm_length_pm"]))
 
 
 def reach(s):
-    return shrink(W(s)["reach"])
+    """What the ITEM says, which is reach from the middle of the body."""
+    return W(s)["reach"]
+
+
+def blade(s):
+    """What hangs past the hand: the weapon that is DRAWN. ArmMotor.BladeLength."""
+    bare = ITEMS[FISTS]["reach"]
+    r = reach(s)
+    if r <= bare:
+        return 0
+    want = (F.mul(C["H"], F.milli(ARM["haft_pm"]))
+            + F.mul(r - bare, F.milli(ARM["reach_to_blade_pm"])))
+    return max(F.mul(C["H"], F.milli(ARM["min_blade_pm"])),
+               min(F.mul(C["H"], F.milli(ARM["max_blade_pm"])), want))
 
 
 def hand(s):
@@ -103,7 +109,7 @@ def hand(s):
 
 
 def tip(s):
-    return F.add(shoulder(s), F.scale(s.arm, arm_length() + reach(s)))
+    return F.add(shoulder(s), F.scale(s.arm, arm_length() + blade(s)))
 
 
 def body_segment(s):
@@ -118,7 +124,7 @@ def slew(s):
 
 
 def top_tip_speed(s):
-    return F.mul(slew(s), arm_length() + reach(s))
+    return F.mul(slew(s), arm_length() + blade(s))
 
 
 def normalized(v):
@@ -176,7 +182,7 @@ def combat_step(s, inp, aim=(0, 0)):
     if F.length_sq(s.arm) == 0:
         s.arm = ((s.facing or 1) * ONE, 0)
 
-    local = F.scale(s.arm, arm_length() + reach(s))
+    local = F.scale(s.arm, arm_length() + blade(s))
     if not s.tip_primed:
         s.tip_prev = local
         s.tip_primed = True
@@ -218,7 +224,7 @@ def resolve(players, sudden_death=False):
 def _clash(a, b):
     if a.dead or b.dead:
         return
-    touch = shrink(ARM["blade_radius"]) * 2
+    touch = F.mul(C["H"], F.milli(ARM["blade_radius_pm"])) * 2
     touching = F.segment_distance_sq(hand(a), tip(a), hand(b), tip(b)) <= F.mul(touch, touch)
     a.in_contact = b.in_contact = touching
     if not touching:
@@ -248,7 +254,7 @@ def _clash(a, b):
     loser.clash_lock = ARM["clash_lock"]
     loser.tip_speed = 0
     # The deflection must not read as a swing of theirs next tick.
-    loser.tip_prev = F.scale(loser.arm, arm_length() + reach(loser))
+    loser.tip_prev = F.scale(loser.arm, arm_length() + blade(loser))
 
 
 def _strike(att, vic, sudden):
@@ -264,7 +270,7 @@ def _strike(att, vic, sudden):
         return
 
     feet, head = body_segment(vic)
-    radius = shrink(ARM["body_radius"])
+    radius = F.mul(C["H"], F.milli(ARM["body_radius_pm"]))
     if F.segment_distance_sq(hand(att), tip(att), feet, head) > F.mul(radius, radius):
         return
 

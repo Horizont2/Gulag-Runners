@@ -22,8 +22,45 @@ namespace GulagRunners.Game
         [Tooltip("Shoulder height, as a share of the body. The arm hangs from here.")]
         [Range(0.5f, 0.95f)] public float shoulderHeight = 0.78f;
 
-        [Tooltip("Arm length in metres. The weapon's reach is added past the hand.")]
-        [Range(0.2f, 0.9f)] public float armLength = 0.45f;
+        [Tooltip("Arm length as a SHARE OF BODY HEIGHT. The weapon's reach is added " +
+                 "past the hand.\n\n" +
+                 "A share and not metres: in metres it was written against the 1.8 m " +
+                 "fighter in the defaults, and the fighter in the prefabs is 0.91 m, so " +
+                 "the arm came out half his own height. The IK goal then sat outside " +
+                 "anything the shoulder could reach and Unity dragged the spine out to " +
+                 "meet it -- which is a body bending into knots at some angles.")]
+        [Range(0.15f, 0.6f)] public float armLength = 0.35f;
+
+        [Tooltip("The grip and head every weapon has before it adds any reach at all, " +
+                 "as a share of body height. A blade is this plus the share below of " +
+                 "whatever reach the weapon adds over bare hands.\n\n" +
+                 "These four numbers decide the BLADE THE SIMULATION SWINGS, and they " +
+                 "are the ones PlayerLoadoutView has always drawn a weapon with — which " +
+                 "is the point: the hitbox and the model are now one object.\n\n" +
+                 "Taking the blade as the item's whole Reach instead, which is what the " +
+                 "simulation used to do, is the single worst bug this fight has had. " +
+                 "Reach is measured from the MIDDLE OF THE BODY, so it already contains " +
+                 "half a torso and an arm; run out from the hand it made every blade " +
+                 "about 1.5x the weapon on screen, and gave bare fists 0.60 m of " +
+                 "invisible steel. Blades longer than the gap between two fighters are " +
+                 "crossed nearly all the time, every crossing is a clash, and a clash " +
+                 "locks both arms: two people swinging at each other stood there for " +
+                 "forty seconds without landing a blow.")]
+        [Range(0f, 0.8f)] public float haft = 0.27f;
+
+        [Tooltip("How much of the reach a weapon adds over bare hands is drawn and " +
+                 "swung as blade.")]
+        [Range(0f, 3f)] public float reachToBlade = 0.73f;
+
+        [Tooltip("Shortest a blade may be, as a share of body height. A dagger adds " +
+                 "almost nothing to bare reach, and a dagger you cannot see is not a " +
+                 "weapon.")]
+        [Range(0f, 1f)] public float minBlade = 0.31f;
+
+        [Tooltip("Longest a blade may be, as a share of body height. The map from reach " +
+                 "to length is linear, which over-rewards the two polearms: uncapped, a " +
+                 "scythe comes out nearly twice the fighter's height.")]
+        [Range(0.2f, 3f)] public float maxBlade = 1.43f;
 
         [Tooltip("Seconds for the arm to sweep half a circle, carrying a weapon whose " +
                  "AttackFrames equals Reference Frames below.\n\n" +
@@ -68,11 +105,11 @@ namespace GulagRunners.Game
                  "lands well under this and pays nothing.")]
         [Range(0.05f, 0.6f)] public float minSwing = 0.25f;
 
-        [Tooltip("Body radius for the hit capsule, in metres.")]
-        [Range(0.1f, 0.6f)] public float bodyRadius = 0.30f;
+        [Tooltip("Body radius for the hit capsule, as a share of body height.")]
+        [Range(0.05f, 0.4f)] public float bodyRadius = 0.18f;
 
-        [Tooltip("Half-width of a blade, for weapon-on-weapon contact.")]
-        [Range(0.02f, 0.25f)] public float bladeRadius = 0.07f;
+        [Tooltip("Half-width of a blade for weapon-on-weapon contact, likewise a share.")]
+        [Range(0.01f, 0.2f)] public float bladeRadius = 0.06f;
 
         [Tooltip("Seconds before the same weapon may hurt the same fighter again. " +
                  "One arc, one hit.")]
@@ -270,15 +307,19 @@ namespace GulagRunners.Game
         public ArmConfig ToArmConfig() => new ArmConfig
         {
             ShoulderPermille = P(shoulderHeight),
-            ArmLength = M(armLength),
+            ArmLengthPermille = P(armLength),
+            HaftPermille = P(haft),
+            ReachToBladePermille = P(reachToBlade),
+            MinBladePermille = P(minBlade),
+            MaxBladePermille = P(maxBlade),
             SweepFrames = Mathf.Max(1, F(sweepTime)),
             ReferenceFrames = Mathf.Max(1, referenceFrames),
             DeadzonePermille = P(aimDeadzone),
             CarryDropPermille = P(carryDrop),
             AimRelativePermille = P(aimRelative),
             MinSwingPermille = P(minSwing),
-            BodyRadius = M(bodyRadius),
-            BladeRadius = M(bladeRadius),
+            BodyRadiusPermille = P(bodyRadius),
+            BladeRadiusPermille = P(bladeRadius),
             HitLockFrames = Mathf.Max(1, F(hitLock)),
             ClashDeflectPermille = P(clashDeflect),
             ClashLockFrames = Mathf.Max(0, F(clashLock)),

@@ -123,7 +123,7 @@ namespace GulagRunners.Game
             PlayerSimState him = foe.State;
 
             TickInput intent = BotBrain.Decide(ref _bot, in me, in him, self.World,
-                                               in tuning, self.Config);
+                                               in tuning, self.Config, self.ArmSettings);
 
             pressing = $"{intent.Flags} aim({intent.AimX},{intent.AimY})  ({_bot.Think})";
             return intent;

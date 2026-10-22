@@ -31,29 +31,10 @@ namespace GulagRunners.Game
 
 
         [Header("Size")]
-        [Tooltip("How long a weapon is drawn, as a share of the reach it ADDS over bare " +
-                 "hands, in metres. 0 draws everything at the fallback length instead.\n\n" +
-                 "Weapon packs are authored for a 1.8 m human; this fighter is 0.91 m, so a " +
-                 "pack greataxe in his hand is longer than he is tall. Rather than guess one " +
-                 "number for one pack, each model's own mesh is measured and its longest axis " +
-                 "scaled to this. Taking the length from reach keeps the picture and the " +
-                 "hitbox agreeing: docs/02 makes reach the whole difference between two " +
-                 "weapons, and a spear drawn dagger-sized is that difference thrown away.")]
-        [Range(0f, 3f)] public float reachToLength = 0.73f;
-
-        [Tooltip("The grip and head every weapon has before it has any reach at all, in " +
-                 "metres. Must match the fighter's own Base Of Body times its height, or a " +
-                 "weapon changes size when it is picked up.")]
-        [Range(0f, 0.8f)] public float baseLength = 0.246f;
-
-        [Tooltip("Shortest a weapon may be drawn, in metres. A dagger adds almost nothing to " +
-                 "bare reach, and a dagger you cannot see is not a weapon.")]
-        [Range(0f, 0.6f)] public float minLength = 0.28f;
-
-        [Tooltip("Longest a weapon may be drawn, in metres. The map from reach to length is " +
-                 "linear, which over-rewards the two polearms: left uncapped a scythe comes " +
-                 "out nearly twice the fighter's height.")]
-        [Range(0f, 3f)] public float maxLength = 1.3f;
+        // A weapon on the floor has to read at the same size as one in a hand, or picking
+        // it up changes what it is. That used to be four numbers here and four more on the
+        // fighter, kept in step by a tooltip asking nicely. It is ArmMotor.BladeLength for
+        // both now, and LootView hands this view the arm tuning the match is running.
 
         [Tooltip("Longest axis, in metres, for anything with no reach of its own — armour, " +
                  "the bandage, a stand-in cube.\n\n" +
@@ -151,14 +132,16 @@ namespace GulagRunners.Game
         /// picking it up changes what it is — which is exactly what happened while the hand
         /// divided out the fighter's 0.5 and the floor did not.
         /// </summary>
-        void Start()
+        public void FitModels(in MoveConfig move, in ArmConfig arm)
         {
-            ItemModels.FitAll(models, reachToLength, minLength, maxLength, fallbackLength,
-                              baseLength);
-            if (fallbackModel != null)
-                ItemModels.Fit(fallbackModel, ItemId.None, 0f, minLength, maxLength,
-                               fallbackLength);
+            if (_fitted) return;
+            _fitted = true;
+
+            ItemModels.FitAll(models, in move, in arm, fallbackLength);
+            if (fallbackModel != null) ItemModels.Fit(fallbackModel, fallbackLength);
         }
+
+        bool _fitted;
 
         /// <summary>Puts this view on an item. Phase keeps a row of them from bobbing in time.</summary>
         public void Show(in GroundItem item, float planeZ, int phase)

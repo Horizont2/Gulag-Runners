@@ -45,36 +45,14 @@ namespace GulagRunners.Game
 
 
         [Header("Size")]
-        [Tooltip("How long a weapon is drawn, as a share of the reach it ADDS over bare " +
-                 "hands, in metres. 0 draws everything at the fallback length instead.\n\n" +
-                 "Weapon packs are authored for a 1.8 m human; this fighter is 0.91 m, so a " +
-                 "pack greataxe in his hand is longer than he is tall. Rather than guess one " +
-                 "number for one pack, each model's own mesh is measured and its longest axis " +
-                 "scaled to this. Taking the length from reach keeps the picture and the " +
-                 "hitbox agreeing: docs/02 makes reach the whole difference between two " +
-                 "weapons, and a spear drawn dagger-sized is that difference thrown away.")]
-        [Range(0f, 3f)] public float reachToLength = 0.73f;
-
-        [Tooltip("The grip and head every weapon has before it has any reach at all, as a " +
-                 "share of the fighter's own height.\n\n" +
-                 "Without it the map from reach to length is a straight line through the " +
-                 "origin, and that is wrong at both ends at once: the dagger adds 0.10 m of " +
-                 "reach, which drew it at the minimum and heaped it in with the mace and " +
-                 "the gladius as the same small stick, while the warhammer came out at 119% " +
-                 "of the fighter's height and the two polearms hit the cap at 143%. A real " +
-                 "warhammer is about half its owner's height and a real spear about 120%.\n\n" +
-                 "With a base, the same table draws 35% for a dagger and 127% for a scythe, " +
-                 "in order and nothing clamped.")]
-        [Range(0f, 0.8f)] public float baseOfBody = 0.27f;
-
-        [Tooltip("Shortest a weapon may be drawn, in metres. A dagger adds almost nothing to " +
-                 "bare reach, and a dagger you cannot see is not a weapon.")]
-        [Range(0f, 0.6f)] public float minLength = 0.28f;
-
-        [Tooltip("Longest a weapon may be drawn, in metres. The map from reach to length is " +
-                 "linear, which over-rewards the two polearms: left uncapped a scythe comes " +
-                 "out nearly twice the fighter's height.")]
-        [Range(0f, 3f)] public float maxLength = 1.3f;
+        // How long a weapon is DRAWN is ArmMotor.BladeLength, off the match's own arm
+        // tuning, and it is not repeated here. It used to be: four numbers on this
+        // component, four more on GroundItemView, and a tooltip on one of them asking
+        // whoever edited it to keep the other in step by hand. Meanwhile the simulation
+        // swung a blade built from the item's whole Reach, which is a different length
+        // again -- about 1.5x the model, on every weapon in the table. A hitbox that is
+        // not the thing you can see is the worst kind of wrong, so there is one rule now
+        // and the sim owns it.
 
         [Tooltip("Longest axis, in metres, for anything with no reach of its own — armour, the " +
                  "bandage, a stand-in cube.")]
@@ -137,14 +115,13 @@ namespace GulagRunners.Game
         /// </summary>
         void Start()
         {
-            // Proportional to the fighter, not a number in metres: the one decision this
-            // project has not taken yet is what a metre is, and a hard-coded haft would
-            // have to be found and changed again on the day it does.
-            float haft = baseOfBody * (player != null ? player.tuning.bodyHeight : 0.91f);
+            // Off the match's own arm tuning, through the simulation's own function, so
+            // the weapon drawn in the hand is the weapon the hitbox is.
+            MoveConfig move = player != null ? player.Config : MoveConfig.Default();
+            ArmConfig arm = player != null ? player.ArmSettings : ArmConfig.Default();
 
-            ItemModels.FitAll(weapons, reachToLength, minLength, maxLength, fallbackLength,
-                              haft);
-            ItemModels.FitAll(armour, 0f, minLength, maxLength, fallbackLength);
+            ItemModels.FitAll(weapons, in move, in arm, fallbackLength);
+            ItemModels.FitAll(armour, fallbackLength);
         }
 
         void LateUpdate()

@@ -67,7 +67,7 @@ namespace GulagRunners.Sim
                               s.Mode == MoveMode.Grounded && s.DodgeRecoverTimer <= 0 &&
                               s.StaminaCharges >= move.DodgeStaminaCost;
 
-            s.SpeedPermille = SpeedCap(in s, in arm, in cfg);
+            s.SpeedPermille = SpeedCap(in s, in move, in arm, in cfg);
             return MaskInput(in s, input, wantsDodge, in cfg);
         }
 
@@ -144,9 +144,10 @@ namespace GulagRunners.Sim
         /// which is the point -- the player sees their own speed answer the stick instead
         /// of snapping between states.
         /// </summary>
-        static short SpeedCap(in PlayerSimState s, in ArmConfig arm, in CombatConfig cfg)
+        static short SpeedCap(in PlayerSimState s, in MoveConfig move, in ArmConfig arm,
+                              in CombatConfig cfg)
         {
-            int share = ArmMotor.SwingPermille(in s, in arm);
+            int share = ArmMotor.SwingPermille(in s, in move, in arm);
             if (share <= 0) return 0;
 
             // Full swing is the old active-frame speed; a lazy wave barely costs anything.

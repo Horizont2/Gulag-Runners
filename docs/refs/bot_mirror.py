@@ -8,6 +8,7 @@ not something you can see reliably by eye in a fight, and it is trivial to count
 Mirrors Gulag runners/Assets/_Game/Sim/Core/BotBrain.cs and BotConfig.cs."""
 from sim_motor_mirror import M, F, C, L, R, UP, DN, JMP, DOD
 from loot_mirror import Rng, ITEMS
+import arm_combat as AC
 
 DUMMY, SPARRING, HUNTER = 0, 1, 2
 
@@ -136,7 +137,10 @@ def think(bot, me, foe, w, cfg):
     if cfg["skill"] == DUMMY:
         return 0
 
-    reach = C["W"] // 2 + ITEMS[me.inv.weapon]["reach"]
+    # The arm and the blade, not the item's Reach: those are the same thing only by
+    # accident, and once the blade became the one that is DRAWN they parted company by
+    # 0.37 m on a spear -- a spear bot standing where its spear does not go.
+    reach = AC.arm_length() + AC.blade(me)
     want = scale(reach, cfg["range_pm"])
     too_close = scale(reach, cfg["close_pm"])
 

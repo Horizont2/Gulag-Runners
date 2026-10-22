@@ -34,12 +34,59 @@ namespace GulagRunners.Sim
         /// <summary>The grip. The weapon runs from here to the tip.</summary>
         public static FixVec2 Hand(in PlayerSimState s, in MoveConfig move,
                                    in ArmConfig cfg) =>
-            Shoulder(in s, in move, in cfg) + s.Arm * cfg.ArmLength;
+            Shoulder(in s, in move, in cfg) + s.Arm * ArmLength(in s, in move, in cfg);
 
         public static FixVec2 Tip(in PlayerSimState s, in MoveConfig move,
                                   in ArmConfig cfg) =>
             Shoulder(in s, in move, in cfg)
-            + s.Arm * (cfg.ArmLength + s.Inventory.WeaponDef.Reach);
+            + s.Arm * (ArmLength(in s, in move, in cfg)
+                       + BladeLength(in move, in cfg, s.Inventory.WeaponDef.Reach));
+
+        /// <summary>
+        /// How much steel hangs past the hand: the blade that is DRAWN, not the item's
+        /// reach. ArmConfig says why they are not the same thing.
+        ///
+        /// Reach is measured from the middle of the body, so a weapon is the part it
+        /// adds over bare hands and nothing more. Bare hands add nothing and get no
+        /// blade; the hand itself is then the whole weapon, which is correct and is also
+        /// what the model shows.
+        /// </summary>
+        public static Fix BladeLength(in MoveConfig move, in ArmConfig cfg, Fix reach)
+        {
+            Fix bare = ItemTable.Get(ItemId.Fists).Reach;
+            if (reach <= bare) return Fix.Zero;
+
+            Fix want = move.BodyHeight * Fix.FromMilli(cfg.HaftPermille)
+                       + (reach - bare) * Fix.FromMilli(cfg.ReachToBladePermille);
+
+            Fix floor = move.BodyHeight * Fix.FromMilli(cfg.MinBladePermille);
+            Fix ceiling = move.BodyHeight * Fix.FromMilli(cfg.MaxBladePermille);
+            if (want < floor) return floor;
+            return want > ceiling ? ceiling : want;
+        }
+
+        /// <summary>
+        /// The lengths that used to be metres, now read off the fighter's own height.
+        ///
+        /// Everything about the arm scales with its owner. Written in metres they were
+        /// written against ONE fighter -- the 1.8 m one in MoveConfig's defaults -- and
+        /// the one in the prefabs is 0.91 m, so the arm came out half his height.
+        ///
+        /// Against BodyHeight and never CrouchHeight: a crouch changes the shape a man
+        /// is in, not the size he is. Ducking moves the shoulder down, which Shoulder
+        /// already does, and it does not shorten his arm or his sword.
+        /// </summary>
+        public static Fix ArmLength(in PlayerSimState s, in MoveConfig move,
+                                    in ArmConfig cfg) =>
+            move.BodyHeight * Fix.FromMilli(cfg.ArmLengthPermille);
+
+        public static Fix BodyRadius(in PlayerSimState s, in MoveConfig move,
+                                     in ArmConfig cfg) =>
+            move.BodyHeight * Fix.FromMilli(cfg.BodyRadiusPermille);
+
+        public static Fix BladeRadius(in PlayerSimState s, in MoveConfig move,
+                                      in ArmConfig cfg) =>
+            move.BodyHeight * Fix.FromMilli(cfg.BladeRadiusPermille);
 
         /// <summary>Mid-chest, which is what a swing is helped toward.</summary>
         public static FixVec2 Chest(in PlayerSimState s, in MoveConfig move)
@@ -78,8 +125,10 @@ namespace GulagRunners.Sim
         }
 
         /// <summary>The fastest this weapon's tip can be made to travel, per tick.</summary>
-        public static Fix TopTipSpeed(in PlayerSimState s, in ArmConfig cfg) =>
-            Slew(in s, in cfg) * (cfg.ArmLength + s.Inventory.WeaponDef.Reach);
+        public static Fix TopTipSpeed(in PlayerSimState s, in MoveConfig move,
+                                      in ArmConfig cfg) =>
+            Slew(in s, in cfg) * (ArmLength(in s, in move, in cfg)
+                                  + BladeLength(in move, in cfg, s.Inventory.WeaponDef.Reach));
 
         // ------------------------------------------------------------------ the swing
 
@@ -139,7 +188,8 @@ namespace GulagRunners.Sim
             // -- it would have made light weapons unusable to buy off a bug in heavy
             // ones. Relative to the shoulder, a walk contributes exactly nothing, which
             // is also the honest statement: a swing is what your ARM did.
-            FixVec2 local = s.Arm * (cfg.ArmLength + s.Inventory.WeaponDef.Reach);
+            FixVec2 local = s.Arm * (ArmLength(in s, in move, in cfg)
+                                     + BladeLength(in move, in cfg, s.Inventory.WeaponDef.Reach));
             if (!s.TipPrimed)
             {
                 s.TipPrev = local;
@@ -149,7 +199,7 @@ namespace GulagRunners.Sim
             s.TipSpeed = (local - s.TipPrev).Length;
             s.TipPrev = local;
 
-            s.SwingShare = SwingPermille(in s, in cfg);
+            s.SwingShare = SwingPermille(in s, in move, in cfg);
 
             if (s.HitLock > 0) s.HitLock--;
             if (s.ClashLock > 0) s.ClashLock--;
@@ -179,15 +229,20 @@ namespace GulagRunners.Sim
         {
             FixVec2 want = aim.Normalized;
 
-            // Only when the THUMB moved. A stick held still keeps the direction the
-            // assist already gave it, so walking at somebody is not an attack: see
-            // PlayerSimState.AimPrev for the measurement that put this here.
+            // Only when the THUMB moved -- measured since the last time the frame was
+            // TAKEN, not since the last tick. That distinction is the whole of it: at
+            // 60 Hz a thumb sliding round the ring moves about a hundredth of the stick
+            // per tick, which never clears any sane threshold on its own, so comparing
+            // tick to tick meant the arm froze and stopped answering the stick at all
+            // for as long as you moved it smoothly. Against the last frame the movement
+            // ADDS UP and crosses in a few ticks, which is what "the thumb moved" has
+            // to mean.
             Fix moved = (aim - s.AimPrev).LengthSq;
             bool steady = s.AssistHeld && moved <= Fix.FromMilli(20) * Fix.FromMilli(20);
-            s.AimPrev = aim;
 
             if (steady) return s.AssistDir;
 
+            s.AimPrev = aim;
             s.AssistHeld = true;
             s.AssistDir = want;
 
@@ -220,9 +275,10 @@ namespace GulagRunners.Sim
         /// What share of this weapon's full blow the tip has earned, in thousandths.
         /// Zero below the floor, so a carried weapon and a walk-in are both harmless.
         /// </summary>
-        public static int SwingPermille(in PlayerSimState s, in ArmConfig cfg)
+        public static int SwingPermille(in PlayerSimState s, in MoveConfig move,
+                                        in ArmConfig cfg)
         {
-            Fix top = TopTipSpeed(in s, in cfg);
+            Fix top = TopTipSpeed(in s, in move, in cfg);
             if (top.Raw <= 0) return 0;
 
             long share = (long)s.TipSpeed.Raw * 1000 / top.Raw;
@@ -277,13 +333,15 @@ namespace GulagRunners.Sim
                           in MoveConfig move, in ArmConfig cfg)
         {
             if (a.Dead || b.Dead) return;
-            if (a.Inventory.WeaponDef.Reach.Raw <= 0 &&
-                b.Inventory.WeaponDef.Reach.Raw <= 0) return;
+            // Two bare fists have no blade between them to catch, so there is nothing
+            // here to resolve: fists meet bodies, in Strike, and nowhere else.
+            if (BladeLength(in move, in cfg, a.Inventory.WeaponDef.Reach).Raw <= 0 &&
+                BladeLength(in move, in cfg, b.Inventory.WeaponDef.Reach).Raw <= 0) return;
 
             FixVec2 ah = Hand(in a, in move, in cfg), at = Tip(in a, in move, in cfg);
             FixVec2 bh = Hand(in b, in move, in cfg), bt = Tip(in b, in move, in cfg);
 
-            Fix touch = cfg.BladeRadius * 2;
+            Fix touch = BladeRadius(in a, in move, in cfg) * 2;
             bool touching = FixGeom.SegmentDistanceSq(ah, at, bh, bt) <= touch * touch;
 
             a.InContact = touching;
@@ -295,7 +353,7 @@ namespace GulagRunners.Sim
             // other have no energy to take off anybody, and this is the line that stops
             // the fight freezing: standing close with weapons crossed -- which at any
             // real range is most of the time -- is not a parry and locks nobody.
-            if (SwingPermille(in a, in cfg) <= 0 && SwingPermille(in b, in cfg) <= 0)
+            if (SwingPermille(in a, in move, in cfg) <= 0 && SwingPermille(in b, in move, in cfg) <= 0)
                 return;
 
             // And the last clash has to have run out. This used to be an EDGE instead --
@@ -338,13 +396,13 @@ namespace GulagRunners.Sim
             bool aWins = diff.Raw > 0;
             Fix shove = Fix.Abs(diff) * Fix.FromMilli(cfg.ClashDeflectPermille);
 
-            if (aWins) Deflect(ref b, in a, shove, in cfg);
-            else Deflect(ref a, in b, shove, in cfg);
+            if (aWins) Deflect(ref b, in a, shove, in move, in cfg);
+            else Deflect(ref a, in b, shove, in move, in cfg);
         }
 
         /// <summary>Knocks a beaten arm away from the blade that beat it.</summary>
         static void Deflect(ref PlayerSimState loser, in PlayerSimState winner, Fix shove,
-                            in ArmConfig cfg)
+                            in MoveConfig move, in ArmConfig cfg)
         {
             // Away from the winner's arm, along whichever perpendicular points away.
             FixVec2 side = winner.Arm.Perpendicular;
@@ -363,7 +421,8 @@ namespace GulagRunners.Sim
             // being parried became a free attack: every weapon in the game could kill by
             // walking into somebody, because the first contact knocked their own arm
             // hard enough to count.
-            loser.TipPrev = loser.Arm * (cfg.ArmLength + loser.Inventory.WeaponDef.Reach);
+            loser.TipPrev = loser.Arm * (ArmLength(in loser, in move, in cfg)
+                                         + BladeLength(in move, in cfg, loser.Inventory.WeaponDef.Reach));
         }
 
         /// <summary>Weapon against body. The only place damage is dealt.</summary>
@@ -376,7 +435,7 @@ namespace GulagRunners.Sim
             if (attacker.HitStopTimer > 0 || attacker.DodgeTimer > 0) return;
             if (victim.DodgeTimer > 0) return;          // the dodge's invulnerable frames
 
-            int share = SwingPermille(in attacker, in cfg);
+            int share = SwingPermille(in attacker, in move, in cfg);
             if (share <= 0) return;
 
             FixVec2 hand = Hand(in attacker, in move, in cfg);
@@ -384,7 +443,8 @@ namespace GulagRunners.Sim
             BodySegment(in victim, in move, out FixVec2 feet, out FixVec2 head);
 
             if (FixGeom.SegmentDistanceSq(hand, tip, feet, head) >
-                cfg.BodyRadius * cfg.BodyRadius) return;
+                BodyRadius(in victim, in move, in cfg)
+                * BodyRadius(in victim, in move, in cfg)) return;
 
             attacker.DealtPermille = share;
 

@@ -76,7 +76,8 @@ namespace GulagRunners.Sim
     {
         public static TickInput Decide(ref BotState bot, in PlayerSimState self,
                                        in PlayerSimState foe, SimWorld world,
-                                       in BotConfig cfg, in MoveConfig move)
+                                       in BotConfig cfg, in MoveConfig move,
+                                       in ArmConfig arm)
         {
             // The arm is re-aimed EVERY tick, outside the reaction gate below. A bot that
             // only moved its weapon once every fourteen frames would not be a slow bot, it
@@ -104,13 +105,14 @@ namespace GulagRunners.Sim
 
             bot.Think = cfg.ReactionFrames +
                         (cfg.ReactionJitter > 0 ? bot.Rng.Below(cfg.ReactionJitter) : 0);
-            bot.Held = Think(ref bot, in self, in foe, world, in cfg, in move);
+            bot.Held = Think(ref bot, in self, in foe, world, in cfg, in move, in arm);
             return new TickInput(bot.Held, bot.AimX, bot.AimY);
         }
 
         static InputFlags Think(ref BotState bot, in PlayerSimState self,
                                 in PlayerSimState foe, SimWorld world,
-                                in BotConfig cfg, in MoveConfig move)
+                                in BotConfig cfg, in MoveConfig move,
+                                in ArmConfig arm)
         {
             if (foe.Dead) return InputFlags.None;
 
@@ -141,7 +143,16 @@ namespace GulagRunners.Sim
 
             // Where it wants to stand, measured off its OWN weapon: a spear bot that stands
             // at a club's distance has thrown away the only thing a spear is for.
-            Fix reach = move.BodyWidth / 2 + self.Inventory.WeaponDef.Reach;
+            //
+            // Off the arm and the blade rather than off the item's Reach, because those
+            // are the same thing only by accident. Reach is a number in a table; the
+            // distance the weapon actually covers is the arm plus the steel past the hand,
+            // and once the blade became the one that is drawn the two parted company by
+            // 0.37 m on a spear -- which is a spear bot standing where its spear does not
+            // go. Asking the geometry leaves nothing to keep in step.
+            Fix reach = ArmMotor.ArmLength(in self, in move, in arm)
+                        + ArmMotor.BladeLength(in move, in arm,
+                                               self.Inventory.WeaponDef.Reach);
             Fix want = Scale(reach, cfg.RangePermille);
             Fix tooClose = Scale(reach, cfg.TooClosePermille);
 

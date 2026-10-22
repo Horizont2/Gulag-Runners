@@ -58,46 +58,31 @@ namespace GulagRunners.Game
         /// Not reach itself, though: reach is measured from the middle of the body, so it
         /// already contains half a torso and an arm. Bare hands have a reach too, and it is
         /// exactly that — so what a weapon is drawn as is the reach it ADDS over bare hands.
-        /// Read out of the table rather than written down here, so retuning fists moves every
-        /// weapon with it. Measured straight off reach instead, a sword came out as long as the
-        /// fighter is tall and a scythe half again as long.
+        /// Measured straight off reach instead, a sword came out as long as the fighter is
+        /// tall and a scythe half again as long.
+        ///
+        /// That rule is no longer written here. It lives in <see cref="ArmMotor.BladeLength"/>,
+        /// because the simulation needs the same answer and the two must not be able to
+        /// disagree: the blade that is swung has to be the blade that is seen. It was written
+        /// here alone for a while and they did disagree — by about 1.5x on all twelve weapons,
+        /// which is most of why the fight played badly.
         ///
         /// Measured off sharedMesh rather than Renderer.bounds, because every one of these
         /// models is switched off when this runs and an inactive renderer has no bounds.
         /// </summary>
-        public static void Fit(GameObject root, ItemId item, float reachToLength,
-                               float minLength, float maxLength, float fallback,
-                               float baseLength = 0f)
+        public static void Fit(GameObject root, ItemId item, in MoveConfig move,
+                               in ArmConfig arm, float fallback)
         {
             if (root == null) return;
 
-            float want = fallback;
-            if (reachToLength > 0f)
-            {
-                Fix reach = ItemTable.Get(item).Reach;
-                Fix arm = ItemTable.Get(ItemId.Fists).Reach;
-                if (reach.Raw > arm.Raw)
-                {
-                    // A HAFT plus the reach it adds, not the reach alone.
-                    //
-                    // Measured straight off the added reach, the family came out wrong at
-                    // both ends at once. The dagger adds 0.10 m, which drew it at the
-                    // minimum length and put it in a heap with the mace and the gladius --
-                    // four weapons that all read as the same small stick. The warhammer
-                    // adds 0.80 m, which drew it at 119% of the fighter's own height, and
-                    // the two polearms ran into the cap at 143%. A real warhammer is half
-                    // its owner's height and a real spear is about 120% of it.
-                    //
-                    // Every weapon has a grip and a head before it has any reach at all, so
-                    // the straight line through the origin was the mistake. With a base,
-                    // the same table draws 35% for a dagger and 127% for a scythe, in
-                    // order, with nothing clamped at either end.
-                    want = baseLength +
-                           (reach - arm).Raw / (float)Fix.RawOne * reachToLength;
-                    want = Mathf.Max(minLength, want);
-                    if (maxLength > 0f) want = Mathf.Min(maxLength, want);
-                }
-            }
+            Fix blade = ArmMotor.BladeLength(in move, in arm, ItemTable.Get(item).Reach);
+            Fit(root, blade.Raw > 0 ? blade.Raw / (float)Fix.RawOne : fallback);
+        }
+
+        /// <summary>Scales a model's longest axis to <paramref name="want"/> world metres.</summary>
+        public static void Fit(GameObject root, float want)
+        {
+            if (root == null) return;
             if (want <= 0f) return;
 
             if (!LocalBounds(root, out Bounds local)) return;
@@ -175,14 +160,22 @@ namespace GulagRunners.Game
         }
 
         /// <summary>Sizes every model in a set, once. Call it from Awake.</summary>
-        public static void FitAll(ItemModel[] models, float reachToLength, float minLength,
-                                  float maxLength, float fallback, float baseLength = 0f)
+        public static void FitAll(ItemModel[] models, in MoveConfig move, in ArmConfig arm,
+                                  float fallback)
         {
             if (models == null) return;
             foreach (ItemModel m in models)
                 if (m != null && m.root != null)
-                    Fit(m.root, m.item, reachToLength, minLength, maxLength, fallback,
-                        baseLength);
+                    Fit(m.root, m.item, in move, in arm, fallback);
+        }
+
+        /// <summary>Sizes a set that has no reach of its own — armour, a stand-in cube.</summary>
+        public static void FitAll(ItemModel[] models, float length)
+        {
+            if (models == null) return;
+            foreach (ItemModel m in models)
+                if (m != null && m.root != null)
+                    Fit(m.root, length);
         }
 
         /// <summary>Tier colour, clamped to whatever palette the view was given.</summary>
