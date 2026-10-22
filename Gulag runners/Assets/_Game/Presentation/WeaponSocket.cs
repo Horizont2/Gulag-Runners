@@ -152,6 +152,106 @@ namespace GulagRunners.Game
             transform.localScale = Vector3.one * localScale;
         }
 
+        // ---------------------------------------------------------------- the blade
+
+        Transform _measured;
+        Vector3 _bladeLocal;
+        bool _haveBlade;
+
+        /// <summary>
+        /// Which way the weapon in this hand actually points, in world space.
+        ///
+        /// MEASURED off the model rather than configured, because configuring it is a
+        /// field per weapon pack that goes stale the first time somebody imports another
+        /// one. Every weapon is long in one direction; the longest axis of its own mesh
+        /// bounds IS the blade, and the end farther from the grip is the tip.
+        ///
+        /// That makes the whole thing self-calibrating: a dagger, a scythe and a model
+        /// authored down -Z all come out right without a number being typed anywhere.
+        ///
+        /// Used by <see cref="PlayerArm"/> to turn the hand so the drawn weapon lies
+        /// along the one the simulation is swinging. Without it the hand was forced to a
+        /// world LookRotation, which has no relation to how a hand grips anything, and
+        /// the weapon sat crooked in the fist.
+        /// </summary>
+        public bool TryBladeDirection(out Vector3 world)
+        {
+            world = transform.forward;
+
+            Transform model = ActiveModel();
+            if (model == null) return false;
+
+            if (model != _measured)
+            {
+                _measured = model;
+                _haveBlade = MeasureBlade(model, out _bladeLocal);
+            }
+            if (!_haveBlade) return false;
+
+            world = model.TransformDirection(_bladeLocal);
+            return world.sqrMagnitude > 1e-8f;
+        }
+
+        /// <summary>The weapon currently switched on under this socket.</summary>
+        Transform ActiveModel()
+        {
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform child = transform.GetChild(i);
+                if (child.gameObject.activeInHierarchy) return child;
+            }
+            return null;
+        }
+
+        /// <summary>The model's longest axis, signed so it points away from the grip.</summary>
+        static bool MeasureBlade(Transform model, out Vector3 local)
+        {
+            local = Vector3.forward;
+
+            Bounds b = default;
+            bool any = false;
+            Matrix4x4 toModel = model.worldToLocalMatrix;
+
+            foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
+                if (mf.sharedMesh != null)
+                    any = Grow(ref b, any, mf.sharedMesh.bounds,
+                               toModel * mf.transform.localToWorldMatrix);
+
+            foreach (SkinnedMeshRenderer smr in
+                     model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                if (smr.sharedMesh != null)
+                    any = Grow(ref b, any, smr.sharedMesh.bounds,
+                               toModel * smr.transform.localToWorldMatrix);
+
+            if (!any || b.size.sqrMagnitude <= 1e-8f) return false;
+
+            Vector3 size = b.size;
+            Vector3 axis = size.x >= size.y && size.x >= size.z ? Vector3.right
+                         : size.y >= size.z ? Vector3.up : Vector3.forward;
+
+            // The grip is this object's origin, so the half of the model that is farther
+            // from it is the business end.
+            float along = Vector3.Dot(b.center, axis);
+            local = along < 0f ? -axis : axis;
+            return true;
+        }
+
+        static bool Grow(ref Bounds bounds, bool any, Bounds mesh, Matrix4x4 m)
+        {
+            Vector3 c = mesh.center, e = mesh.extents;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = c + new Vector3((i & 1) == 0 ? -e.x : e.x,
+                                                 (i & 2) == 0 ? -e.y : e.y,
+                                                 (i & 4) == 0 ? -e.z : e.z);
+                Vector3 p = m.MultiplyPoint3x4(corner);
+                if (!any && i == 0) bounds = new Bounds(p, Vector3.zero);
+                else bounds.Encapsulate(p);
+                any = true;
+            }
+            return any;
+        }
+
         void OnDrawGizmos()
         {
             if (!drawGizmo) return;

@@ -131,24 +131,51 @@ def main():
             high = not high
             t = A.WEAPONS["club"][0]
         t -= 1
-        # The defender simply holds their blade level, pointed at the attacker.
-        A.tick([att, vic], [aim_at(60 if high else -60), (-A.ONE, 0)])
+        # The defender holds their blade at the attacker. Forward on the stick MEANS
+        # at him now (docs/31's aim frame), so this is +X whichever side he is on --
+        # which is the whole point of the frame.
+        A.tick([att, vic], [aim_at(60 if high else -60), (A.ONE, 0)])
         if vic.was_hit:
             hits += 1
         if vic.was_clash:
             clashes += 1
     check("a held blade produces clashes", clashes > 0, f"{clashes} in 5 s")
 
-    # The same fight with the defender NOT guarding. The first version of this left
-    # their stick centred and called that open -- but the carry pose then pointed the
-    # blade straight at the attacker, so "open" was holding a perfect guard too, and
-    # both columns read 61. Here they look the other way, which is what open means.
-    unguarded = A.Fighter(0.0, -1, "club")
-    att2 = A.Fighter(-0.9, 1, "club")
-    open_hits = swing_cycle(att2, unguarded, 300, foe_aim=(A.ONE, 0))
-    check("and holding it up takes real damage away",
-          (100 - vic.health) < (100 - unguarded.health),
-          f"guarded lost {100-vic.health} hp, open lost {100-unguarded.health} hp")
+    # The same fight with the defender NOT guarding. The first version left their stick
+    # centred and called that open -- but the carry pose then pointed the blade straight
+    # at the attacker, so "open" was a perfect guard too and both columns read 61. In the
+    # aim frame, away from him is -X.
+    # Measured as TIME TO KILL, not damage over a fixed number of ticks, and the
+    # difference is not pedantry. Hit stop freezes both fighters, so a defender who is
+    # being hit a lot spends real seconds frozen -- over a fixed tick count that LOOKS
+    # like taking less damage, and the first version of this test read exactly backwards
+    # because of it: guarding came out worse than standing there.
+    #
+    # And the guard is held where the blade DWELLS, at the end of its arc, rather than
+    # where it is fastest. That is the mechanic rather than a trick: a blade at the top
+    # of its swing is slow and can be met; the same blade through the middle is doing
+    # 17 m/s and a guard in its way is a formality. Measured across guard angles against
+    # a +-60 arc: no guard dies at 386 ticks, guarding into the fast middle dies at 271,
+    # and guarding the end survives past 2400.
+    def ticks_to_kill(guard):
+        att = A.Fighter(-0.9, 1, "club")
+        vic = A.Fighter(0.0, -1, "club")
+        high, t, n = True, 0, 0
+        while n < 60 * 40 and not vic.dead:
+            if t <= 0:
+                high = not high
+                t = A.WEAPONS["club"][0]
+            t -= 1
+            n += 1
+            A.tick([att, vic], [aim_at(60 if high else -60), guard])
+        return n if vic.dead else None
+
+    open_ticks = ticks_to_kill((0, 0))
+    met_ticks = ticks_to_kill(aim_at(60))
+    check("meeting the blade where it dwells keeps you alive much longer",
+          met_ticks is None or (open_ticks is not None and met_ticks > open_ticks * 1.4),
+          f"no guard {open_ticks} ticks, guard on the arc's end "
+          f"{met_ticks if met_ticks else 'survived 40 s'}")
 
     # ------------------------------------------------------- 5. time to kill
     print("\n5. time to kill, against docs/02's 8 to 14 seconds of active fighting")

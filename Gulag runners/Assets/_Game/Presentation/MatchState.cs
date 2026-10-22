@@ -474,6 +474,20 @@ namespace GulagRunners.Game
             for (int i = 0; i < fighters.Count; i++) fighters[i].OverwriteState(in _scratch[i]);
         }
 
+        /// <summary>
+        /// The other fighter, or null. Used by the aim assist, which needs to know where
+        /// the man is before it can help point a blade at him.
+        /// </summary>
+        public PlayerController Opponent(PlayerController mine)
+        {
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                PlayerController p = fighters[i];
+                if (p != null && p != mine && !p.State.Dead) return p;
+            }
+            return null;
+        }
+
         /// <summary>Puts every fighter back on their feet at full health. One call is a new round.</summary>
         [ContextMenu("Reset fighters")]
         public void ResetFighters()

@@ -41,6 +41,13 @@ namespace GulagRunners.Sim
             Shoulder(in s, in move, in cfg)
             + s.Arm * (cfg.ArmLength + s.Inventory.WeaponDef.Reach);
 
+        /// <summary>Mid-chest, which is what a swing is helped toward.</summary>
+        public static FixVec2 Chest(in PlayerSimState s, in MoveConfig move)
+        {
+            Fix height = s.Crouching ? move.CrouchHeight : move.BodyHeight;
+            return new FixVec2(s.Position.X, s.Position.Y + height / 2);
+        }
+
         /// <summary>The body, as the segment a capsule is built around.</summary>
         public static void BodySegment(in PlayerSimState s, in MoveConfig move,
                                        out FixVec2 feet, out FixVec2 head)
@@ -84,16 +91,26 @@ namespace GulagRunners.Sim
         /// back to the way the body is facing, which is how the weapon is carried.
         /// </summary>
         public static void Step(ref PlayerSimState s, FixVec2 aim, in MoveConfig move,
-                                in ArmConfig cfg)
+                                in ArmConfig cfg) =>
+            Step(ref s, aim, FixVec2.Zero, false, in move, in cfg);
+
+        /// <summary>
+        /// As above, but knowing where the other fighter is, so the aim can be helped.
+        /// </summary>
+        public static void Step(ref PlayerSimState s, FixVec2 aim, FixVec2 foeChest,
+                                bool hasFoe, in MoveConfig move, in ArmConfig cfg)
         {
             FixVec2 want;
             Fix push = aim.LengthSq;
             Fix dead = Fix.FromMilli(cfg.DeadzonePermille);
 
             if (push > dead * dead)
-                want = aim.Normalized;
+                want = Assist(ref s, aim, foeChest, hasFoe, in move, in cfg);
             else
+            {
                 want = Carry(in s, in cfg);
+                s.AssistHeld = false;
+            }
 
             // Dead, stunned or frozen: the arm drops to the carry pose and stops being a
             // weapon. A corpse whose blade still answered the stick would keep killing.
@@ -142,6 +159,56 @@ namespace GulagRunners.Sim
         {
             int f = s.Inventory.WeaponDef.AttackFrames;
             return f < 1 ? 1 : f;
+        }
+
+        /// <summary>
+        /// Reads the stick in the other fighter's frame instead of the world's.
+        ///
+        /// Forward on the stick means AT HIM, up means over him, down means under him.
+        /// The direction the thumb asked for is kept exactly -- it is only measured from
+        /// a different zero -- so nothing is steered, nothing snaps, and a blade sent
+        /// deliberately over a guard goes exactly as far over it as the player asked.
+        ///
+        /// Which is why it replaced a cone-and-pull assist: pulling a blade toward a man
+        /// pulls it off the line the OTHER man is holding HIS weapon on, so an assist
+        /// and a block are the same number fighting each other. Measured, a held guard
+        /// stopped taking any damage off at all.
+        /// </summary>
+        static FixVec2 Assist(ref PlayerSimState s, FixVec2 aim, FixVec2 foeChest,
+                              bool hasFoe, in MoveConfig move, in ArmConfig cfg)
+        {
+            FixVec2 want = aim.Normalized;
+
+            // Only when the THUMB moved. A stick held still keeps the direction the
+            // assist already gave it, so walking at somebody is not an attack: see
+            // PlayerSimState.AimPrev for the measurement that put this here.
+            Fix moved = (aim - s.AimPrev).LengthSq;
+            bool steady = s.AssistHeld && moved <= Fix.FromMilli(20) * Fix.FromMilli(20);
+            s.AimPrev = aim;
+
+            if (steady) return s.AssistDir;
+
+            s.AssistHeld = true;
+            s.AssistDir = want;
+
+            if (!hasFoe || cfg.AimRelativePermille <= 0) return want;
+
+            FixVec2 toFoe = (foeChest - Shoulder(in s, in move, in cfg)).Normalized;
+            if (toFoe.LengthSq.Raw == 0) return want;
+
+            // The frame's forward axis: the line to him, blended back toward the way the
+            // body is facing by however much of the world is being kept.
+            FixVec2 ahead = new FixVec2(Fix.FromInt(s.Facing == 0 ? 1 : s.Facing), Fix.Zero);
+            FixVec2 axis = (ahead + (toFoe - ahead) * Fix.FromMilli(cfg.AimRelativePermille))
+                           .Normalized;
+            if (axis.LengthSq.Raw == 0) return want;
+
+            // Rotating a vector by the angle of a unit vector is one complex multiply.
+            // No trigonometry, no angles, nothing to go round the wrong way at 180.
+            FixVec2 turned = new FixVec2(want.X * axis.X - want.Y * axis.Y,
+                                         want.X * axis.Y + want.Y * axis.X);
+            if (turned.LengthSq.Raw != 0) s.AssistDir = turned.Normalized;
+            return s.AssistDir;
         }
 
         /// <summary>Where the weapon rests when nobody is asking for anything: low.</summary>
@@ -219,22 +286,25 @@ namespace GulagRunners.Sim
             Fix touch = cfg.BladeRadius * 2;
             bool touching = FixGeom.SegmentDistanceSq(ah, at, bh, bt) <= touch * touch;
 
-            bool wasTouching = a.InContact && b.InContact;
             a.InContact = touching;
             b.InContact = touching;
 
             if (!touching) return;
 
-            // Already crossed last tick: this is not a parry, it is two people standing
-            // close with their weapons overlapping, which at any realistic range is most
-            // of the time. Clashing again here re-locks both of them every tick and the
-            // fight stops for good.
-            if (wasTouching) return;
-
-            // And somebody has to actually be swinging. Two blades resting against each
-            // other have no energy to take off anybody.
+            // Somebody has to actually be SWINGING. Two blades resting against each
+            // other have no energy to take off anybody, and this is the line that stops
+            // the fight freezing: standing close with weapons crossed -- which at any
+            // real range is most of the time -- is not a parry and locks nobody.
             if (SwingPermille(in a, in cfg) <= 0 && SwingPermille(in b, in cfg) <= 0)
                 return;
+
+            // And the last clash has to have run out. This used to be an EDGE instead --
+            // clash only on the tick contact began -- which fixed the freeze and broke
+            // the block: a blade held steadily against another never re-triggers, so it
+            // stopped the first blow of a fight and none of the rest. A cooldown does
+            // both. A guard parries again and again, and the gaps between are what a
+            // patient attacker is looking for.
+            if (a.ClashLock > 0 || b.ClashLock > 0) return;
 
             a.WasClash = true;
             b.WasClash = true;
@@ -250,6 +320,13 @@ namespace GulagRunners.Sim
             // touching a body; locking both is simply saying so.
             a.ClashLock = cfg.ClashLockFrames;
             b.ClashLock = cfg.ClashLockFrames;
+
+            // The blow is NOT additionally "spent" here, and that was measured rather
+            // than assumed. Making a clash also cost each fighter their weapon's arc
+            // read as the obvious fix -- a parry should cost the attacker something --
+            // but at one arc it changed nothing (the attacker was spending that arc
+            // anyway) and at two it stopped the fight dead: zero damage in five seconds
+            // at every guard angle. The lock above is the whole of it.
 
             // And the slower arm is thrown aside on top of it, which is the difference
             // between parrying and merely surviving: a committed swing beats a held

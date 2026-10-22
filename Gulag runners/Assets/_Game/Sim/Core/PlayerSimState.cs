@@ -77,6 +77,20 @@ namespace GulagRunners.Sim
         /// <summary>Metres the tip travelled last tick. This is what damage is made of.</summary>
         public Fix TipSpeed;
 
+        /// <summary>
+        /// The stick reading the aim assist last resolved against, and what it resolved
+        /// to. Held so the assist only re-aims when the THUMB moves.
+        ///
+        /// Without that it re-aims every tick, and the direction to a man you are
+        /// walking into swings faster the closer you get -- so the assist moved the arm
+        /// by itself, that movement is tip speed, and tip speed is damage. Every weapon
+        /// in the game could kill by walking forward with the stick held. The assist is
+        /// there to help a SWING, not to hold a lock.
+        /// </summary>
+        public FixVec2 AimPrev;
+        public FixVec2 AssistDir;
+        public bool AssistHeld;
+
         /// <summary>Ticks until this weapon may hurt anybody again. One arc, one hit.</summary>
         public int HitLock;
 

@@ -87,7 +87,13 @@ namespace GulagRunners.Sim
                 Tier = 0,
                 Damage = Fix.FromMilli(4000),      // docs/02 says 6 against weapons of 12-26;
                                                     // these weapons are 0.6 of that scale
-                AttackFrames = 12,                  // 0.20 s
+                // The FASTEST arm in the game, and that is the whole character of bare
+                // hands under docs/31: a weapon's AttackFrames is now how long it takes
+                // to swing, so fists at 12 were slower than a dagger AND shorter AND
+                // weaker -- strictly worse than every weapon, which made the opening of
+                // every match feel like a punishment. Short and weak is the price; quick
+                // is what you get for it.
+                AttackFrames = 7,                   // 0.12 s to sweep half a circle
                 Reach = Fix.FromMilli(600),
                 Durability = 0,                     // never breaks
                 PrySpeed = Fix.FromMilli(1000)      // the baseline every chest time is quoted at

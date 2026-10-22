@@ -18,7 +18,7 @@ PI = F.milli(3142)
 # ----------------------------------------------------------------- the weapons
 # name: (AttackFrames, damage, reach) straight out of ItemTable.
 WEAPONS = {
-    "fists":       (12, 4.0, 0.60),
+    "fists":       (7,  4.0, 0.60),
     "dagger":      (9,  5.0, 0.70),
     "gladius":     (12, 7.0, 0.90),
     "saber":       (14, 9.0, 1.10),
@@ -37,6 +37,7 @@ CFG = dict(
     shoulder=780, arm_length=F.milli(450),
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
+    aim_relative=1000,
     body_radius=F.milli(300), blade_radius=F.milli(70),
     hit_lock=18, clash_deflect=700, clash_lock=10,
 )
@@ -63,6 +64,9 @@ class Fighter:
         self.arm = (facing * ONE, 0)
         self.tip_prev = (0, 0)
         self.tip_primed = False
+        self.aim_prev = (0, 0)
+        self.assist_dir = (0, 0)
+        self.assist_held = False
         self.tip_speed = 0
         self.swing_share = 0
         self.hit_lock = 0
@@ -125,14 +129,60 @@ def carry(f):
     return normalized(((f.facing or 1) * ONE, -F.milli(CFG["carry_drop"])))
 
 
-def step(f, aim):
+def chest(f):
+    return (f.x, f.y + F.cdiv(BODY_HEIGHT, 2))
+
+
+def assist(f, aim, foe):
+    """Read the stick in the other fighter's frame rather than the world's.
+
+    Forward means AT HIM, up means over him, down means under him. Nothing is steered --
+    the direction asked for is kept, only measured from a different zero -- so a guard
+    keeps all of its value, which a cone-and-pull version did not.
+
+    Re-framed only when the thumb MOVES. Doing it every tick let the frame rotate under a
+    held stick as you walked in, and a moving arm is damage: every weapon could kill by
+    walking forward.
+    """
+    want = normalized(aim)
+    moved = F.length_sq(F.sub(aim, f.aim_prev))
+    steady = f.assist_held and moved <= F.mul(F.milli(20), F.milli(20))
+    f.aim_prev = aim
+    if steady:
+        return f.assist_dir
+
+    f.assist_held = True
+    f.assist_dir = want
+
+    if foe is None or CFG["aim_relative"] <= 0:
+        return want
+    to_foe = normalized(F.sub(chest(foe), f.shoulder()))
+    if F.length_sq(to_foe) == 0:
+        return want
+
+    # The frame's forward axis, blended back toward the facing by whatever world is kept.
+    ahead = ((f.facing or 1) * ONE, 0)
+    axis = normalized(F.add(ahead, F.scale(F.sub(to_foe, ahead), F.milli(CFG["aim_relative"]))))
+    if F.length_sq(axis) == 0:
+        return want
+
+    # Rotating by the angle of a unit vector is one complex multiply.
+    turned = (F.mul(want[0], axis[0]) - F.mul(want[1], axis[1]),
+              F.mul(want[0], axis[1]) + F.mul(want[1], axis[0]))
+    if F.length_sq(turned) != 0:
+        f.assist_dir = normalized(turned)
+    return f.assist_dir
+
+
+def step(f, aim, foe=None):
     """ArmMotor.Step."""
     push = F.length_sq(aim)
     dead = F.milli(CFG["deadzone"])
     if push > F.mul(dead, dead):
-        want = normalized(aim)
+        want = assist(f, aim, foe)
     else:
         want = carry(f)
+        f.assist_held = False
 
     if f.dead or f.hitstop > 0 or f.hitstun > 0 or f.stagger > 0:
         want = carry(f)
@@ -211,17 +261,16 @@ def clash(a, b):
         return
     touch = CFG["blade_radius"] * 2
     touching = F.segment_distance_sq(a.hand(), a.tip(), b.hand(), b.tip()) <= F.mul(touch, touch)
-    was = getattr(a, "in_contact", False) and getattr(b, "in_contact", False)
     a.in_contact = b.in_contact = touching
     if not touching:
         return
-    # An edge, not a state: a clash is blades MEETING. Blades resting against each other
-    # is two people standing close, which at any real range is most of the time -- and
-    # re-locking them every tick for it froze the fight for good. Measured at 899 clashed
-    # ticks out of 900 before this line existed.
-    if was:
-        return
+    # Somebody has to be SWINGING -- resting blades have no energy, and that is what
+    # stops the fight freezing when two people stand close with weapons crossed.
     if swing_permille(a) <= 0 and swing_permille(b) <= 0:
+        return
+    # And the last clash has to have run out. An EDGE here fixed the freeze and broke the
+    # block: a held blade never re-triggers, so it stopped one blow and none after it.
+    if a.clash_lock > 0 or b.clash_lock > 0:
         return
 
     a.was_clash = b.was_clash = True
@@ -332,9 +381,10 @@ def tick(fighters, aims, sudden=False):
         if f.dodge > 0:
             f.dodge -= 1
 
-    for f, aim in zip(fighters, aims):
+    for i, (f, aim) in enumerate(zip(fighters, aims)):
         if f.hitstop > 0:
             continue
-        step(f, aim)
+        foe = fighters[1 - i] if len(fighters) == 2 else None
+        step(f, aim, foe)
 
     resolve([f for f in fighters if f.hitstop == 0] or fighters, sudden)
