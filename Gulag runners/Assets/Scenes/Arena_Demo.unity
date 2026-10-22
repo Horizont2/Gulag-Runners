@@ -269,6 +269,30 @@ MonoBehaviour:
   blendSeconds: 0.12
   drawTargets: 0
   warnIfNoPass: 1
+--- !u!95 &8519459 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 8796100473108256133, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
+  m_PrefabInstance: {fileID: 3585453818357731686}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8519460
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8519454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc2d511ad0c57ba4cb720238a4605236, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.PlayerArm
+  player: {fileID: 1900000130}
+  animator: {fileID: 8519459}
+  rightHanded: 1
+  handWeight: 1
+  rotationWeight: 0.85
+  bodyFollow: 0.22
+  drawGizmo: 1
 --- !u!1 &16752001
 GameObject:
   m_ObjectHideFlags: 0
@@ -10905,6 +10929,30 @@ MonoBehaviour:
   blendSeconds: 0.12
   drawTargets: 0
   warnIfNoPass: 1
+--- !u!95 &943041560 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 7507459182000444744, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 7772177323803372879}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &943041561
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 943041555}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc2d511ad0c57ba4cb720238a4605236, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.PlayerArm
+  player: {fileID: 1900000122}
+  animator: {fileID: 943041560}
+  rightHanded: 1
+  handWeight: 1
+  rotationWeight: 0.85
+  bodyFollow: 0.22
+  drawGizmo: 1
 --- !u!1001 &943124554
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -30610,6 +30658,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4708675116766100728, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8519457}
+    - targetCorrespondingSourceObject: {fileID: 4708675116766100728, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8519460}
   m_SourcePrefab: {fileID: 100100000, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
 --- !u!1001 &7772177323803372879
 PrefabInstance:
@@ -30711,6 +30762,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6009296746703928373, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       insertIndex: -1
       addedObject: {fileID: 943041558}
+    - targetCorrespondingSourceObject: {fileID: 6009296746703928373, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 943041561}
   m_SourcePrefab: {fileID: 100100000, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
