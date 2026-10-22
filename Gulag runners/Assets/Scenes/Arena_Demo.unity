@@ -30710,6 +30710,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5024959557588029240, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.9238795
+      objectReference: {fileID: 0}
+    - target: {fileID: 5024959557588029240, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.38268346
+      objectReference: {fileID: 0}
+    - target: {fileID: 5024959557588029240, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5480937427733612651, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       propertyPath: m_Name
       value: Player 1
@@ -30722,6 +30734,14 @@ PrefabInstance:
       propertyPath: worldBaker
       value: 
       objectReference: {fileID: 1900000117}
+    - target: {fileID: 8347036192406887455, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+      propertyPath: localEuler.x
+      value: -45
+      objectReference: {fileID: 0}
+    - target: {fileID: 8347036192406887455, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+      propertyPath: localEuler.z
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8696656603016052251, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       propertyPath: stick
       value: 

@@ -25,7 +25,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1164305901473561832}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
+  m_LocalRotation: {x: -0.38268346, y: 0, z: 0, w: 0.9238795}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -61,7 +61,7 @@ MonoBehaviour:
   boneOverride: {fileID: 0}
   boneNameContains: hand
   localPosition: {x: 0, y: 0, z: 0}
-  localEuler: {x: 0, y: 0, z: 90}
+  localEuler: {x: -45, y: 0, z: 0}
   localScale: 1
   drawGizmo: 1
   gizmoSize: 0.08
