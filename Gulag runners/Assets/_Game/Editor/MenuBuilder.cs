@@ -3,6 +3,9 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Events;
+// Names which UnityEventTools is meant. Unity has only one; the reference assemblies
+// compile_check builds against carry a second, and an alias is the honest way to say so.
+using UnityEventTools = UnityEditor.Events.UnityEventTools;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;

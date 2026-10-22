@@ -103,11 +103,14 @@ namespace GulagRunners.GameEditor
                     Add(s.frame); Add(s.glow); Add(s.icon);
                 }
 
-            foreach (HudButton b in new[] { v.attack, v.block, v.action, v.jump })
+            foreach (HudButton b in new[] { v.dodge, v.action, v.jump })
             {
                 if (b == null) continue;
                 Add(b.ring); Add(b.glyph);
             }
+
+            // The attack stick, which replaced the attack and block rings (docs/31).
+            if (v.aim != null) { Add(v.aim.ring); Add(v.aim.knob); }
 
             if (v.lineArt != null) foreach (Graphic g in v.lineArt) Add(g);
             return all;
@@ -165,8 +168,12 @@ namespace GulagRunners.GameEditor
                         gaps.Add($"No square reads the {kind} slot.");
             }
 
-            if (v.block != null && v.block.ring == null && v.block.glyph == null)
-                gaps.Add("The block button is not wired, so a broken guard will not show.");
+            if (v.aim == null || (v.aim.ring == null && v.aim.knob == null))
+                gaps.Add("The attack stick is not wired. It is the whole of the fight " +
+                         "(docs/31): without it the right thumb does nothing at all.");
+
+            if (v.dodge != null && v.dodge.ring == null && v.dodge.glyph == null)
+                gaps.Add("The dodge button is not wired, so there is no way to roll.");
 
             return gaps;
         }

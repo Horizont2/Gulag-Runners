@@ -14,8 +14,12 @@ Unity is not installed here and never will be, but it does not have to be:
   * the simulation assembly is engine-free by design (GulagRunners.Sim.asmdef sets
     noEngineReferences), so it compiles as plain C# with no stand-ins at all.
 
-What it does NOT cover: Assets/_Game/Editor, because UnityEditor ships with the editor rather
-than with a package. Those scripts are editor tooling and cannot break a build.
+Assets/_Game/Editor is covered too, and the sentence that used to sit here -- "those scripts
+are editor tooling and cannot break a build" -- was wrong. It cannot break a PLAYER build; it
+breaks the EDITOR, which stops Unity compiling anything at all, which stops play mode, which
+stops the game. One stale field in HudViewEditor.cs did exactly that. UnityEditor ships with
+the editor rather than on NuGet, so unity_stubs/UnityEditorStubs.cs stands in for the seventy
+or so members this project's tooling actually calls, extracted from the sources.
 
     cd docs/refs && python3 compile_check.py
 
@@ -30,7 +34,7 @@ GAME = os.path.join(ROOT, "Gulag runners", "Assets", "_Game")
 
 # The folders that make up the two real assemblies: the engine-free simulation, and everything
 # in the default assembly that the game needs at runtime.
-FOLDERS = ("Sim", "Presentation", "Audio", "Input", "Meta", "Menu")
+FOLDERS = ("Sim", "Presentation", "Audio", "Input", "Meta", "Menu", "Editor")
 
 UNITY_PACKAGE = "UnityEngine.Modules"
 UNITY_VERSION = "2021.3.33"      # reference assemblies only: the API this project uses is old
