@@ -32,6 +32,8 @@ namespace GulagRunners.GameEditor
         [MenuItem("Tools/Gulag Runners/Setup/Build hit effects")]
         public static void Build()
         {
+            EffectPack.Forget();
+
             PlayerController[] fighters =
                 Object.FindObjectsByType<PlayerController>(FindObjectsInactive.Include,
                                                            FindObjectsSortMode.None);
@@ -137,6 +139,21 @@ namespace GulagRunners.GameEditor
 
             Wire(fighter, sparks, blood, guard, parry, quiet, loud, landSoft, landHard,
                  jumpPuff, dodgePuff, died, working, opened, trail, feet, body);
+
+            // And anything an imported pack does better. Nothing happens if none is
+            // installed, which is why this is a pass rather than a second menu item.
+            PlayerEffects fx = fighter.GetComponent<PlayerEffects>();
+            FighterDamageView wounds = fighter.GetComponentInChildren<FighterDamageView>(true);
+            List<string> fromPack = EffectPack.Upgrade(fighter, fx, wounds, feet, body, h);
+            if (fromPack.Count > 0)
+                Debug.Log($"{fighter.name}: {fromPack.Count} slot(s) taken from an imported "
+                          + "effects pack instead of the built-in shapes — "
+                          + string.Join(", ", fromPack) + ".\n"
+                          + "Each one is scaled to this fighter (packs are authored for a "
+                          + "1.8 m human), set not to play on awake, and stopped from "
+                          + "deleting itself when it finishes — a pack effect that clears "
+                          + "itself plays once and leaves an empty slot for the rest of "
+                          + "the match.", fighter);
 
             Debug.Log($"{fighter.name}: {made.Count} effect(s) built under \"Effects\" and " +
                       $"wired.\n  " + string.Join(", ", made) + "\n" +

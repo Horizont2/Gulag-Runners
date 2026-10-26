@@ -139,6 +139,14 @@ namespace GulagRunners.GameEditor
                            + "the player in the arena with no result and no way out. "
                            + "Tools > Gulag Runners > Build the result screen");
 
+            int noFx = 0;
+            foreach (PlayerController f in fighters)
+                if (f.GetComponent<PlayerEffects>() == null) noFx++;
+            if (noFx > 0)
+                faults.Add($"{noFx} fighter(s) have no PlayerEffects, so landing a blow "
+                           + "leaves no mark: no sparks, no blood, no dust. "
+                           + "Tools > Gulag Runners > Setup > Build hit effects");
+
             if (Object.FindFirstObjectByType<HudView>() == null)
                 faults.Add("no HudView, so there is no health, no stamina and no controls. "
                            + "Tools > Gulag Runners > Build the combat HUD");
