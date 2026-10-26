@@ -121,6 +121,28 @@ namespace GulagRunners.Game
                  "lands well under this and pays nothing.")]
         [Range(0.05f, 0.6f)] public float minSwing = 0.25f;
 
+        [Tooltip("How far a swing must travel to be worth a FULL blow, as a share of a " +
+                 "half circle. Less than that and it is worth proportionally less.\n\n" +
+                 "The number that decides whether there is a game here. Damage used to " +
+                 "be the tip's instantaneous speed, and that is maximised by shaking " +
+                 "the thumb over a sliver: a vibration never spends a tick accelerating " +
+                 "or dwelling at the end of an arc, so it sits at top speed for ever. " +
+                 "Measured, shaking beat swinging on EVERY weapon — club 20 against 16, " +
+                 "sword 25 against 16, warhammer 26 against 19. A player finds that in " +
+                 "ten seconds and then there is nothing left to play.\n\n" +
+                 "It also buys a windup for nothing: the first part of every swing is " +
+                 "harmless, and it lasts longer on a heavy weapon because a heavy " +
+                 "weapon turns slower — which is the arc everyone is meant to see.")]
+        [Range(0.1f, 1f)] public float fullSweep = 0.4f;
+
+        [Tooltip("How much of its speed the arm keeps while the last blow is still " +
+                 "spent.\n\n" +
+                 "The hit lock has to be SEEN. A blade that sweeps through somebody and " +
+                 "does nothing looks exactly like one that hits, so an invisible lock " +
+                 "reads as the game ignoring you. An arm that visibly labours reads as " +
+                 "weight, and carries the same information.")]
+        [Range(0.1f, 1f)] public float recovery = 0.45f;
+
         [Tooltip("Body radius for the hit capsule, as a share of body height.")]
         [Range(0.05f, 0.4f)] public float bodyRadius = 0.18f;
 
@@ -336,6 +358,8 @@ namespace GulagRunners.Game
             AimFloorPermille = P(aimFloor),
             AimTiltPermille = P(aimTilt),
             MinSwingPermille = P(minSwing),
+            FullSweepPermille = P(fullSweep),
+            RecoveryPermille = P(recovery),
             BodyRadiusPermille = P(bodyRadius),
             BladeRadiusPermille = P(bladeRadius),
             HitLockFrames = Mathf.Max(1, F(hitLock)),

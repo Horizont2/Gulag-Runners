@@ -78,6 +78,24 @@ namespace GulagRunners.Sim
         public Fix TipSpeed;
 
         /// <summary>
+        /// How far this swing has travelled in one direction, in radians, and which
+        /// direction that is. A swing BEGINS where the arm reverses and ENDS at the next
+        /// reversal -- which is the only definition of "a swing" the simulation has, and
+        /// it comes free out of the arm's own motion rather than out of a button.
+        /// </summary>
+        public Fix Swept;
+        public int TurnSign;
+
+        /// <summary>
+        /// Which swing this is, and which one already drew blood. One hit per swing: a
+        /// blade may not bill the same body twice for one stroke, however long the
+        /// stroke lies across it -- and at the distance fighters actually stand, a
+        /// weapon's tip is inside the other one between a third and a half of the time.
+        /// </summary>
+        public int SwingId;
+        public int SpentOn;
+
+        /// <summary>
         /// The stick reading the aim assist last resolved against, and what it resolved
         /// to. Held so the assist only re-aims when the THUMB moves.
         ///
@@ -328,6 +346,7 @@ namespace GulagRunners.Sim
             // Spawning into it meant every round opened in the pose the design removed,
             // and the arm then visibly dropped once the first tick ran.
             s.Arm = ArmMotor.Carry(in s, in arm);
+            s.SpentOn = -1;
             s.TipPrimed = false;
             return s;
         }

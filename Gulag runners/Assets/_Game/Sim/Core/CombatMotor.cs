@@ -305,6 +305,12 @@ namespace GulagRunners.Sim
             victim.TipSpeed = Fix.Zero;
             victim.SwingShare = 0;
 
+            // And the arc it had built is gone with it, so converting off being hit
+            // means starting a new swing from nothing rather than finishing the one
+            // that was already half way round.
+            victim.SpentOn = victim.SwingId;
+            victim.Swept = Fix.Zero;
+
             Fix push = heavy ? cfg.HeavyKnockbackSpeed : cfg.KnockbackSpeed;
 
             // Each further hit of a string pushes harder, so the attacker runs out of reach

@@ -261,6 +261,31 @@ def main():
 
     for _ in range(180):
         A.tick([att, vic], [(A.ONE, 0), (0, 0)])
+    # And one STROKE is one hit, however long the stroke takes. The rate floor cannot
+    # do this on its own: a warhammer dragged across somebody over three seconds spends
+    # far longer inside them than its own lock, so without "one hit per swing" the same
+    # single stroke bills twice.
+    def bills(weapon, secs, per_swing=True):
+        att = A.Fighter(-stand_off(weapon), 1, weapon)
+        vic = A.Fighter(0.0, -1, "fists")
+        for _ in range(40):
+            A.step(att, aim_at(-80), vic)
+        ticks, hits = int(secs * 60), 0
+        for t in range(ticks):
+            vic.health, vic.dead = 100, False
+            if not per_swing:
+                att.spent_on = -1
+            A.tick([att, vic], [aim_at(-80 + 160 * t / ticks), (0, 0)])
+            if vic.was_hit:
+                hits += 1
+        return hits
+
+    slow = bills("warhammer", 3.0)
+    check("and one STROKE is one hit, however slowly it is dragged across",
+          slow <= 1,
+          f"a three-second warhammer stroke billed {slow} time(s); "
+          f"{bills('warhammer', 3.0, False)} without the rule")
+
     check("a blade held STILL inside somebody does nothing, however long it rests there",
           vic.health == settled,
           f"{settled} hp after the arm arrived, {vic.health} hp three seconds later")
@@ -463,6 +488,63 @@ def main():
     check("and nothing lands fast enough to be a loop rather than a fight",
           worst_rate < 5.0,
           f"worst is {worst_name} at {worst_rate:.1f} hits a second")
+
+    # ------------------------- 9c. swinging has to beat vibrating the thumb
+    #
+    # The one that decides whether there is a game here. Damage used to be the tip's
+    # INSTANTANEOUS speed, and instantaneous speed is maximised by high frequency and
+    # low amplitude: a thumb shaken over a 30-degree sliver never spends a tick
+    # accelerating or dwelling at the end of an arc, so it sits at the weapon's top
+    # speed permanently. Measured against a real swing, per weapon, damage a second:
+    #
+    #     club 20.0 vs 16.0    sword 25.0 vs 16.0    warhammer 26.2 vs 18.9
+    #
+    # The vibration won everywhere, and by the most on the warhammer -- the one weapon
+    # the whole design says you cannot flick. A player finds that in ten seconds and
+    # then there is nothing left to play.
+    #
+    # So a blow is worth speed TIMES COMMITMENT: how far this swing has travelled in
+    # one direction since it last reversed. A vibration goes nowhere and is worth
+    # nothing; the first part of every swing is harmless, which is a windup the player
+    # performs with their own thumb and the other fighter can see.
+    print("\n9c. a swing is worth more than a shake")
+
+    def rate(motion, weapon, ticks=60 * 20):
+        """Damage a second against a dummy that cannot die."""
+        att = A.Fighter(-stand_off(weapon), 1, weapon)
+        vic = A.Fighter(0.0, -1, "fists")
+        dealt = 0
+        for t in range(ticks):
+            vic.health, vic.dead = 100, False
+            A.tick([att, vic], [motion(t, weapon), (0, 0)])
+            dealt += vic.damage_taken
+        return dealt / (ticks / 60.0)
+
+    def shake(span, period):
+        return lambda t, w: aim_at(span if (t // period) % 2 else -span)
+
+    def swing(t, w):
+        return aim_at(60 if (t // A.WEAPONS[w][0]) % 2 else -60)
+
+    print("        weapon        swing    best shake")
+    beaten = []
+    for name in ("fists", "club", "sword", "axe", "spear", "warhammer"):
+        good = rate(swing, name)
+        bad = max(rate(shake(30, 3), name), rate(shake(60, 4), name),
+                  rate(shake(20, 2), name), rate(shake(45, 5), name))
+        print(f"        {name:<12}{good:>7.1f}{bad:>12.1f}")
+        if bad > good * 1.15:
+            beaten.append(f"{name} ({bad:.1f} against {good:.1f})")
+
+    check("a committed swing beats a vibrating thumb, on every weapon",
+          not beaten, "beaten on: " + (", ".join(beaten) or "none"))
+
+    # And the heavy end especially, because that is where it was worst.
+    heavy = rate(swing, "warhammer")
+    heavy_shake = max(rate(shake(30, 3), "warhammer"), rate(shake(60, 4), "warhammer"))
+    check("and a warhammer cannot be flicked at all",
+          heavy_shake < heavy * 0.5,
+          f"shaking a warhammer earns {heavy_shake:.1f} against {heavy:.1f} for swinging it")
 
     # ------------------------------------------ 10. the stick means what it says
     #

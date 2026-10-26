@@ -38,6 +38,7 @@ CFG = dict(
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
     aim_relative=1000, aim_floor_pm=500, aim_tilt_pm=1000,
+    full_sweep_pm=400, recovery_pm=450,
     haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
     body_radius_pm=180, blade_radius_pm=60,
     hit_lock=18, clash_deflect=700, clash_lock=10,
@@ -81,6 +82,10 @@ class Fighter:
         self.tip_speed = 0
         self.swing_share = 0
         self.hit_lock = 0
+        self.swept = 0
+        self.turn_sign = 0
+        self.swing_id = 0
+        self.spent_on = -1
         self.clash_lock = 0
         self.was_clash = False
         self.dealt = 0
@@ -281,7 +286,25 @@ def step(f, aim, foe=None):
     if F.length_sq(f.arm) == 0:
         f.arm = ((f.facing or 1) * ONE, 0)
 
-    f.arm = turn(f.arm, want, f.slew(), f.facing or 1)
+    # Slowed while the last blow is still spent. A lock nobody can see reads as the
+    # game ignoring you; an arm that visibly labours reads as weight.
+    rate = f.slew()
+    if f.hit_lock > 0:
+        rate = F.mul(rate, F.milli(CFG["recovery_pm"]))
+
+    before = f.arm
+    f.arm = turn(f.arm, want, rate, f.facing or 1)
+
+    # A swing BEGINS where the arm reverses and ENDS at the next reversal. The signed
+    # cross product of two unit vectors is the sine of the angle between, which over a
+    # tick's travel is the angle.
+    swung = F.cross(before, f.arm)
+    sign = 1 if swung > 0 else (-1 if swung < 0 else 0)
+    if sign != 0 and sign != f.turn_sign:
+        f.turn_sign = sign
+        f.swept = 0
+        f.swing_id += 1
+    f.swept = min(PI, f.swept + abs(swung))
 
     # Tip speed in the fighter's OWN frame: how far it moved around the shoulder.
     local = F.scale(f.arm, f.arm_length() + f.blade())
@@ -300,10 +323,27 @@ def step(f, aim, foe=None):
 
 
 def swing_permille(f):
+    """What share of a full blow this arm has earned: speed TIMES commitment.
+
+    Speed alone is maximised by vibrating the thumb over a sliver, because a vibration
+    never spends a tick accelerating or dwelling at the end of an arc. Measured, that
+    beat a real swing on EVERY weapon in the table, and by the most on the warhammer --
+    the one weapon that is supposed to be impossible to flick.
+
+    Commitment is how far this swing has travelled in one direction. A blade that has
+    not gone anywhere is not a blow, whatever its tip is doing.
+    """
     top = f.top_tip_speed()
     if top <= 0:
         return 0
-    share = f.tip_speed * 1000 // top
+    speed = f.tip_speed * 1000 // top
+    if speed <= 0:
+        return 0
+
+    full = F.mul(PI, F.milli(CFG["full_sweep_pm"]))
+    commit = min(1000, f.swept * 1000 // full) if full > 0 else 1000
+
+    share = speed * commit // 1000
     if share <= CFG["min_swing"]:
         return 0
     return min(1000, share)
@@ -397,6 +437,10 @@ def deflect(loser, winner, shove):
 def strike(att, vic, sudden=False):
     if att.dead or vic.dead:
         return
+    # One hit per SWING as well as the rate floor: a blade may not bill the same body
+    # twice for one stroke, however long the stroke lies across it.
+    if att.spent_on == att.swing_id:
+        return
     if att.hit_lock > 0 or att.clash_lock > 0:
         return
     if att.hitstop > 0 or att.dodge > 0 or vic.dodge > 0:
@@ -412,7 +456,7 @@ def strike(att, vic, sudden=False):
         return
 
     att.dealt = share
-    # One hit per ARC, and the arc is this weapon's own.
+    att.spent_on = att.swing_id
     att.hit_lock = max(CFG["hit_lock"], WEAPONS[att.weapon][0])
 
     dmg_raw = F.milli(int(round(WEAPONS[att.weapon][1] * 1000)))
@@ -456,6 +500,8 @@ def apply_hit(att, vic, damage, share):
     # The swing is SPENT, which is a lock set rather than cleared. It read
     # `hit_lock = 0` -- the opposite of its own comment -- and bare fists then
     # exchanged at 11.8 hits a second with the match frozen 72% of the time.
+    vic.spent_on = vic.swing_id
+    vic.swept = 0
     vic.hit_lock = max(CFG["hit_lock"], WEAPONS[vic.weapon][0])
 
 

@@ -162,8 +162,28 @@ namespace GulagRunners.Sim
             if (s.Arm.LengthSq.Raw == 0)
                 s.Arm = new FixVec2(Fix.FromInt(s.Facing == 0 ? 1 : s.Facing), Fix.Zero);
 
-            s.Arm = Turn(s.Arm, want, Slew(in s, in cfg),
-                         s.Facing == 0 ? 1 : s.Facing);
+            // Slowed while the last blow is still spent. A lock nobody can see reads as
+            // the game ignoring you; an arm that visibly labours reads as weight, and
+            // it is the same information.
+            Fix rate = Slew(in s, in cfg);
+            if (s.HitLock > 0) rate = rate * Fix.FromMilli(cfg.RecoveryPermille);
+
+            FixVec2 was = s.Arm;
+            s.Arm = Turn(s.Arm, want, rate, s.Facing == 0 ? 1 : s.Facing);
+
+            // A swing BEGINS where the arm reverses and ENDS at the next reversal. The
+            // signed cross product of two unit vectors is the sine of the angle between
+            // them, which over a tick's travel is the angle.
+            Fix swung = FixVec2.Cross(was, s.Arm);
+            int sign = swung.Raw > 0 ? 1 : swung.Raw < 0 ? -1 : 0;
+            if (sign != 0 && sign != s.TurnSign)
+            {
+                s.TurnSign = sign;
+                s.Swept = Fix.Zero;
+                s.SwingId++;
+            }
+            s.Swept += Fix.Abs(swung);
+            if (s.Swept > Pi) s.Swept = Pi;
 
             // The tip's speed IN THE FIGHTER'S OWN FRAME -- how far it moved around the
             // shoulder, not how far it moved across the arena.
@@ -381,7 +401,17 @@ namespace GulagRunners.Sim
             Fix top = TopTipSpeed(in s, in move, in cfg);
             if (top.Raw <= 0) return 0;
 
-            long share = (long)s.TipSpeed.Raw * 1000 / top.Raw;
+            long speed = (long)s.TipSpeed.Raw * 1000 / top.Raw;
+            if (speed <= 0) return 0;
+
+            // Speed TIMES commitment. Speed alone is maximised by shaking the thumb over
+            // a sliver, which beat a real swing on every weapon in the table; ArmConfig
+            // has the measurements. A blade that has not gone anywhere is not a blow.
+            Fix full = Pi * Fix.FromMilli(cfg.FullSweepPermille);
+            long commit = full.Raw > 0 ? (long)s.Swept.Raw * 1000 / full.Raw : 1000;
+            if (commit > 1000) commit = 1000;
+
+            long share = speed * commit / 1000;
             if (share <= cfg.MinSwingPermille) return 0;
             return share > 1000 ? 1000 : (int)share;
         }
@@ -531,6 +561,9 @@ namespace GulagRunners.Sim
                            bool suddenDeath)
         {
             if (attacker.Dead || victim.Dead) return;
+            // One hit per SWING as well as the rate floor: a blade may not bill the same
+            // body twice for one stroke, however long the stroke lies across it.
+            if (attacker.SpentOn == attacker.SwingId) return;
             if (attacker.HitLock > 0 || attacker.ClashLock > 0) return;
             if (attacker.HitStopTimer > 0 || attacker.DodgeTimer > 0) return;
             if (victim.DodgeTimer > 0) return;          // the dodge's invulnerable frames
@@ -553,6 +586,7 @@ namespace GulagRunners.Sim
             // floor was 0.3 s and its swing takes 0.57 -- it was being allowed to hit
             // twice in one sweep. Taking the weapon's own sweep as the floor is the
             // same sentence the whole design is built on, applied here too.
+            attacker.SpentOn = attacker.SwingId;
             attacker.HitLock = ArcLock(in attacker, in cfg);
 
             // Kept as a Fix until the very end, and rounded rather than floored.

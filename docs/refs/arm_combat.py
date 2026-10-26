@@ -19,6 +19,7 @@ ARM = dict(
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
     aim_relative=1000, aim_floor_pm=500, aim_tilt_pm=1000,
+    full_sweep_pm=400, recovery_pm=450,
     haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
     body_radius_pm=180, blade_radius_pm=60,
     hit_lock=18, clash_deflect=700, clash_lock=10,
@@ -70,6 +71,10 @@ def init(s):
     s.tip_speed = 0
     s.swing_share = 0
     s.hit_lock = s.clash_lock = 0
+    s.swept = 0
+    s.turn_sign = 0
+    s.swing_id = 0
+    s.spent_on = -1
     s.was_clash = False
     s.dealt = 0
     s.stun_stack = 0
@@ -194,7 +199,12 @@ def swing_permille(s):
     top = top_tip_speed(s)
     if top <= 0:
         return 0
-    share = s.tip_speed * 1000 // top
+    speed = s.tip_speed * 1000 // top
+    if speed <= 0:
+        return 0
+    full = F.mul(PI, F.milli(ARM["full_sweep_pm"]))
+    commit = min(1000, s.swept * 1000 // full) if full > 0 else 1000
+    share = speed * commit // 1000
     return 0 if share <= ARM["min_swing"] else min(1000, share)
 
 
@@ -234,7 +244,21 @@ def combat_step(s, inp, aim=(0, 0), foe=None):
 
     # Rotate by the ANGLE, not along the chord. See ArmMotor.Turn and arm_mirror.turn:
     # the chord version could not turn the arm to the far side at all.
-    s.arm = AM.turn(s.arm, want, slew(s), s.facing or 1)
+    rate = slew(s)
+    if s.hit_lock > 0:
+        rate = F.mul(rate, F.milli(ARM["recovery_pm"]))
+
+    before = s.arm
+    s.arm = AM.turn(s.arm, want, rate, s.facing or 1)
+
+    # A swing begins at a reversal and ends at the next. See arm_mirror.
+    swung = F.cross(before, s.arm)
+    sign = 1 if swung > 0 else (-1 if swung < 0 else 0)
+    if sign != 0 and sign != s.turn_sign:
+        s.turn_sign = sign
+        s.swept = 0
+        s.swing_id += 1
+    s.swept = min(PI, s.swept + abs(swung))
 
     local = F.scale(s.arm, arm_length() + blade(s))
     if not s.tip_primed:
@@ -330,6 +354,7 @@ def _strike(att, vic, sudden):
 
     att.dealt = share
     # One hit per ARC, and the arc is this weapon's own.
+    att.spent_on = att.swing_id
     att.hit_lock = max(ARM["hit_lock"], W(att)["frames"])
 
     dealt = F.mul(F.from_f(W(att)["dmg"]), F.milli(share))
@@ -377,4 +402,6 @@ def _strike(att, vic, sudden):
     vic.tip_speed = 0
     vic.swing_share = 0
     # The swing is SPENT: a lock set, not cleared. See arm_mirror.
+    vic.spent_on = vic.swing_id
+    vic.swept = 0
     vic.hit_lock = max(ARM["hit_lock"], W(vic)["frames"])

@@ -128,6 +128,42 @@ namespace GulagRunners.Sim
         public int AimTiltPermille;
 
         /// <summary>
+        /// How far a swing must travel, as a share of a half circle in thousandths, to
+        /// be worth a full blow. Less than that and it is worth proportionally less.
+        ///
+        /// This is the number that decides whether there is a game here. Damage used to
+        /// be the tip's INSTANTANEOUS speed, and instantaneous speed is maximised by
+        /// high frequency and low amplitude: a thumb shaken over a 30-degree sliver
+        /// never spends a tick accelerating or dwelling at the end of an arc, so it sits
+        /// at the weapon's top speed permanently. Measured against a real swing, damage
+        /// a second:
+        ///
+        ///     club 20.0 vs 16.0   sword 25.0 vs 16.0   warhammer 26.2 vs 18.9
+        ///
+        /// The vibration won on every weapon in the table, and by the most on the
+        /// warhammer -- the one weapon the whole design says cannot be flicked. A player
+        /// finds that in ten seconds and then there is nothing left to play.
+        ///
+        /// Commitment is what a blow actually is: distance travelled, not the speed it
+        /// happened to be doing on the frame it touched. It also buys a windup for
+        /// nothing -- the first part of every swing is harmless, and it is longer on a
+        /// heavy weapon because a heavy weapon turns slower, which is the arc everyone
+        /// is supposed to be able to see.
+        /// </summary>
+        public int FullSweepPermille;
+
+        /// <summary>
+        /// How much of its speed the arm keeps while the last blow is still spent, in
+        /// thousandths.
+        ///
+        /// The hit lock has to be SEEN. A blade that sweeps through somebody and does
+        /// nothing is indistinguishable from one that hits, so an invisible lock reads
+        /// as the game ignoring you. An arm that visibly labours reads as weight, and
+        /// it is the same information.
+        /// </summary>
+        public int RecoveryPermille;
+
+        /// <summary>
         /// Tip speed below this share of the weapon's own maximum does no damage at all.
         ///
         /// The single most important number here. Too low and holding the blade out
@@ -219,6 +255,13 @@ namespace GulagRunners.Sim
             // A quarter of the weapon's own top speed. Measured against a 3.6 m/s run:
             // a walk-in with a dagger reaches 15% and a spear 9%, so neither pays.
             c.MinSwingPermille = 250;
+
+            // 72 degrees of travel is a full blow, and the arm keeps 45% of its speed
+            // while the last one is spent. Both measured: at these two the whole weapon
+            // table kills in 8.1 to 12.9 seconds -- docs/02 asks for 8 to 14 -- and a
+            // committed swing beats a shaken thumb on every weapon.
+            c.FullSweepPermille = 400;
+            c.RecoveryPermille = 450;
 
             // The same four numbers PlayerLoadoutView draws a weapon with, so the blade
             // that is swung is the blade that is seen. Its own defaults are in metres
