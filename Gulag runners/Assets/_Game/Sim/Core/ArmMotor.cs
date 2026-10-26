@@ -162,13 +162,8 @@ namespace GulagRunners.Sim
             if (s.Arm.LengthSq.Raw == 0)
                 s.Arm = new FixVec2(Fix.FromInt(s.Facing == 0 ? 1 : s.Facing), Fix.Zero);
 
-            // Toward the target by at most one step of chord, then back onto the unit
-            // circle. No trigonometry, one square root, and the turn naturally eases as
-            // it arrives, which is what an arm does.
-            FixVec2 delta = (want - s.Arm).ClampLength(Slew(in s, in cfg));
-            s.Arm = (s.Arm + delta).Normalized;
-            if (s.Arm.LengthSq.Raw == 0)
-                s.Arm = new FixVec2(Fix.FromInt(s.Facing == 0 ? 1 : s.Facing), Fix.Zero);
+            s.Arm = Turn(s.Arm, want, Slew(in s, in cfg),
+                         s.Facing == 0 ? 1 : s.Facing);
 
             // The tip's speed IN THE FIGHTER'S OWN FRAME -- how far it moved around the
             // shoulder, not how far it moved across the arena.
@@ -196,6 +191,75 @@ namespace GulagRunners.Sim
 
             if (s.HitLock > 0) s.HitLock--;
             if (s.ClashLock > 0) s.ClashLock--;
+        }
+
+        /// <summary>
+        /// Turns <paramref name="from"/> toward <paramref name="to"/> by at most
+        /// <paramref name="step"/> radians, and snaps to it once inside that.
+        ///
+        /// This used to interpolate the CHORD: move the tip straight toward the target by
+        /// `step`, then push it back onto the unit circle. It is one line and it is wrong,
+        /// and it was wrong in the worst possible place.
+        ///
+        /// A chord is shorter than its arc, and the gap grows with the angle. At 90
+        /// degrees the error is small; behind you it is total. Asked to turn exactly 180
+        /// degrees, `to - from` is `-2 * from`, which points straight back DOWN THE ARM --
+        /// so the step shortens the arm instead of turning it, and normalising puts it
+        /// back exactly where it started. Measured, with the arm settled forward:
+        ///
+        ///     flick the stick to  180 deg   the arm moves   0 deg, for ever
+        ///                         179                       6 deg in 16 ticks
+        ///                         175                      31
+        ///                         170                      60
+        ///                         150                     134
+        ///
+        /// There is a dead cone about 25 degrees wide directly behind the arm where it
+        /// crawls, and a hard lock at the middle of it. The most natural attack a player
+        /// can make -- the arm is out one way, flick the stick the other way to swing back
+        /// through him -- was the slowest input in the game, and the straightest version
+        /// of it froze your arm. "The weapon sweeps half a circle in N ticks" was never
+        /// true of the half circle that matters.
+        ///
+        /// Rotating by the ANGLE costs two multiplies and makes the promise true in every
+        /// direction. Sine and cosine come off their series rather than a table: the step
+        /// is at most 0.45 rad (a seven-frame weapon), where four terms are good to about
+        /// one part in fifty thousand, which is far finer than a tick of arm travel.
+        /// </summary>
+        public static FixVec2 Turn(FixVec2 from, FixVec2 to, Fix step, int facing)
+        {
+            if (from.LengthSq.Raw == 0) from = new FixVec2(Fix.FromInt(facing), Fix.Zero);
+            if (to.LengthSq.Raw == 0) return from;
+
+            Fix cross = FixVec2.Cross(from, to);      // sin of the angle between
+            Fix dot = FixVec2.Dot(from, to);          // cos of it
+
+            // Already inside one step, on the near side: just arrive. Without the dot
+            // test this also catches the 180 degree case, where sin is zero too.
+            if (dot.Raw > 0 && Fix.Abs(cross) <= step) return to;
+
+            // Which way round. Exactly behind -- sin is zero and cos is negative -- has no
+            // shorter side, so it takes the one the body is facing and commits to it,
+            // rather than stalling between two equal choices as the chord version did.
+            int dir = cross.Raw > 0 ? 1 : cross.Raw < 0 ? -1 : (facing >= 0 ? 1 : -1);
+
+            SinCos(step, out Fix sin, out Fix cos);
+            if (dir < 0) sin = -sin;
+
+            FixVec2 turned = new FixVec2(from.X * cos - from.Y * sin,
+                                         from.X * sin + from.Y * cos);
+            return turned.LengthSq.Raw == 0 ? from : turned.Normalized;
+        }
+
+        /// <summary>
+        /// Sine and cosine of a SMALL angle, from their series. Good to a part in fifty
+        /// thousand up to about half a radian, which is more than any weapon turns in a
+        /// tick, and every operation is integer so two devices agree exactly.
+        /// </summary>
+        static void SinCos(Fix a, out Fix sin, out Fix cos)
+        {
+            Fix a2 = a * a;
+            sin = a - a * a2 / 6 + a * a2 * a2 / 120;
+            cos = Fix.One - a2 / 2 + a2 * a2 / 24;
         }
 
         static int s_weaponFrames(in PlayerSimState s)

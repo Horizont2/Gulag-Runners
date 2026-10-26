@@ -518,6 +518,50 @@ def main():
           f"frame leaned {overhead:.0f} deg, cap {cap:.0f}, and 60 is the most that is "
           "still a usable stick")
 
+    # The arm turns at the rate the weapon promises, IN EVERY DIRECTION.
+    #
+    # It did not. The slew interpolated the CHORD between where the arm is and where the
+    # stick points, and a chord is shorter than its arc by more and more as the angle
+    # grows. Asked to turn exactly 180 degrees, "toward the target" points straight back
+    # down the arm, so the step shortened the arm instead of turning it and normalising
+    # put it back exactly where it started: the arm froze, permanently. Around that was a
+    # dead cone about 25 degrees wide where it crawled.
+    #
+    # Which is the most natural attack in the game -- arm out one way, flick the stick
+    # the other way to swing back through him -- being the slowest input there is, and
+    # the straightest version of it doing nothing at all.
+    def ticks_to_reach(deg_target, weapon="club"):
+        f = A.Fighter(0, 1, weapon)
+        foe = A.Fighter(2.0, -1, weapon)
+        for _ in range(40):
+            A.step(f, aim_at(0), foe)          # settle pointing forward
+        for t in range(120):
+            A.step(f, aim_at(deg_target), foe)
+            now = math.degrees(math.atan2(F.to_f(f.arm[1]), F.to_f(f.arm[0])))
+            if abs(((now - deg_target) + 180) % 360 - 180) < 3:
+                return t + 1
+        return None
+
+    arc = A.WEAPONS["club"][0]                  # a club sweeps 180 deg in this many ticks
+    reached = {d: ticks_to_reach(d) for d in (45, 90, 120, 170, 175, 179, 180)}
+    print("        flick to   ticks taken   (a club sweeps 180 deg in "
+          f"{arc})")
+    for d, n in reached.items():
+        print(f"        {d:>8}   {str(n) if n else 'NEVER ARRIVES':>11}")
+
+    check("the arm reaches every angle, the far side included",
+          all(n is not None for n in reached.values()),
+          "stuck at: " + (", ".join(f"{d} deg" for d, n in reached.items()
+                                    if n is None) or "nothing"))
+
+    # And at the promised RATE, not just eventually: the time to turn must grow with the
+    # angle and nowhere blow out. 180 degrees is one full arc, so it may not take much
+    # more than one arc's worth of ticks.
+    far = reached.get(180)
+    check("and it takes one arc to turn a half circle, not ten",
+          far is not None and far <= arc + 2,
+          f"180 deg took {far} ticks against the {arc} the weapon promises")
+
     # And the pose a fighter who has touched nothing is in.
     fresh = A.Fighter(0, 1, "club")
     rest = math.degrees(math.atan2(F.to_f(fresh.arm[1]), F.to_f(fresh.arm[0])))

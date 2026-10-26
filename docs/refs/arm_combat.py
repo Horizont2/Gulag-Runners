@@ -12,6 +12,7 @@ tests go green and say the game works.
 import fixgeom_mirror as F
 from sim_motor_mirror import C, ONE
 from loot_mirror import ITEMS, NONE, FISTS
+import arm_mirror as AM
 
 ARM = dict(
     shoulder=780, arm_length_pm=350,
@@ -231,13 +232,9 @@ def combat_step(s, inp, aim=(0, 0), foe=None):
     if F.length_sq(s.arm) == 0:
         s.arm = ((s.facing or 1) * ONE, 0)
 
-    delta = F.sub(want, s.arm)
-    mx = slew(s)
-    if F.length_sq(delta) > F.mul(mx, mx):
-        delta = F.with_length(delta, mx)
-    s.arm = normalized(F.add(s.arm, delta))
-    if F.length_sq(s.arm) == 0:
-        s.arm = ((s.facing or 1) * ONE, 0)
+    # Rotate by the ANGLE, not along the chord. See ArmMotor.Turn and arm_mirror.turn:
+    # the chord version could not turn the arm to the far side at all.
+    s.arm = AM.turn(s.arm, want, slew(s), s.facing or 1)
 
     local = F.scale(s.arm, arm_length() + blade(s))
     if not s.tip_primed:

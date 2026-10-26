@@ -166,6 +166,42 @@ def normalized(v):
     return (F.div(v[0], ln), F.div(v[1], ln))
 
 
+def sin_cos(a):
+    """Sine and cosine of a SMALL angle, from their series. ArmMotor.SinCos."""
+    a2 = F.mul(a, a)
+    sin = a - F.cdiv(F.mul(a, a2), 6) + F.cdiv(F.mul(F.mul(a, a2), a2), 120)
+    cos = ONE - F.cdiv(a2, 2) + F.cdiv(F.mul(a2, a2), 24)
+    return sin, cos
+
+
+def turn(frm, to, step, facing):
+    """ArmMotor.Turn: rotate `frm` toward `to` by at most `step` radians.
+
+    It used to interpolate the CHORD and renormalise, which is one line and is wrong by
+    more and more as the angle grows. Asked to turn exactly 180 degrees it does not turn
+    at all -- `to - frm` points straight back down the arm, so the step shortens it and
+    normalising puts it back. Flicking the stick to the far side froze the arm solid.
+    """
+    if F.length_sq(frm) == 0:
+        frm = (facing * ONE, 0)
+    if F.length_sq(to) == 0:
+        return frm
+
+    cross = F.cross(frm, to)
+    dot = F.dot(frm, to)
+    if dot > 0 and abs(cross) <= step:
+        return to
+
+    d = 1 if cross > 0 else (-1 if cross < 0 else (1 if facing >= 0 else -1))
+    sin, cos = sin_cos(step)
+    if d < 0:
+        sin = -sin
+
+    turned = (F.mul(frm[0], cos) - F.mul(frm[1], sin),
+              F.mul(frm[0], sin) + F.mul(frm[1], cos))
+    return frm if F.length_sq(turned) == 0 else normalized(turned)
+
+
 def carry(f):
     """The rest pose: blade low, not a free guard."""
     return normalized(((f.facing or 1) * ONE, -F.milli(CFG["carry_drop"])))
@@ -245,10 +281,7 @@ def step(f, aim, foe=None):
     if F.length_sq(f.arm) == 0:
         f.arm = ((f.facing or 1) * ONE, 0)
 
-    delta = clamp_length(F.sub(want, f.arm), f.slew())
-    f.arm = normalized(F.add(f.arm, delta))
-    if F.length_sq(f.arm) == 0:
-        f.arm = ((f.facing or 1) * ONE, 0)
+    f.arm = turn(f.arm, want, f.slew(), f.facing or 1)
 
     # Tip speed in the fighter's OWN frame: how far it moved around the shoulder.
     local = F.scale(f.arm, f.arm_length() + f.blade())
