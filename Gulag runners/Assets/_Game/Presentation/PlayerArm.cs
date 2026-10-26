@@ -78,6 +78,7 @@ namespace GulagRunners.Game
         Vector3 _grip;
         Vector3 _tip;
         bool _have;
+        PlayerIK _ik;
 
         void Reset()
         {
@@ -90,6 +91,10 @@ namespace GulagRunners.Game
             if (player == null) player = GetComponentInParent<PlayerController>();
             if (animator == null) animator = GetComponent<Animator>();
             if (socket == null) socket = GetComponentInChildren<WeaponSocket>(true);
+
+            // On THIS object: OnAnimatorIK only arrives where the Animator is, so a
+            // PlayerIK anywhere else is not competing for the same goals.
+            _ik = GetComponent<PlayerIK>();
 
             // Said out loud, because the failure is otherwise invisible: no Animator on
             // THIS object means Unity never calls OnAnimatorIK on it, so the arm is
@@ -110,9 +115,24 @@ namespace GulagRunners.Game
             if (layer != 0) return;
             if (animator == null || player == null) return;
 
-            if (!Read(out Vector3 grip, out Vector3 tip)) return;
-
             AvatarIKGoal goal = rightHanded ? AvatarIKGoal.RightHand : AvatarIKGoal.LeftHand;
+
+            // Climbing takes both hands, and PlayerIK is placing them on the rungs. It is
+            // the owner of this goal for as long as that lasts, and the two of them must
+            // never both write it -- which they did, every frame, with the winner decided
+            // by component order.
+            if (_ik != null && _ik.HandsBusy) return;
+
+            if (!Read(out Vector3 grip, out Vector3 tip))
+            {
+                // Say so, rather than leaving last frame's weight standing. A goal nobody
+                // updated keeps the hand pinned to where the arm was when it last had an
+                // answer, which reads as the arm sticking.
+                animator.SetIKPositionWeight(goal, 0f);
+                animator.SetIKRotationWeight(goal, 0f);
+                _have = false;
+                return;
+            }
 
             animator.SetIKPositionWeight(goal, handWeight);
             animator.SetIKPosition(goal, grip);

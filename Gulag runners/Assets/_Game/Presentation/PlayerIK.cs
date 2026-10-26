@@ -175,19 +175,62 @@ namespace GulagRunners.Game
         Vector3 _leftHandV, _rightHandV, _leftFootV, _rightFootV;
         bool _held;
 
+        PlayerArm _arm;
+
         void Awake()
         {
             _animator = GetComponent<Animator>();
             if (player == null) player = GetComponentInParent<PlayerController>();
+
+            // On THIS object, not in the children: OnAnimatorIK only arrives where the
+            // Animator is, so that is the only place a PlayerArm can be doing anything.
+            _arm = GetComponent<PlayerArm>();
         }
+
+        /// <summary>Climbing or hauling out, which are the two poses that need both hands.</summary>
+        bool Climbing()
+        {
+            if (player == null) return false;
+            PlayerSimState s = player.State;
+            SimWorld world = player.World;
+            bool onLadder = gripLadder && world != null &&
+                            s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length;
+            return onLadder || (gripLedge && !onLadder && s.Mode == MoveMode.Mantling);
+        }
+
+        /// <summary>
+        /// True while this component needs BOTH hands -- climbing, or still blending off a
+        /// climb. <see cref="PlayerArm"/> reads it to know whether its weapon hand is its
+        /// own this frame.
+        ///
+        /// Decided in Update and only read in OnAnimatorIK, because every Update in the
+        /// scene runs before any OnAnimatorIK does. Two components on one object get their
+        /// IK callback in component order, which is whatever order somebody happened to
+        /// add them in -- and for a component added to a nested prefab instance it is not
+        /// visible anywhere. Anything that depends on that order is a coin toss that lands
+        /// the same way until the day it does not.
+        /// </summary>
+        public bool HandsBusy { get; private set; }
 
         /// <summary>
         /// A layer with no IK Pass never calls OnAnimatorIK, and the symptom is that nothing
         /// happens at all — which looks exactly like this component being broken. So it says
         /// so, once, rather than leaving an hour to be spent looking in the wrong place.
         /// </summary>
+
+        /// <summary>Whether the weapon hand is this component's to place this frame.</summary>
+        bool OwnsWeaponHand => HandsBusy || _arm == null || !_arm.isActiveAndEnabled;
+
+        AvatarIKGoal WeaponGoal => _arm != null && !_arm.rightHanded
+            ? AvatarIKGoal.LeftHand : AvatarIKGoal.RightHand;
+
+        AvatarIKGoal FreeGoal => WeaponGoal == AvatarIKGoal.RightHand
+            ? AvatarIKGoal.LeftHand : AvatarIKGoal.RightHand;
+
         void Update()
         {
+            HandsBusy = _ladderBlend > 0.001f || Climbing();
+
             if (!warnIfNoPass || _warned) return;
 
             _since += Time.deltaTime;
@@ -244,8 +287,17 @@ namespace GulagRunners.Game
             else if (_gripping) Release();
             else
             {
-                Clear(AvatarIKGoal.LeftHand);
-                Clear(AvatarIKGoal.RightHand);
+                // Not the hand the weapon is in, if something else owns it.
+                //
+                // This cleared BOTH, every frame, and PlayerArm sets the weapon hand
+                // every frame -- two components writing one goal on one object, with the
+                // winner decided by component order. When this one won, the weapon hand's
+                // weight went to zero and the arm was drawn wherever the clip put it:
+                // held up, ignoring the stick, while the simulation swung an arm nobody
+                // could see. The hitbox was right and invisible, which is the worst way
+                // for this to be wrong.
+                if (!OwnsWeaponHand) Clear(WeaponGoal);
+                Clear(FreeGoal);
             }
 
             bool standing = groundFeet && world != null && s.Mode == MoveMode.Grounded;
@@ -500,6 +552,11 @@ namespace GulagRunners.Game
 
         void Look(in PlayerSimState s, SimWorld world)
         {
+            // The weapon leads the body in a fight, so PlayerArm aims the look at its own
+            // blade and this stands down. Both wrote SetLookAtWeight every frame, which
+            // is the same coin toss the hands were.
+            if (!OwnsWeaponHand && _arm != null && _arm.bodyFollow > 0f) return;
+
             if (lookWeight <= 0.001f)
             {
                 _animator.SetLookAtWeight(0f);

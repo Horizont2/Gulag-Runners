@@ -175,6 +175,55 @@ def strays():
     return found
 
 
+def arms():
+    """Every fighter in a playable scene must have something DRAWING its weapon arm.
+
+    Direct-aim combat (docs/31) replaced the attack clip with an IK goal: the simulation
+    owns the arm as a vector and PlayerArm puts the drawn hand on it. Without PlayerArm
+    nothing reports anything -- the fight runs, the hitbox swings, damage lands -- and
+    the arm on screen just plays whatever the clip says, held up and deaf to the stick.
+    An invisible correct hitbox is the worst shape this can fail in, and it is exactly
+    how it was found: "the arm is still raised and the stick does not match it".
+
+    It got that way because the components are added per SCENE by the setup tool and are
+    not on the fighter prefabs, so Arena_Demo had them and SetupScene -- also in the
+    build, also two fighters and a MatchState -- never did.
+
+    PlayerArm must also sit on the Animator's own object. OnAnimatorIK is only ever
+    called there, so one placed anywhere else is a component that never runs.
+    """
+    scripts = {}
+    for name in ("PlayerController", "PlayerArm", "MatchState"):
+        g = guid_of(os.path.join(ASSETS, "_Game", "Presentation", name + ".cs"))
+        if g:
+            scripts[name] = g
+
+    found = 0
+    folder = os.path.join(ASSETS, "Scenes")
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith(".unity"):
+            continue
+        text = read(os.path.join(folder, name))
+        if f"guid: {scripts['MatchState']}" not in text:
+            continue                                   # not a scene a match runs in
+
+        docs = documents(text)
+        fighters = [fid for fid, (cls, body) in docs.items()
+                    if cls == 114 and f"guid: {scripts['PlayerController']}" in body]
+        armed = [fid for fid, (cls, body) in docs.items()
+                 if cls == 114 and f"guid: {scripts['PlayerArm']}" in body]
+
+        if len(armed) >= len(fighters):
+            continue
+
+        print(f"  {name}: {len(fighters)} fighter(s) but {len(armed)} PlayerArm(s). The "
+              "ones without it swing a hitbox nobody draws -- the arm on screen stays in "
+              "the clip's pose and ignores the attack stick. Tools > Gulag Runners > "
+              "Setup > Set up IK, with this scene open.")
+        found += 1
+    return found
+
+
 def main():
     assets = by_guid()
     animator_cs = os.path.join(ASSETS, "_Game", "Presentation", "PlayerAnimator.cs")
@@ -278,6 +327,7 @@ def main():
         return 1
 
     problems += strays()
+    problems += arms()
 
     print(f"animator_check: {checked} fighter(s), {problems} problem(s)")
     return 1 if problems else 0
