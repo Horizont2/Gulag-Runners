@@ -74,6 +74,22 @@ SPARE = {
     "MenuUI.leagueBadgeChanged": "no rank badge on the first screen yet",
     "MatchSearch.detailChanged": "optional second line",
     "HudView.onChestOpened": "driven from the sim, not a readout",
+    # The three hooks on the finishing sequence are genuinely optional, and were only
+    # ever flagged because there was nothing at all handling the end of a match. There
+    # is now: MatchResultView subscribes to MatchState.SeriesEnded directly, which is
+    # the right signal -- onEnded fires once per ROUND, and a results card between
+    # rounds is not a results card. The rule that replaced them is below, and it is a
+    # stronger one: a scene a match runs in must HAVE an ending.
+    "MatchOutcomeView.onEnded": "per round, not per match; the result screen uses "
+                                "SeriesEnded",
+    "MatchOutcomeView.onDraw": "per round, as above",
+    "MatchOutcomeView.onSettled": "optional: the result screen times itself off "
+                                  "SeriesEnded instead",
+    # Spare hooks for a sting, a camera change or a ping. The two readouts the panel
+    # cannot do without -- HeadlineChanged and ScoreChanged -- are deliberately NOT
+    # here: the builder wires both, so an empty one means the panel went up blank.
+    "MatchResultView.Shown": "spare hook for a sound or a camera change",
+    "MatchResultView.Hidden": "spare hook, as above",
 }
 
 
@@ -375,6 +391,18 @@ def main():
 
         if buttons == 0 and scene == "Menu.unity":
             problems.append(f"{here}: no uGUI Button in the scene at all")
+
+        # A scene a match runs in has to have an END to the match.
+        #
+        # MatchState has raised SeriesEnded since the clock was written and for a long
+        # time NOTHING subscribed to it anywhere in the project. The arena played its
+        # finishing beat and then sat there for ever: no result, no rematch, no way back
+        # to the menu. Nothing reported it, because every part of it was working.
+        if "MatchState" in present and "MatchResultView" not in present:
+            problems.append(
+                f"{here}: a match runs in this scene and nothing ends it -- no "
+                "MatchResultView, so winning leaves the player in the arena with no "
+                "result and no way out. Tools > Gulag Runners > Build the result screen.")
 
         # --- the event system
         modules = [b for _, (c, b) in docs.items()

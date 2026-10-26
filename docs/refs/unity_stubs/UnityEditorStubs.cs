@@ -273,6 +273,36 @@ namespace UnityEditor
         Bounds, Gradient, Quaternion, ExposedReference, FixedBufferSize, Vector2Int,
         Vector3Int, RectInt, BoundsInt, ManagedReference, Hash128,
     }
+    /// <summary>Marks a static method to run when the editor loads the assemblies.</summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    public class InitializeOnLoadMethodAttribute : Attribute { }
+
+    public enum PlayModeStateChange
+    {
+        EnteredEditMode, ExitingEditMode, EnteredPlayMode, ExitingPlayMode
+    }
+
+    public static class EditorApplication
+    {
+        public static Action<PlayModeStateChange> playModeStateChanged;
+        public static bool isPlaying { get; set; }
+    }
+
+    public static class EditorPrefs
+    {
+        public static bool GetBool(string key, bool def = false) => def;
+        public static void SetBool(string key, bool value) { }
+        public static int GetInt(string key, int def = 0) => def;
+        public static void SetInt(string key, int value) { }
+        public static string GetString(string key, string def = "") => def;
+        public static void SetString(string key, string value) { }
+    }
+
+    public static class Menu
+    {
+        public static void SetChecked(string path, bool on) { }
+        public static bool GetChecked(string path) => false;
+    }
 }
 
 namespace UnityEditor.SceneManagement
@@ -283,6 +313,7 @@ namespace UnityEditor.SceneManagement
         public static void MarkAllScenesDirty() { }
         public static bool SaveOpenScenes() => true;
     }
+
 }
 
 namespace UnityEditor.Events
