@@ -205,6 +205,20 @@ namespace GulagRunners.Sim
         }
 
         /// <summary>
+        /// Ticks this fighter's weapon may not land again for: one hit per arc, and the
+        /// arc is its own.
+        ///
+        /// Public because being HIT spends a swing too, and CombatMotor needs the same
+        /// number to spend it by. It was a bare 0 there -- which clears the lock rather
+        /// than setting it, the exact opposite of the line's own comment.
+        /// </summary>
+        public static int ArcLock(in PlayerSimState s, in ArmConfig cfg)
+        {
+            int lockout = s_weaponFrames(in s);
+            return lockout > cfg.HitLockFrames ? lockout : cfg.HitLockFrames;
+        }
+
+        /// <summary>
         /// Reads the stick in the other fighter's frame instead of the world's.
         ///
         /// Forward on the stick means AT HIM, up means over him, down means under him.
@@ -475,8 +489,7 @@ namespace GulagRunners.Sim
             // floor was 0.3 s and its swing takes 0.57 -- it was being allowed to hit
             // twice in one sweep. Taking the weapon's own sweep as the floor is the
             // same sentence the whole design is built on, applied here too.
-            int lockout = s_weaponFrames(in attacker);
-            attacker.HitLock = lockout > cfg.HitLockFrames ? lockout : cfg.HitLockFrames;
+            attacker.HitLock = ArcLock(in attacker, in cfg);
 
             // Kept as a Fix until the very end, and rounded rather than floored.
             // Truncating to an int first and multiplying after loses the whole bonus on

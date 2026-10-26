@@ -412,6 +412,58 @@ def main():
           f"ceiling is {height * A.CFG['max_blade_pm'] / 1000.0:.2f} m on a "
           f"{height:.2f} m fighter; over it: {overgrown or 'none'}")
 
+    # --------------------------- 9b. how much of a fight the player is allowed to play
+    #
+    # Hit stop freezes BOTH fighters and hit stun freezes the one who was hit. Each rule
+    # is right on its own and nobody had added them up over a real duel, which is where
+    # the answer lives: a fighter who spends most of the match unable to act is playing
+    # a game that does not answer, however good each rule is by itself.
+    #
+    # It was 72% for bare fists. `victim.HitLock = 0` on being hit read as the opposite
+    # of its own comment -- it CLEARED the one-hit-per-arc cooldown instead of spending
+    # it -- so each hit armed the other fighter's next one. Two blades crossed at fist
+    # range made that a loop: 11.8 hits a second, four frames of freeze each, on both of
+    # them. This is that, pinned, and pinned by the symptom rather than by the line.
+    print("\n9b. a fight the player is allowed to play")
+
+    def frozen_share(weapon, offset=7):
+        att = A.Fighter(-stand_off(weapon), 1, weapon)
+        vic = A.Fighter(0.0, -1, weapon)
+        ta = tb = 0
+        ha = hb = True
+        n = stopped = hits = 0
+        while n < 60 * 40 and not (att.dead or vic.dead):
+            if ta <= 0:
+                ha = not ha
+                ta = A.WEAPONS[weapon][0]
+            if n >= offset and tb <= 0:
+                hb = not hb
+                tb = A.WEAPONS[weapon][0]
+            ta -= 1
+            tb -= 1
+            n += 1
+            A.tick([att, vic], [aim_at(60 if ha else -60), aim_at(60 if hb else -60)])
+            hits += (1 if att.was_hit else 0) + (1 if vic.was_hit else 0)
+            if att.hitstop > 0:
+                stopped += 1
+        return stopped / float(n), hits / (n / 60.0)
+
+    print("        weapon        frozen   hits/s")
+    worst_frozen = worst_rate = 0.0
+    worst_name = ""
+    for name in ("fists", "dagger", "club", "sword", "axe", "spear", "warhammer"):
+        share, rate = frozen_share(name)
+        print(f"        {name:<12}{share:>7.0%}{rate:>9.1f}")
+        if share > worst_frozen:
+            worst_frozen, worst_rate, worst_name = share, rate, name
+
+    check("no weapon freezes the fight for most of it",
+          worst_frozen < 0.30,
+          f"worst is {worst_name} at {worst_frozen:.0%} of the match frozen")
+    check("and nothing lands fast enough to be a loop rather than a fight",
+          worst_rate < 5.0,
+          f"worst is {worst_name} at {worst_rate:.1f} hits a second")
+
     # ------------------------------------------ 10. the stick means what it says
     #
     # docs/31 promises four things about the attack stick: forward is at him, up is over

@@ -420,7 +420,10 @@ def apply_hit(att, vic, damage, share):
     vic.stun_stack_timer = COMBAT["combo_stack_frames"]
     vic.tip_speed = 0
     vic.swing_share = 0
-    vic.hit_lock = 0
+    # The swing is SPENT, which is a lock set rather than cleared. It read
+    # `hit_lock = 0` -- the opposite of its own comment -- and bare fists then
+    # exchanged at 11.8 hits a second with the match frozen 72% of the time.
+    vic.hit_lock = max(CFG["hit_lock"], WEAPONS[vic.weapon][0])
 
 
 def tick(fighters, aims, sudden=False):

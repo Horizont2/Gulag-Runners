@@ -379,4 +379,5 @@ def _strike(att, vic, sudden):
     vic.stun_stack_t = K["combo_stack"]
     vic.tip_speed = 0
     vic.swing_share = 0
-    vic.hit_lock = 0
+    # The swing is SPENT: a lock set, not cleared. See arm_mirror.
+    vic.hit_lock = max(ARM["hit_lock"], W(vic)["frames"])
