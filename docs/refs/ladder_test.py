@@ -287,5 +287,34 @@ check("even a bot match is dealt from a number",
       got is not None and "seed" in got,
       "the arena is dealt, not sent -- a match with no seed is two different arenas")
 
+print("\nwhat a matched pair works out without sending a packet")
+# A matchmaking service says "you two are playing". It does not say who drives the
+# first fighter, nor what number the arena is dealt from, and in a deterministic
+# simulation both are load-bearing.
+
+pairs = [("aaa", "bbb"), ("Zz", "aa"), ("9", "A"), ("player-01", "player-02"),
+         ("f47ac10b", "f47ac10c"), ("\u0430\u0431\u0432", "abc")]
+sides = [(m.local_player(a, b), m.local_player(b, a)) for a, b in pairs]
+check("the two devices never pick the same fighter",
+      all(x != y for x, y in sides), str(sides))
+check("and between them they cover both",
+      all(sorted((x, y)) == [0, 1] for x, y in sides), str(sides))
+
+# The fault: a culture-sensitive comparison. Czech sorts "ch" after "h"; Turkish
+# dotless i; here it is enough to model ANY ordering that differs from ordinal.
+swapped = lambda s: s.lower()
+both_zero = [(a, b) for a, b in [("Zz", "aa")]
+             if m.local_player(a, b, culture=swapped) == m.local_player(b, a)]
+check("the fault this replaces is caught", both_zero,
+      "a non-ordinal compare puts both players on fighter one and nobody on fighter two")
+
+print("   and the arena is dealt from the session id, not from a round trip")
+check("the same id gives the same number", m.match_seed("abc") == m.match_seed("abc"))
+check("different ids give different numbers",
+      len({m.match_seed(x) for x in ("a", "b", "c", "session-1", "session-2")}) == 5)
+check("never zero, which means 'nobody has told me yet'",
+      all(m.match_seed(x) != 0 for x in ("", "a", "\x00")))
+check("an empty id still deals something", m.match_seed("") == 2166136261 or m.match_seed("") == 1)
+
 print("\n%s" % ("ALL PASS" if not fails else "%d FAIL(S): %s" % (len(fails), ", ".join(fails))))
 raise SystemExit(1 if fails else 0)

@@ -297,3 +297,31 @@ def search(queue, played, rating=1500.0, step=1 / 60.0, limit=120.0):
             return seconds, got
         seconds += step
     return None, None
+
+
+# ------------------------------------------------- what a matched pair works out alone
+# Mirrors Assets/_Game/Meta/MatchAgreement.cs.
+
+
+def local_player(mine, theirs, culture=None):
+    """Which fighter this device drives, from the two player ids alone.
+
+    `culture` models the fault: a comparison that is not ORDINAL can order the same
+    pair differently on two devices with different system languages, and then both
+    players drive fighter one while nobody drives fighter two.
+    """
+    if not mine:
+        return 0 if not theirs else 1
+    if not theirs:
+        return 0
+    key = culture or (lambda s: s)
+    a, b = key(mine), key(theirs)
+    return 0 if a <= b else 1
+
+
+def match_seed(session_id):
+    """The number the arena is dealt from, folded out of the session id (FNV-1a)."""
+    h = 2166136261
+    for ch in session_id or "":
+        h = ((h ^ ord(ch)) * 16777619) & 0xFFFFFFFF
+    return h if h else 1
