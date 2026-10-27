@@ -173,6 +173,30 @@ namespace GulagRunners.Game
             _wins[0] >= Mathf.Max(1, roundsToWin) ? 0 :
             _wins[1] >= Mathf.Max(1, roundsToWin) ? 1 : -1;
 
+        /// <summary>
+        /// Hands the match to the other fighter and ends it there.
+        ///
+        /// For the one case a round cannot decide on its own: somebody stopped playing.
+        /// A match abandoned has still happened -- it costs the person who stayed their
+        /// time either way -- so it is recorded rather than quietly dropped, which is
+        /// also what stops walking out being a free way not to lose.
+        /// </summary>
+        public void Concede(int loser)
+        {
+            if (loser < 0 || loser > 1) return;
+            if (SeriesOver) return;
+
+            int winner = 1 - loser;
+            _wins[winner] = Mathf.Max(1, roundsToWin);
+            _wins[loser] = Mathf.Min(_wins[loser], Mathf.Max(1, roundsToWin) - 1);
+
+            if (logMatch)
+                Debug.Log($"{name}: player {loser + 1} conceded, so the match goes to "
+                          + $"player {winner + 1} ({_wins[0]}–{_wins[1]})", this);
+
+            SeriesEnded?.Invoke(winner);
+        }
+
         /// <summary>Back to nil-nil. The next round dealt is round one of a new match.</summary>
         public void ResetSeries()
         {

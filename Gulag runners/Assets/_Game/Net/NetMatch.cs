@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Events;
 using GulagRunners.Game;
 using GulagRunners.Sim;
 
@@ -57,6 +58,30 @@ namespace GulagRunners.Net
                  "a cap, a long wait is repaid as a lurch.")]
         [Range(1, 16)] public int catchUpLimit = 6;
 
+        [Header("When the other player stops answering")]
+        [Tooltip("Seconds of total silence before a bot takes their fighter over.\n\n" +
+                 "Lockstep cannot run without their input, so this is how long the WHOLE " +
+                 "match freezes — not how long their fighter stands there. The bot picks " +
+                 "up from the tick the input stopped, because there is no later moment to " +
+                 "pick up from, so nobody ever gets a free swing at a statue.\n\n" +
+                 "Short enough that a freeze reads as a hitch; long enough that a bad " +
+                 "second on a phone's Wi-Fi does not throw somebody out of their own " +
+                 "match for good. Every packet already carries sixteen past inputs — a " +
+                 "quarter second of history — so total silence for whole seconds is not " +
+                 "a lossy link, it is an absent player.")]
+        [Range(0.5f, 15f)] public float substituteAfter = 2.5f;
+
+        [Tooltip("What to say while waiting, with {0} as the seconds left. A frozen " +
+                 "screen that explains itself is a wait; one that does not is a hang.")]
+        public string waitingFor = "OPPONENT NOT RESPONDING… {0}";
+
+        [Header("Readouts")]
+        [Tooltip("Fired every frame of a wait, with the line above. Empty once it ends.")]
+        public UnityEvent<string> WaitingChanged;
+
+        [Tooltip("Fired once, when a bot takes the other fighter over for good.")]
+        public UnityEvent Substituted;
+
         [Header("Debug")]
         public int tick;
         public string state = "not connected";
@@ -74,6 +99,10 @@ namespace GulagRunners.Net
         bool _holding;
         int _takenFor = -1;
         int _sentTo = -1;
+        float _silent;
+        bool _substituted;
+        bool _wasPaused;
+        string _said = "";
         TickInput _queued;
         PlayerController _controls;
 
@@ -113,8 +142,16 @@ namespace GulagRunners.Net
         {
             if (link == null || match == null) return;
 
-            if (link.Role == LinkRole.Off || !link.Connected)
+            // Once a bot has their fighter the link is gone on purpose, and the match
+            // is this device's alone to finish. Tearing the clock down here would hand
+            // BOTH fighters back to their own accumulators mid-match.
+            if (!_substituted && (link.Role == LinkRole.Off || !link.Connected))
             {
+                // Dropped while this device was in the background: it is the one that
+                // went away, so the match is lost rather than quietly continued against
+                // a bot. Otherwise backgrounding is a free way not to lose.
+                if (_wasPaused && _holding) { Concede(); return; }
+
                 ReleaseClock();
                 state = link.Role == LinkRole.Off ? "not connected" : "waiting for the other player";
                 return;
@@ -158,12 +195,31 @@ namespace GulagRunners.Net
                     link.SendLocal(_sentTo, Mine(_sentTo));   // re-send, in case it was lost
                 }
 
-                if (!link.TryRemote(tick, out TickInput theirs))
+                TickInput theirs;
+                if (_substituted)
+                {
+                    // Their fighter's own brain, read fresh each tick. Deterministic and
+                    // in the Sim assembly, which matters not at all now that there is
+                    // nobody left to stay in step with -- but it is the same opponent
+                    // the practice match uses, which is the point.
+                    PlayerController left = At(link.RemotePlayer);
+                    theirs = left != null ? left.ReadLocalInput() : default;
+                }
+                else if (!link.TryRemote(tick, out theirs))
                 {
                     stalledFrames++;
-                    state = $"tick {tick}: waiting for the other player";
+                    _silent += Time.unscaledDeltaTime;
+
+                    if (_silent >= substituteAfter) { Substitute(); return; }
+
+                    int left = Mathf.CeilToInt(substituteAfter - _silent);
+                    Say(string.Format(waitingFor, left));
+                    state = $"tick {tick}: no answer for {_silent:0.0}s";
                     return;                       // hold the accumulator; try next frame
                 }
+
+                _silent = 0f;
+                Say("");
 
                 _accumulator -= PlayerController.SecondsPerTick;
                 ran++;
@@ -297,6 +353,81 @@ namespace GulagRunners.Net
             if (result != null) result.Dismiss();
         }
 
+        /// <summary>
+        /// Gives the other fighter to a bot, for good.
+        ///
+        /// The one thing lockstep cannot do is carry on without the other player's
+        /// input -- so when it stops coming, the choice is to wait for ever or to stop
+        /// needing it. This stops needing it: their fighter is handed to the same
+        /// deterministic brain the practice match uses, from the tick the input ran
+        /// out, and the match finishes here.
+        ///
+        /// For good, and that is not a shortcut. The moment this device simulates a
+        /// tick the other one did not, the two have parted -- so the link is dropped
+        /// rather than left open, because a packet arriving afterwards would be input
+        /// for a match that no longer exists.
+        /// </summary>
+        void Substitute()
+        {
+            if (_substituted) return;
+            _substituted = true;
+            _silent = 0f;
+            Say("");
+
+            // Their brain back on, and only theirs: the human's fighter keeps its
+            // controls. TakeClock switched every brain off; this undoes exactly one.
+            PlayerController left = At(link != null ? link.RemotePlayer : 1);
+            if (left != null)
+            {
+                FighterBrain brain = left.GetComponentInChildren<FighterBrain>(true);
+                if (brain != null) brain.enabled = true;
+            }
+
+            if (link != null) link.Stop();
+
+            state = "the other player stopped answering; a bot has their fighter";
+            Debug.Log($"{name}: no input for {substituteAfter:0.0}s, so a bot has "
+                      + "fighter " + ((link != null ? link.RemotePlayer : 1) + 1)
+                      + " from here. The match is this device's to finish.", this);
+
+            Substituted?.Invoke();
+        }
+
+        /// <summary>
+        /// This device went away and the link died with it, so the match is lost.
+        ///
+        /// The other end has already given this fighter to a bot and is playing on.
+        /// Recording a loss here is what keeps the two stories the same, and what
+        /// stops stepping out of the room being a way to avoid a result.
+        /// </summary>
+        void Concede()
+        {
+            _wasPaused = false;
+            ReleaseClock();
+            Say("");
+            state = "left the match while it was running";
+
+            if (match != null && link != null) match.Concede(link.LocalPlayer);
+        }
+
+        /// <summary>
+        /// A phone does not close an app, it stops it -- and a stopped app sends no
+        /// input, which freezes the other player until their own clock gives up on
+        /// this one. Remembered so that a link dying afterwards is read as what it
+        /// is: this device left.
+        /// </summary>
+        void OnApplicationPause(bool paused)
+        {
+            if (paused && _holding) _wasPaused = true;
+        }
+
+        void Say(string line)
+        {
+            if (line == _said) return;
+            _said = line;
+            WaitingChanged?.Invoke(line);
+        }
+
         /// <summary>The fighter the on-screen controls drive: the one with no brain on it.</summary>
         PlayerController Human()
         {
@@ -351,7 +482,11 @@ namespace GulagRunners.Net
             tick = 0;
             _takenFor = -1;
             _sentTo = -1;
+            _silent = 0f;
+            _substituted = false;
+            _wasPaused = false;
             _controls = null;
+            Say("");
             if (result != null) result.someoneElseRestarts = false;
             if (match == null) return;
             for (int i = 0; i < match.fighters.Count; i++)

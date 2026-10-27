@@ -272,3 +272,49 @@ class Rematch:
         self.done = self.at
         self.at = -1
         return True
+
+
+# ------------------------------------------- when the other player stops answering
+# Mirrors the wait in Assets/_Game/Net/NetMatch.cs.
+
+SUBSTITUTE_AFTER = 2.5
+
+
+class Wait:
+    """How long a device tolerates silence before a bot takes the other fighter.
+
+    Lockstep cannot step without the other player's input, so the wait freezes the
+    WHOLE match -- not just their fighter. Which is why the bot picks up from the tick
+    the input ran out: there is no later moment to pick up from, and nobody ever gets a
+    free swing at a statue.
+    """
+
+    def __init__(self, patience=SUBSTITUTE_AFTER):
+        self.patience = patience
+        self.silent = 0.0
+        self.substituted = False
+        self.ticks = 0
+
+    def frame(self, dt, heard):
+        """One frame. `heard` is whether the input for this tick has arrived."""
+        if self.substituted:
+            self.ticks += 1            # a bot supplies it now; the match never stalls
+            return "bot"
+        if heard:
+            self.silent = 0.0
+            self.ticks += 1
+            return "ran"
+        self.silent += dt
+        if self.silent >= self.patience:
+            self.substituted = True
+            return "substituted"
+        return "waiting"
+
+
+def hiccup(lost_seconds, patience=SUBSTITUTE_AFTER, dt=1 / 60.0):
+    """A burst of loss, then the link recovers. Did it cost the player their match?"""
+    w = Wait(patience)
+    for _ in range(int(lost_seconds / dt)):
+        w.frame(dt, heard=False)
+    w.frame(dt, heard=True)
+    return w.substituted

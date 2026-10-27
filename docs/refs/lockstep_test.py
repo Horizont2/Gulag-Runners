@@ -20,6 +20,7 @@ import sys
 from lockstep_mirror import (
     CARRIED, RING, INPUT, WELCOME, End, Input, NOTHING, Rematch, Ring, handshake, packet,
     receive, step_order, suggested_delay, covers, worst_of, sent_ticks,
+    Wait, hiccup, SUBSTITUTE_AFTER,
 )
 
 FAILED = []
@@ -285,6 +286,40 @@ check("a shrinking budget re-sends instead of rewriting history",
 check("and the clock catches up to it rather than stalling for ever",
       sent[-1][0] == "new", str(sent[-3:]))
 
+
+print("\n10. when the other player stops answering, a bot takes their fighter")
+print("   Lockstep cannot step without their input: the wait freezes the WHOLE match,")
+print("   so the only question is how long before it stops needing them.")
+
+check("a quarter second of loss costs nobody their match", not hiccup(0.25),
+      "every packet already carries sixteen past inputs -- that much is routine")
+check("nor does a second and a half", not hiccup(1.5))
+check("three seconds of total silence is an absent player", hiccup(3.0))
+
+w = Wait()
+w.frame(1 / 60.0, heard=False)
+check("and the wait is reported from the first frame of it", w.silent > 0 and not w.substituted)
+
+w = Wait()
+for _ in range(600):
+    w.frame(1 / 60.0, heard=False)
+check("once a bot has the fighter, the match runs again", w.substituted)
+before = w.ticks
+for _ in range(60):
+    w.frame(1 / 60.0, heard=False)
+check("and never stalls again, however silent the wire", w.ticks == before + 60,
+      "the bot supplies the input now; there is nothing left to wait for")
+
+check("a late packet does not un-substitute", w.frame(1 / 60.0, heard=True) == "bot",
+      "the moment this device stepped a tick the other did not, the two had parted")
+
+print("\n   The patience is a real choice and the test says what it costs.")
+for seconds in (0.5, 1.0, 2.5, 5.0):
+    worst = [g for g in (0.3, 0.8, 1.2, 2.0, 4.0) if hiccup(g, patience=seconds)]
+    print(f"      {seconds:>4}s patience -> ejects a player after a "
+          f"{min(worst) if worst else '>4'}s hiccup")
+check("the shipped patience survives a one-second hiccup",
+      not hiccup(1.0, patience=SUBSTITUTE_AFTER))
 
 print()
 if FAILED:
