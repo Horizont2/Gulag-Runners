@@ -160,6 +160,55 @@ def day_at(matches, wins, dailies_done):
             (FIRST_OF_DAY if matches > 0 else 0) + dailies_done * PER_DAILY)
 
 
+# ------------------------------------------------------------- what gets saved
+# Mirrors the day number and the streak in Assets/_Game/Meta/PlayerProgress.cs.
+import datetime                                                   # noqa: E402
+
+DAYS_IN_A_STREAK = 7
+EPOCH = datetime.date(2024, 1, 1)
+
+
+def day_number(date):
+    """The one definition of a day: whole days since a fixed date, in UTC."""
+    return (date - EPOCH).days
+
+
+def folded_day_number(date):
+    """What version 1 saved: day-of-year plus the year times four hundred.
+
+    Kept so the test can show what it did at New Year, which is drop the streak of
+    every player holding one -- in the week they are most likely to be playing.
+    """
+    return date.timetuple().tm_yday + date.year * 400
+
+
+def advance_streak(days_in_a_row, last_played_day, today):
+    """Returns (days_in_a_row, paid) after a first match on `today`."""
+    if last_played_day < 0:
+        days_in_a_row = 1
+    elif today == last_played_day + 1:
+        days_in_a_row += 1
+    elif today > last_played_day:
+        days_in_a_row = 1
+    else:
+        return days_in_a_row, False            # the clock went backwards
+    return days_in_a_row, days_in_a_row % DAYS_IN_A_STREAK == 0
+
+
+def play_days(days, day_of=day_number, streak=advance_streak):
+    """Play one match on each of `days` (dates), and report the gold and the streak."""
+    last, in_a_row, paid = -1, 0, 0
+    for date in days:
+        today = day_of(date)
+        if today == last:
+            continue                            # not the first match of that day
+        in_a_row, hit = streak(in_a_row, last, today)
+        if hit:
+            paid += 1
+        last = max(last, today)      # never backwards: see RecordMatch
+    return in_a_row, paid
+
+
 # ---------------------------------------------------------------- the search
 # Mirrors Assets/_Game/Meta/Matchmaker.cs.
 START_BAND, WIDEN_PER_SECOND, MAX_BAND, BOT_AFTER = 60, 25, 400, 25

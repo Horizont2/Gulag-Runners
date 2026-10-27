@@ -208,5 +208,50 @@ check("never before the net is fully cast AND the clock has run", not early, str
 check("the net being wide is not enough on its own",
       not m.offer_bot(40, 14) and m.cast(14) >= 1.0)
 
+print("\nthe weekly streak, which until now nothing in the game could earn")
+# docs/09 lists it at 150 gold "for retention" and does not define the week. Days in a
+# row is the reading taken: a missed day starts again, and the seventh pays.
+import datetime  # noqa: E402
+
+day = datetime.date(2025, 3, 3)
+week = [day + datetime.timedelta(days=i) for i in range(7)]
+in_a_row, paid = m.play_days(week)
+check("seven days in a row pays once", paid == 1 and in_a_row == 7,
+      "in a row %d, paid %d" % (in_a_row, paid))
+
+check("six days does not pay", m.play_days(week[:6])[1] == 0)
+check("two weeks pays twice",
+      m.play_days([day + datetime.timedelta(days=i) for i in range(14)])[1] == 2)
+
+broken = [day + datetime.timedelta(days=i) for i in range(4)] + \
+         [day + datetime.timedelta(days=i) for i in range(5, 9)]
+check("a day missed starts the count again", m.play_days(broken)[1] == 0)
+
+twice = [day, day, day + datetime.timedelta(days=1)]
+check("two matches on one day are one day", m.play_days(twice)[0] == 2)
+
+back = [day, day - datetime.timedelta(days=3), day + datetime.timedelta(days=1)]
+check("a clock corrected backwards does not cost the streak",
+      m.play_days(back)[0] == 2, str(m.play_days(back)))
+
+print("\nand the day number survives the 31st of December")
+new_year = [datetime.date(2025, 12, 28) + datetime.timedelta(days=i) for i in range(7)]
+check("a streak running into January still pays", m.play_days(new_year)[1] == 1)
+check("the fault this replaces is caught",
+      m.play_days(new_year, day_of=m.folded_day_number)[1] == 0,
+      "day-of-year plus year*400 puts 35 days between the 31st and the 1st")
+
+check("consecutive dates are consecutive numbers",
+      all(m.day_number(datetime.date(2025, 1, 1) + datetime.timedelta(days=i + 1)) -
+          m.day_number(datetime.date(2025, 1, 1) + datetime.timedelta(days=i)) == 1
+          for i in range(0, 800)))
+
+print("\nand a day of play still lands where docs/09 wants it, streak included")
+# The streak is one day in seven, so it adds about 21 gold a day on average -- which has
+# to not push the daily total past the band the skin prices were set against.
+with_streak = m.day_at(6, 3, 3) + m.WEEKLY_STREAK / 7.0
+check("250-350 a day holds with the streak averaged in",
+      250 <= with_streak <= 350, "%.0f" % with_streak)
+
 print("\n%s" % ("ALL PASS" if not fails else "%d FAIL(S): %s" % (len(fails), ", ".join(fails))))
 raise SystemExit(1 if fails else 0)

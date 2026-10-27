@@ -111,11 +111,9 @@ namespace GulagRunners.Game
                 Volatility = progress.volatility,
             };
 
-            // The day the match was played, as a day number, so "first today" survives
-            // the app being closed and reopened.
-            int today = System.DateTime.UtcNow.DayOfYear + System.DateTime.UtcNow.Year * 400;
-
-            LastReward = progress.RecordMatch(won, opponent, today);
+            // The day the match was played, so "first today" and the streak survive the
+            // app being closed and reopened. One definition, kept on PlayerProgress.
+            LastReward = progress.RecordMatch(won, opponent, PlayerProgress.Today);
 
             state = $"{(won ? "won" : "lost")}, +{LastReward.Total} gold, "
                     + $"{progress.LeagueName}";
