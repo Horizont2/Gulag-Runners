@@ -237,6 +237,20 @@ namespace GulagRunners.Game
             Gizmos.color = live ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 1f, 1f, 0.5f);
             Gizmos.DrawLine(_grip, _tip);
             Gizmos.DrawWireSphere(_tip, 0.06f);
+
+            // And which way the MODEL thinks it points, which is a different question and
+            // the one that goes wrong quietly. Twist turns the hand by the rotation that
+            // puts this on the line above, so when the two disagree the wrist is wrenched
+            // and the solver drags the whole arm after it -- which shows up as an arm that
+            // will not go below horizontal on some weapons and not others. Green along the
+            // white line is right; green across it is the bug, and now it is visible
+            // rather than something to be felt through the controls.
+            if (socket != null && socket.TryBladeDirection(out Vector3 blade) &&
+                blade.sqrMagnitude > 1e-8f)
+            {
+                Gizmos.color = new Color(0.3f, 1f, 0.4f, 0.9f);
+                Gizmos.DrawLine(_grip, _grip + blade.normalized * (_tip - _grip).magnitude);
+            }
         }
     }
 }

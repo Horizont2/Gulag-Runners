@@ -203,7 +203,34 @@ namespace GulagRunners.Game
             return null;
         }
 
-        /// <summary>The model's longest axis, signed so it points away from the grip.</summary>
+        /// <summary>
+        /// Which way the weapon points, measured off its own mesh, or false when the
+        /// model will not say clearly.
+        ///
+        /// FALSE MATTERS AS MUCH AS THE ANSWER. PlayerArm turns the hand by the rotation
+        /// that puts this direction on the arm's line, so a wrong answer wrenches the
+        /// wrist by up to a right angle -- and Unity's humanoid solver will bend the
+        /// forearm and shoulder to honour a hand rotation it cannot otherwise reach. The
+        /// visible result is an arm that refuses to go below horizontal on some weapons
+        /// and not others, which is exactly how this was reported.
+        ///
+        /// It used to take the LONGEST AXIS OF THE BOUNDING BOX and never refuse. That
+        /// works for a sword and fails for the shapes it ought to be most careful with:
+        /// an axe, a warhammer and a flanged mace are all wider across the head than the
+        /// haft is long, so the longest axis runs ACROSS the weapon and the hand is
+        /// turned ninety degrees out.
+        ///
+        /// Two better questions, in order, and a refusal if neither answers:
+        ///
+        ///   where is the weapon's MASS, relative to the grip? The grip is the model's
+        ///   origin, so a weapon held by the handle has its bulk up the haft and the
+        ///   centre of the bounds points along it whatever shape the head is. This is
+        ///   the reliable one.
+        ///
+        ///   failing that, the longest axis -- but only if it is CLEARLY longest. A
+        ///   model that is nearly as wide as it is long has no long axis, and picking
+        ///   one by a rounding error is how the wrong answer got in.
+        /// </summary>
         static bool MeasureBlade(Transform model, out Vector3 local)
         {
             local = Vector3.forward;
@@ -226,13 +253,39 @@ namespace GulagRunners.Game
             if (!any || b.size.sqrMagnitude <= 1e-8f) return false;
 
             Vector3 size = b.size;
-            Vector3 axis = size.x >= size.y && size.x >= size.z ? Vector3.right
-                         : size.y >= size.z ? Vector3.up : Vector3.forward;
+            float longest = Mathf.Max(size.x, Mathf.Max(size.y, size.z));
 
-            // The grip is this object's origin, so the half of the model that is farther
-            // from it is the business end.
-            float along = Vector3.Dot(b.center, axis);
-            local = along < 0f ? -axis : axis;
+            // 1. Away from the grip, toward where the weapon actually is. Only when the
+            //    offset is a real part of the model's size -- a model centred on its own
+            //    origin is not held by the handle and has nothing to say here.
+            if (b.center.magnitude > longest * 0.15f)
+            {
+                local = b.center.normalized;
+                return true;
+            }
+
+            // 2. The longest axis, if it is longest by enough to mean it.
+            Vector3 axis;
+            float second;
+            if (size.x >= size.y && size.x >= size.z)
+            {
+                axis = Vector3.right;
+                second = Mathf.Max(size.y, size.z);
+            }
+            else if (size.y >= size.z)
+            {
+                axis = Vector3.up;
+                second = Mathf.Max(size.x, size.z);
+            }
+            else
+            {
+                axis = Vector3.forward;
+                second = Mathf.Max(size.x, size.y);
+            }
+
+            if (longest < second * 1.3f) return false;      // no clear long axis: say so
+
+            local = Vector3.Dot(b.center, axis) < 0f ? -axis : axis;
             return true;
         }
 
