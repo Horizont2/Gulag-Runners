@@ -248,7 +248,17 @@ namespace GulagRunners.Sim
 
             c.DeadzonePermille = 220;
             c.CarryDropPermille = 700;     // about 35 degrees below level: a lowered blade
-            c.AimRelativePermille = 1000;  // forward on the stick means at him
+            // ZERO: the arm goes exactly where the thumb points, and nothing is
+            // re-framed. The frame was 1000 and it read beautifully on paper -- "forward
+            // means at him, wherever he is standing" -- and it is wrong in the hand.
+            // Measured, with the other fighter on your LEFT, it turns the whole stick a
+            // half turn: push up and the arm goes DOWN, push right and it goes left. Half
+            // of every match played with the controls inverted.
+            //
+            // There is no version of that a player can learn, because the inversion
+            // flips every time the two of you cross. The assist is kept as a knob for
+            // anyone who wants to try it again, and it is off.
+            c.AimRelativePermille = 0;
             c.AimFloorPermille = 500;      // half his height: closer than that is "ahead"
             c.AimTiltPermille = 1000;      // and the frame never leans past 45 degrees
 

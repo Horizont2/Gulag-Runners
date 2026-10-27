@@ -21356,7 +21356,7 @@ MonoBehaviour:
   combat:
     maxHealth: 100
     shoulderHeight: 0.78
-    armLength: 0.45
+    armLength: 0.35
     haft: 0.27
     reachToBlade: 0.73
     minBlade: 0.31
@@ -21365,7 +21365,7 @@ MonoBehaviour:
     referenceFrames: 15
     aimDeadzone: 0.22
     carryDrop: 0.7
-    aimRelative: 1
+    aimRelative: 0
     minSwing: 0.25
     bodyRadius: 0.3
     bladeRadius: 0.07

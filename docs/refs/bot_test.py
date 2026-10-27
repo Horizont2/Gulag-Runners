@@ -179,9 +179,10 @@ for t in range(60 * 20):
     # above the guard never builds enough tip speed to count -- which is the rule
     # working, and was the first version of this test measuring nothing.
     tick([h_bot, h_man], [f, 0],
-         # In the FRAME, like the bot's own aim and like the player's stick: forward
-         # is at him, so +500 whichever side of him this man is standing on.
-         [aim_of(*aim), aim_of(500, 866 if (t // 27) % 2 else -866)])
+         # World terms, like the bot's own aim and like the stick: this man stands to
+         # the bot's RIGHT, so swinging at it is -X. It was +500 for as long as the
+         # stick was read in the other fighter's frame.
+         [aim_of(*aim), aim_of(-500, 866 if (t // 27) % 2 else -866)])
     if h_bot.was_hit:
         took += 1
 check("and it takes damage like anything else", took > 0 or h_bot.health < 100,
@@ -212,7 +213,7 @@ print("\n6. it aims the weapon, which is the whole of attacking now")
 # blade moving, so measuring its guard against a man standing still measures nothing --
 # and correctly reported zero when this was first written that way.
 r = spar(weapon=CLUB, foe_weapon=CLUB, ticks=60 * 40, seed=13,
-         foe_aim=lambda t: (500, 866 if (t // 15) % 2 else -866))
+         foe_aim=lambda t: (-500, 866 if (t // 15) % 2 else -866))
 
 swinging = sum(1 for a in r["aims"] if a[1] != 0)
 check("it throws the blade through an arc rather than holding it out",

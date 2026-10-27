@@ -18,7 +18,7 @@ ARM = dict(
     shoulder=780, arm_length_pm=350,
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
-    aim_relative=1000, aim_floor_pm=500, aim_tilt_pm=1000,
+    aim_relative=0, aim_floor_pm=500, aim_tilt_pm=1000,
     full_sweep_pm=400, recovery_pm=450,
     haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
     body_radius_pm=180, blade_radius_pm=60,

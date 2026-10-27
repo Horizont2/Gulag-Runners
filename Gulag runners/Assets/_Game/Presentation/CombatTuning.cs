@@ -96,7 +96,7 @@ namespace GulagRunners.Game
                  "assist -- pulling a blade toward him pulls it off the line the other " +
                  "man is guarding, and a measured version of that took a guard's whole " +
                  "value away.")]
-        [Range(0f, 1f)] public float aimRelative = 1f;
+        [Range(0f, 1f)] public float aimRelative;
 
         [Tooltip("How close he may get, horizontally, before the aim frame stops " +
                  "measuring exactly where he is — as a share of body height.\n\n" +

@@ -53,28 +53,42 @@ namespace GulagRunners.GameEditor
             List<string> took = new List<string>();
             if (fx == null) return took;
 
+            // Authored for a 1.8 m human and worn by a 0.91 m one -- but the object these
+            // hang off is ITSELF scaled (the fighter root is 0.5), and with scalingMode
+            // Hierarchy the system already inherits that. Asking for height/1.8 on top of
+            // it drew everything at a quarter size, down among the ankles. Divide the
+            // inherited scale back out and ask for the world size once.
             Transform home = feet != null ? feet.parent : fighter.transform;
-            float scale = Mathf.Max(0.05f, height / AuthoredFor);
+            float worn = Mathf.Abs(fighter.transform.lossyScale.y);
+            if (worn < 0.0001f) worn = 1f;
+            float scale = Mathf.Max(0.05f, height / AuthoredFor / worn);
 
-            // A swing is the one that matters most: it is the only cue that says the blade
-            // went live, and under the commitment rule that moment is the whole read.
-            Take(fx.swing, home, "swing", scale, took, "slash", "wind trail");
-            Take(fx.hurt, body, "hurt", scale, took, "blood directional", "blood", "hit a");
-            Take(fx.parried, body, "parried", scale, took, "flash", "sword hit plain");
-            Take(fx.guardBroken, body, "clash", scale, took, "hit misc a", "sword hit plain");
-            Take(fx.death, body, "death", scale, took, "souls escape", "skull head");
+            // THREE slots, and only three.
+            //
+            // The first version took seventeen -- every slot a name matched. That was the
+            // mistake: "a prefab whose name contains these words" is not the same question
+            // as "does this belong on this event". It put a magic poof on picking up a
+            // club, souls escaping out of a man knocked down in a prison yard, and a
+            // ground-impact burst under every footfall. Reported, correctly, as too many
+            // and some of them absurd.
+            //
+            // What is left is the three the pack genuinely does better than a handful of
+            // quads: blood, steel on steel, and the flash of a parry. Everything else
+            // keeps the built-in shapes, which were authored for this game at this size.
+            // A pack is a library to take FROM, not a list to spend.
+            // Sparks here and blood below, never both in one slot. Two views answer a
+            // hit -- this one and FighterDamageView -- and the same system in both is two
+            // bursts on one frame, which reads as a bigger event than being hit. The
+            // original hand-built wiring split them for exactly that reason: sparks read
+            // the metal, blood reads the body, and the blood belongs to the view that can
+            // size it by the damage that actually got through.
+            Take(fx.hurt, body, "hit sparks", scale, took, "sword hit plain", "hit misc a");
+            Take(fx.parried, body, "parried", scale, took, "flash");
 
-            Take(fx.stepQuiet, feet, "step quiet", scale, took, "hit misc f smoke");
-            Take(fx.stepLoud, feet, "step loud", scale, took, "ground hit");
-            Take(fx.landSoft, feet, "land soft", scale, took, "hit misc f smoke");
-            Take(fx.landHard, feet, "land hard", scale, took, "ground hit");
-            Take(fx.jump, feet, "jump", scale, took, "hit misc f smoke");
-            Take(fx.dodge, feet, "dodge", scale, took, "wind trail", "hit misc f smoke");
-
-            Take(fx.chestOpened, body, "chest opened", scale, took, "magic poof");
-            Take(fx.pickUp, body, "pick up", scale, took, "magic poof");
-            Take(fx.mantle, feet, "mantle", scale, took, "ground hit");
-            Take(fx.ladderGrab, feet, "ladder grab", scale, took, "hit misc f smoke");
+            // No swing graphic. A cartoon SLASH drawn over the arc is a second, louder
+            // statement about something the weapon trail already says continuously, and
+            // the trail is the one that tracks the blade. Two cues for one event read as
+            // a bug, not as emphasis.
 
             // chestWorking is deliberately left alone: it is the one that must LOOP, and a
             // pack's one-shot in that slot would play once and leave the tell off for the

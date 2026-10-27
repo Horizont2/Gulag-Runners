@@ -146,10 +146,12 @@ def main():
             high = not high
             t = A.WEAPONS["club"][0]
         t -= 1
-        # The defender holds their blade at the attacker. Forward on the stick MEANS
-        # at him now (docs/31's aim frame), so this is +X whichever side he is on --
-        # which is the whole point of the frame.
-        A.tick([att, vic], [aim_at(60 if high else -60), (A.ONE, 0)])
+        # The defender holds their blade at the attacker, who stands on their LEFT.
+        # This was +X and a comment explaining that forward means "at him" whichever
+        # side he is on -- true only while the stick was read in his frame. With that
+        # off, +X pointed the guard out of the back of the arena and the clash count
+        # fell from 13 to 2 without a single assertion noticing.
+        A.tick([att, vic], [aim_at(60 if high else -60), aim_at(180)])
         if vic.was_hit:
             hits += 1
         if vic.was_clash:
@@ -171,6 +173,14 @@ def main():
     #
     # The design's two claims survive the change, and they are what is pinned instead:
     # a guard is worth holding, and no guard is safe against everything.
+    # The guard angles below are stated as the DEFENDER means them -- 0 is straight at
+    # the attacker, up is over him -- and turned into world angles here. They used to be
+    # passed to the simulation raw, which was only ever right while the attack stick was
+    # read in the enemy's frame; with that off, a guard of 0 pointed the defender's blade
+    # out of the back of the arena and the whole table measured nothing.
+    def toward(g):
+        return aim_at(180.0 - g)          # the defender stands on the right, facing left
+
     def ticks_to_kill(guard, lo=-60, hi=60):
         att = A.Fighter(-stand_off("club"), 1, "club")
         vic = A.Fighter(0.0, -1, "club")
@@ -191,7 +201,7 @@ def main():
     grid = {}
     for lo, hi in ARCS:
         for g in GUARDS:
-            grid[(lo, hi, g)] = ticks_to_kill(aim_at(g), lo, hi) or ALIVE
+            grid[(lo, hi, g)] = ticks_to_kill(toward(g), lo, hi) or ALIVE
 
     # 1. There is always SOME guard that greatly outlasts standing open. Note that
     #    standing open is not standing defenceless: the carry pose is a lowered blade and
@@ -577,15 +587,29 @@ def main():
     check("forward points at him, whatever the range", miss < 1.0,
           f"worst is {miss:.1f} deg out, at {g} m")
 
-    g, miss = worst((A.ONE, 0), 180.0, side=-1)
+    g, miss = worst((A.ONE, 0), 0.0, side=-1)
     check("and it still does with him on the other side", miss < 1.0,
           f"worst is {miss:.1f} deg out, at {g} m")
 
-    g_up, up = worst((0, A.ONE), 90.0)
-    g_dn, dn = worst((0, -A.ONE), -90.0)
-    check("up is over him and down is under him, and they do not trade places",
-          up < 1.0 and dn < 1.0,
-          f"up {up:.1f} deg out at {g_up} m, down {dn:.1f} deg out at {g_dn} m")
+    # FROM BOTH SIDES, which is the hole the first version of this had. It checked
+    # forward from the left and the right but up and down from the right only -- and
+    # the enemy-relative frame turns the whole stick a HALF TURN when he is on your
+    # left, so up came out as down and the test never looked. Measured, with him on the
+    # left: thumb up gave -90, thumb right gave 180, every direction inverted. Half of
+    # every match was played with the controls upside down and the suite said fine.
+    worst_up = worst_dn = 0.0
+    where = ""
+    for side in (1, -1):
+        _, u = worst((0, A.ONE), 90.0, side=side)
+        _, d = worst((0, -A.ONE), -90.0, side=side)
+        if max(u, d) > max(worst_up, worst_dn):
+            where = "his right" if side > 0 else "his left"
+        worst_up, worst_dn = max(worst_up, u), max(worst_dn, d)
+
+    check("up is up and down is down, from either side of him",
+          worst_up < 1.0 and worst_dn < 1.0,
+          f"worst is up {worst_up:.0f} deg out, down {worst_dn:.0f} deg out"
+          + (f", standing on {where}" if where else ""))
 
     # A fighter on a ledge directly overhead is the case the floor and the cap are for:
     # without them the line to him goes vertical and the whole stick turns a quarter.

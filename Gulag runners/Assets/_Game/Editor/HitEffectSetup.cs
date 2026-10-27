@@ -61,8 +61,16 @@ namespace GulagRunners.GameEditor
             Transform root = Child(fighter.transform, "Effects");
             Transform feet = Child(root, "At Feet");
             Transform body = Child(root, "At Body");
-            feet.localPosition = new Vector3(0f, -fighter.visualYOffset, 0f);
-            body.localPosition = new Vector3(0f, -fighter.visualYOffset + h * 0.55f, 0f);
+
+            // Through the fighter's own scale. Every figure in this file is a metre of
+            // WORLD, and these anchors hang off an object scaled to 0.5 -- so written
+            // straight into localPosition they land at half the height asked for, which
+            // put the chest anchor at knee height and every effect with it. The same
+            // sentence is in PlayerController.PlaceVisualRoot, which does divide by it.
+            float k = Mathf.Abs(fighter.transform.lossyScale.y);
+            if (k < 0.0001f) k = 1f;
+            feet.localPosition = new Vector3(0f, -fighter.visualYOffset / k, 0f);
+            body.localPosition = new Vector3(0f, (-fighter.visualYOffset + h * 0.55f) / k, 0f);
 
             List<string> made = new List<string>();
 

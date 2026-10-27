@@ -82,23 +82,24 @@ def decide(bot, me, foe, w, cfg):
 def aim(bot, me, foe):
     """Two poses: guard (blade level at them) and swing (throw it high to low).
 
-    In the SAME FRAME the player's stick is read in -- forward is at him -- and not in
-    world terms. In world terms the frame turned the bot's aim by the direction to the
-    foe, which is the same direction the bot had already applied, so the two cancelled:
-    a bot to its foe's right guarded to the right, away from him, and swung high when
-    it meant low.
+    In WORLD terms, which is what the stick means now that aim_relative is 0. Exactly
+    one of the two may know which side of the foe this fighter is on -- for a while both
+    did and they cancelled, then neither did. bot_test checks the guard from both sides
+    so that turning that knob fails there rather than in somebody's hand.
     """
+    towards = 1 if foe.x >= me.x else -1
+
     if bot.swing_hold > 0:
         bot.swing_hold -= 1
         if bot.swing_hold == 0:
             bot.swing_high = not bot.swing_high
-        bot.aim_x = 500
+        bot.aim_x = towards * 500
         bot.aim_y = 866 if bot.swing_high else -866
         return
 
     if bot.guard_hold > 0:
         bot.guard_hold -= 1
-        bot.aim_x = 1000
+        bot.aim_x = towards * 1000
         bot.aim_y = 0
         return
 
