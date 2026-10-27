@@ -39,6 +39,9 @@ ASSETS = os.path.join(ROOT, "Gulag runners", "Assets")
 GAME = os.path.join(ASSETS, "_Game")
 
 # The scenes a match is played in. The menu has its own look and its own profile.
+# A name that is not there any more is not a fault -- SetupScene was deleted once it had
+# served its purpose -- but a list with NOTHING left in it is, because then this check
+# passes while checking nothing.
 GAMEPLAY = ("Arena_Demo.unity", "SetupScene.unity")
 
 VOLUME_SCRIPT = "172515602e62fb746b5d573b38a5fe58"
@@ -81,11 +84,14 @@ def main():
     problems, notes = [], []
     thresholds = []
 
+    looked_at = 0
+
     for scene in GAMEPLAY:
         path = os.path.join(ASSETS, "Scenes", scene)
         if not os.path.exists(path):
-            problems.append(f"{scene}: not there")
+            notes.append(f"{scene}: not in the project any more, so it was skipped")
             continue
+        looked_at += 1
         src = read(path)
 
         if f"guid: {VOLUME_SCRIPT}" not in src:
@@ -192,11 +198,17 @@ def main():
                                         f"ItemModels.DefaultPalette() -- {got} against "
                                         f"{want}")
 
+    # Nothing left to look at is the one case a skipped scene becomes a fault: this check
+    # would otherwise go on printing a pass while reading no scene at all.
+    if looked_at == 0:
+        problems.append("none of the gameplay scenes this knows about are in the project "
+                        f"any more ({', '.join(GAMEPLAY)}), so no scene was checked")
+
     for n in notes:
         print(f"  note - {n}")
     for p in problems:
         print(f"  {p}")
-    print(f"glow_check: {len(problems)} problem(s) across {len(GAMEPLAY)} gameplay scene(s)")
+    print(f"glow_check: {len(problems)} problem(s) across {looked_at} gameplay scene(s)")
     return 1 if problems else 0
 
 

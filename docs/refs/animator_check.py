@@ -18,7 +18,7 @@ import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 ASSETS = os.path.join(ROOT, "Gulag runners", "Assets")
-SCENE = os.path.join(ASSETS, "Scenes", "SetupScene.unity")
+SCENES = os.path.join(ASSETS, "Scenes")
 
 # Fields on PlayerAnimator that name a state. Everything else on it is a number or a flag.
 # Read off the component rather than listed by hand: a new state field would otherwise be
@@ -48,6 +48,28 @@ def guid_of(asset_path):
         return None
     m = re.search(r"guid: ([0-9a-f]+)", read(meta))
     return m.group(1) if m else None
+
+
+def holding(guid):
+    """Every scene and prefab under Assets with that component on it.
+
+    One scene used to be named here, and when SetupScene was deleted this stopped with a
+    FileNotFoundError. Naming it was wrong twice over: the fighters had already moved
+    into prefabs, so a scene full of prefab INSTANCES carries no PlayerAnimator document
+    at all and reading it would have checked nothing while reporting a pass. The fighters
+    are found by what they are now, wherever they live.
+    """
+    if guid is None:
+        return []
+    out = []
+    for dirpath, _dirs, files in os.walk(ASSETS):
+        for f in sorted(files):
+            if not (f.endswith(".unity") or f.endswith(".prefab")):
+                continue
+            path = os.path.join(dirpath, f)
+            if f"guid: {guid}" in read(path):
+                out.append(path)
+    return sorted(out)
 
 
 def by_guid():
@@ -231,8 +253,10 @@ def main():
     fields = set(STATE_FIELD.findall(source)) | set(ARRAY_FIELD.findall(source))
 
     guid = guid_of(animator_cs)
-    scene = read(SCENE)
-    docs = documents(scene)
+    where = holding(guid)
+    if not where:
+        print("animator_check: nothing under Assets has a PlayerAnimator on it.")
+        return 1
 
     # Every PlayerAnimator in the scene, and the states it asks for. A field absent from the
     # YAML was added to the component after the scene was last saved, so Unity will give it
@@ -243,9 +267,16 @@ def main():
 
     problems, checked = 0, 0
 
-    for fid, (cls, body) in sorted(docs.items()):
-        if cls != 114 or f"guid: {guid}" not in body:
-            continue
+    # Gathered first so the long body below reads the same whether the fighters are in
+    # one prefab or five scenes.
+    fighters = []
+    for source in where:
+        here = documents(read(source))
+        for fid, (cls, body) in sorted(here.items()):
+            if cls == 114 and f"guid: {guid}" in body:
+                fighters.append((source, here, body))
+
+    for source, docs, body in fighters:
         checked += 1
 
         go = re.search(r"m_GameObject: \{fileID: (\d+)\}", body)
