@@ -530,6 +530,10 @@ namespace GulagRunners.Net
 
             if (_wire == null) return;
 
+            // Whatever the wire needs doing for itself: nothing for a socket, and for
+            // a relay driver it is everything that is not sending.
+            _wire.Pump();
+
             // Both ends, whichever they are, and before the host's early return below.
             // The budget has to be measured from the device that will be WAITING, and
             // that is both of them.

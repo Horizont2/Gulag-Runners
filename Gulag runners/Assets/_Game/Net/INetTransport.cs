@@ -43,6 +43,16 @@ namespace GulagRunners.Net
         /// <summary>Send to the peer. Silent when there is no peer: see Ready.</summary>
         void Send(byte[] data, int length);
 
+        /// <summary>
+        /// One frame's worth of whatever this transport has to do for itself.
+        ///
+        /// A socket needs nothing -- it has its own thread and blocks on it. Unity
+        /// Transport needs this, because its driver may not be touched from a thread
+        /// at all, so accepting, reading and delivering all happen here. Called once
+        /// per frame by the link, which is the only place that knows what a frame is.
+        /// </summary>
+        void Pump();
+
         /// <summary>Done. Safe to call twice, and safe to call when never opened.</summary>
         void Close();
     }

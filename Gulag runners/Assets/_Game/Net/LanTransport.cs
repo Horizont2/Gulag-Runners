@@ -109,6 +109,13 @@ namespace GulagRunners.Net
             return true;
         }
 
+        /// <summary>
+        /// Nothing: the receiving thread is the pump. Here because a transport that
+        /// cannot block on a thread of its own needs one, and the link should not have
+        /// to know which kind it is holding.
+        /// </summary>
+        public void Pump() { }
+
         public void Send(byte[] data, int length)
         {
             IPEndPoint peer = _peer;

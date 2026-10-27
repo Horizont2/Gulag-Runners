@@ -87,3 +87,80 @@ namespace Unity.Services.Multiplayer
             => Task.FromResult<ISession>(null);
     }
 }
+
+// ---------------------------------------------------------------- Unity Transport
+//
+// Same caveat as above, with one difference worth knowing: com.unity.transport 2.7.4
+// IS installed in the project, so Unity's own compiler checks RelayTransport against
+// the real thing. These exist only so compile_check here can parse the file at all.
+
+namespace Unity.Networking.Transport
+{
+    public struct NetworkEndpoint
+    {
+        public static NetworkEndpoint AnyIpv4 => default;
+    }
+
+    public struct NetworkConnection
+    {
+        public bool IsCreated { get; }
+    }
+
+    public struct DataStreamReader
+    {
+        public int Length { get; }
+        public byte ReadByte() => 0;
+    }
+
+    public struct DataStreamWriter
+    {
+        public void WriteByte(byte value) { }
+    }
+
+    public struct NetworkSettings
+    {
+        public NetworkSettings WithRelayParameters(
+            ref Unity.Networking.Transport.Relay.RelayServerData data) => this;
+    }
+
+    public static class NetworkEvent
+    {
+        public enum Type { Empty, Data, Connect, Disconnect }
+    }
+
+    public struct JobHandleStub { public void Complete() { } }
+
+    public struct NetworkDriver
+    {
+        public static NetworkDriver Create(NetworkSettings settings) => default;
+
+        public bool IsCreated { get; }
+        public int Bind(NetworkEndpoint endpoint) => 0;
+        public int Listen() => 0;
+        public NetworkConnection Connect() => default;
+        public NetworkConnection Accept() => default;
+        public JobHandleStub ScheduleUpdate() => default;
+
+        public NetworkEvent.Type PopEvent(out NetworkConnection connection,
+                                          out DataStreamReader reader)
+        {
+            connection = default;
+            reader = default;
+            return NetworkEvent.Type.Empty;
+        }
+
+        public int BeginSend(NetworkConnection connection, out DataStreamWriter writer)
+        {
+            writer = default;
+            return 0;
+        }
+
+        public int EndSend(DataStreamWriter writer) => 0;
+        public void Dispose() { }
+    }
+}
+
+namespace Unity.Networking.Transport.Relay
+{
+    public struct RelayServerData { }
+}
