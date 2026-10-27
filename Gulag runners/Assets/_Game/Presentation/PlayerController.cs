@@ -431,6 +431,64 @@ namespace GulagRunners.Game
             Teleported?.Invoke();
         }
 
+        /// <summary>
+        /// True while something else owns the clock -- a network match, a replay, a test.
+        ///
+        /// Each fighter pumps its own accumulator off Time.deltaTime, which is right on
+        /// one device and impossible across two: the whole MATCH has to advance on a
+        /// single clock that waits for the other player's input. So an owner can take the
+        /// clock, and then drives every fighter itself with StepOnce, in a fixed order.
+        /// </summary>
+        public bool ExternallyClocked
+        {
+            get => _externallyClocked;
+            set
+            {
+                if (_externallyClocked == value) return;
+                _externallyClocked = value;
+
+                // Whatever was waiting to be spent goes with the clock that was going to
+                // spend it. A fighter nobody is taking input from still samples every
+                // frame -- so without this, the taps pile up unspent for as long as the
+                // network match lasts and all arrive at once the moment it ends.
+                _pending = default;
+                _accumulator = 0f;
+            }
+        }
+
+        bool _externallyClocked;
+
+        /// <summary>Seconds a tick lasts, for whoever is driving the clock.</summary>
+        public static float SecondsPerTick => TickSeconds;
+
+        /// <summary>
+        /// One tick, from an input somebody else chose. The whole of networked play:
+        /// the simulation never learns where the input came from.
+        /// </summary>
+        public void StepOnce(TickInput intent) => Tick(intent);
+
+        /// <summary>Draw between ticks, for whoever is driving the clock.</summary>
+        public void RenderAt(float alpha) => Render(Mathf.Clamp01(alpha));
+
+        /// <summary>What this fighter's own controls are asking for, this frame.</summary>
+        public TickInput ReadLocalInput() => _input != null ? _input.Read() : default;
+
+        /// <summary>
+        /// What this fighter's own controls have asked for since this was last taken, and
+        /// clears it -- exactly what the local loop below does between two ticks.
+        ///
+        /// Taking rather than reading is the whole point: a tap that begins and ends inside
+        /// one frame never appears in Read, and on a phone at 60 fps against a 60 Hz tick
+        /// that is a real share of the attacks. The networked clock has to consume the
+        /// pending input for the same reason the local one does.
+        /// </summary>
+        public TickInput TakeLocalInput()
+        {
+            TickInput intent = _pending;
+            _pending = _held;              // taps are consumed, held buttons stay held
+            return intent;
+        }
+
         void Update()
         {
             // Sample once per frame. _held is what is down now; _pending also carries anything
@@ -440,6 +498,11 @@ namespace GulagRunners.Game
                 _held = _input.Read();
                 _pending = TickInput.Merge(_pending, _held);
             }
+
+            // Somebody else is counting the ticks. The input above is still sampled, so a
+            // tap between two ticks is not lost; the stepping and the drawing are both
+            // theirs, through StepOnce and RenderAt.
+            if (ExternallyClocked) return;
 
             _accumulator += Time.deltaTime;
 

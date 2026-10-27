@@ -32,9 +32,29 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..", "..")
 GAME = os.path.join(ROOT, "Gulag runners", "Assets", "_Game")
 
-# The folders that make up the two real assemblies: the engine-free simulation, and everything
-# in the default assembly that the game needs at runtime.
-FOLDERS = ("Sim", "Presentation", "Audio", "Input", "Meta", "Menu", "Editor")
+def _folders():
+    """Every folder under _Game that holds C#, found rather than listed.
+
+    This was a hand-written tuple, and a hand-written list of what to check is a list
+    somebody forgets. It has already happened twice: Editor was missing, so a broken
+    editor script sat in the project reporting nothing until it was opened in Unity; and
+    Net was missing the moment it was created, so the first networking file compiled
+    against nothing at all. A folder that exists is a folder that ships, and there is no
+    judgement to make about which ones count.
+    """
+    found = []
+    for name in sorted(os.listdir(GAME)):
+        path = os.path.join(GAME, name)
+        if not os.path.isdir(path):
+            continue
+        for _, _, files in os.walk(path):
+            if any(f.endswith(".cs") for f in files):
+                found.append(name)
+                break
+    return tuple(found)
+
+
+FOLDERS = _folders()
 
 UNITY_PACKAGE = "UnityEngine.Modules"
 UNITY_VERSION = "2021.3.33"      # reference assemblies only: the API this project uses is old

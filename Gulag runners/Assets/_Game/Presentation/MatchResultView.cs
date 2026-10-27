@@ -74,6 +74,17 @@ namespace GulagRunners.Game
         public UnityEvent<int> Shown;
         public UnityEvent Hidden;
 
+        [Header("Two-phone play")]
+        [Tooltip("Set by whatever owns the match clock while two devices are playing one " +
+                 "match. While it is on, Again raises the event below instead of " +
+                 "restarting, because a rematch on one phone and not the other is two " +
+                 "games. Left alone in a single-player scene: nothing sets it.")]
+        public bool someoneElseRestarts;
+
+        [Tooltip("Raised by Again when something else owns the restart. Wire it to " +
+                 "NetMatch.AskRematch — Setup > Set up two-phone play does it for you.")]
+        public UnityEvent RematchAsked;
+
         [Header("Debug")]
         public string state = "waiting";
 
@@ -143,12 +154,31 @@ namespace GulagRunners.Game
         public void Rematch()
         {
             if (!_up) return;
+
+            // While two devices are playing one match, restarting it is not this screen's
+            // to do. Both phones have to deal the new arena on the SAME tick or they are
+            // playing two games from then on -- so the tap becomes a request, and whoever
+            // owns the clock schedules it. Nothing is hidden yet: the screen comes down
+            // when the new match actually begins, half a second later.
+            if (someoneElseRestarts)
+            {
+                RematchAsked?.Invoke();
+                state = "rematch asked for";
+                return;
+            }
+
             Hide();
 
             if (match == null) return;
             match.ResetSeries();
             match.NextRound();
             state = "rematch";
+        }
+
+        /// <summary>Take the screen down from outside, when something else restarted.</summary>
+        public void Dismiss()
+        {
+            if (_up) Hide();
         }
 
         /// <summary>Wire a Button's OnClick here. Out of the arena.</summary>

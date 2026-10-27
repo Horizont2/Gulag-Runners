@@ -266,6 +266,37 @@ namespace GulagRunners.Game
         [ContextMenu("Reset round")]
         public void ResetRound() => Deal(_match.Round);
 
+        /// <summary>
+        /// Round one of a new match, dealt from a number somebody else chose.
+        ///
+        /// Two devices about to play each other have each been sitting in this scene for a
+        /// while -- bots fighting, rounds turning over, chests opened -- so their states
+        /// are nothing alike by the time anybody taps JOIN. Neither one is wrong; they are
+        /// simply two matches. This throws both away and starts one, which is the only
+        /// moment in a deterministic design where the two devices have to be told anything
+        /// at all beyond each other's thumbs.
+        ///
+        /// What is handed over is the number the loot is dealt from, not the loot. The
+        /// rolling seed is set rather than pinned, so round two is a different arena from
+        /// round one on both devices and still the SAME different arena -- a pinned seed
+        /// would deal the identical chests every round of the match.
+        /// </summary>
+        public void StartFresh(uint dealtFrom)
+        {
+            // A seed pinned in the inspector is already the same number on both devices,
+            // because it is the same build. Leave a deliberate pin alone.
+            if (seed == 0) _rollingSeed = dealtFrom;
+
+            ResetSeries();
+            Deal(0);
+            ResetFighters();
+
+            if (logMatch) Debug.Log($"{name}: new match, dealt from {dealtFrom}", this);
+
+            RoundBegan?.Invoke(_match.Round);
+            PhaseBegan?.Invoke(_match.Phase);
+        }
+
         void Deal(int round)
         {
             Config = chests.ToConfig();

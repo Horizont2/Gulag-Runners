@@ -223,6 +223,16 @@ def unassigned_struct_fields(path, src, fields):
             continue
 
         written = set(re.findall(r'\b' + local + r'\.(\w+)\s*=[^=]', "\n".join(body)))
+
+        # Nothing written at all is not a half-built config. One line of regex cannot tell
+        # a local from a FIELD of the same shape, and a field is zero-initialised by C# and
+        # perfectly legal -- while a local that really is never written does not compile,
+        # which compile_check says with Roslyn rather than guessing. So this rule speaks
+        # only about the case it can actually judge: a builder that fills some in and
+        # forgets the rest.
+        if not written:
+            continue
+
         missing = sorted(fields[type_name] - written)
         if missing:
             out.append(f"{path}:{n + 1}: '{local}' is returned as a {type_name} with "
