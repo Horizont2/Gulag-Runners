@@ -178,6 +178,57 @@ def check(path, guids):
     return len(bad)
 
 
+def tuning_drift():
+    """Serialized tuning that disagrees with the C# default, listed with both numbers.
+
+    The failure this is for has now happened three times in one session, and it is
+    invisible by every other means: a field keeps its NAME while its MEANING changes.
+    armLength went from metres to a share of body height; bodyRadius and bladeRadius
+    went with it. Unity keeps the old number because the name still matches, so the
+    arena quietly ran a 0.41 m arm against the 0.32 it was retuned to, and a hit capsule
+    two thirds too wide. Nothing is wrong with either file on its own.
+
+    No verdict, because most of these are somebody deliberately tuning and that is what
+    the inspector is FOR. It prints the disagreements and lets a person read them: a
+    short list is easy to scan, and a share sitting at an old metre value stands out of
+    it immediately.
+    """
+    cs = os.path.join(ROOT, "Gulag runners/Assets/_Game/Presentation")
+    defaults = {}
+    for name in ("CombatTuning.cs", "MovementTuning.cs"):
+        path = os.path.join(cs, name)
+        if not os.path.exists(path):
+            continue
+        for m in re.finditer(r"public (?:float|int) (\w+)\s*=\s*(-?[\d.]+)f?;",
+                             io.open(path, encoding="utf-8").read()):
+            defaults[m.group(1)] = float(m.group(2))
+        # A field with no initialiser defaults to zero, and that is a real default.
+        for m in re.finditer(r"public (?:float|int) (\w+)\s*;",
+                             io.open(path, encoding="utf-8").read()):
+            defaults.setdefault(m.group(1), 0.0)
+
+    shown = 0
+    for path in sorted(glob.glob(os.path.join(ROOT, "Gulag runners/Assets/Scenes/*.unity"))):
+        drift = []
+        for m in re.finditer(r"^    (\w+): (-?[\d.]+)$", io.open(
+                path, encoding="utf-8", errors="replace").read(), re.M):
+            field, value = m.group(1), float(m.group(2))
+            if field not in defaults:
+                continue
+            if abs(value - defaults[field]) < 1e-6:
+                continue
+            drift.append((field, value, defaults[field]))
+        if not drift:
+            continue
+        seen = sorted(set(drift))
+        print(f"  note - {os.path.basename(path)}: {len(seen)} tuning value(s) differ "
+              "from the C# default:")
+        for field, value, was in seen:
+            print(f"      {field}: {value:g}  (default {was:g})")
+        shown += len(seen)
+    return shown
+
+
 def main():
     guids = guid_index()
     total = 0
@@ -188,7 +239,9 @@ def main():
         if not any(os.path.relpath(p, ROOT).replace(os.sep, "/").startswith(o) for o in OURS):
             continue
         total += check(p, guids)
-    print(f"scene_check: {'FAIL' if total else 'ok'} ({total} problem(s))")
+    drifted = tuning_drift()
+    print(f"scene_check: {'FAIL' if total else 'ok'} ({total} problem(s), "
+          f"{drifted} tuning value(s) overridden)")
     return 1 if total else 0
 
 

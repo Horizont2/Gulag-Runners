@@ -3034,7 +3034,7 @@ MonoBehaviour:
     staminaRecoverFrames: 33
     bodyWidth: 0.3
     bodyHeight: 0.91
-    crouchHeight: 1.1
+    crouchHeight: 0.682
     stepUpHeight: 0.3
     clamberHeight: 0.55
     clamberSpeed: 0.4
@@ -3248,7 +3248,7 @@ MonoBehaviour:
     staminaRecoverFrames: 33
     bodyWidth: 0.3
     bodyHeight: 0.91
-    crouchHeight: 1.1
+    crouchHeight: 0.682
     stepUpHeight: 0.3
     clamberHeight: 0.55
     clamberSpeed: 0.4
