@@ -326,6 +326,24 @@ def lights_and_torches(path):
     elif not live:
         print("      fighter: MenuFighter present, PlayerController quiet")
 
+    # And his boots are nailed down. The idle breathes and MenuFighter sways him a few
+    # degrees, both applied to the root -- so without this the legs go along and the feet
+    # slide and twist on the stone, which is the one thing a man standing in a cell does
+    # not do. Only checked once there is a fighter to stand: a scene with no MenuFighter
+    # has a louder problem above.
+    plant = script_guid("Menu/MenuFootPlant.cs")
+    planted = plant and any(
+        re.search(r"m_Script: \{fileID: -?\d+, guid: " + plant, body)
+        for comps in owner.values() for cls, body in comps if cls == 114)
+
+    if posed and not planted:
+        problems += 1
+        print("      PROBLEM - no MenuFootPlant, so the idle and the sway move his feet "
+              "with the rest of him and the boots slide. Run Tools/Gulag Runners/Setup/"
+              "Set up the menu scene.")
+    elif planted:
+        print("      fighter: feet planted")
+
     return problems
 
 

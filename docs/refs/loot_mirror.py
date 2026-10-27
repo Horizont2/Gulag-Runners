@@ -171,7 +171,12 @@ NOISE_FRAMES = 20
 
 # ---------------------------------------------------------------- loot on the floor (DropConfig)
 D = dict(POP_X=M(1400), POP_Y=M(3600), DROP_X=M(1100), DROP_Y=M(2200),
-         GRAV=M(22000), MAXFALL=M(14000), BOUNCE=M(150), RADIUS=M(220),
+         GRAV=M(22000), MAXFALL=M(14000), BOUNCE=M(150),
+         # RADIUS is how big the item IS -- what rests on the floor and what a wall
+         # stops. REACH is how close you have to be to take it. One number did both
+         # until the pickup was asked to be wider, which would have floated every
+         # dropped weapon off the ground.
+         RADIUS=M(220), REACH=M(330),
          POP_LOCK=14, DROP_LOCK=30)
 DT = ONE // 60
 
@@ -425,7 +430,7 @@ def take_from_ground(s, pressed, ground, button_taken):
     for i, g in enumerate(ground):
         if not g.takeable:
             continue
-        box = (g.x - D["RADIUS"], g.y - D["RADIUS"], g.x + D["RADIUS"], g.y + D["RADIUS"])
+        box = (g.x - D["REACH"], g.y - D["REACH"], g.x + D["REACH"], g.y + D["REACH"])
         if not overlaps(b, box):
             continue
         slot = s.inv.slot(ITEMS[g.item]["kind"])

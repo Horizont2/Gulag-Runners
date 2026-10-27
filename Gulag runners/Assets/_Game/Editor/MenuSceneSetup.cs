@@ -132,11 +132,36 @@ namespace GulagRunners.GameEditor
             }
 
             Wardrobe(f, said);
+            Plant(model, said);
 
             EditorUtility.SetDirty(f);
             said.AppendLine($"  pose: \"{f.poseState}\", freeze {f.freeze}, "
                           + $"sway {f.sway}");
             return f;
+        }
+
+        /// <summary>
+        /// Nails his boots down, so the breathing and the sway move the man and not the
+        /// floor he is standing on.
+        ///
+        /// On the Animator's own object, because OnAnimatorIK is called nowhere else --
+        /// which is the same rule PlayerArm follows and the same mistake it documents.
+        /// </summary>
+        static void Plant(Animator model, System.Text.StringBuilder said)
+        {
+            if (model == null) return;
+
+            MenuFootPlant plant = model.GetComponent<MenuFootPlant>();
+            if (plant == null)
+            {
+                plant = Undo.AddComponent<MenuFootPlant>(model.gameObject);
+                said.AppendLine($"  MenuFootPlant added to {model.name}, so the idle "
+                              + "rocks his shoulders rather than sliding his feet");
+            }
+
+            Undo.RecordObject(plant, "Set up the menu scene");
+            if (plant.animator == null) plant.animator = model;
+            EditorUtility.SetDirty(plant);
         }
 
         /// <summary>

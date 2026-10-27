@@ -321,8 +321,12 @@ namespace GulagRunners.Sim
                 GroundItem item = ground[i];
                 if (!item.Takeable) continue;
 
-                Aabb box = new Aabb(item.Position.X - cfg.PickupRadius, item.Position.Y - cfg.PickupRadius,
-                                    item.Position.X + cfg.PickupRadius, item.Position.Y + cfg.PickupRadius);
+                // Reach, not radius. How big the item IS decides what it rests on and
+                // what stops it; how close you have to be to take it is a separate
+                // number, and sharing one meant the pickup box could not be widened
+                // without the item also floating off the floor.
+                Aabb box = new Aabb(item.Position.X - cfg.PickupReach, item.Position.Y - cfg.PickupReach,
+                                    item.Position.X + cfg.PickupReach, item.Position.Y + cfg.PickupReach);
                 if (!body.Overlaps(in box)) continue;
 
                 if (s.Inventory.SlotContents(ItemTable.KindOf(item.Item)) == ItemId.None)

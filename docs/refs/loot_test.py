@@ -14,7 +14,7 @@ from loot_mirror import (Chest, Inv, loot_step, frames_to_open, fresh, pool, ste
                          LEATHER, PLATE, LEATHER_CAP, MAIL_COIF, GREAT_HELM,
                          ROPE_BELT, TOOL_BELT, WAR_BELT,
                          Rng, roll_chest, roll_tier, TIER_ODDS, deal,
-                         WEAPON, ARMOUR, UTILITY)
+                         WEAPON, ARMOUR, UTILITY, take_from_ground)
 
 W = world()
 
@@ -644,5 +644,64 @@ check("and the largest is near a real polearm, not twice one",
 check("and a weapon is big enough to read at all",
       min(drawn(i) for i in weapons) / HEIGHT > 0.28,
       f"shortest is {100 * min(drawn(i) for i in weapons) / HEIGHT:.0f}% of the fighter")
+
+# ------------------------------------------------- how close you have to be to take it
+print("\npicking things up off the floor")
+
+def reach_to(item=CLUB):
+    """Stand a fighter further and further from an item until he can no longer take it.
+
+    Measured by standing him still and asking, rather than by reading the number out of
+    the config: the distance a player feels is the item's reach PLUS half the fighter's
+    body, and the only way to be sure the two were added up right is to add them up.
+    """
+    far = 0.0
+    for cm in range(0, 141):
+        gap = cm / 100.0
+        reset_ground()
+        GROUND[0].item, GROUND[0].state, GROUND[0].lock = item, RESTING, 0
+        GROUND[0].x, GROUND[0].y = T.M(0), T.M(0)
+
+        s = spawn(gap, 0.0)
+        take_from_ground(s, False, GROUND, False)
+        if s.inv.weapon == item:
+            far = gap
+    return far
+
+
+took = reach_to()
+rest_y = None
+# Dropped from two metres and left to land. FLYING, because a RESTING item is one
+# that has already landed and step_ground rightly does nothing with it.
+reset_ground()
+GROUND[0].item, GROUND[0].state = CLUB, FLYING
+GROUND[0].x, GROUND[0].y = T.M(0), T.M(2000)
+for _ in range(600):
+    step_ground(GROUND, W)
+rest_y = GROUND[0].y / T.ONE
+landed = GROUND[0].state == RESTING
+
+floor_y = T.floor_under(T.M(0), T.M(2000), W) / T.ONE
+above = rest_y - floor_y
+
+print(f"        taken from up to {took * 100:.0f} cm away "
+      f"(it was {(0.22 + 0.15) * 100:.0f} before), and it rests "
+      f"{above * 100:.1f} cm above the floor at {floor_y:+.3f}")
+
+check("loot is taken from about half a metre, not from standing on it",
+      0.40 <= took <= 0.60, f"{took * 100:.0f} cm")
+check("which is further than it used to be", took > 0.37 + 1e-9,
+      f"{took * 100:.0f} cm against 37")
+check("but not from further than the fighter is tall", took < 0.91,
+      "reaching further than he is high would take loot he is nowhere near")
+
+# The item's own size still decides where it sits. The whole reason the two numbers were
+# split is that this must not move when the reach does.
+check("and widening the reach did not lift the item off the floor",
+      abs(above - T.D["RADIUS"] / T.ONE) < 0.01,
+      f"resting {above:.3f} m up, its own radius is {T.D['RADIUS'] / T.ONE:.3f} m")
+check("the reach is its own number now",
+      T.D["REACH"] != T.D["RADIUS"],
+      "one number for both is what stopped the pickup being widened")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

@@ -116,8 +116,19 @@ namespace GulagRunners.Game
         [Range(0f, 0.6f)] public float bounce = 0.15f;
 
         [Header("On the floor")]
-        [Tooltip("Half the size of the box you walk through to pick it up.")]
+        [Tooltip("Half the size of the ITEM: what rests on the floor and what a wall " +
+                 "stops. Raising it lifts loot off the ground and makes it bump into " +
+                 "things sooner — it is not the pickup distance, which is below.")]
         public float pickupRadius = 0.22f;
+
+        [Tooltip("How close you have to be to take it, measured from the item against " +
+                 "the fighter's whole body — so the reach past his skin is this plus " +
+                 "half his width.\n\n" +
+                 "Its own number since the day it was asked to be bigger: it used to be " +
+                 "the line above, so widening the pickup also made the item a larger " +
+                 "object that rested higher off the floor. A thing's size and the " +
+                 "distance you can reach it from are two different facts.")]
+        public float pickupReach = 0.33f;
 
         [Tooltip("Seconds before loot that just came out of a chest can be taken. It has to land " +
                  "first, or opening a chest would be the same as being handed the item.")]
@@ -140,6 +151,12 @@ namespace GulagRunners.Game
             MaxFallSpeed = M(maxFallSpeed),
             Bounce = M(bounce),
             PickupRadius = M(Mathf.Max(0.05f, pickupRadius)),
+
+            // Never smaller than the item: a reach inside the thing you are reaching
+            // for cannot be walked into, and a scene saved before this field existed
+            // reads it as zero.
+            PickupReach = M(Mathf.Max(pickupReach, Mathf.Max(0.05f, pickupRadius))),
+
             PopLockFrames = F(popLock),
             DropLockFrames = F(dropLock)
         };
