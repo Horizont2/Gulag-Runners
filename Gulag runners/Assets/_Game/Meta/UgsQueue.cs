@@ -187,10 +187,12 @@ namespace GulagRunners.Meta
                 },
             };
 
-            // Relay, and two players, because a duel is two. The transport takes the
-            // allocation off the session afterwards; nothing here opens a socket.
-            SessionOptions session = new SessionOptions { MaxPlayers = 2 }
-                .WithRelayNetwork();
+            // No network on the session, which is the deliberate part. SessionOptions
+            // offers WithRelayNetwork and it exists so the SDK can drive a netcode for
+            // you -- and this project already has one, whose entire wire format is six
+            // bytes of thumb. The session is a meeting place; RelayHandshake turns it
+            // into a relay afterwards, and nothing here opens a socket.
+            SessionOptions session = new SessionOptions { MaxPlayers = 2 };
 
             return MultiplayerService.Instance.MatchmakeSessionAsync(ticket, session, stop);
         }

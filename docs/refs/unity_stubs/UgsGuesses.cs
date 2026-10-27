@@ -60,8 +60,12 @@ namespace Unity.Services.Multiplayer
     public interface ISession
     {
         string Id { get; }
+        string Code { get; }
         IReadOnlyPlayer CurrentPlayer { get; }
         IReadOnlyList<IReadOnlyPlayer> Players { get; }
+        IReadOnlyDictionary<string, SessionProperty> Properties { get; }
+        IHostSession AsHost();
+        Task RefreshAsync();
         Task LeaveAsync();
     }
 
@@ -163,4 +167,53 @@ namespace Unity.Networking.Transport
 namespace Unity.Networking.Transport.Relay
 {
     public struct RelayServerData { }
+}
+
+// ------------------------------------------------- the rest of the session, and Relay
+
+namespace Unity.Services.Multiplayer
+{
+    public class SessionProperty
+    {
+        public SessionProperty(string value, VisibilityPropertyOptions visibility) { Value = value; }
+        public string Value { get; set; }
+    }
+
+    public interface IHostSession
+    {
+        void SetProperty(string key, SessionProperty property);
+        Task SavePropertiesAsync();
+    }
+}
+
+namespace Unity.Services.Relay
+{
+    public class RelayService
+    {
+        public static RelayService Instance { get; } = new RelayService();
+
+        public Task<Models.Allocation> CreateAllocationAsync(int maxConnections)
+            => Task.FromResult<Models.Allocation>(null);
+
+        public Task<string> GetJoinCodeAsync(System.Guid allocationId)
+            => Task.FromResult("");
+
+        public Task<Models.JoinAllocation> JoinAllocationAsync(string joinCode)
+            => Task.FromResult<Models.JoinAllocation>(null);
+    }
+
+    public static class AllocationUtils
+    {
+        public static Unity.Networking.Transport.Relay.RelayServerData ToRelayServerData(
+            Models.Allocation allocation, string connectionType) => default;
+
+        public static Unity.Networking.Transport.Relay.RelayServerData ToRelayServerData(
+            Models.JoinAllocation allocation, string connectionType) => default;
+    }
+}
+
+namespace Unity.Services.Relay.Models
+{
+    public class Allocation { public System.Guid AllocationId { get; set; } }
+    public class JoinAllocation { public System.Guid AllocationId { get; set; } }
 }
