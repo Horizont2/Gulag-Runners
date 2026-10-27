@@ -54,6 +54,14 @@ namespace GulagRunners.Game
                  "phase then flashes past rather than being faked, and that is correct.")]
         public MonoBehaviour opponentGate;
 
+        [Tooltip("The pool this searches in. Anything implementing IMatchQueue.\n\n" +
+                 "Left empty, everybody is paired with a practice opponent — which is " +
+                 "not a stub: docs/09 makes the first five matches bots by design, and " +
+                 "is equally clear that twenty-five seconds of an empty queue is a " +
+                 "player deciding the game is dead. That floor stays under every real " +
+                 "pool that is ever put here.")]
+        public MonoBehaviour queueSource;
+
         [Tooltip("Optional. The stills behind it all.")]
         public MenuBackdrop backdrop;
 
@@ -134,12 +142,25 @@ namespace GulagRunners.Game
         [Tooltip("True while this screen should be on at all.")]
         public UnityEvent<bool> shownChanged;
 
+        [Tooltip("Fired the moment an opponent is found, with true when it is a bot. " +
+                 "Read Opponent for who they are and the number the arena is dealt from.")]
+        public UnityEvent<bool> Paired;
+
         [Header("Debug")]
         public SearchPhase phase = SearchPhase.Cancelled;
         public float elapsed;
 
         IMatchGate _gate;
+        IMatchQueue _queue;
+        MatchFound _opponent;
         bool _running;
+
+        /// <summary>
+        /// Who this device was paired with, and the number the arena is dealt from.
+        /// Read it after Paired fires: the arena needs the seed, and the result screen
+        /// needs to know whether that was a person.
+        /// </summary>
+        public MatchFound Opponent => _opponent;
         float _held;
         int _tip = -1;
         float _tipHeld;
@@ -160,6 +181,18 @@ namespace GulagRunners.Game
                                  "Opponent Gate slot but does not implement IMatchGate, so " +
                                  "nothing is being waited for.", this);
 
+            _queue = queueSource as IMatchQueue;
+
+            if (queueSource != null && _queue == null)
+                Debug.LogWarning($"{name}: {queueSource.GetType().Name} is in the Queue " +
+                                 "slot but does not implement IMatchQueue, so the search " +
+                                 "will fall back to practice opponents.", this);
+
+            // No pool wired is not an error and not a stub: it is the floor docs/09
+            // describes, where everybody gets the practice opponent, immediately while
+            // they are placing and once the net is fully cast after that.
+            if (_queue == null) _queue = new BotQueue(rules);
+
             shownChanged?.Invoke(false);
         }
 
@@ -169,6 +202,8 @@ namespace GulagRunners.Game
             if (_running) return;
 
             _running = true;
+            _queue.Begin(progress != null ? progress.rating : 1500.0,
+                         progress != null ? progress.matchesPlayed : 0);
             elapsed = 0f;
             _held = 0f;
             _tip = -1;
@@ -191,6 +226,7 @@ namespace GulagRunners.Game
             if (phase != SearchPhase.Searching && phase != SearchPhase.Found) return;
 
             _running = false;
+            _queue.Cancel();
             Enter(SearchPhase.Cancelled);
             shownChanged?.Invoke(false);
             if (director != null) director.Rewind();
@@ -221,16 +257,26 @@ namespace GulagRunners.Game
             Say(Matchmaker.Detail(rating, elapsed, played));
             Fill(Matchmaker.Cast(rules, elapsed));
 
-            // Nothing else is looking yet -- there is no queue to ask. So the only
-            // opponent this can honestly produce is the one docs/09 already promises:
-            // a bot, offered immediately for the first five matches and otherwise once
-            // the net is fully cast and the clock has run out.
-            if (!Matchmaker.OfferBot(rules, played, elapsed)) return;
+            // The bar above is this screen's: it measures how far the net has been cast
+            // and nothing else knows that. WHO is on the other end is the pool's, and
+            // the screen does not care whether that pool is a service with people in it
+            // or the bot floor docs/09 promises -- it asks the same question either way.
+            _queue.Poll(elapsed);
+
+            if (_queue.State == QueueState.Failed)
+            {
+                Say(string.IsNullOrEmpty(_queue.Status) ? "NO CONNECTION" : _queue.Status);
+                return;
+            }
+
+            if (!_queue.TryTake(out _opponent)) return;
 
             _held = 0f;
             Enter(SearchPhase.Found);
-            Say(played < 5 ? "TRAINING OPPONENT" : "A BOT, WHILE THE QUEUE IS THIN");
+            Say(string.IsNullOrEmpty(_opponent.OpponentName)
+                ? "OPPONENT FOUND" : _opponent.OpponentName);
             Fill(1f);
+            Paired?.Invoke(_opponent.AgainstBot);
         }
 
         void Found()

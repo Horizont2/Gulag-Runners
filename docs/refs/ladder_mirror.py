@@ -236,3 +236,64 @@ def offer_bot(matches_played, seconds, bot_after=BOT_AFTER, **kw):
     if pool_for(matches_played) == "Training":
         return True
     return seconds >= max(1, bot_after) and cast(seconds, **kw) >= 1.0
+
+
+# ------------------------------------------------------------------- the pool
+# Mirrors Assets/_Game/Meta/BotQueue.cs and how MatchSearch drives it.
+IDLE, LOOKING, FOUND, FAILED = 0, 1, 2, 3
+
+
+class BotQueue:
+    """The pool with nobody in it: everybody is paired with a practice opponent.
+
+    Not a stub. docs/09 makes the first five matches bots by design, and is equally
+    clear that twenty-five seconds of an empty queue is a player deciding the game is
+    dead. This floor stays under every real pool that is ever put above it.
+    """
+
+    def __init__(self, seed=0x5EED):
+        self.state = IDLE
+        self.seed = seed
+        self._waiting = False
+        self._played = 0
+        self.found = None
+
+    def begin(self, rating, played):
+        self._played = played
+        self._waiting = False
+        self.state = LOOKING
+
+    def poll(self, seconds):
+        if self.state != LOOKING or self._waiting:
+            return
+        if not offer_bot(self._played, seconds):
+            return
+        self.found = dict(local_player=0, seed=self.seed, against_bot=True,
+                          opponent_rating=1500,
+                          name="TRAINING OPPONENT" if pool_for(self._played) == "Training"
+                               else "A BOT, WHILE THE QUEUE IS THIN")
+        self._waiting = True
+        self.state = FOUND
+
+    def try_take(self):
+        if not self._waiting:
+            return None
+        self._waiting = False
+        return self.found
+
+    def cancel(self):
+        self._waiting = False
+        self.state = IDLE
+
+
+def search(queue, played, rating=1500.0, step=1 / 60.0, limit=120.0):
+    """Run the search screen's loop against a pool. Returns (seconds, pairing)."""
+    queue.begin(rating, played)
+    seconds = 0.0
+    while seconds < limit:
+        queue.poll(seconds)
+        got = queue.try_take()
+        if got is not None:
+            return seconds, got
+        seconds += step
+    return None, None

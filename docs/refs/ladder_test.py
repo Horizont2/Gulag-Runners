@@ -253,5 +253,39 @@ with_streak = m.day_at(6, 3, 3) + m.WEEKLY_STREAK / 7.0
 check("250-350 a day holds with the streak averaged in",
       250 <= with_streak <= 350, "%.0f" % with_streak)
 
+print("\nthe pool, as the search screen actually drives it")
+# The screen used to decide this itself, in an if, in the middle of Searching(). It asks
+# a pool now -- and the floor under every pool has to behave exactly as that if did, or
+# moving it broke the one thing docs/09 is most specific about.
+
+at, got = m.search(m.BotQueue(), played=2)
+check("somebody placing is given a practice opponent at once", at is not None and at < 0.05,
+      "%.2f s" % (at if at is not None else -1))
+check("and told that is what it is", got and got["name"] == "TRAINING OPPONENT", str(got))
+
+at, got = m.search(m.BotQueue(), played=40)
+check("a veteran waits the full twenty-five seconds", at is not None and 24.9 <= at <= 25.2,
+      "%.2f s" % (at if at is not None else -1))
+check("and is told the queue was thin, not that they were placing",
+      got and got["name"].startswith("A BOT"), str(got))
+check("the net is fully cast by the time it happens", m.cast(at) >= 1.0)
+
+q = m.BotQueue()
+m.search(q, played=2)
+check("a pairing is handed over exactly once", q.try_take() is None,
+      "a screen that read it twice would load two matches")
+
+q = m.BotQueue()
+q.begin(1500, 40)
+q.poll(30.0)
+q.cancel()
+check("cancelling clears a pairing that was waiting", q.try_take() is None)
+check("and leaves the pool idle", q.state == m.IDLE)
+
+at, got = m.search(m.BotQueue(seed=0), played=2)
+check("even a bot match is dealt from a number",
+      got is not None and "seed" in got,
+      "the arena is dealt, not sent -- a match with no seed is two different arenas")
+
 print("\n%s" % ("ALL PASS" if not fails else "%d FAIL(S): %s" % (len(fails), ", ".join(fails))))
 raise SystemExit(1 if fails else 0)
