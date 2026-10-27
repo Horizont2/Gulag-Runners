@@ -1,4 +1,5 @@
 using System;
+using Unity.Collections;
 using Unity.Networking.Transport;
 using Unity.Networking.Transport.Relay;
 using UnityEngine;
@@ -113,7 +114,7 @@ namespace GulagRunners.Net
 
             NetworkEvent.Type what;
             while ((what = _driver.PopEvent(out NetworkConnection from,
-                                            out Unity.Collections.DataStreamReader reader))
+                                            out DataStreamReader reader))
                    != NetworkEvent.Type.Empty)
             {
                 switch (what)
@@ -135,7 +136,7 @@ namespace GulagRunners.Net
             }
         }
 
-        void Deliver(ref Unity.Collections.DataStreamReader reader)
+        void Deliver(ref DataStreamReader reader)
         {
             int length = reader.Length;
             if (length <= 0) return;
@@ -156,7 +157,7 @@ namespace GulagRunners.Net
 
             try
             {
-                if (_driver.BeginSend(_peer, out Unity.Collections.DataStreamWriter writer) != 0) return;
+                if (_driver.BeginSend(_peer, out DataStreamWriter writer) != 0) return;
                 for (int i = 0; i < length; i++) writer.WriteByte(data[i]);
                 _driver.EndSend(writer);
             }

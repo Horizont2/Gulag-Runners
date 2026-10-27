@@ -98,6 +98,11 @@ SPARE = {
     # The connect panel hides ITSELF on connecting, so this is a hook for anything else
     # that wants to know, and a scene with nothing else up needs nobody listening.
     "NetConnectView.Connected": "optional: the panel takes itself down either way",
+
+    # The search screen does not listen for this -- it holds its Loading phase on
+    # OnlineMatch.OpponentReady, polled, because a gate that can miss its own
+    # notification waits for ever. The event is for anything ELSE that wants to know.
+    "OnlineMatch.Ready": "optional: the gate is polled, this is for anything else",
 }
 
 

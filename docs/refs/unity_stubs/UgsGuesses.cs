@@ -100,6 +100,8 @@ namespace Unity.Services.Multiplayer
 
 namespace Unity.Networking.Transport
 {
+    using Unity.Collections;
+
     public struct NetworkEndpoint
     {
         public static NetworkEndpoint AnyIpv4 => default;
@@ -108,17 +110,6 @@ namespace Unity.Networking.Transport
     public struct NetworkConnection
     {
         public bool IsCreated { get; }
-    }
-
-    public struct DataStreamReader
-    {
-        public int Length { get; }
-        public byte ReadByte() => 0;
-    }
-
-    public struct DataStreamWriter
-    {
-        public void WriteByte(byte value) { }
     }
 
     public struct NetworkSettings
@@ -167,6 +158,23 @@ namespace Unity.Networking.Transport
 namespace Unity.Networking.Transport.Relay
 {
     public struct RelayServerData { }
+}
+
+// Where Unity actually keeps them, which these stubs got wrong and the real compiler
+// caught: DataStreamReader and DataStreamWriter are Collections types, not Transport
+// ones. Corrected here so the next person reading the stubs is not misled the same way.
+namespace Unity.Collections
+{
+    public struct DataStreamReader
+    {
+        public int Length { get; }
+        public byte ReadByte() => 0;
+    }
+
+    public struct DataStreamWriter
+    {
+        public void WriteByte(byte value) { }
+    }
 }
 
 // ------------------------------------------------- the rest of the session, and Relay
