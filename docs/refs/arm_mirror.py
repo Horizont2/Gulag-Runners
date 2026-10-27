@@ -34,7 +34,7 @@ WEAPONS = {
 
 # ----------------------------------------------------------------- ArmConfig.Default
 CFG = dict(
-    shoulder=780, arm_length_pm=350,
+    shoulder=721, arm_length_pm=350,
     sweep_frames=15, reference_frames=15,
     deadzone=220, min_swing=250, carry_drop=700,
     aim_relative=0, aim_floor_pm=500, aim_tilt_pm=1000,

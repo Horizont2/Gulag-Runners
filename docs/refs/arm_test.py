@@ -546,6 +546,31 @@ def main():
         if bad > good * 1.15:
             beaten.append(f"{name} ({bad:.1f} against {good:.1f})")
 
+    # KNOWN RED, on the sword, and not a regression. Putting the simulation's shoulder
+    # where the model's actually is (0.78 -> 0.721 of body height, measured by
+    # arm_reach_check) moved this one number from 7.0 to 7.7 against a swing worth 6.4.
+    #
+    # It was already losing before that. At the old shoulder the sword read 7.0 against
+    # 6.4 -- the shake winning by 9% -- and this passed only because of the 15% the line
+    # below tolerates. So the headline above was not true then either; the tolerance was
+    # covering for it.
+    #
+    # Two things were tried and neither is a fix:
+    #
+    #   full sweep 400 -> 450   passes everything, and 440 and 460 both fail. A single
+    #                           point is tuning to the test, not a design value.
+    #   a swing baseline        the `swing` above dwells: 120 degrees takes two thirds
+    #   that does not dwell     of a weapon's half-circle, so it waits at each end. Take
+    #                           the wait out and the sword is comfortable (0.84) -- and
+    #                           the CLUB is beaten instead, at 1.26, identically at both
+    #                           shoulder heights.
+    #
+    # So the hole is in the damage model and it is older than the geometry. A blow is
+    # worth what the swing has committed AT THE MOMENT IT LANDS, and at any sensible
+    # standing distance a big swing makes contact early -- so it is scored on its windup
+    # while a flick is scored on all it ever does. Fixing it means scoring the blow at
+    # the swing's peak rather than at first touch, which is a combat change with its own
+    # measurements to take, not something to slip in beside a geometry correction.
     check("a committed swing beats a vibrating thumb, on every weapon",
           not beaten, "beaten on: " + (", ".join(beaten) or "none"))
 

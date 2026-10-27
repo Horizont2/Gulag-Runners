@@ -19,8 +19,15 @@ namespace GulagRunners.Game
 
         // ----------------------------------------------------------------- the arm
         [Header("The arm (docs/31)")]
-        [Tooltip("Shoulder height, as a share of the body. The arm hangs from here.")]
-        [Range(0.5f, 0.95f)] public float shoulderHeight = 0.78f;
+        [Tooltip("Shoulder height, as a share of the body. The arm hangs from here.\n\n" +
+                 "MEASURED off the rig, not chosen: the model's shoulder joint sits at " +
+                 "0.721 of the body it is drawn at. It used to say 0.78, and the 5.4 cm " +
+                 "of difference was the worst thing in the fight — the hand goal was " +
+                 "then drawn on a circle around a point the arm does not hang from, so " +
+                 "how far out of reach it was CHANGED as the stick turned, and the " +
+                 "fighter writhed while the player aimed. docs/refs/arm_reach_check.py " +
+                 "measures it.")]
+        [Range(0.5f, 0.95f)] public float shoulderHeight = 0.721f;
 
         [Tooltip("Arm length as a SHARE OF BODY HEIGHT. The weapon's reach is added " +
                  "past the hand.\n\n" +
@@ -28,7 +35,21 @@ namespace GulagRunners.Game
                  "fighter in the defaults, and the fighter in the prefabs is 0.91 m, so " +
                  "the arm came out half his own height. The IK goal then sat outside " +
                  "anything the shoulder could reach and Unity dragged the spine out to " +
-                 "meet it -- which is a body bending into knots at some angles.")]
+                 "meet it -- which is a body bending into knots at some angles.\n\n" +
+                 "0.35 was the first attempt at that, and it is STILL 20% past what " +
+                 "this model can do: the rig's arm measures 0.277 m, and the shoulder " +
+                 "sits 9.4 cm out of the plane the simulation is flat in, so the arm is " +
+                 "always reaching a little sideways and the straight-line distance is " +
+                 "longer than the drawn one. 0.270 is what fits.\n\n" +
+                 "It is left at 0.35 on purpose, and the overshoot is now CONSTANT -- " +
+                 "a slightly over-straight arm at every angle, which is a pose, rather " +
+                 "than something that changes while the player aims, which was the " +
+                 "writhing. Correcting it is a real change to the fight and not a " +
+                 "tidy-up: 7.3 cm off every weapon's reach took the mace from 10.1 to " +
+                 "29.7 seconds to kill, because contact then lands earlier in the arc " +
+                 "and a blow is worth what it has committed at the moment it lands. " +
+                 "docs/refs/arm_reach_check.py measures the gap; closing it needs the " +
+                 "fight re-tuned around it.")]
         [Range(0.15f, 0.6f)] public float armLength = 0.35f;
 
         [Tooltip("The grip and head every weapon has before it adds any reach at all, " +

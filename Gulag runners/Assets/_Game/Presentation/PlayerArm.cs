@@ -63,6 +63,25 @@ namespace GulagRunners.Game
                  "too much and the legs skate, because the hips come with it.")]
         [Range(0f, 0.6f)] public float bodyFollow = 0.22f;
 
+        [Tooltip("How much of the arm's UP-AND-DOWN the chest is allowed to copy.\n\n" +
+                 "The chest used to be aimed at the weapon's tip, and the tip goes all " +
+                 "the way round: a guard held low puts it below the fighter's own feet, " +
+                 "and a chest told to look there folds the body in half. Sideways is " +
+                 "the part of an aim a torso actually turns with, so the up-and-down is " +
+                 "kept to this share of it.")]
+        [Range(0f, 1f)] public float verticalFollow = 0.3f;
+
+        [Tooltip("How far the look is allowed to turn the body before it is held.\n\n" +
+                 "Unity's clamp, and it reads backwards: 0 is NO limit and 1 is frozen. " +
+                 "This was 0 -- which is why an arm swung behind the fighter could turn " +
+                 "the spine around after it. PlayerIK uses 0.6 for the same reason.")]
+        [Range(0f, 1f)] public float lookClamp = 0.6f;
+
+        [Tooltip("How far ahead of the shoulder the look point is put. Only the " +
+                 "direction matters to the solver; a point a couple of metres out keeps " +
+                 "the angle steady while the hand moves.")]
+        [Range(0.5f, 6f)] public float lookDistance = 2.5f;
+
         [Tooltip("The hand's weapon socket. Found under this object when empty.\n\n" +
                  "Used to MEASURE which way the weapon points, so the hand can be turned " +
                  "to put it on the arm's line without anyone typing an axis per weapon " +
@@ -139,14 +158,43 @@ namespace GulagRunners.Game
 
             if (rotationWeight > 0f) Twist(goal, grip, tip);
 
-            if (bodyFollow > 0f)
-            {
-                // Only the LOOK, never the body position: moving the body IK goal drags
-                // the hips, and a fighter whose hips follow their sword cannot stand on
-                // a ledge.
-                animator.SetLookAtWeight(bodyFollow, bodyFollow, 1f, 0f, 0f);
-                animator.SetLookAtPosition(tip);
-            }
+            if (bodyFollow > 0f) Lean(grip, tip);
+        }
+
+        /// <summary>
+        /// Turns the chest a little after the weapon, without folding the fighter up.
+        ///
+        /// Only the LOOK, never the body position: moving the body IK goal drags the
+        /// hips, and a fighter whose hips follow their sword cannot stand on a ledge.
+        ///
+        /// Two things were wrong with doing that at the tip, unclamped, and both of them
+        /// are the same complaint -- the body bending as the stick tilts:
+        ///
+        ///   the target went under the floor   The tip travels a full circle around the
+        ///       shoulder, so a low guard puts it below the fighter's own feet. A chest
+        ///       told to look straight down does what it is told.
+        ///   nothing stopped it               Unity's clamp argument reads backwards: 0
+        ///       is no limit, not full limit. So an arm swung behind could take the
+        ///       spine round after it, which is the pose that reads as broken rather
+        ///       than as leaning.
+        ///
+        /// What a torso actually does with an aim is turn toward it; the up-and-down is
+        /// mostly the arm's own business. So the direction is flattened toward the
+        /// horizontal and then held at a sensible distance, which keeps the lean while
+        /// the stick is doing anything at all.
+        /// </summary>
+        void Lean(Vector3 grip, Vector3 tip)
+        {
+            Vector3 aim = tip - grip;
+            if (aim.sqrMagnitude <= 1e-6f) aim = grip - transform.position;
+            if (aim.sqrMagnitude <= 1e-6f) return;
+
+            aim.y *= verticalFollow;
+            if (aim.sqrMagnitude <= 1e-8f) return;
+
+            Vector3 at = grip + aim.normalized * lookDistance;
+            animator.SetLookAtWeight(bodyFollow, bodyFollow, 1f, 0f, lookClamp);
+            animator.SetLookAtPosition(at);
         }
 
         /// <summary>

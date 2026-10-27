@@ -53929,7 +53929,7 @@ MonoBehaviour:
   seed: 0
   combat:
     maxHealth: 100
-    shoulderHeight: 0.78
+    shoulderHeight: 0.721
     armLength: 0.35
     haft: 0.27
     reachToBlade: 0.73

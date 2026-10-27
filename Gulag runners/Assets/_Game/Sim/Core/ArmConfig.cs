@@ -36,6 +36,13 @@ namespace GulagRunners.Sim
         /// <summary>
         /// Shoulder height as a share of body height, in thousandths. The arm hangs from
         /// here and every length below is measured from it.
+        ///
+        /// Measured off the rig rather than chosen, because of what being wrong costs:
+        /// the hand goal is drawn on a circle around THIS point, so if it is not where
+        /// the model's shoulder is, how far out of reach the goal sits changes as the
+        /// stick turns -- and the fighter writhes while the player aims rather than
+        /// simply standing in a slightly wrong pose. 5.4 cm of error was worth 10.3 cm
+        /// of swing. docs/refs/arm_reach_check.py measures it from the FBX's bind pose.
         /// </summary>
         public int ShoulderPermille;
 
@@ -50,7 +57,23 @@ namespace GulagRunners.Sim
         /// Unity did the only thing it can: dragged the spine out to meet it. That is
         /// the body bending itself into knots at some angles.
         ///
-        /// 350 is roughly where a human arm is, and it is right at any size.
+        /// 350 was the first attempt at that, from "roughly where a human arm is", and
+        /// it is still 20% past what this model can do -- because roughly is not a
+        /// measurement, and because the shoulder is not IN the plane the simulation is
+        /// flat in. It sits 9.4 cm out of it, so the arm always reaches a little
+        /// sideways and the straight-line distance is longer than the drawn one. The
+        /// rig's arm is 0.277 m on a 0.898 m body; 270 is what fits.
+        ///
+        /// Left at 350 deliberately. With the shoulder now measured, the overshoot is
+        /// the SAME at every angle -- an over-straight arm, which is a pose. It used to
+        /// change as the stick turned, which is a fighter writhing while the player
+        /// aims, and that is the part that was worth fixing on its own.
+        ///
+        /// Closing the rest costs 7.3 cm of everyone's reach, and that is a change to
+        /// the fight rather than a correction: it moved the mace from 10.1 to 29.7
+        /// seconds to kill. A blow is worth what it has committed when it LANDS, and a
+        /// shorter arm lands it earlier in the arc. docs/refs/arm_reach_check.py keeps
+        /// the measurement honest; the fight has to be re-tuned to take it.
         /// </summary>
         public int ArmLengthPermille;
 
@@ -238,8 +261,8 @@ namespace GulagRunners.Sim
         public static ArmConfig Default()
         {
             ArmConfig c;
-            c.ShoulderPermille = 780;      // just below the head on a 1.8 m body
-            c.ArmLengthPermille = 350;     // about where a human arm is
+            c.ShoulderPermille = 721;      // the rig's own shoulder, measured
+            c.ArmLengthPermille = 350;     // 20% past the rig; see the field, it is on purpose
 
             // A reference weapon sweeps 180 degrees in its own AttackFrames. The club,
             // at 15, is the middle of the table and the one the feel was tuned on.
