@@ -58,6 +58,8 @@ namespace GulagRunners.Net
         const byte PacketBeacon = 4;
         const byte PacketCheck = 5;
         const byte PacketRematch = 6;    // a new match, on an agreed tick
+        const byte PacketPing = 7;       // what time do you make it
+        const byte PacketPong = 8;       // the same number, straight back
 
         [Header("Ports")]
         [Tooltip("Where the match itself talks. Any free high port; both devices must " +
@@ -75,7 +77,25 @@ namespace GulagRunners.Net
                  "because your thumb now takes this many ticks to reach your own fighter " +
                  "too: lockstep delays BOTH players equally, which is what keeps the two " +
                  "simulations identical.")]
-        [Range(2, 12)] public int inputDelay = 4;
+        [Range(2, 20)] public int inputDelay = 4;
+
+        [Tooltip("Set the delay from the round trip actually measured, instead of " +
+                 "holding the number above.\n\n" +
+                 "On a LAN the two are the same and this changes nothing. Over anything " +
+                 "else it is the difference between a game and a slideshow: lockstep " +
+                 "waits for the other player, so a budget smaller than the round trip " +
+                 "means waiting on EVERY tick. Four ticks is 67 ms, which a Wi-Fi " +
+                 "clears and the internet does not.\n\n" +
+                 "Costs what it buys. The delay is applied to your own thumb as well as " +
+                 "theirs -- that is what keeps the two simulations identical -- so a " +
+                 "slow link feels slow rather than stuttering. Rollback is how you stop " +
+                 "paying it, and this is not rollback.")]
+        public bool measureDelay = true;
+
+        [Tooltip("The most the measurement may ask for. Past about 12 ticks (200 ms) " +
+                 "the controls are further away than most people will put up with, and " +
+                 "the honest answer is that the link is too slow for lockstep.")]
+        [Range(4, 20)] public int maxDelay = 12;
 
         [Tooltip("Ticks between simulation checksums. 0 never checks, which is only " +
                  "right if you enjoy silent desyncs.")]
@@ -122,6 +142,32 @@ namespace GulagRunners.Net
         /// </summary>
         public int Now { get; set; }
 
+        /// <summary>The worst round trip seen lately, in milliseconds. 0 until measured.</summary>
+        public int RoundTrip => _rtt;
+
+        /// <summary>
+        /// How many ticks ahead input should be sent, from the round trip actually
+        /// measured. Falls back to the inspector's number while nothing is known.
+        ///
+        /// The two devices need not agree on this, which is worth saying because it
+        /// looks like they must: every packet carries the ABSOLUTE tick its input
+        /// belongs to, so a device that sends further ahead is simply a device that
+        /// stalls less. Nothing about the simulation depends on it.
+        /// </summary>
+        public int SuggestedDelay
+        {
+            get
+            {
+                if (!measureDelay || _rtt <= 0) return inputDelay;
+
+                // One tick is 16.67 ms. Half the round trip is the one-way wait, and the
+                // input has to arrive BEFORE the tick it belongs to -- so the budget is
+                // the one-way trip plus a tick of slack for a frame landing badly.
+                int ticks = (_rtt * 3 / 100) + 2;
+                return Mathf.Clamp(ticks, inputDelay, Mathf.Max(inputDelay, maxDelay));
+            }
+        }
+
         /// <summary>How many hosts have been heard from. Safe to read from a frame.</summary>
         public int FoundCount { get { lock (_gate) return _found.Count; } }
 
@@ -165,7 +211,11 @@ namespace GulagRunners.Net
         volatile int _rematchAt = -1;
         volatile int _rematchDone = -1;
         uint _rematchSeed;
+        volatile int _rtt;
+        readonly int[] _trips = new int[8];
+        int _tripAt;
         float _nextBeacon;
+        float _nextPing;
         float _nextHello;
         float _askedAt;
         IPAddress[] _broadcasts = Array.Empty<IPAddress>();
@@ -257,6 +307,13 @@ namespace GulagRunners.Net
                 _theirChecks.Clear();
                 _myChecks.Clear();
                 _found.Clear();
+
+                // The next peer is a different link. Carrying a LAN's two milliseconds
+                // into a connection across the country would set the budget from the
+                // wrong wire and stall every tick until the samples aged out.
+                Array.Clear(_trips, 0, _trips.Length);
+                _tripAt = 0;
+                _rtt = 0;
             }
             state = "off";
         }
@@ -358,6 +415,56 @@ namespace GulagRunners.Net
             lock (_gate)
                 return _mineAt[tick & Mask] == tick ? _mine[tick & Mask] : default;
         }
+
+        // ------------------------------------------------------------- the round trip
+
+        /// <summary>
+        /// How long a packet takes to get there and back, measured rather than assumed.
+        ///
+        /// The WORST of the last few, not the average. Lockstep does not care what the
+        /// link usually does: one late input stalls the tick and everybody sees it, so
+        /// the budget has to cover the bad trips, and smoothing them away is smoothing
+        /// away the only samples that matter.
+        /// </summary>
+        void Ping()
+        {
+            IPEndPoint peer = _peer;
+            UdpClient socket = _match;
+            if (peer == null || socket == null) return;
+
+            byte[] packet = new byte[1 + 4];
+            int at = 0;
+            packet[at++] = PacketPing;
+            Write(packet, ref at, Stamp());
+            try { socket.Send(packet, at, peer); } catch (Exception) { }
+        }
+
+        void TakePong(byte[] data)
+        {
+            if (data.Length < 5) return;
+            int at = 1;
+            int sent = ReadInt(data, ref at);
+            int trip = Stamp() - sent;
+
+            // The clock wraps every 24 days, and a reading from before a wrap is not a
+            // round trip, it is arithmetic. Nothing sensible is over ten seconds either.
+            if (trip < 0 || trip > 10000) return;
+
+            lock (_gate)
+            {
+                _trips[_tripAt] = trip;
+                _tripAt = (_tripAt + 1) % _trips.Length;
+
+                int worst = 0;
+                for (int i = 0; i < _trips.Length; i++)
+                    if (_trips[i] > worst) worst = _trips[i];
+                _rtt = worst;
+            }
+        }
+
+        /// <summary>Milliseconds since midnight-ish. Only differences are ever read.</summary>
+        static int Stamp() => (int)(DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond
+                                    & 0x3FFFFFFF);
 
         // ---------------------------------------------------------------- the rematch
 
@@ -477,6 +584,15 @@ namespace GulagRunners.Net
 
             if (_match == null) return;
 
+            // Both ends, whichever they are, and before the host's early return below.
+            // The budget has to be measured from the device that will be WAITING, and
+            // that is both of them.
+            if (_connected && Time.unscaledTime >= _nextPing)
+            {
+                _nextPing = Time.unscaledTime + 0.25f;
+                Ping();
+            }
+
             if (_role == LinkRole.Host)
             {
                 // Say it again until it fires. One lost packet here restarts this phone
@@ -554,6 +670,25 @@ namespace GulagRunners.Net
 
                     case PacketCheck:
                         TakeCheck(data);
+                        break;
+
+                    case PacketPing:
+                    {
+                        // Straight back, unchanged and from the receiving thread, so the
+                        // reading is the wire and not how busy the other end's frame was.
+                        if (data.Length < 5) break;
+                        IPEndPoint peer = _peer;
+                        UdpClient socket = _match;
+                        if (peer == null || socket == null) break;
+                        byte[] pong = new byte[5];
+                        pong[0] = PacketPong;
+                        Array.Copy(data, 1, pong, 1, 4);
+                        try { socket.Send(pong, 5, peer); } catch (Exception) { }
+                        break;
+                    }
+
+                    case PacketPong:
+                        TakePong(data);
                         break;
 
                     case PacketRematch:

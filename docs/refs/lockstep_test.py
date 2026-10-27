@@ -19,7 +19,7 @@ import sys
 
 from lockstep_mirror import (
     CARRIED, RING, WELCOME, End, Input, NOTHING, Rematch, Ring, handshake, packet,
-    receive, step_order,
+    receive, step_order, suggested_delay, covers, worst_of, sent_ticks,
 )
 
 FAILED = []
@@ -227,6 +227,48 @@ host.ask(now=5)
 first = host.at
 host.ask(now=6)
 check("still one rematch, at the first time named", host.at == first, str(host.at))
+
+
+print("\n9. the input budget is measured, not assumed")
+print("   Lockstep waits for the other player. A budget smaller than the trip means")
+print("   waiting on EVERY tick, which is the whole difference between a LAN and not.")
+
+print(f"   {'round trip':>12}  {'budget':>7}  {'covers it':>10}")
+for rtt in (2, 20, 60, 100, 140, 200, 400):
+    d = suggested_delay(rtt)
+    print(f"   {rtt:>9} ms  {d:>4} tk  {'yes' if covers(rtt, d) else 'NO':>10}")
+
+check("a LAN is left exactly as it was", suggested_delay(2) == 4 and suggested_delay(20) == 4,
+      "two milliseconds must not change a number that already works")
+check("and nothing below the floor is ever asked for",
+      all(suggested_delay(r) >= 4 for r in range(0, 500)))
+
+short = [r for r in range(1, 300) if not covers(r, suggested_delay(r))]
+check("every trip up to the ceiling is actually covered", not short,
+      f"not covered: {short[:4]}")
+
+check("a trip too slow for lockstep is capped, not chased",
+      suggested_delay(1000) == 12,
+      "past about 200 ms the controls are further away than anyone will accept, and "
+      "the honest answer is that the link is too slow for this")
+check("the fault this replaces is caught", not covers(200, 4),
+      "a fixed 4 ticks against a 200 ms trip is a stall on every tick")
+
+print("\n   Judged on the worst of the last few, because one late input stalls a tick.")
+check("a single bad trip moves the budget", worst_of([20, 20, 20, 180]) == 180)
+check("and the average would have hidden it", sum([20, 20, 20, 180]) / 4 < 180)
+check("but it ages out once the link settles",
+      worst_of([180] + [20] * 8) == 20, "eight good samples clear one bad one")
+
+print("\n   And the tick already sent is never un-sent when the budget shrinks.")
+sent = sent_ticks([8, 8, 4, 4, 4, 4, 4, 4, 4, 4])
+nums = [t for _kind, t in sent]
+check("the furthest tick sent only ever goes forward",
+      all(b >= a for a, b in zip(nums, nums[1:])), str(nums))
+check("a shrinking budget re-sends instead of rewriting history",
+      sent[2][0] == "again" and sent[3][0] == "again", str(sent[:5]))
+check("and the clock catches up to it rather than stalling for ever",
+      sent[-1][0] == "new", str(sent[-3:]))
 
 
 print()

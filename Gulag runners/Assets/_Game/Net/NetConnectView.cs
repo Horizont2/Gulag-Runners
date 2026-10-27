@@ -41,6 +41,10 @@ namespace GulagRunners.Net
         [Header("Debug")]
         public string state = "idle";
 
+        [Tooltip("The address last typed into the box. Kept here so a Button can join " +
+                 "it without this component knowing what an InputField is.")]
+        public string typed = "";
+
         bool _announced;
         bool _looking;
         string _was;
@@ -86,14 +90,27 @@ namespace GulagRunners.Net
             Say("Looking for a host on this network…");
         }
 
-        /// <summary>Wire a Button here, or a text field's end-edit, for a typed address.</summary>
+        /// <summary>Wire a text field's end-edit here, for an address typed by hand.</summary>
         public void JoinAt(string address)
         {
-            if (link == null) return;
+            if (link == null || string.IsNullOrWhiteSpace(address)) return;
+            typed = address.Trim();
             _looking = false;
-            link.Join(address);
-            Say($"Joining {address}…");
+            link.Join(typed);
+            Say($"Joining {typed}…");
         }
+
+        /// <summary>
+        /// Wire a text field's value-changed here. Remembering what was typed is what
+        /// lets a BUTTON join it: a Button's OnClick carries no argument, and the
+        /// alternative is this component holding an InputField -- a uGUI type, in the
+        /// one layer that is kept clear of them so the screen can be rebuilt in
+        /// anything.
+        /// </summary>
+        public void SetAddress(string address) => typed = address;
+
+        /// <summary>Wire a Button here. Joins whatever is in the box.</summary>
+        public void JoinTyped() => JoinAt(typed);
 
         public void Disconnect()
         {

@@ -144,6 +144,33 @@ namespace UnityEngine.UI
         public Graphic targetGraphic;
     }
 
+    /// <summary>
+    /// uGUI's text box. The connect screen builds one so an address can be typed, for
+    /// every host a broadcast cannot reach -- a forwarded port, or the far side of a VPN.
+    /// </summary>
+    public class InputField : Selectable
+    {
+        public string text;
+        public int characterLimit;
+        public Text textComponent;
+        public Graphic placeholder;
+        public LineType lineType;
+        public ContentType contentType;
+
+        public UnityEngine.Events.UnityEvent<string> onValueChanged =
+            new UnityEngine.Events.UnityEvent<string>();
+        public UnityEngine.Events.UnityEvent<string> onEndEdit =
+            new UnityEngine.Events.UnityEvent<string>();
+
+        public enum LineType { SingleLine, MultiLineSubmit, MultiLineNewline }
+
+        public enum ContentType
+        {
+            Standard, Autocorrected, IntegerNumber, DecimalNumber, Alphanumeric,
+            Name, EmailAddress, Password, Pin, Custom,
+        }
+    }
+
     public class CanvasScaler : MonoBehaviour
     {
         public ScaleMode uiScaleMode;

@@ -62,10 +62,18 @@ namespace GulagRunners.Net
         public string state = "not connected";
         public int stalledFrames;
 
+        [Tooltip("Ticks of input budget actually in use, and the round trip it came " +
+                 "from. Read these when the match feels laggy: a delay that keeps " +
+                 "climbing is the link, and stalls at a delay that is not climbing are " +
+                 "packet loss.")]
+        public int delay;
+        public int roundTripMs;
+
         float _accumulator;
         bool _primed;
         bool _holding;
         int _takenFor = -1;
+        int _sentTo = -1;
         TickInput _queued;
         PlayerController _controls;
 
@@ -100,6 +108,7 @@ namespace GulagRunners.Net
             if (!_primed)
             {
                 for (int t = 0; t < link.inputDelay; t++) link.SendLocal(t, default);
+                _sentTo = link.inputDelay - 1;
                 _primed = true;
             }
 
@@ -110,7 +119,24 @@ namespace GulagRunners.Net
             {
                 // Keep feeding the other device even while stalled: its clock is waiting
                 // on this input, and a stall on both sides at once never resolves.
-                link.SendLocal(tick + link.inputDelay, Mine(tick + link.inputDelay));
+                //
+                // How far ahead is measured, not fixed -- see LanLink.SuggestedDelay --
+                // and it can therefore come DOWN when the link improves. Sending the
+                // tick it then names would be sending one already sent, which SendLocal
+                // rightly refuses while throwing away the newer thumb with it. So the
+                // furthest tick sent only ever moves forward: a shrinking budget means
+                // the clock quietly catches up to it instead.
+                delay = link.SuggestedDelay;
+                int want = tick + delay;
+                if (want > _sentTo)
+                {
+                    _sentTo = want;
+                    link.SendLocal(want, Mine(want));
+                }
+                else
+                {
+                    link.SendLocal(_sentTo, Mine(_sentTo));   // re-send, in case it was lost
+                }
 
                 if (!link.TryRemote(tick, out TickInput theirs))
                 {
@@ -140,7 +166,9 @@ namespace GulagRunners.Net
             if (ran == catchUpLimit)
                 _accumulator = Mathf.Min(_accumulator, PlayerController.SecondsPerTick);
 
-            state = link.Desync ?? $"tick {tick}, as player {link.LocalPlayer + 1}";
+            roundTripMs = link.RoundTrip;
+            state = link.Desync
+                    ?? $"tick {tick}, as player {link.LocalPlayer + 1}, {delay} tick(s) of input budget for {roundTripMs} ms";
             Draw(_accumulator / PlayerController.SecondsPerTick);
         }
 
@@ -219,6 +247,7 @@ namespace GulagRunners.Net
             tick = 0;
             _accumulator = 0f;
             _takenFor = -1;
+            _sentTo = -1;
         }
 
         /// <summary>
@@ -301,6 +330,7 @@ namespace GulagRunners.Net
             _primed = false;
             tick = 0;
             _takenFor = -1;
+            _sentTo = -1;
             _controls = null;
             if (result != null) result.someoneElseRestarts = false;
             if (match == null) return;

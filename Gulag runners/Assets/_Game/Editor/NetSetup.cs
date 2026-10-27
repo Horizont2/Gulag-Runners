@@ -94,6 +94,11 @@ namespace GulagRunners.GameEditor
                  new Color(1f, 1f, 1f, 0.12f), new Color(0.93f, 0.93f, 0.93f),
                  new UnityAction(view.JoinFound), wired);
 
+            // And a place to type one, for everything the beacon cannot reach: a host
+            // across the internet behind a forwarded port, or either end of a VPN that
+            // makes two machines look like one network without carrying its broadcasts.
+            Typed(panel, view, wired);
+
             // Again, on the result screen, becomes a request rather than a restart: both
             // devices have to deal the new arena on the same tick. Wired here, as a
             // persistent call, so it is visible in the inspector like everything else.
@@ -138,6 +143,62 @@ namespace GulagRunners.GameEditor
                 + "clock: a tick happens when both thumbs have arrived."
                 + missing,
                 root.gameObject);
+        }
+
+        /// <summary>
+        /// A box to type a host's address into, and a button that joins it.
+        ///
+        /// The beacon only reaches as far as a broadcast does, which is one subnet. Any
+        /// host further away -- behind a forwarded port, or on the far side of a VPN
+        /// that joins two machines without carrying their broadcasts -- has to be named,
+        /// and NetConnectView.JoinAt has always taken an address. Nothing called it.
+        /// </summary>
+        static void Typed(Transform parent, NetConnectView view, List<string> wired)
+        {
+            RectTransform rt = Make("Address / Typed", parent,
+                                    DesignW * 0.5f - 420, 660, 620, 88);
+            Image box = Undo.AddComponent<Image>(rt.gameObject);
+            box.color = new Color(1f, 1f, 1f, 0.08f);
+            box.raycastTarget = true;
+
+            RectTransform textRt = Make("Text", rt, 20, 0, 580, 88);
+            Text text = Undo.AddComponent<Text>(textRt.gameObject);
+            text.fontSize = 34;
+            text.color = new Color(0.93f, 0.93f, 0.93f);
+            text.alignment = TextAnchor.MiddleLeft;
+            text.supportRichText = false;
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            RectTransform hintRt = Make("Hint", rt, 20, 0, 580, 88);
+            Text hint = Undo.AddComponent<Text>(hintRt.gameObject);
+            hint.text = "host's address, e.g. 192.168.1.14";
+            hint.fontSize = 32;
+            hint.color = new Color(1f, 1f, 1f, 0.35f);
+            hint.alignment = TextAnchor.MiddleLeft;
+            hint.raycastTarget = false;
+            hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            InputField field = Undo.AddComponent<InputField>(rt.gameObject);
+            field.targetGraphic = box;
+            field.textComponent = text;
+            field.placeholder = hint;
+            field.lineType = InputField.LineType.SingleLine;
+            field.characterLimit = 45;              // an IPv6 address, with room to spare
+
+            // A button as well as the end-edit, because a soft keyboard's "done" is not
+            // somewhere everybody looks and a visible way to commit costs one rectangle.
+            Face(parent, "Button / Join at", "JOIN AT", DesignW * 0.5f + 220, 660, 200, 88,
+                 new Color(1f, 1f, 1f, 0.12f), new Color(0.93f, 0.93f, 0.93f),
+                 new UnityAction(view.JoinTyped), wired);
+
+            // Every keystroke goes to the view, so the button above has something to
+            // join: a Button's OnClick carries no argument, and the only other way is
+            // for the view to hold the InputField itself.
+            UnityEventTools.AddPersistentListener(field.onValueChanged,
+                                                  new UnityAction<string>(view.SetAddress));
+            UnityEventTools.AddPersistentListener(field.onEndEdit,
+                                                  new UnityAction<string>(view.JoinAt));
+            wired.Add("typed address");
         }
 
         static Canvas Canvas()

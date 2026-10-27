@@ -151,6 +151,58 @@ def step_order(local_player):
     return ("mine", "theirs") if local_player == 0 else ("theirs", "mine")
 
 
+# --------------------------------------------------------------- the input budget
+
+TICK_MS = 1000.0 / 60.0
+
+
+def suggested_delay(rtt_ms, floor=4, ceiling=12, measure=True):
+    """How far ahead input is sent, from the round trip actually measured.
+
+    Mirrors LanLink.SuggestedDelay. Lockstep waits for the other player, so the budget
+    has to cover the ONE-WAY trip -- the input has to be there before the tick it
+    belongs to -- plus a tick of slack for a frame landing badly.
+    """
+    if not measure or rtt_ms <= 0:
+        return floor
+    ticks = (rtt_ms * 3 // 100) + 2
+    return max(floor, min(ticks, max(floor, ceiling)))
+
+
+def covers(rtt_ms, delay):
+    """Does that many ticks of budget actually cover that round trip?"""
+    return delay * TICK_MS >= rtt_ms / 2.0
+
+
+def worst_of(samples, keep=8):
+    """What the link is judged on: the worst of the last few, not the average.
+
+    One late input stalls the tick and both players see it, so a budget set from the
+    average is a budget that is wrong exactly when it matters.
+    """
+    recent = samples[-keep:]
+    return max(recent) if recent else 0
+
+
+def sent_ticks(delays, start_sent=3):
+    """Which tick each frame sends, when the budget moves while the match runs.
+
+    Mirrors NetMatch: the furthest tick sent only ever goes FORWARD. A budget that
+    shrinks would otherwise name a tick already sent, and SendLocal rightly refuses to
+    overwrite one -- throwing away the newer thumb with it.
+    """
+    sent_to = start_sent
+    out = []
+    for tick, delay in enumerate(delays):
+        want = tick + delay
+        if want > sent_to:
+            sent_to = want
+            out.append(("new", want))
+        else:
+            out.append(("again", sent_to))
+    return out
+
+
 # ------------------------------------------------------------------- the rematch
 
 REMATCH_LEAD = 30
