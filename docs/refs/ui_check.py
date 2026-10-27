@@ -90,6 +90,10 @@ SPARE = {
     # here: the builder wires both, so an empty one means the panel went up blank.
     "MatchResultView.Shown": "spare hook for a sound or a camera change",
     "MatchResultView.Hidden": "spare hook, as above",
+    # The recorder's readouts are for the result panel and are wired by its builder; a
+    # scene can legitimately record a match without showing what it paid.
+    "MatchRecorder.GoldChanged": "optional: what the match paid, shown on the result panel",
+    "MatchRecorder.LeagueChanged": "optional, as above",
 }
 
 
@@ -398,6 +402,14 @@ def main():
         # time NOTHING subscribed to it anywhere in the project. The arena played its
         # finishing beat and then sat there for ever: no result, no rematch, no way back
         # to the menu. Nothing reported it, because every part of it was working.
+        # A match that never reaches the saved progress is a match that did not count.
+        if "MatchState" in present and "MatchRecorder" not in present:
+            problems.append(
+                f"{here}: a match runs in this scene and nothing records it -- no "
+                "MatchRecorder, so the rating, the purse and the match count are "
+                "thrown away every time somebody plays. Tools > Gulag Runners > Build "
+                "the result screen puts one in.")
+
         if "MatchState" in present and "MatchResultView" not in present:
             problems.append(
                 f"{here}: a match runs in this scene and nothing ends it -- no "

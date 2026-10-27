@@ -70,14 +70,45 @@ namespace GulagRunners.GameEditor
             MenuLabel score = Line(root, "Score", "2 — 1", 360, 70, 56,
                                    new Color(1f, 1f, 1f, 0.78f));
 
+            // What the match CHANGED, between the score and the buttons. A result screen
+            // that only says who won is a scoreboard; this is the line that makes a
+            // second match worth playing, and it is the one the whole meta was written
+            // for and never connected to.
+            MenuLabel league = Line(root, "League", "SILVER III", 450, 44, 32,
+                                    new Color(1f, 1f, 1f, 0.55f));
+            MenuLabel gold = Line(root, "Gold", "+40", 492, 44, 32,
+                                  new Color(0.91f, 0.64f, 0.24f));
+
             MatchResultView view = Undo.AddComponent<MatchResultView>(root.gameObject);
             Undo.RecordObject(view, "Build the result screen");
             view.match = match;
             view.panel = root.gameObject;
 
+            // The thing that tells the saved progress a match happened. Everything it
+            // needs was already written -- Glicko-2, the purse, the daily roll, the
+            // PlayerPrefs save -- and nothing in the project had ever called it, so a
+            // player could win twenty matches and the menu would still read nought.
+            MatchRecorder recorder = Object.FindFirstObjectByType<MatchRecorder>();
+            if (recorder == null)
+            {
+                GameObject keeper = new GameObject("Match record");
+                Undo.RegisterCreatedObjectUndo(keeper, "Build the result screen");
+                recorder = Undo.AddComponent<MatchRecorder>(keeper);
+            }
+            Undo.RecordObject(recorder, "Build the result screen");
+            recorder.match = match;
+            recorder.localPlayer = view.localPlayer;
+            PrefabUtility.RecordPrefabInstancePropertyModifications(recorder);
+
             List<string> wired = new List<string>();
             Wire(view.HeadlineChanged, headline.Set, "headline", wired);
             Wire(view.ScoreChanged, score.Set, "score", wired);
+            Wire(recorder.GoldChanged, gold.Set, "gold", wired);
+            Wire(recorder.LeagueChanged, league.Set, "league", wired);
+
+            // A rematch is a new match and may be recorded in its own right.
+            UnityEventTools.AddPersistentListener(view.Hidden, new UnityAction(recorder.Rearm));
+            wired.Add("rearm");
 
             Face(root, "Button / Rematch", "REMATCH", DesignW * 0.5f - 420, 560, 400, 104,
                  new Color(0.91f, 0.64f, 0.24f), new Color(0.09f, 0.07f, 0.05f),
