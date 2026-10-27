@@ -126,6 +126,16 @@ namespace GulagRunners.Net
         {
             if (link == null) return;
 
+            // A match the queue arranged needs no arranging. The panel is for two
+            // people in one room typing at each other, and when a service has already
+            // found the opponent and opened the wire there is nothing here to do but
+            // get out of the way of the fight.
+            if (link.Arranged)
+            {
+                if (panel != null && panel.activeSelf) panel.SetActive(false);
+                return;
+            }
+
             if (link.Connected)
             {
                 if (_announced) return;

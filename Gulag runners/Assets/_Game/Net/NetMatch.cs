@@ -100,9 +100,9 @@ namespace GulagRunners.Net
         /// </summary>
         void Adopt()
         {
-            if (link == null || OnlineMatch.Live == null) return;
-            if (!OnlineMatch.Live.TryTake(out INetTransport wire, out bool host,
-                                          out uint seed, out int _)) return;
+            if (link == null) return;
+            if (!OnlineMatch.TryTake(out INetTransport wire, out bool host,
+                                     out uint seed, out int _)) return;
 
             link.Adopt(wire, host, seed);
         }

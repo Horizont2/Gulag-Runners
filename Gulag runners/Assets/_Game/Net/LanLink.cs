@@ -122,6 +122,13 @@ namespace GulagRunners.Net
         public bool Connected => _adopted ? _wire != null && _wire.Ready : _connected;
 
         /// <summary>
+        /// True when somebody else arranged this match -- a queue found the player and
+        /// opened the wire. Nothing is left to arrange by hand, which is what the
+        /// connect screen exists to do, so it stands down.
+        /// </summary>
+        public bool Arranged => _adopted;
+
+        /// <summary>
         /// The number this match is dealt from. The host picks it and the guest is told,
         /// because two devices that deal their own loot are playing two different arenas
         /// -- which is a desync nobody would read as one, since both look perfectly fine

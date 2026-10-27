@@ -16,10 +16,16 @@ namespace GulagRunners.Net
     /// This is the piece in between, and the reason it is small is that both halves
     /// were built to be met.
     ///
-    /// It outlives the scene, because the pairing happens in the menu and is spent in
-    /// the arena, and a relay opened in one must still be open in the other. That makes
-    /// it the only object in the project that survives a load -- worth knowing, and
-    /// worth it being exactly one.
+    /// The pairing outlives the scene, because it happens in the menu and is spent in
+    /// the arena, and a relay opened in one must still be open in the other. The
+    /// COMPONENT does not: it is held in statics below, and this object dies with the
+    /// menu like everything else there.
+    ///
+    /// That distinction was learnt the hard way. DontDestroyOnLoad was the obvious
+    /// answer and it is wrong here, because this component sits on the search screen --
+    /// and DontDestroyOnLoad keeps the whole GameObject, children and all. The arena
+    /// came up with the entire search UI floating over it, still saying "waiting to be
+    /// let through". Moving three fields is cheaper than moving a scene.
     ///
     /// It is also the search screen's gate. Opening a relay takes a second or two of
     /// real network, and that wait is what MatchSearch's Loading and Waiting phases are
@@ -28,8 +34,23 @@ namespace GulagRunners.Net
     [DisallowMultipleComponent]
     public sealed class OnlineMatch : MonoBehaviour, IMatchGate
     {
-        /// <summary>The one in flight, for the arena to find after the load.</summary>
+        /// <summary>The one in flight, while the menu that owns it is still loaded.</summary>
         public static OnlineMatch Live { get; private set; }
+
+        // What crosses the scene load. Statics rather than a surviving object, and
+        // cleared on entering play because Unity can be told not to reload the domain,
+        // and then yesterday's match would still be here.
+        static RelayTransport _carried;
+        static MatchFound _carriedPairing;
+        static bool _carriedHave;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void Forget()
+        {
+            _carried = null;
+            _carriedPairing = default;
+            _carriedHave = false;
+        }
 
         [Header("Wiring")]
         [Tooltip("The search screen. Wire its Paired event to Begin, or leave this and " +
@@ -54,17 +75,20 @@ namespace GulagRunners.Net
 
         void Awake()
         {
-            if (Live != null && Live != this) { Destroy(gameObject); return; }
+            if (Live != null && Live != this) { Destroy(this); return; }
             Live = this;
-            DontDestroyOnLoad(gameObject);
 
             if (search == null) search = FindFirstObjectByType<MatchSearch>();
         }
 
+        /// <summary>
+        /// The menu unloading is NOT the match ending -- it is the moment before the
+        /// arena needs it. So this lets go of the component and keeps the relay.
+        /// Drop is for a player who left, and is called by hand.
+        /// </summary>
         void OnDestroy()
         {
             if (Live == this) Live = null;
-            Drop();
         }
 
         /// <summary>
@@ -114,6 +138,10 @@ namespace GulagRunners.Net
             if (!_wire.Open()) { Say($"relay: {_wire.Describe}"); _wire = null; return; }
 
             relayOpen = true;
+            _carried = _wire;
+            _carriedPairing = _pairing;
+            _carriedHave = true;
+
             Say(opened.Said);
             Ready?.Invoke();
         }
@@ -122,14 +150,14 @@ namespace GulagRunners.Net
         /// Hands the arena its match. Called by NetMatch when the scene is up, because
         /// the arena is the thing that knows when it is ready to be told.
         /// </summary>
-        public bool TryTake(out INetTransport wire, out bool host, out uint seed,
-                            out int player)
+        public static bool TryTake(out INetTransport wire, out bool host, out uint seed,
+                                    out int player)
         {
-            wire = _wire;
-            host = _pairing.LocalPlayer == 0;
-            seed = _pairing.Seed;
-            player = _pairing.LocalPlayer;
-            return _have && relayOpen && _wire != null;
+            wire = _carried;
+            host = _carriedPairing.LocalPlayer == 0;
+            seed = _carriedPairing.Seed;
+            player = _carriedPairing.LocalPlayer;
+            return _carriedHave && _carried != null;
         }
 
         /// <summary>Fired once the relay is up and the match can start.</summary>
@@ -146,6 +174,8 @@ namespace GulagRunners.Net
             }
 
             if (_wire != null) { _wire.Close(); _wire = null; }
+            if (_carried != null) { _carried.Close(); }
+            Forget();
             relayOpen = false;
             _have = false;
             Say("idle");
