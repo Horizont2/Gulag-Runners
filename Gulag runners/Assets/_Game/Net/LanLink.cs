@@ -119,7 +119,7 @@ namespace GulagRunners.Net
         public int RemotePlayer => 1 - LocalPlayer;
 
         /// <summary>True once both ends have said hello.</summary>
-        public bool Connected => _connected;
+        public bool Connected => _adopted ? _wire != null && _wire.Ready : _connected;
 
         /// <summary>
         /// The number this match is dealt from. The host picks it and the guest is told,
@@ -165,13 +165,13 @@ namespace GulagRunners.Net
         }
 
         /// <summary>How many hosts have been heard from. Safe to read from a frame.</summary>
-        public int FoundCount => _wire != null ? _wire.FoundCount : 0;
+        public int FoundCount => Beacon != null ? Beacon.FoundCount : 0;
 
         /// <summary>The first host heard from, if any. Safe to read from a frame.</summary>
         public bool TryFound(out string address)
         {
             address = null;
-            return _wire != null && _wire.TryFound(out address);
+            return Beacon != null && Beacon.TryFound(out address);
         }
 
         // Each slot says which tick it holds. The ring is 256 ticks -- 4.3 seconds -- and
@@ -188,9 +188,17 @@ namespace GulagRunners.Net
 
         readonly object _gate = new object();
 
-        LanTransport _wire;
+        INetTransport _wire;
+
+        /// <summary>
+        /// The wire's other half, when it has one. Only a local network can find
+        /// anybody by shouting; a relay was handed its peer by the queue and has
+        /// nothing to announce, so this is null there and every caller checks.
+        /// </summary>
+        INetDiscovery Beacon => _wire as INetDiscovery;
         volatile LinkRole _role = LinkRole.Off;
         volatile bool _connected;
+        bool _adopted;
         volatile string _desync;
         volatile bool _desyncReported;
         uint _seed;
@@ -231,10 +239,11 @@ namespace GulagRunners.Net
 
             // Not learning: a guest knows who it is talking to, and a stray packet from
             // anything else on the network must not turn the match around.
-            if (!Wire().Open(learnPeer: false)) { _role = LinkRole.Off; return; }
-            if (!_wire.PointAt(address))
+            LanTransport lan = Wire();
+            if (!lan.Open(learnPeer: false)) { _role = LinkRole.Off; return; }
+            if (!lan.PointAt(address))
             {
-                state = _wire.Describe;
+                state = lan.Describe;
                 Stop();
                 return;
             }
@@ -254,6 +263,7 @@ namespace GulagRunners.Net
         public void Stop()
         {
             _connected = false;
+            _adopted = false;
             _role = LinkRole.Off;
             _rematchAt = -1;
             _rematchDone = -1;
@@ -288,12 +298,44 @@ namespace GulagRunners.Net
         /// </summary>
         LanTransport Wire()
         {
-            if (_wire == null)
-            {
-                _wire = new LanTransport(matchPort, beaconPort);
-                _wire.Received += Take;
-            }
-            return _wire;
+            if (_wire is LanTransport had) return had;
+
+            LanTransport made = new LanTransport(matchPort, beaconPort);
+            Hold(made);
+            return made;
+        }
+
+        /// <summary>Takes a wire and listens to it. The one place either is done.</summary>
+        void Hold(INetTransport wire)
+        {
+            if (_wire != null) _wire.Received -= Take;
+            _wire = wire;
+            if (_wire != null) _wire.Received += Take;
+        }
+
+        /// <summary>
+        /// Play a match somebody else arranged.
+        ///
+        /// A queue found the other player, agreed which of the two drives fighter one
+        /// and what the arena is dealt from, and opened a wire to them. All of that is
+        /// what the LAN handshake exists to discover, so when it has already happened
+        /// there is nothing to discover and nothing to greet: this is connected from
+        /// the moment the transport is.
+        ///
+        /// The protocol above does not change. Same ring, same redundancy, same
+        /// checksum, same measured budget -- the hello and the welcome are simply a
+        /// conversation two devices have when nobody has introduced them.
+        /// </summary>
+        public void Adopt(INetTransport wire, bool host, uint dealtFrom)
+        {
+            Stop();
+            if (wire == null) return;
+
+            _role = host ? LinkRole.Host : LinkRole.Guest;
+            _seed = dealtFrom;
+            Hold(wire);
+            _adopted = true;
+            state = $"matched, as player {LocalPlayer + 1}";
         }
 
         void Awake()
@@ -569,7 +611,7 @@ namespace GulagRunners.Net
             }
         }
 
-        void Shout() => _wire?.Shout();
+        void Shout() => Beacon?.Shout();
 
         /// <summary>
         /// One datagram, from whatever is carrying them. MAY BE ON ANY THREAD: a socket

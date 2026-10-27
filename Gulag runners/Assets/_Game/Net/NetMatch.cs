@@ -80,11 +80,31 @@ namespace GulagRunners.Net
         void Awake()
         {
             if (link == null) link = FindFirstObjectByType<LanLink>();
+            Adopt();
             if (match == null) match = FindFirstObjectByType<MatchState>();
             if (view == null) view = FindFirstObjectByType<SideViewCamera>();
             if (hud == null) hud = FindFirstObjectByType<HudView>();
             if (result == null) result = FindFirstObjectByType<MatchResultView>();
             if (recorder == null) recorder = FindFirstObjectByType<MatchRecorder>();
+        }
+
+        /// <summary>
+        /// Takes the match the menu arranged, if there was one.
+        ///
+        /// OnlineMatch is the only object that survives the load into this scene, and
+        /// it survives carrying exactly three things: a relay already open to the other
+        /// player, which of the two fighters this device drives, and the number the
+        /// arena is dealt from. All three are what the LAN handshake exists to discover
+        /// -- so when they are already known there is nothing to discover, and the link
+        /// is simply told.
+        /// </summary>
+        void Adopt()
+        {
+            if (link == null || OnlineMatch.Live == null) return;
+            if (!OnlineMatch.Live.TryTake(out INetTransport wire, out bool host,
+                                          out uint seed, out int _)) return;
+
+            link.Adopt(wire, host, seed);
         }
 
         void OnDisable() => ReleaseClock();
