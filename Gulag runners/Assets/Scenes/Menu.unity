@@ -3090,7 +3090,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 836f59438db3094168fd6399a73b22c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuUI
-  director: {fileID: 0}
+  director: {fileID: 1053348788}
   search: {fileID: 820177704}
   fighter: {fileID: 1900006000}
   profile:
@@ -9055,6 +9055,7 @@ MonoBehaviour:
   director: {fileID: 0}
   progress: {fileID: 1148558277}
   opponentGate: {fileID: 0}
+  queueSource: {fileID: 0}
   backdrop: {fileID: 820177703}
   rules:
     StartBand: 60
@@ -9186,6 +9187,9 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+  Paired:
+    m_PersistentCalls:
+      m_Calls: []
   phase: 5
   elapsed: 0
 --- !u!114 &820177705
@@ -11741,6 +11745,110 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2458920840818511905, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
   m_PrefabInstance: {fileID: 1044965267}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1053348787
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1053348789}
+  - component: {fileID: 1053348788}
+  m_Layer: 0
+  m_Name: Menu
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1053348788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1053348787}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 373c93e23a7649a8f02c317e59df4afd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuDirector
+  fighter: {fileID: 1900006000}
+  view: {fileID: 2048723873}
+  gate: {fileID: 785206435}
+  gateRise: 2.6
+  gateSeconds: 1.1
+  gateEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  walkDistance: 5
+  walkSeconds: 1.4
+  walkStartsAt: 0.45
+  walkEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  matchScene: Arena_Demo
+  loadStartsAt: 0.2
+  waitForRelease: 0
+  state: waiting
+--- !u!4 &1053348789
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1053348787}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1054612114
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -12717,7 +12825,9 @@ MonoBehaviour:
   matchesWon: 0
   dailiesDone: 0
   lastPlayedDay: -1
+  daysInARow: 0
   persist: 1
+  saveState: not loaded yet
 --- !u!4 &1148558278
 Transform:
   m_ObjectHideFlags: 0
@@ -20993,7 +21103,88 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5480937427733612651, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1900006000}
+    - targetCorrespondingSourceObject: {fileID: 6009296746703928373, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1884161502}
   m_SourcePrefab: {fileID: 100100000, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+--- !u!1 &1884161490 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2159656931650466576, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161491 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5447943970622344260, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161492 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4083410480119782572, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161493 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6763066617472813184, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161494 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6299876876708387650, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161495 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6812366463712413258, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161496 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3682450600589683281, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161497 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 383139384652574663, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161498 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7360071460488915183, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161499 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5849974895505519746, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161500 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3929184077239217870, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1884161501 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6009296746703928373, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 1884161489}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1884161502
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1884161501}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32399333bc464a389d79cc84752edb05, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuFootPlant
+  animator: {fileID: 1723216470}
+  weight: 1
+  holdFacing: 1
+  settleFrames: 4
+  snapToFloor: 1
+  state: not planted yet
 --- !u!1001 &1886374165
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -22685,9 +22876,33 @@ MonoBehaviour:
   swayDegrees: 7
   swayPerSecond: 0.12
   facing: 90
-  skins: []
+  skins:
+  - id: default
+    root: {fileID: 1884161501}
   skin: 
-  weapons: []
+  weapons:
+  - item: 4
+    root: {fileID: 1884161500}
+  - item: 2
+    root: {fileID: 1884161499}
+  - item: 9
+    root: {fileID: 1884161498}
+  - item: 10
+    root: {fileID: 1884161497}
+  - item: 5
+    root: {fileID: 1884161496}
+  - item: 11
+    root: {fileID: 1884161495}
+  - item: 6
+    root: {fileID: 1884161494}
+  - item: 3
+    root: {fileID: 1884161493}
+  - item: 12
+    root: {fileID: 1884161492}
+  - item: 7
+    root: {fileID: 1884161491}
+  - item: 8
+    root: {fileID: 1884161490}
   weapon: 0
   armour: []
   wearing: 0
@@ -24974,3 +25189,4 @@ SceneRoots:
   - {fileID: 290508189}
   - {fileID: 820177708}
   - {fileID: 483300416}
+  - {fileID: 1053348789}
