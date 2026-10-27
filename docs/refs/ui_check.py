@@ -94,6 +94,10 @@ SPARE = {
     # scene can legitimately record a match without showing what it paid.
     "MatchRecorder.GoldChanged": "optional: what the match paid, shown on the result panel",
     "MatchRecorder.LeagueChanged": "optional, as above",
+
+    # The connect panel hides ITSELF on connecting, so this is a hook for anything else
+    # that wants to know, and a scene with nothing else up needs nobody listening.
+    "NetConnectView.Connected": "optional: the panel takes itself down either way",
 }
 
 
