@@ -56,7 +56,7 @@ namespace GulagRunners.Net
 
         void OnEnable()
         {
-            AddressChanged?.Invoke(LanLink.LocalAddress());
+            AddressChanged?.Invoke(LanTransport.LocalAddress());
             Say("Tap HOST on one phone and JOIN on the other.");
         }
 
@@ -66,7 +66,7 @@ namespace GulagRunners.Net
             if (link == null) return;
             _looking = false;
             link.Host();
-            Say($"Hosting. Tell the other phone to tap JOIN.\n{LanLink.LocalAddress()}");
+            Say($"Hosting. Tell the other phone to tap JOIN.\n{LanTransport.LocalAddress()}");
         }
 
         /// <summary>Wire a Button here. Looks for a host and joins the first one heard.</summary>
@@ -149,7 +149,7 @@ namespace GulagRunners.Net
 
             if (link.Role == LinkRole.Host)
             {
-                Say($"Hosting as player 1 — {LanLink.LocalAddress()}\n"
+                Say($"Hosting as player 1 — {LanTransport.LocalAddress()}\n"
                     + "Tap JOIN on the other phone.");
                 return;
             }

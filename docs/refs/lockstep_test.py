@@ -18,7 +18,7 @@ long they would have taken to find in a build:
 import sys
 
 from lockstep_mirror import (
-    CARRIED, RING, WELCOME, End, Input, NOTHING, Rematch, Ring, handshake, packet,
+    CARRIED, RING, INPUT, WELCOME, End, Input, NOTHING, Rematch, Ring, handshake, packet,
     receive, step_order, suggested_delay, covers, worst_of, sent_ticks,
 )
 
@@ -133,6 +133,21 @@ storm_guest = End("guest", echo_hello=True)
 storm = handshake(storm_host, storm_guest, rounds=8)
 check("the fault this replaces is caught", storm > 4,
       "answering a hello with a hello would have passed; it never stops")
+
+print("\n   A guest is never 'connected' without the number the match is dealt from.")
+guest = End("guest")
+guest.take(INPUT, None)
+check("input alone does not start the guest", not guest.connected and guest.seed == 0,
+      "the seed is only in the welcome; starting without it deals a different arena")
+host = End("host", seed=7)
+host.take(INPUT, None)
+check("but it does start the host, which has the seed already", host.connected)
+
+loose = End("guest")
+loose.seed_only_from_welcome = False
+loose.take(INPUT, None)
+check("the fault this replaces is caught", loose.connected and loose.seed == 0,
+      "connected, dealing from zero, against a host dealing from its own number")
 
 print("\n   A welcome that arrives twice does not re-deal the match.")
 guest = End("guest")

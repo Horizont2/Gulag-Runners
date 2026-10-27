@@ -108,6 +108,9 @@ class End:
         # neither end had any reason to stop. That is a packet per round trip for as long
         # as the game runs, which on a phone is a warm battery and no explanation.
         self.echo_hello = echo_hello
+        # The pre-fix behaviour, for the test to catch: any packet at all counted as
+        # being connected, seed or no seed.
+        self.seed_only_from_welcome = True
         self.outbox = []
 
     def take(self, kind, payload=None):
@@ -125,6 +128,14 @@ class End:
                 return
             self.seed = payload
             self.connected = True
+        elif kind == INPUT:
+            # Input alone connects the HOST, which has the seed already. Never the
+            # guest: the seed arrives in the welcome and nowhere else, so a guest that
+            # started on an input packet whose welcome had been lost would deal its
+            # arena from zero against a host dealing from the real number -- two
+            # different matches, agreed on tick by tick, with nothing to notice.
+            if self.role == "host" or not self.seed_only_from_welcome:
+                self.connected = True
 
 
 def handshake(host, guest, rounds=8):

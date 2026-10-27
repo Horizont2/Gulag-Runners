@@ -1,9 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Threading;
 using UnityEngine;
 using GulagRunners.Sim;
 
@@ -55,7 +51,7 @@ namespace GulagRunners.Net
         const byte PacketHello = 1;      // guest -> host: let me in
         const byte PacketWelcome = 2;    // host -> guest: you are in, deal from this
         const byte PacketInput = 3;
-        const byte PacketBeacon = 4;
+        const byte PacketBeacon = 4;   // read by LanTransport, not here
         const byte PacketCheck = 5;
         const byte PacketRematch = 6;    // a new match, on an agreed tick
         const byte PacketPing = 7;       // what time do you make it
@@ -169,19 +165,14 @@ namespace GulagRunners.Net
         }
 
         /// <summary>How many hosts have been heard from. Safe to read from a frame.</summary>
-        public int FoundCount { get { lock (_gate) return _found.Count; } }
+        public int FoundCount => _wire != null ? _wire.FoundCount : 0;
 
         /// <summary>The first host heard from, if any. Safe to read from a frame.</summary>
         public bool TryFound(out string address)
         {
-            lock (_gate)
-            {
-                address = _found.Count > 0 ? _found[0] : null;
-                return address != null;
-            }
+            address = null;
+            return _wire != null && _wire.TryFound(out address);
         }
-
-        readonly List<string> _found = new List<string>();
 
         // Each slot says which tick it holds. The ring is 256 ticks -- 4.3 seconds -- and
         // a match is minutes, so every slot is reused many times over. A plain "have I got
@@ -197,14 +188,9 @@ namespace GulagRunners.Net
 
         readonly object _gate = new object();
 
-        UdpClient _match;
-        UdpClient _beacon;
-        Thread _listen;
-        Thread _beaconListen;
-        volatile bool _running;
+        LanTransport _wire;
         volatile LinkRole _role = LinkRole.Off;
         volatile bool _connected;
-        volatile IPEndPoint _peer;
         volatile string _desync;
         volatile bool _desyncReported;
         uint _seed;
@@ -218,8 +204,6 @@ namespace GulagRunners.Net
         float _nextPing;
         float _nextHello;
         float _askedAt;
-        IPAddress[] _broadcasts = Array.Empty<IPAddress>();
-        object _multicastLock;
 
         // ----------------------------------------------------------------- opening up
 
@@ -233,26 +217,28 @@ namespace GulagRunners.Net
             // every match, or every match plays out in the same arena.
             _seed = unchecked((uint)DateTime.UtcNow.Ticks) * 2654435761u + 1u;
 
-            Open();
-            if (_role == LinkRole.Off) return;
-            state = $"hosting on {LocalAddress()}:{matchPort}";
+            // Learning the peer is the host's half of a LAN handshake: it cannot know who
+            // will join, so the first datagram names them.
+            if (!Wire().Open(learnPeer: true)) { _role = LinkRole.Off; return; }
+            state = $"hosting on {LanTransport.LocalAddress()}:{matchPort}";
         }
 
         /// <summary>Join a host by address. This device is player 1.</summary>
         public void Join(string address)
         {
-            if (!IPAddress.TryParse(address, out IPAddress ip))
+            Stop();
+            _role = LinkRole.Guest;
+
+            // Not learning: a guest knows who it is talking to, and a stray packet from
+            // anything else on the network must not turn the match around.
+            if (!Wire().Open(learnPeer: false)) { _role = LinkRole.Off; return; }
+            if (!_wire.PointAt(address))
             {
-                state = $"\"{address}\" is not an address";
+                state = _wire.Describe;
+                Stop();
                 return;
             }
 
-            Stop();
-            _role = LinkRole.Guest;
-            Open();
-            if (_role == LinkRole.Off) return;
-
-            _peer = new IPEndPoint(ip, matchPort);
             _askedAt = Time.unscaledTime;
             _nextHello = 0f;                 // Update sends the first one immediately
             state = $"joining {address}:{matchPort}";
@@ -261,52 +247,30 @@ namespace GulagRunners.Net
         /// <summary>Listen for hosts shouting, so nobody has to type an address.</summary>
         public void Discover()
         {
-            if (_beaconListen != null) return;
-            try
-            {
-                _beacon = new UdpClient();
-                _beacon.Client.SetSocketOption(SocketOptionLevel.Socket,
-                                               SocketOptionName.ReuseAddress, true);
-                _beacon.Client.EnableBroadcast = true;
-                _beacon.Client.Bind(new IPEndPoint(IPAddress.Any, beaconPort));
-            }
-            catch (Exception e)
-            {
-                state = $"cannot listen for hosts: {e.Message}";
-                _beacon = null;
-                return;
-            }
-
-            HoldBroadcastsOpen();
-            _running = true;
-            _beaconListen = new Thread(BeaconLoop) { IsBackground = true };
-            _beaconListen.Start();
+            Wire().Discover();
+            state = _wire.Describe;
         }
 
         public void Stop()
         {
-            _running = false;
             _connected = false;
             _role = LinkRole.Off;
-            _peer = null;
             _rematchAt = -1;
             _rematchDone = -1;
             Now = 0;
 
-            try { _match?.Close(); } catch (Exception) { }
-            try { _beacon?.Close(); } catch (Exception) { }
-            _match = null;
-            _beacon = null;
-            _listen = null;
-            _beaconListen = null;
-            ReleaseBroadcasts();
+            if (_wire != null)
+            {
+                _wire.Received -= Take;
+                _wire.Close();
+                _wire = null;
+            }
 
             lock (_gate)
             {
                 for (int i = 0; i < Ring; i++) { _mineAt[i] = -1; _theirsAt[i] = -1; }
                 _theirChecks.Clear();
                 _myChecks.Clear();
-                _found.Clear();
 
                 // The next peer is a different link. Carrying a LAN's two milliseconds
                 // into a connection across the country would set the budget from the
@@ -318,35 +282,24 @@ namespace GulagRunners.Net
             state = "off";
         }
 
+        /// <summary>
+        /// The wire this match runs on. One today; the seam is INetTransport, and a
+        /// relay slots in here without the protocol below noticing.
+        /// </summary>
+        LanTransport Wire()
+        {
+            if (_wire == null)
+            {
+                _wire = new LanTransport(matchPort, beaconPort);
+                _wire.Received += Take;
+            }
+            return _wire;
+        }
+
         void Awake()
         {
             lock (_gate)
                 for (int i = 0; i < Ring; i++) { _mineAt[i] = -1; _theirsAt[i] = -1; }
-        }
-
-        void Open()
-        {
-            try
-            {
-                _match = new UdpClient();
-                _match.Client.SetSocketOption(SocketOptionLevel.Socket,
-                                              SocketOptionName.ReuseAddress, true);
-                _match.Client.Bind(new IPEndPoint(IPAddress.Any, matchPort));
-                _match.EnableBroadcast = true;
-            }
-            catch (Exception e)
-            {
-                state = $"cannot open port {matchPort}: {e.Message}";
-                _match = null;
-                _role = LinkRole.Off;
-                return;
-            }
-
-            _broadcasts = Broadcasts();
-            HoldBroadcastsOpen();
-            _running = true;
-            _listen = new Thread(Listen) { IsBackground = true };
-            _listen.Start();
         }
 
         void OnDestroy() => Stop();
@@ -371,9 +324,7 @@ namespace GulagRunners.Net
                     _mineAt[tick & Mask] = tick;
                 }
 
-            IPEndPoint peer = _peer;
-            UdpClient socket = _match;
-            if (peer == null || socket == null) return;
+            if (_wire == null || !_wire.Ready) return;
 
             // The newest input and the ones before it, so a lost packet costs nothing.
             byte[] packet = new byte[2 + 4 + Carried * 8];
@@ -393,7 +344,8 @@ namespace GulagRunners.Net
                     Write(packet, ref at, one.AimY);
                 }
 
-            try { socket.Send(packet, at, peer); sent++; } catch (Exception) { }
+            _wire.Send(packet, at);
+            sent++;
         }
 
         /// <summary>The other player's input for a tick, if it has arrived.</summary>
@@ -428,15 +380,13 @@ namespace GulagRunners.Net
         /// </summary>
         void Ping()
         {
-            IPEndPoint peer = _peer;
-            UdpClient socket = _match;
-            if (peer == null || socket == null) return;
+            if (_wire == null || !_wire.Ready) return;
 
             byte[] packet = new byte[1 + 4];
             int at = 0;
             packet[at++] = PacketPing;
             Write(packet, ref at, Stamp());
-            try { socket.Send(packet, at, peer); } catch (Exception) { }
+            _wire.Send(packet, at);
         }
 
         void TakePong(byte[] data)
@@ -502,16 +452,14 @@ namespace GulagRunners.Net
 
         void SendRematch(int at, uint dealtFrom)
         {
-            IPEndPoint peer = _peer;
-            UdpClient socket = _match;
-            if (peer == null || socket == null) return;
+            if (_wire == null || !_wire.Ready) return;
 
             byte[] packet = new byte[1 + 4 + 4];
             int cursor = 0;
             packet[cursor++] = PacketRematch;
             Write(packet, ref cursor, at);
             Write(packet, ref cursor, unchecked((int)dealtFrom));
-            try { socket.Send(packet, cursor, peer); } catch (Exception) { }
+            _wire.Send(packet, cursor);
         }
 
         // ---------------------------------------------------------------- the checksum
@@ -533,16 +481,14 @@ namespace GulagRunners.Net
                 Compare(tick);
             }
 
-            IPEndPoint peer = _peer;
-            UdpClient socket = _match;
-            if (peer == null || socket == null) return;
+            if (_wire == null || !_wire.Ready) return;
 
             byte[] packet = new byte[1 + 4 + 4];
             int at = 0;
             packet[at++] = PacketCheck;
             Write(packet, ref at, tick);
             Write(packet, ref at, unchecked((int)hash));
-            try { socket.Send(packet, at, peer); } catch (Exception) { }
+            _wire.Send(packet, at);
         }
 
         /// <summary>Holds the gate. Sets Desync; the main thread does the shouting.</summary>
@@ -582,7 +528,7 @@ namespace GulagRunners.Net
                                + "iteration order that is not the same on both.", this);
             }
 
-            if (_match == null) return;
+            if (_wire == null) return;
 
             // Both ends, whichever they are, and before the host's early return below.
             // The budget has to be measured from the device that will be WAITING, and
@@ -619,109 +565,101 @@ namespace GulagRunners.Net
             }
         }
 
-        void Shout()
+        void Shout() => _wire?.Shout();
+
+        /// <summary>
+        /// One datagram, from whatever is carrying them. MAY BE ON ANY THREAD: a socket
+        /// has its own, and answering a ping from it is what makes the reading the wire
+        /// rather than how busy this end's frame was. Everything it touches is behind
+        /// the gate or volatile.
+        /// </summary>
+        void Take(byte[] data, int length)
         {
-            byte[] packet = { PacketBeacon };
-            for (int i = 0; i < _broadcasts.Length; i++)
+            if (data == null || length < 1) return;
+
+            switch (data[0])
             {
-                try
+                case PacketHello:
+                    // Only a host answers a hello. A guest that answered one would
+                    // start a pair of devices saying hello to each other for ever.
+                    //
+                    // Nobody records who said it: the transport knows where a datagram
+                    // came from and this layer does not want to -- on a relay there is
+                    // no address to record.
+                    if (_role != LinkRole.Host) break;
+                    Welcome();
+                    _connected = true;
+                    break;
+
+                case PacketWelcome:
+                    if (_role != LinkRole.Guest || _connected) break;
+                    if (length < 5) break;
+                    int at = 1;
+                    _seed = unchecked((uint)ReadInt(data, ref at));
+                    _connected = true;
+                    break;
+
+                case PacketInput:
+                    // Input alone is enough for the HOST to call itself connected: it
+                    // has the seed already, so there is nothing left for it to learn.
+                    //
+                    // Never for the guest. The seed arrives in the welcome and nowhere
+                    // else, so a guest that started the match on an input packet whose
+                    // welcome had been lost would deal its arena from zero while the
+                    // host dealt from the real number -- two different matches, agreed
+                    // on tick by tick. It keeps knocking until the welcome lands.
+                    if (_role == LinkRole.Host) _connected = true;
+                    TakeInput(data);
+                    break;
+
+                case PacketCheck:
+                    TakeCheck(data);
+                    break;
+
+                case PacketPing:
                 {
-                    _match.Send(packet, packet.Length,
-                                new IPEndPoint(_broadcasts[i], beaconPort));
+                    // Straight back, unchanged and from the receiving thread, so the
+                    // reading is the wire and not how busy the other end's frame was.
+                    if (length < 5) break;
+                    byte[] pong = new byte[5];
+                    pong[0] = PacketPong;
+                    Array.Copy(data, 1, pong, 1, 4);
+                    if (_wire != null && _wire.Ready) _wire.Send(pong, 5);
+                    break;
                 }
-                catch (Exception) { }
-            }
-        }
 
-        void Listen()
-        {
-            IPEndPoint from = new IPEndPoint(IPAddress.Any, 0);
-            while (_running)
-            {
-                byte[] data;
-                try { data = _match.Receive(ref from); }
-                catch (Exception) { return; }          // closed, or the app is going away
-                if (data == null || data.Length < 1) continue;
+                case PacketPong:
+                    TakePong(data);
+                    break;
 
-                switch (data[0])
-                {
-                    case PacketHello:
-                        // Only a host answers a hello. A guest that answered one would
-                        // start a pair of devices saying hello to each other for ever.
-                        if (_role != LinkRole.Host) break;
-                        _peer = new IPEndPoint(from.Address, from.Port);
-                        Welcome();
-                        _connected = true;
-                        break;
-
-                    case PacketWelcome:
-                        if (_role != LinkRole.Guest || _connected) break;
-                        if (data.Length < 5) break;
-                        int at = 1;
-                        _seed = unchecked((uint)ReadInt(data, ref at));
-                        _peer = new IPEndPoint(from.Address, from.Port);
-                        _connected = true;
-                        break;
-
-                    case PacketInput:
-                        if (_peer == null) _peer = new IPEndPoint(from.Address, from.Port);
-                        TakeInput(data);
-                        break;
-
-                    case PacketCheck:
-                        TakeCheck(data);
-                        break;
-
-                    case PacketPing:
+                case PacketRematch:
+                    if (length < 9) break;
+                    int cursor = 1;
+                    int when = ReadInt(data, ref cursor);
+                    uint dealt = unchecked((uint)ReadInt(data, ref cursor));
+                    if (when < 0) { if (_role == LinkRole.Host) ScheduleRematch(); }
+                    else if (_role == LinkRole.Guest && when > _rematchDone)
                     {
-                        // Straight back, unchanged and from the receiving thread, so the
-                        // reading is the wire and not how busy the other end's frame was.
-                        if (data.Length < 5) break;
-                        IPEndPoint peer = _peer;
-                        UdpClient socket = _match;
-                        if (peer == null || socket == null) break;
-                        byte[] pong = new byte[5];
-                        pong[0] = PacketPong;
-                        Array.Copy(data, 1, pong, 1, 4);
-                        try { socket.Send(pong, 5, peer); } catch (Exception) { }
-                        break;
+                        // The host re-sends this until it fires, because losing it
+                        // restarts one phone and not the other. Taking it once is
+                        // this side's half of that: a copy arriving after the tick
+                        // has passed must not deal a second time.
+                        _rematchSeed = dealt;
+                        _rematchAt = when;
                     }
-
-                    case PacketPong:
-                        TakePong(data);
-                        break;
-
-                    case PacketRematch:
-                        if (data.Length < 9) break;
-                        int cursor = 1;
-                        int when = ReadInt(data, ref cursor);
-                        uint dealt = unchecked((uint)ReadInt(data, ref cursor));
-                        if (when < 0) { if (_role == LinkRole.Host) ScheduleRematch(); }
-                        else if (_role == LinkRole.Guest && when > _rematchDone)
-                        {
-                            // The host re-sends this until it fires, because losing it
-                            // restarts one phone and not the other. Taking it once is
-                            // this side's half of that: a copy arriving after the tick
-                            // has passed must not deal a second time.
-                            _rematchSeed = dealt;
-                            _rematchAt = when;
-                        }
-                        break;
-                }
+                    break;
             }
         }
 
         void Welcome()
         {
-            IPEndPoint peer = _peer;
-            UdpClient socket = _match;
-            if (peer == null || socket == null) return;
+            if (_wire == null || !_wire.Ready) return;
 
             byte[] packet = new byte[1 + 4];
             int at = 0;
             packet[at++] = PacketWelcome;
             Write(packet, ref at, unchecked((int)_seed));
-            try { socket.Send(packet, at, peer); } catch (Exception) { }
+            _wire.Send(packet, at);
         }
 
         void TakeInput(byte[] data)
@@ -766,28 +704,10 @@ namespace GulagRunners.Net
             }
         }
 
-        void BeaconLoop()
-        {
-            IPEndPoint from = new IPEndPoint(IPAddress.Any, 0);
-            while (_running)
-            {
-                byte[] data;
-                try { data = _beacon.Receive(ref from); }
-                catch (Exception) { return; }
-                if (data == null || data.Length < 1 || data[0] != PacketBeacon) continue;
-
-                string who = from.Address.ToString();
-                lock (_gate)
-                    if (!_found.Contains(who)) _found.Add(who);
-            }
-        }
-
         void Say(byte kind)
         {
-            IPEndPoint peer = _peer;
-            UdpClient socket = _match;
-            if (peer == null || socket == null) return;
-            try { socket.Send(new[] { kind }, 1, peer); } catch (Exception) { }
+            if (_wire == null || !_wire.Ready) return;
+            _wire.Send(new[] { kind }, 1);
         }
 
         // ------------------------------------------------------------------- plumbing
@@ -820,121 +740,8 @@ namespace GulagRunners.Net
             return v;
         }
 
-        /// <summary>
-        /// Everywhere worth shouting. 255.255.255.255 is the obvious one and the one most
-        /// likely to be dropped: plenty of Wi-Fi chipsets and routers pass the directed
-        /// broadcast for their own subnet and nothing else, so both go out.
-        /// </summary>
-        static IPAddress[] Broadcasts()
-        {
-            List<IPAddress> where = new List<IPAddress> { IPAddress.Broadcast };
-            try
-            {
-                foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (nic.OperationalStatus != OperationalStatus.Up) continue;
-                    if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
 
-                    foreach (UnicastIPAddressInformation one in
-                             nic.GetIPProperties().UnicastAddresses)
-                    {
-                        if (one.Address.AddressFamily != AddressFamily.InterNetwork) continue;
-                        IPAddress mask = one.IPv4Mask;
-                        if (mask == null) continue;
 
-                        byte[] a = one.Address.GetAddressBytes();
-                        byte[] m = mask.GetAddressBytes();
-                        if (a.Length != 4 || m.Length != 4) continue;
-                        for (int i = 0; i < 4; i++) a[i] = (byte)(a[i] | ~m[i]);
 
-                        IPAddress edge = new IPAddress(a);
-                        if (!where.Contains(edge)) where.Add(edge);
-                    }
-                }
-            }
-            catch (Exception) { }
-            return where.ToArray();
-        }
-
-        /// <summary>This device's address on the local network, for reading aloud.</summary>
-        public static string LocalAddress()
-        {
-            // The interface list first: Dns.GetHostEntry answers "127.0.0.1" on plenty of
-            // Android builds, which is the one address that is no use to the other phone.
-            try
-            {
-                foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (nic.OperationalStatus != OperationalStatus.Up) continue;
-                    if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-
-                    foreach (UnicastIPAddressInformation one in
-                             nic.GetIPProperties().UnicastAddresses)
-                        if (one.Address.AddressFamily == AddressFamily.InterNetwork &&
-                            !IPAddress.IsLoopback(one.Address))
-                            return one.Address.ToString();
-                }
-            }
-            catch (Exception) { }
-
-            try
-            {
-                foreach (IPAddress ip in Dns.GetHostEntry(Dns.GetHostName()).AddressList)
-                    if (ip.AddressFamily == AddressFamily.InterNetwork &&
-                        !IPAddress.IsLoopback(ip))
-                        return ip.ToString();
-            }
-            catch (Exception) { }
-            return "unknown";
-        }
-
-        /// <summary>
-        /// Android drops broadcast and multicast traffic to save the radio unless something
-        /// asks it not to. Without this the beacon simply never arrives on a good many
-        /// phones -- and it fails silently, which is the worst way for a thing to fail.
-        /// </summary>
-        void HoldBroadcastsOpen()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (_multicastLock != null) return;
-            try
-            {
-                using (AndroidJavaClass player =
-                       new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-                using (AndroidJavaObject activity =
-                       player.GetStatic<AndroidJavaObject>("currentActivity"))
-                using (AndroidJavaObject wifi =
-                       activity.Call<AndroidJavaObject>("getSystemService", "wifi"))
-                {
-                    AndroidJavaObject held =
-                        wifi.Call<AndroidJavaObject>("createMulticastLock", "GulagRunners");
-                    held.Call("setReferenceCounted", false);
-                    held.Call("acquire");
-                    _multicastLock = held;
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"{name}: no multicast lock ({e.Message}). Finding a host "
-                                 + "automatically may not work; the address still can be "
-                                 + "typed in.", this);
-            }
-#endif
-        }
-
-        void ReleaseBroadcasts()
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (_multicastLock == null) return;
-            try
-            {
-                AndroidJavaObject held = (AndroidJavaObject)_multicastLock;
-                held.Call("release");
-                held.Dispose();
-            }
-            catch (Exception) { }
-#endif
-            _multicastLock = null;
-        }
     }
 }
