@@ -613,15 +613,101 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -24.754
       objectReference: {fileID: 0}
+    - target: {fileID: -1876569322609409209, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: c55e5911bde74004eba51f94ba19c0a5, type: 2}
     - target: {fileID: 919132149155446097, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
       propertyPath: m_Name
       value: Floor_5_Brown (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 4817868895273796077, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 9a33ec0bee863b8459c8f15f62216767, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8724372271552718851, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 13072580}
+    - targetCorrespondingSourceObject: {fileID: 4297149973883602253, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 13072579}
   m_SourcePrefab: {fileID: 100100000, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+--- !u!1 &13072575 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4297149973883602253, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+  m_PrefabInstance: {fileID: 13072574}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &13072576 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4817868895273796077, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+  m_PrefabInstance: {fileID: 13072574}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &13072577 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8724372271552718851, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+  m_PrefabInstance: {fileID: 13072574}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &13072578 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -1876569322609409209, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+  m_PrefabInstance: {fileID: 13072574}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &13072579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 13072575}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 13072576}
+  spanOrigin: {x: -1.5575964, y: 0.088316105, z: 0.011912882}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 3.115869
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
+--- !u!114 &13072580
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 13072577}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 13072578}
+  spanOrigin: {x: -1.5575964, y: 0.088316105, z: -0.00019228458}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 3.115869
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1001 &34846541
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -682,6 +768,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -162.638
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f7466884475389b4b81aba63f72ee966, type: 2}
     - target: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
       propertyPath: m_Name
       value: Chain_1_Black (6)
@@ -689,8 +779,47 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 34846544}
   m_SourcePrefab: {fileID: 100100000, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+--- !u!1 &34846542 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 34846541}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &34846543 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 34846541}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &34846544
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 34846542}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 34846543}
+  spanOrigin: {x: 0.0000000037252903, y: 0, z: 0}
+  spanAxis: {x: 0, y: 1, z: 0}
+  spanLength: 1.14
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &36417647
 GameObject:
   m_ObjectHideFlags: 0
@@ -1094,7 +1223,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 928e67672e621b144a8c7e2baa18a0e9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1235,6 +1364,10 @@ PrefabInstance:
       propertyPath: scalingMode
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6823200998282874673, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6823200998282874675, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.0111111
@@ -1294,6 +1427,10 @@ PrefabInstance:
     - target: {fileID: 6823200998337669616, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6823200998337669617, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2164,10 +2301,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -5718934016109707745, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 426d5870a54f97140b98f25c54ea47fb, type: 2}
     - target: {fileID: 919132149155446097, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
       propertyPath: m_Name
       value: Cage_1_Black
       objectReference: {fileID: 0}
+    - target: {fileID: 7752869147688974958, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: bfae809860605724d9a0489e6bb3a74f, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2175,7 +2320,85 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 422985324}
+    - targetCorrespondingSourceObject: {fileID: 3978640675780065682, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 127891044}
+    - targetCorrespondingSourceObject: {fileID: -2117188530202603140, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 127891043}
   m_SourcePrefab: {fileID: 100100000, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+--- !u!1 &127891039 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -2117188530202603140, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 127891038}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &127891040 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7752869147688974958, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 127891038}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &127891041 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3978640675780065682, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 127891038}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &127891042 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -5718934016109707745, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 127891038}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &127891043
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 127891039}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 127891040}
+  spanOrigin: {x: -0.73019695, y: 0.75000006, z: 0.000000059604645}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 1.4603939
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
+--- !u!114 &127891044
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 127891041}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 127891042}
+  spanOrigin: {x: -0.75, y: 0.745, z: 0}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 1.5
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &131652013
 GameObject:
   m_ObjectHideFlags: 0
@@ -4275,7 +4498,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -9244,7 +9467,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -13504,10 +13727,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d46b972c8006d8240ba130b57bdc3e58, type: 2}
+    - target: {fileID: -3138454207659777194, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 859072e2b914c124bb0721018207153c, type: 2}
     - target: {fileID: 919132149155446097, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Name
       value: Bridge_5_Brown (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 64db12a0a62f37349a30fd63e06ddcba, type: 2}
     - target: {fileID: 6140288381748933299, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -13518,8 +13753,125 @@ PrefabInstance:
     - {fileID: 5675911855102184163, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
     - {fileID: 2815277084611486704, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 210270024}
+    - targetCorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 210270023}
+    - targetCorrespondingSourceObject: {fileID: 4448750676884988608, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 210270022}
   m_SourcePrefab: {fileID: 100100000, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+--- !u!1 &210270016 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4448750676884988608, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 210270015}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &210270017 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 210270015}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &210270018 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 210270015}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &210270019 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 210270015}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &210270020 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 210270015}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &210270021 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -3138454207659777194, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 210270015}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &210270022
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210270016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 210270017}
+  spanOrigin: {x: -1.28, y: 2, z: -1.5}
+  spanAxis: {x: -0, y: -1, z: -0}
+  spanLength: 4
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0.06
+  follow: {fileID: 13072579}
+--- !u!114 &210270023
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210270018}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 210270019}
+  spanOrigin: {x: -1.28, y: 2, z: 1.5}
+  spanAxis: {x: -0, y: -1, z: -0}
+  spanLength: 4
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0.06
+  follow: {fileID: 13072579}
+--- !u!114 &210270024
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210270020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 210270021}
+  spanOrigin: {x: -0.0016977191, y: -0.0027021915, z: -3.0899997}
+  spanAxis: {x: 0, y: 0, z: 1}
+  spanLength: 6.09
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1001 &218322086
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -13636,7 +13988,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: e41243b9caf93ca4b9f01178ad3e52c4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -14542,6 +14894,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -53.232
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f7466884475389b4b81aba63f72ee966, type: 2}
     - target: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
       propertyPath: m_Name
       value: Chain_1_Black
@@ -14549,8 +14905,47 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 270285039}
   m_SourcePrefab: {fileID: 100100000, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+--- !u!1 &270285037 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 270285036}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &270285038 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 270285036}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &270285039
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 270285037}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 270285038}
+  spanOrigin: {x: 0.0000000037252903, y: 0, z: 0}
+  spanAxis: {x: 0, y: 1, z: 0}
+  spanLength: 1.14
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &271083786
 GameObject:
   m_ObjectHideFlags: 0
@@ -20658,7 +21053,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -24530,6 +24925,7 @@ GameObject:
   m_Component:
   - component: {fileID: 290993511}
   - component: {fileID: 290993510}
+  - component: {fileID: 290993512}
   m_Layer: 0
   m_Name: Rarity Glow
   m_TagString: Untagged
@@ -24617,6 +25013,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1900000731}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &290993512
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 290993509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1001 &295348283
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -26060,7 +26485,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 44
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -26400,7 +26825,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 113.9, y: -68}
+  m_AnchoredPosition: {x: 113.8999, y: -68}
   m_SizeDelta: {x: 88.4, y: 17}
   m_Pivot: {x: 0, y: 1}
 --- !u!1001 &368412986
@@ -26523,7 +26948,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 928e67672e621b144a8c7e2baa18a0e9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -28376,10 +28801,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d46b972c8006d8240ba130b57bdc3e58, type: 2}
+    - target: {fileID: -3138454207659777194, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 859072e2b914c124bb0721018207153c, type: 2}
     - target: {fileID: 919132149155446097, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Name
       value: Bridge_5_Brown
       objectReference: {fileID: 0}
+    - target: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 64db12a0a62f37349a30fd63e06ddcba, type: 2}
     - target: {fileID: 6140288381748933299, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -28390,8 +28827,125 @@ PrefabInstance:
     - {fileID: 5675911855102184163, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
     - {fileID: 2815277084611486704, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 494039451}
+    - targetCorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 494039450}
+    - targetCorrespondingSourceObject: {fileID: 4448750676884988608, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 494039449}
   m_SourcePrefab: {fileID: 100100000, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+--- !u!1 &494039443 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4448750676884988608, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 494039442}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &494039444 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 494039442}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &494039445 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 494039442}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &494039446 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 494039442}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &494039447 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 494039442}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &494039448 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -3138454207659777194, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 494039442}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &494039449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 494039443}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 494039444}
+  spanOrigin: {x: -1.28, y: 2, z: -1.5}
+  spanAxis: {x: -0, y: -1, z: -0}
+  spanLength: 4
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0.06
+  follow: {fileID: 1786209828}
+--- !u!114 &494039450
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 494039445}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 494039446}
+  spanOrigin: {x: -1.28, y: 2, z: 1.5}
+  spanAxis: {x: -0, y: -1, z: -0}
+  spanLength: 4
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0.06
+  follow: {fileID: 1786209828}
+--- !u!114 &494039451
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 494039447}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 494039448}
+  spanOrigin: {x: -0.0016977191, y: -0.0027021915, z: -3.0899997}
+  spanAxis: {x: 0, y: 0, z: 1}
+  spanLength: 6.09
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &506825839
 GameObject:
   m_ObjectHideFlags: 0
@@ -29503,7 +30057,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -34046,7 +34600,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: e41243b9caf93ca4b9f01178ad3e52c4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -35292,7 +35846,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -40541,7 +41095,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -44919,6 +45473,7 @@ GameObject:
   m_Component:
   - component: {fileID: 620771724}
   - component: {fileID: 620771723}
+  - component: {fileID: 620771725}
   m_Layer: 0
   m_Name: Rarity Glow
   m_TagString: Untagged
@@ -45006,6 +45561,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1900000741}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &620771725
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 620771722}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1001 &622379436
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -45176,6 +45760,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -120.183
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f7466884475389b4b81aba63f72ee966, type: 2}
     - target: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
       propertyPath: m_Name
       value: Chain_1_Black (2)
@@ -45183,8 +45771,47 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 625761575}
   m_SourcePrefab: {fileID: 100100000, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+--- !u!1 &625761573 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 625761572}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &625761574 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 625761572}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &625761575
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 625761573}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 625761574}
+  spanOrigin: {x: 0.0000000037252903, y: 0, z: 0}
+  spanAxis: {x: 0, y: 1, z: 0}
+  spanLength: 1.14
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1001 &631887127
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -45372,7 +45999,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 56
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -45556,6 +46183,10 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8525990746615576123, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8525990746615576125, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.0111111
@@ -45612,9 +46243,17 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8941974229056258647, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8941974229959612359, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8941974229959612376, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -45902,6 +46541,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d46b972c8006d8240ba130b57bdc3e58, type: 2}
+    - target: {fileID: -3138454207659777194, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 859072e2b914c124bb0721018207153c, type: 2}
     - target: {fileID: -2919749213416614620, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 1
@@ -45910,6 +46557,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Bridge_5_Brown (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 64db12a0a62f37349a30fd63e06ddcba, type: 2}
     - target: {fileID: 6140288381748933299, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -45920,8 +46571,125 @@ PrefabInstance:
     - {fileID: 5675911855102184163, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
     - {fileID: 2815277084611486704, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 664725942}
+    - targetCorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 664725941}
+    - targetCorrespondingSourceObject: {fileID: 4448750676884988608, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 664725940}
   m_SourcePrefab: {fileID: 100100000, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+--- !u!1 &664725934 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4448750676884988608, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 664725933}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &664725935 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 664725933}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &664725936 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 664725933}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &664725937 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 664725933}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &664725938 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 664725933}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &664725939 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -3138454207659777194, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+  m_PrefabInstance: {fileID: 664725933}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &664725940
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 664725934}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 664725935}
+  spanOrigin: {x: -1.28, y: 2, z: -1.5}
+  spanAxis: {x: -0, y: -1, z: -0}
+  spanLength: 4
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0.06
+  follow: {fileID: 13072579}
+--- !u!114 &664725941
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 664725936}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 664725937}
+  spanOrigin: {x: -1.28, y: 2, z: 1.5}
+  spanAxis: {x: -0, y: -1, z: -0}
+  spanLength: 4
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0.06
+  follow: {fileID: 1786209828}
+--- !u!114 &664725942
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 664725938}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 664725939}
+  spanOrigin: {x: -0.0016977191, y: -0.0027021915, z: -3.0899997}
+  spanAxis: {x: 0, y: 0, z: 1}
+  spanLength: 6.09
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &667158314
 GameObject:
   m_ObjectHideFlags: 0
@@ -47033,7 +47801,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -52218,7 +52986,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -56546,7 +57314,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: e41243b9caf93ca4b9f01178ad3e52c4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -56762,6 +57530,10 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1685380275729221207, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2656852500830063814, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
       propertyPath: playOnAwake
       value: 0
@@ -56769,6 +57541,18 @@ PrefabInstance:
     - target: {fileID: 4857190449412570763, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5376562053934187832, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5706262300690992334, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6138313721048611992, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6793051285707621876, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
       propertyPath: playOnAwake
@@ -56826,6 +57610,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7177991128484655637, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7177991128484655639, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
       propertyPath: clearBehavior
       value: 0
@@ -56841,7 +57629,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3463396040527041655, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 718547185}
   m_SourcePrefab: {fileID: 100100000, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
 --- !u!4 &718547182 stripped
 Transform:
@@ -56853,6 +57644,40 @@ ParticleSystem:
   m_CorrespondingSourceObject: {fileID: 7177991128484655658, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
   m_PrefabInstance: {fileID: 718547181}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &718547184 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3463396040527041655, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+  m_PrefabInstance: {fileID: 718547181}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &718547185
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 718547184}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!4 &724054455 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3600717397851917141, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
@@ -57134,7 +57959,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 44
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -57429,6 +58254,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -162.638
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f7466884475389b4b81aba63f72ee966, type: 2}
     - target: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
       propertyPath: m_Name
       value: Chain_1_Black (3)
@@ -57436,8 +58265,47 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 743851738}
   m_SourcePrefab: {fileID: 100100000, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+--- !u!1 &743851736 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 743851735}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &743851737 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 743851735}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &743851738
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 743851736}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 743851737}
+  spanOrigin: {x: 0.0000000037252903, y: 0, z: 0}
+  spanAxis: {x: 0, y: 1, z: 0}
+  spanLength: 1.14
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!4 &744576061 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8819633815334433360, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
@@ -60322,7 +61190,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -65255,6 +66123,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -120.183
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f7466884475389b4b81aba63f72ee966, type: 2}
     - target: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
       propertyPath: m_Name
       value: Chain_1_Black (5)
@@ -65262,8 +66134,47 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 921054230}
   m_SourcePrefab: {fileID: 100100000, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+--- !u!1 &921054228 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 921054227}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &921054229 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 921054227}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &921054230
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 921054228}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 921054229}
+  spanOrigin: {x: 0.0000000037252903, y: 0, z: 0}
+  spanAxis: {x: 0, y: 1, z: 0}
+  spanLength: 1.14
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1001 &922557839
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -66620,6 +67531,10 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8525990746615576123, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8525990746615576125, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.0111111
@@ -66676,9 +67591,17 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8941974229056258647, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8941974229959612359, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8941974229959612376, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -67222,7 +68145,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 96
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -67336,6 +68259,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1040381432}
   - component: {fileID: 1040381431}
+  - component: {fileID: 1040381433}
   m_Layer: 0
   m_Name: Rarity Glow
   m_TagString: Untagged
@@ -67423,6 +68347,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1900000711}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1040381433
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1040381430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1001 &1041679085
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -68743,7 +69696,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -73002,7 +73955,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 44
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -73485,6 +74438,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1121662955}
   - component: {fileID: 1121662954}
+  - component: {fileID: 1121662956}
   m_Layer: 0
   m_Name: Rarity Glow
   m_TagString: Untagged
@@ -73572,6 +74526,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1900000761}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1121662956
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1121662953}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &1136279093
 GameObject:
   m_ObjectHideFlags: 0
@@ -73767,6 +74750,10 @@ PrefabInstance:
       propertyPath: scalingMode
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6823200998282874673, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6823200998282874675, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.0111111
@@ -73826,6 +74813,10 @@ PrefabInstance:
     - target: {fileID: 6823200998337669616, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6823200998337669617, guid: 8f8fe12323625f5499b2853dd2ad3e58, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -79680,7 +80671,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -487.90002, y: -30.6}
+  m_AnchoredPosition: {x: -487.90002, y: -30.599976}
   m_SizeDelta: {x: 374, y: 27.2}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1225717815
@@ -79836,6 +80827,10 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8525990746615576123, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8525990746615576125, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.0111111
@@ -79892,9 +80887,17 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8941974229056258647, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8941974229959612359, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8941974229959612376, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -81022,7 +82025,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -84849,7 +85852,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 928e67672e621b144a8c7e2baa18a0e9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -86427,7 +87430,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 113.9, y: -30.6}
+  m_AnchoredPosition: {x: 113.8999, y: -30.599976}
   m_SizeDelta: {x: 374, y: 27.2}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1351222060
@@ -86737,6 +87740,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -17.702
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f7466884475389b4b81aba63f72ee966, type: 2}
     - target: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
       propertyPath: m_Name
       value: Chain_1_Black (1)
@@ -86744,8 +87751,47 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1362744655}
   m_SourcePrefab: {fileID: 100100000, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+--- !u!1 &1362744653 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 1362744652}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1362744654 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 1362744652}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1362744655
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1362744653}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 1362744654}
+  spanOrigin: {x: 0.0000000037252903, y: 0, z: 0}
+  spanAxis: {x: 0, y: 1, z: 0}
+  spanLength: 1.14
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &1370685654
 GameObject:
   m_ObjectHideFlags: 0
@@ -86894,10 +87940,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -5718934016109707745, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 426d5870a54f97140b98f25c54ea47fb, type: 2}
     - target: {fileID: 919132149155446097, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
       propertyPath: m_Name
       value: Cage_1_Black (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 7752869147688974958, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: bfae809860605724d9a0489e6bb3a74f, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -86905,7 +87959,85 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 100543878}
+    - targetCorrespondingSourceObject: {fileID: 3978640675780065682, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1372700468}
+    - targetCorrespondingSourceObject: {fileID: -2117188530202603140, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1372700467}
   m_SourcePrefab: {fileID: 100100000, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+--- !u!1 &1372700463 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -2117188530202603140, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 1372700462}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1372700464 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7752869147688974958, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 1372700462}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1372700465 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3978640675780065682, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 1372700462}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1372700466 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -5718934016109707745, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 1372700462}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1372700467
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1372700463}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 1372700464}
+  spanOrigin: {x: -0.73019695, y: 0.75000006, z: 0.000000059604645}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 1.4603939
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
+--- !u!114 &1372700468
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1372700465}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 1372700466}
+  spanOrigin: {x: -0.75, y: 0.745, z: 0}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 1.5
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1001 &1379571702
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -88175,7 +89307,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -93069,7 +94201,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -98103,7 +99235,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -105388,7 +106520,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -109302,6 +110434,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -29.98
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f7466884475389b4b81aba63f72ee966, type: 2}
     - target: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
       propertyPath: m_Name
       value: Chain_1_Black (7)
@@ -109309,8 +110445,47 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1583825137}
   m_SourcePrefab: {fileID: 100100000, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+--- !u!1 &1583825135 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 1583825134}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1583825136 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 1583825134}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1583825137
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583825135}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 1583825136}
+  spanOrigin: {x: 0.0000000037252903, y: 0, z: 0}
+  spanAxis: {x: 0, y: 1, z: 0}
+  spanLength: 1.14
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &1584375422
 GameObject:
   m_ObjectHideFlags: 0
@@ -109518,7 +110693,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 44
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -109633,7 +110808,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 928e67672e621b144a8c7e2baa18a0e9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -110175,6 +111350,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -53.232
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f7466884475389b4b81aba63f72ee966, type: 2}
     - target: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
       propertyPath: m_Name
       value: Chain_1_Black (4)
@@ -110182,8 +111361,47 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1644726339}
   m_SourcePrefab: {fileID: 100100000, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+--- !u!1 &1644726337 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 1644726336}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1644726338 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
+  m_PrefabInstance: {fileID: 1644726336}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1644726339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1644726337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 1644726338}
+  spanOrigin: {x: 0.0000000037252903, y: 0, z: 0}
+  spanAxis: {x: 0, y: 1, z: 0}
+  spanLength: 1.14
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &1650734746
 GameObject:
   m_ObjectHideFlags: 0
@@ -110575,7 +111793,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: e41243b9caf93ca4b9f01178ad3e52c4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -112434,7 +113652,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 113.9, y: -88.4}
+  m_AnchoredPosition: {x: 113.8999, y: -88.400024}
   m_SizeDelta: {x: 272, y: 25.5}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1740193129
@@ -112952,15 +114170,101 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 24.353
       objectReference: {fileID: 0}
+    - target: {fileID: -1876569322609409209, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: c55e5911bde74004eba51f94ba19c0a5, type: 2}
     - target: {fileID: 919132149155446097, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
       propertyPath: m_Name
       value: Floor_5_Brown
       objectReference: {fileID: 0}
+    - target: {fileID: 4817868895273796077, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 9a33ec0bee863b8459c8f15f62216767, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8724372271552718851, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1786209829}
+    - targetCorrespondingSourceObject: {fileID: 4297149973883602253, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1786209828}
   m_SourcePrefab: {fileID: 100100000, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+--- !u!1 &1786209824 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4297149973883602253, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+  m_PrefabInstance: {fileID: 1786209823}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1786209825 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4817868895273796077, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+  m_PrefabInstance: {fileID: 1786209823}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1786209826 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8724372271552718851, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+  m_PrefabInstance: {fileID: 1786209823}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1786209827 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -1876569322609409209, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
+  m_PrefabInstance: {fileID: 1786209823}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1786209828
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1786209824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 1786209825}
+  spanOrigin: {x: -1.5575964, y: 0.088316105, z: 0.011912882}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 3.115869
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
+--- !u!114 &1786209829
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1786209826}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 1786209827}
+  spanOrigin: {x: -1.5575964, y: 0.088316105, z: -0.00019228458}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 3.115869
+  watch:
+  - {fileID: 1900000127}
+  - {fileID: 1900000119}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 70
+  damping: 7
+  swayPerLoad: 0
+  follow: {fileID: 0}
 --- !u!1 &1788308989
 GameObject:
   m_ObjectHideFlags: 0
@@ -114813,7 +116117,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -118655,7 +119959,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: e41243b9caf93ca4b9f01178ad3e52c4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -118712,6 +120016,10 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1685380275729221207, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2656852500830063814, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
       propertyPath: playOnAwake
       value: 0
@@ -118719,6 +120027,18 @@ PrefabInstance:
     - target: {fileID: 4857190449412570763, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5376562053934187832, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5706262300690992334, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6138313721048611992, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6793051285707621876, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
       propertyPath: playOnAwake
@@ -118776,6 +120096,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7177991128484655637, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7177991128484655639, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
       propertyPath: clearBehavior
       value: 0
@@ -118791,7 +120115,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3463396040527041655, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1833828953}
   m_SourcePrefab: {fileID: 100100000, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
 --- !u!4 &1833828950 stripped
 Transform:
@@ -118803,6 +120130,40 @@ ParticleSystem:
   m_CorrespondingSourceObject: {fileID: 7177991128484655658, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
   m_PrefabInstance: {fileID: 1833828949}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1833828952 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3463396040527041655, guid: 59a35ab9f68edff40b6e5332bed330f5, type: 3}
+  m_PrefabInstance: {fileID: 1833828949}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1833828953
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1833828952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &1836654969
 GameObject:
   m_ObjectHideFlags: 0
@@ -120540,7 +121901,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -125439,7 +126800,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -136556,7 +137917,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 44
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -138159,6 +139520,10 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8525990746615576123, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8525990746615576125, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.0111111
@@ -138215,9 +139580,17 @@ PrefabInstance:
       propertyPath: playOnAwake
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8941974229056258647, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8941974229959612359, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
       propertyPath: playOnAwake
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8941974229959612376, guid: b85d21f3b8fed714bacf0c4fd50fa512, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -139542,7 +140915,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -143590,6 +144963,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2045732864}
   - component: {fileID: 2045732863}
+  - component: {fileID: 2045732865}
   m_Layer: 0
   m_Name: Rarity Glow
   m_TagString: Untagged
@@ -143677,6 +145051,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1900000721}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2045732865
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2045732862}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &2050454415
 GameObject:
   m_ObjectHideFlags: 0
@@ -144788,7 +146191,7 @@ ParticleSystem:
           m_PostInfinity: 2
           m_RotationOrder: 4
       cycleCount: 1
-      repeatInterval: 0.0001
+      repeatInterval: 0.01
       probability: 1
   SizeModule:
     enabled: 1
@@ -149810,6 +151213,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2104471993}
   - component: {fileID: 2104471992}
+  - component: {fileID: 2104471994}
   m_Layer: 0
   m_Name: Rarity Glow
   m_TagString: Untagged
@@ -149897,6 +151301,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1900000751}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2104471994
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2104471991}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &2107520367
 GameObject:
   m_ObjectHideFlags: 0
