@@ -244,6 +244,19 @@ namespace UnityEditor
         public int anisoLevel;
     }
 
+    // Enough of the model importer to fix a file that lies about its own units:
+    // useFileScale false with globalScale 1 means one file unit is one metre,
+    // whatever the FBX's UnitScaleFactor claims.
+    public class ModelImporter : AssetImporter
+    {
+        public bool useFileScale;
+        public float globalScale;
+        public bool importCameras;
+        public bool importLights;
+        public bool isReadable;
+        public bool bakeAxisConversion;
+    }
+
     public enum TextureImporterType { Default, Sprite, NormalMap, GUI }
     public enum SpriteImportMode { None, Single, Multiple, Polygon }
     public enum TextureImporterNPOTScale { None, ToNearest, ToLarger, ToSmaller }

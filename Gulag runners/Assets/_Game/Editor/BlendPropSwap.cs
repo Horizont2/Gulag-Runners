@@ -316,8 +316,75 @@ namespace GulagRunners.GameEditor
             return found;
         }
 
+        // A prop whose whole model imports smaller than this is not a small prop, it is
+        // a unit mistake.
+        //
+        // Measured rather than guessed, over every FBX in both packs, at the size Unity
+        // currently gives them: the dungeon pack spans 0.2 cm to 5.8 cm and the AA Low
+        // Poly pack starts at 21.6 cm and goes up. Nothing at all lands in between, so
+        // 12 cm sits in the middle of a clean gap -- it catches all 48 of the mislabelled
+        // models and none of the 855 correct ones, with about a factor of two of margin
+        // either side.
+        //
+        // The first threshold was 5 cm and let Arch and Statue_Horse through at 5.8 and
+        // 5.2, which are the same fault in bigger models.
+        const float TooSmall = 0.12f;
+
+        static readonly HashSet<string> Rescaled = new HashSet<string>();
+
+        /// <summary>
+        /// Makes an FBX import at the size it was modelled at, where its file lies about
+        /// its own units.
+        ///
+        /// This is what made the swapped props microscopic. The dungeon pack's FBX
+        /// declare UnitScaleFactor 1 -- "one unit is one centimetre" -- while their
+        /// vertices are plainly in metres: the barrel's raw box is 1.04 x 1.03 x 1.35.
+        /// The exporter papered over it with Lcl Scaling 100 on the node, which Unity
+        /// does not carry onto the imported root. So Unity dutifully scaled the whole
+        /// model by 0.01 and produced a one-centimetre barrel, which at the instance's
+        /// own 0.4555 scale is four and a half millimetres.
+        ///
+        /// The same pack's .blend files go through Blender's exporter with Unity's own
+        /// settings and come out in metres, which is why they were the right size and
+        /// their FBX twins are not.
+        ///
+        /// It is NOT applied to everything, because for most models the declaration is
+        /// true: the AA Low Poly chain is 15 x 114 units and really is in centimetres,
+        /// and forcing metres on that would hang a 114-metre chain in the arena. The
+        /// test is the imported size -- below five centimetres for an entire prop, the
+        /// file is wrong about its units.
+        /// </summary>
+        static bool MatchUnits(string path)
+        {
+            if (Rescaled.Contains(path)) return false;
+            Rescaled.Add(path);
+
+            GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (asset == null) return false;
+
+            float biggest = 0f;
+            foreach (MeshFilter filter in asset.GetComponentsInChildren<MeshFilter>(true))
+                if (filter.sharedMesh != null)
+                    biggest = Mathf.Max(biggest, filter.sharedMesh.bounds.size.magnitude);
+
+            if (biggest <= 0f || biggest >= TooSmall) return false;
+
+            var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            if (importer == null || !importer.useFileScale) return false;
+
+            importer.useFileScale = false;
+            importer.globalScale = 1f;
+            importer.SaveAndReimport();
+
+            Debug.Log($"Blend props: {Path.GetFileName(path)} imported at " +
+                      $"{biggest:0.###} m across -- its file claims centimetres but is " +
+                      "modelled in metres. Switched that model to 1 unit = 1 metre.");
+            return true;
+        }
+
         static GameObject Swap(GameObject broken, string path)
         {
+            MatchUnits(path);
             GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (asset == null)
             {
