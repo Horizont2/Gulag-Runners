@@ -96,6 +96,7 @@ namespace GulagRunners.GameEditor
             int replaced = 0;
 
             var traced = new List<string>();
+            var created = new List<GameObject>();
             foreach (GameObject go in broken)
             {
                 // Read the name BEFORE anything can destroy the object. Doing it after
@@ -129,7 +130,19 @@ namespace GulagRunners.GameEditor
                 // that stops dead halfway leaves the scene in a state nobody asked for.
                 try
                 {
-                    if (Swap(go, path)) { replaced++; done.Add($"  {label}  ->  {path}"); }
+                    GameObject made = Swap(go, path);
+                    if (made != null)
+                    {
+                        replaced++;
+                        created.Add(made);
+                        // The renderer count is the difference between "an object now
+                        // exists" and "you can see it". An FBX root with nothing to draw
+                        // under it would replace a missing prop with an invisible one,
+                        // and the count would still read 76.
+                        int draws = made.GetComponentsInChildren<Renderer>(true).Length;
+                        done.Add($"  {label}  ->  {path}  ({draws} renderer(s) at " +
+                                 $"{made.transform.position})");
+                    }
                 }
                 catch (System.Exception e)
                 {
@@ -138,8 +151,17 @@ namespace GulagRunners.GameEditor
                 }
             }
 
+            // Count what is STILL broken, and save. "76 replaced" is a claim about what
+            // this code did; the only thing worth printing is what the scene looks like
+            // afterwards, counted the same way it was counted before. The two disagreeing
+            // is the single most useful line this tool can produce.
+            int left = -1;
             if (!dryRun && replaced > 0)
+            {
+                left = Broken().Count;
                 UnityEditor.SceneManagement.EditorSceneManager.MarkAllScenesDirty();
+                UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
+            }
 
             var message = new System.Text.StringBuilder();
             message.AppendLine(dryRun
@@ -147,7 +169,52 @@ namespace GulagRunners.GameEditor
                   $"broken objects have an FBX of the same name, out of {models.Count} " +
                   "FBX in the project."
                 : $"Blend props: {replaced} of {broken.Count} replaced, from " +
-                  $"{models.Count} FBX in the project.");
+                  $"{models.Count} FBX in the project. Scene saved.");
+
+            if (left >= 0)
+            {
+                message.AppendLine($"  Still missing a prefab after the run: {left}. " +
+                                   (left == broken.Count - replaced
+                                    ? "That matches -- the swap stuck."
+                                    : "That does NOT match what was replaced, so the " +
+                                      "swap did not stick. Send this line."));
+            }
+
+            // WHERE they went, and all of them selected so you can press F and look.
+            //
+            // "It replaced them but I cannot see them" is not something a count can
+            // answer. These props were placed by somebody working with the .blend
+            // import; the swap puts the FBX on the same transform, so if one was tucked
+            // behind the floor slab it still is. The combined box says whether they
+            // landed in the arena or somewhere absurd, and the split above and below the
+            // floor says how many were never going to be visible from the front.
+            if (!dryRun && created.Count > 0)
+            {
+                Bounds all = new Bounds(created[0].transform.position, Vector3.zero);
+                int drawable = 0, below = 0;
+                foreach (GameObject made in created)
+                {
+                    all.Encapsulate(made.transform.position);
+                    if (made.transform.position.y < 0f) below++;
+                    foreach (Renderer r in made.GetComponentsInChildren<Renderer>(true))
+                    {
+                        all.Encapsulate(r.bounds);
+                        drawable++;
+                    }
+                }
+
+                message.AppendLine();
+                message.AppendLine($"  They occupy {all.size.x:0.0} x {all.size.y:0.0} x " +
+                                   $"{all.size.z:0.0} m centred on {all.center}, with " +
+                                   $"{drawable} renderer(s) between them.");
+                message.AppendLine($"  {below} of {created.Count} sit below y=0, so they " +
+                                   "are under the main floor and were already hidden " +
+                                   "from the front before this ran.");
+                message.AppendLine("  All of them are selected now -- hover the Scene " +
+                                   "view and press F to frame them.");
+
+                Selection.objects = created.ToArray();
+            }
 
             // Long lists are worse than useless in the console; the first few say whether
             // the names matched the way you expected, which is the thing to check.
@@ -249,19 +316,19 @@ namespace GulagRunners.GameEditor
             return found;
         }
 
-        static bool Swap(GameObject broken, string path)
+        static GameObject Swap(GameObject broken, string path)
         {
             GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (asset == null)
             {
                 Debug.LogWarning($"Blend props: {path} would not load, so {broken.name} " +
                                  "was left as it is.");
-                return false;
+                return null;
             }
 
             Transform old = broken.transform;
             var made = PrefabUtility.InstantiatePrefab(asset, old.parent) as GameObject;
-            if (made == null) return false;
+            if (made == null) return null;
 
             Undo.RegisterCreatedObjectUndo(made, "Replace broken .blend props");
 
@@ -277,7 +344,7 @@ namespace GulagRunners.GameEditor
             made.SetActive(broken.activeSelf);
 
             Undo.DestroyObjectImmediate(broken);
-            return true;
+            return made;
         }
     }
 }
