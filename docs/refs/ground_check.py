@@ -133,6 +133,79 @@ def texture_contrast():
     return out
 
 
+# Shader property -> the name ground_mirror knows it by.
+SETTING_NAMES = {
+    "_TopTile": "top_tile", "_SideTile": "side_tile",
+    "_TopFacing": "top_facing", "_TopBlend": "top_blend", "_Sharpness": "sharpness",
+    "_Overhang": "overhang", "_OverhangFade": "overhang_fade",
+    "_LipShade": "lip_shade", "_LipShadeDepth": "lip_shade_depth",
+    "_LipJitter": "lip_jitter", "_LipJitterScale": "lip_jitter_scale",
+    "_FootShade": "foot_shade", "_FootShadeHeight": "foot_shade_height",
+    "_EdgeRound": "edge_round", "_EdgeRoundStrength": "edge_round_strength",
+    "_Warp": "warp", "_Interlock": "interlock",
+    "_MacroScale": "macro_scale", "_MacroStrength": "macro_strength",
+    "_MacroWarm": "macro_warm", "_Detune": "detune", "_Wear": "wear",
+}
+
+# Breakup()'s parameters, which stand in for the properties it writes.
+BREAKUP_NAMES = {
+    "edgeRound": "_EdgeRound", "edgeStrength": "_EdgeRoundStrength",
+    "warp": "_Warp", "interlock": "_Interlock", "macroScale": "_MacroScale",
+    "macroStrength": "_MacroStrength", "macroWarm": "_MacroWarm",
+    "detune": "_Detune", "wear": "_Wear",
+}
+
+
+def tool_values():
+    """What ArenaGroundSetup will actually write, read out of the C#.
+
+    The settings live in two places -- the tool writes them and ground_mirror describes
+    them -- and there are two dozen of them. Without this the preview can quietly come
+    to show a surface the game never renders, which is the one failure a preview tool
+    must not have, because nothing downstream of it would look wrong.
+    """
+    with open(SETUP, encoding="utf-8") as fh:
+        source = fh.read()
+
+    out = {}
+    for method, kind in (("BuildGround", "ground"), ("BuildRock", "rock"),
+                         ("BuildPillar", "pillar")):
+        start = source.find("static Material " + method)
+        if start < 0:
+            continue
+        end = source.find("\n        static ", start + 1)
+        body = source[start:end if end > 0 else len(source)]
+
+        values = {}
+        for name, number in re.findall(
+                r'SetFloat\("(\w+)",\s*(-?[\d.]+)f?\)', body):
+            if name in SETTING_NAMES:
+                values[SETTING_NAMES[name]] = float(number)
+
+        call = re.search(r"Breakup\(m,(.*?)\);", body, re.S)
+        if call:
+            for arg, number in re.findall(r"(\w+):\s*(-?[\d.]+)f?", call.group(1)):
+                prop = BREAKUP_NAMES.get(arg)
+                if prop:
+                    values[SETTING_NAMES[prop]] = float(number)
+
+        mesh = re.search(r"SetVector\(\"_MeshSize\",\s*new Vector4\("
+                         r"(-?[\d.]+)f,\s*(-?[\d.]+)f,\s*(-?[\d.]+)f", body)
+        if mesh:
+            values["mesh_size"] = tuple(float(v) for v in mesh.groups())
+
+        for prop, key in (("_TopColor", "top_tint"), ("_SideColor", "side_tint")):
+            colour = re.search(re.escape(prop) + r"\",\s*new Color\("
+                               r"(-?[\d.]+)f,\s*(-?[\d.]+)f,\s*(-?[\d.]+)f", body)
+            if colour:
+                values[key] = tuple(float(v) for v in colour.groups())
+            elif re.search(re.escape(prop) + r"\",\s*Color\.white", body):
+                values[key] = (1.0, 1.0, 1.0)
+
+        out[kind] = values
+    return out
+
+
 def main(argv=()):
     problems, notes = [], []
 
@@ -280,6 +353,32 @@ def main(argv=()):
             f"on {worst.name} ({' x '.join(f'{v:.2f}' for v in worst.world_size)} m). "
             f"Projected from the world axes it is 1x on every block, because the block "
             f"is not in the expression.")
+
+    # --- does the mirror still describe the tool?
+
+    written = tool_values()
+    for kind, settings in sorted(written.items()):
+        described = gm.MATERIALS.get(kind)
+        if described is None:
+            problems.append(f"{kind}: the tool builds it, ground_mirror does not know it")
+            continue
+        for key, value in sorted(settings.items()):
+            if key not in described:
+                problems.append(f"{kind}: the tool writes {key} = {value}, which "
+                                f"ground_mirror has no setting for")
+                continue
+            mine = described[key]
+            same = (all(abs(a - b) < 1e-4 for a, b in zip(value, mine))
+                    if isinstance(value, tuple) else abs(value - mine) < 1e-4)
+            if not same:
+                problems.append(
+                    f"{kind}: the tool writes {key} = {value} but ground_mirror says "
+                    f"{mine} -- the preview and the check are describing a surface the "
+                    f"game will not render")
+        for key in described:
+            if key not in settings and key not in ("mesh_size",):
+                problems.append(f"{kind}: ground_mirror has {key} but the tool never "
+                                f"writes it, so the material keeps the shader default")
 
     # --- can you tell the cap from the side at all?
 

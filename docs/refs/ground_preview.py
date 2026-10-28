@@ -72,6 +72,69 @@ def sample(tex, uv):
     return tex[y, x]
 
 
+def luma(c):
+    return c[..., 0] * 0.2126 + c[..., 1] * 0.7152 + c[..., 2] * 0.0722
+
+
+def smoothstep(lo, hi, x):
+    t = np.clip((x - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def height_blend(height_a, height_b, want, depth):
+    """Mirrors HeightBlend in the shader: both materials argue, the higher one wins."""
+    depth = max(depth, 1e-4)
+    a = (1.0 - want) + height_a * depth
+    b = want + height_b * depth
+    m = np.maximum(a, b) - depth
+    wa = np.maximum(a - m, 0.0)
+    wb = np.maximum(b - m, 0.0)
+    return wb / np.maximum(wa + wb, 1e-4)
+
+
+def _frac(x):
+    """HLSL frac(), which is x - floor(x) and never negative.
+
+    numpy's modf keeps the sign of its input, and half this arena sits at negative x,
+    so using it here would hash the two ends of the level differently from the shader.
+    """
+    return x - np.floor(x)
+
+
+def _hash13(p):
+    """The shader's Hash13, in float64. Same arithmetic, wider floats.
+
+    The bits will not match a GPU's float32 exactly, and do not need to: what the
+    preview answers is whether patches of the right SIZE break the surface up, which
+    any hash without visible structure answers equally well.
+    """
+    p = _frac(p * 0.1031)
+    p = p + (p * (p[..., ::-1] + 31.32)).sum(axis=-1, keepdims=True)
+    return _frac((p[..., 0] + p[..., 1]) * p[..., 2])
+
+
+def noise3(p):
+    """Trilinear value noise, one wavelength per unit of p. Mirrors Noise3."""
+    i = np.floor(p)
+    f = p - i
+    f = f * f * (3.0 - 2.0 * f)
+    corners = {}
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                corners[(dx, dy, dz)] = _hash13(i + np.array([dx, dy, dz], dtype=float))
+    fx, fy, fz = f[..., 0], f[..., 1], f[..., 2]
+
+    def mix(a, b, t):
+        return a * (1.0 - t) + b * t
+
+    x00 = mix(corners[(0, 0, 0)], corners[(1, 0, 0)], fx)
+    x10 = mix(corners[(0, 1, 0)], corners[(1, 1, 0)], fx)
+    x01 = mix(corners[(0, 0, 1)], corners[(1, 0, 1)], fx)
+    x11 = mix(corners[(0, 1, 1)], corners[(1, 1, 1)], fx)
+    return mix(mix(x00, x10, fy), mix(x01, x11, fy), fz)
+
+
 # ------------------------------------------------------------------ the arena, as boxes
 
 class Solid:
@@ -129,6 +192,40 @@ class Solid:
         length = np.linalg.norm(n_world, axis=-1, keepdims=True)
         return t, n_world / np.where(length < 1e-9, 1.0, length)
 
+    def round_edges(self, p, n):
+        """Mirrors RoundEdges: the normal swung towards the face around the corner.
+
+        The box stays a box; what changes is that every edge gets a shoulder that catches
+        light differently from both faces, which is the thing a cube does not have and
+        real ground always does.
+        """
+        m = self.material
+        if m.edge_round <= 0 or m.edge_round_strength <= 0:
+            return n
+
+        scale = np.array([np.linalg.norm(self.basis[:, a]) for a in range(3)])
+        local = (p - self.origin) @ self.inv.T
+        half = np.array(m.mesh_size) * 0.5
+        to_edge = (half - np.abs(local)) * scale
+
+        # The axis this face points along is not an edge of its own.
+        own = np.abs(n @ self.basis)
+        ranked = to_edge + own * 1e3
+
+        nearest = ranked.min(axis=-1, keepdims=True)
+        t = np.clip(1.0 - nearest / m.edge_round, 0.0, 1.0)
+
+        pick = (ranked <= nearest).astype(float)
+        pick /= np.maximum(pick.sum(axis=-1, keepdims=True), 1.0)
+        dir_local = pick * np.sign(local)
+        adjacent = dir_local @ self.basis.T
+        adjacent /= np.maximum(np.linalg.norm(adjacent, axis=-1, keepdims=True), 1e-9)
+
+        blended = n + adjacent
+        blended /= np.maximum(np.linalg.norm(blended, axis=-1, keepdims=True), 1e-9)
+        out = n + (blended - n) * (t * m.edge_round_strength)
+        return out / np.maximum(np.linalg.norm(out, axis=-1, keepdims=True), 1e-9)
+
     def shade(self, p, n):
         """The fragment, through ground_mirror: the same arithmetic as the shader."""
         m = self.material
@@ -136,21 +233,36 @@ class Solid:
         w = np.abs(n) ** sharp
         w = w / np.maximum(w.sum(axis=-1, keepdims=True), 1e-4)
 
+        big = noise3(p / max(m.macro_scale, 0.1))
+        small = noise3(p / max(m.macro_scale * m.detune, 0.05))
+
+        # Bend the lookup off its grid. Fixed texel density means a dead straight repeat
+        # every two metres, and a regular grid shows up long before the texture does.
+        warp = np.stack([big * 2.0 - 1.0, small * 2.0 - 1.0], -1) * m.warp
+
         side_tile = max(m.side_tile, 1e-3)
         top_tile = max(m.top_tile, 1e-3)
-        uv_x = np.stack([p[..., 2] / side_tile, p[..., 1] / side_tile], -1)
-        uv_y = np.stack([p[..., 0] / top_tile, p[..., 2] / top_tile], -1)
-        uv_z = np.stack([p[..., 0] / side_tile, p[..., 1] / side_tile], -1)
+        uv_x = np.stack([p[..., 2] / side_tile, p[..., 1] / side_tile], -1) + warp
+        uv_y = np.stack([p[..., 0] / top_tile, p[..., 2] / top_tile], -1) + warp
+        uv_z = np.stack([p[..., 0] / side_tile, p[..., 1] / side_tile], -1) + warp
 
         side_w = np.maximum(w[..., 0:1] + w[..., 2:3], 1e-4)
-        side = (sample(self.side, uv_x) * w[..., 0:1]
-                + sample(self.side, uv_z) * w[..., 2:3]) / side_w
-        side = side * np.array(m.side_tint)
-        top = sample(self.top, uv_y) * np.array(m.top_tint)
+        side_raw = (sample(self.side, uv_x) * w[..., 0:1]
+                    + sample(self.side, uv_z) * w[..., 2:3]) / side_w
+        top_raw = sample(self.top, uv_y)
 
+        wear = smoothstep(0.55, 0.95, small)[..., None] * m.wear
+        top_raw = top_raw * (1.0 - wear) + side_raw * wear
+
+        side = side_raw * np.array(m.side_tint)
+        top = top_raw * np.array(m.top_tint)
+
+        # The turf follows the rounded shoulder, so it wraps an edge instead of
+        # stopping dead on the corner.
+        shading = self.round_edges(p, n)
         lo = m.top_facing - m.top_blend
         hi = m.top_facing + m.top_blend
-        t = np.clip((n[..., 1] - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
+        t = np.clip((shading[..., 1] - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
         cap = t * t * (3.0 - 2.0 * t)
 
         half = self.half * np.array([1.0, 1.0, 1.0])
@@ -160,13 +272,25 @@ class Solid:
         above_foot = p[..., 1] - (centre_y - half_height)
 
         if m.overhang > 0:
-            lip = np.clip(1.0 - below_top / max(m.overhang, 1e-4), 0.0, 1.0)
+            fine = noise3(p / max(m.lip_jitter_scale, 0.02))
+            ragged = np.maximum(1.0 + (fine * 2.0 - 1.0) * m.lip_jitter, 0.08)
+            lip = np.clip(1.0 - below_top / np.maximum(m.overhang * ragged, 1e-4),
+                          0.0, 1.0)
             lip = (lip ** m.overhang_fade) * (1.0 - cap)
         else:
             lip = np.zeros_like(cap)
 
-        mask = np.maximum(cap, lip)[..., None]
+        want = np.maximum(cap, lip)
+        mask = height_blend(luma(side_raw), luma(top_raw), want, m.interlock)[..., None]
         albedo = side * (1.0 - mask) + top * mask
+
+        macro = (big * 0.65 + small * 0.35)[..., None]
+        albedo = albedo * ((1.0 - m.macro_strength)
+                           + macro * 2.0 * m.macro_strength)
+        warm = np.array([1.06, 1.00, 0.90])
+        cool = np.array([0.92, 0.98, 1.06])
+        drift = warm * (1.0 - macro) + cool * macro
+        albedo = albedo * (1.0 + (drift - 1.0) * m.macro_warm)
 
         under = 1.0 - np.clip((below_top - m.overhang)
                               / max(m.lip_shade_depth, 1e-4), 0.0, 1.0)
@@ -191,6 +315,29 @@ def camera(scene, docs, which):
         fov = _field(body, "field of view", float, 30.0)
         return np.array(origin), np.array(basis), fov
     raise SystemExit(f"ground_preview: no camera named '...{which}' in the scene")
+
+
+def hero(blocks, aspect):
+    """Three-quarter view of the end of the main floor, close in and slightly above.
+
+    The arena's own cameras sit almost at floor level, so what they frame is mostly the
+    top plane: good for judging the fight, useless for judging whether a block reads as
+    a solid thing. This looks down the length of the biggest slab from off to one side,
+    where its top, its side and the edge between them are all in shot at once.
+    """
+    floor = max(blocks, key=lambda b: b.world_size[0] * b.world_size[2])
+    centre = np.array(floor.origin)
+    size = np.array(floor.world_size)
+
+    end = centre + np.array([size[0] * 0.30, 0.0, 0.0])
+    eye = end + np.array([-2.6, 1.55, -3.4])
+
+    forward = end + np.array([0.0, -0.25, 0.0]) - eye
+    forward /= np.linalg.norm(forward)
+    right = np.cross(np.array([0.0, 1.0, 0.0]), forward)
+    right /= np.linalg.norm(right)
+    up = np.cross(forward, right)
+    return eye, np.stack([right, up, forward], axis=1), 38.0
 
 
 def wide(blocks, aspect):
@@ -231,7 +378,9 @@ def main(argv):
         elif argv[i] == "--scene":
             scene_path = argv[i + 1]; i += 2
         elif argv[i] == "--wide":
-            whole = True; i += 1
+            whole = "wide"; i += 1
+        elif argv[i] == "--hero":
+            whole = "hero"; i += 1
         else:
             rest.append(argv[i]); i += 1
     if rest:
@@ -241,8 +390,10 @@ def main(argv):
     docs = _docs(open(scene_path, encoding="utf-8").read())
 
     height = int(width * 9 / 16)
-    if whole:
+    if whole == "wide":
         eye, basis, fov = wide(gm.blocks(path=scene_path), width / height)
+    elif whole == "hero":
+        eye, basis, fov = hero(gm.blocks(path=scene_path), width / height)
     else:
         eye, basis, fov = camera(scene, docs, which)
     half_h = np.tan(np.radians(fov) * 0.5)
@@ -263,7 +414,7 @@ def main(argv):
 
     solids = [Solid(b) for b in gm.blocks(path=scene_path)]
     print(f"ground_preview: {len(solids)} blocks from {os.path.basename(scene_path)}, "
-          f"{'wide' if whole else 'camera ' + str(which)}, {width}x{height}")
+          f"{whole or ('camera ' + str(which))}, {width}x{height}")
 
     best_t = np.full(rd.shape[:2], np.inf)
     colour = np.zeros(rd.shape)
@@ -280,6 +431,8 @@ def main(argv):
         p = ro + rd * np.where(np.isfinite(t), t, 0.0)[..., None]
         albedo = s.shade(p, n)
 
+        # Lit by the ROUNDED normal, which is where the edge shoulders come from.
+        n = s.round_edges(p, n)
         lambert = np.maximum(n @ SUN, 0.0)[..., None]
         sky_term = (0.5 + 0.5 * n[..., 1])[..., None]
         lit = albedo * (SUN_COLOUR * lambert + SKY * sky_term

@@ -67,11 +67,24 @@ class Ground:
                  sharpness=6.0, overhang=0.05, overhang_fade=1.6, lip_shade=0.35,
                  lip_shade_depth=0.12, foot_shade=0.18, foot_shade_height=0.25,
                  mesh_size=(1.0, 1.0, 1.0),
-                 top_tint=(1.0, 1.0, 1.0), side_tint=(1.0, 1.0, 1.0)):
+                 top_tint=(1.0, 1.0, 1.0), side_tint=(1.0, 1.0, 1.0),
+                 lip_jitter=0.6, lip_jitter_scale=0.35, interlock=0.45, macro_scale=14.0,
+                 edge_round=0.14, edge_round_strength=0.8, warp=0.35, macro_strength=0.3, macro_warm=0.45, detune=0.22, wear=0.4):
         self.top_tile = top_tile
         self.side_tile = side_tile
         self.top_tint = top_tint
         self.side_tint = side_tint
+        self.lip_jitter = lip_jitter
+        self.lip_jitter_scale = lip_jitter_scale
+        self.edge_round = edge_round
+        self.edge_round_strength = edge_round_strength
+        self.warp = warp
+        self.interlock = interlock
+        self.macro_scale = macro_scale
+        self.macro_strength = macro_strength
+        self.macro_warm = macro_warm
+        self.detune = detune
+        self.wear = wear
         self.top_facing = top_facing
         self.top_blend = top_blend
         self.sharpness = sharpness
@@ -112,16 +125,49 @@ class Ground:
 
         A downward face never is. The underside of a walkway is earth, and a platform
         with grass on its belly is the most obviously wrong thing the shader could draw.
+
+        Takes the FACE normal, where the shader takes the rounded one. Within _EdgeRound
+        of an edge the shader's normal has swung round the corner, so it does put some
+        turf on the shoulder of a vertical face -- deliberately, because turf wraps an
+        edge. What this answers is the bulk of the face, which is what must not be
+        capped; the shoulders are the lip's business and are checked separately.
         """
         return smoothstep(self.top_facing - self.top_blend,
                           self.top_facing + self.top_blend, normal[1])
 
-    def lip(self, below_top, cap):
-        """The cap spilling over the top edge, as a share, 1 at the edge and 0 below it."""
+    def lip(self, below_top, cap, ragged=1.0):
+        """The cap spilling over the top edge, as a share, 1 at the edge and 0 below it.
+
+        `ragged` scales the overhang at this point along the edge: the shader drives it
+        from noise, because a constant overhang paints a dead straight line of turf at a
+        constant height down a thirty-metre floor, and that line is the loudest thing in
+        the picture saying "this is a box".
+        """
         if self.overhang <= 0.0:
             return 0.0
-        t = saturate(1.0 - below_top / max(self.overhang, 1e-4))
+        depth = self.overhang * max(ragged, 0.08)
+        t = saturate(1.0 - below_top / max(depth, 1e-4))
         return (t ** self.overhang_fade) * (1.0 - cap)
+
+    def ragged_range(self):
+        """How deep the lip can get, at its thinnest and thickest along one edge."""
+        return (self.overhang * max(1.0 - self.lip_jitter, 0.08),
+                self.overhang * (1.0 + self.lip_jitter))
+
+    def interlocked(self, side_height, top_height, want):
+        """Which material wins once both get a say. Mirrors HeightBlend.
+
+        A plain lerp draws a soft ruled line across whatever is underneath. Letting each
+        material's own height argue makes the boundary follow the stones instead, so turf
+        fills the hollows and stops at their shoulders.
+        """
+        depth = max(self.interlock, 1e-4)
+        a = (1.0 - want) + side_height * depth
+        b = want + top_height * depth
+        m = max(a, b) - depth
+        wa = max(a - m, 0.0)
+        wb = max(b - m, 0.0)
+        return wb / max(wa + wb, 1e-4)
 
     def shade(self, below_top, above_foot, cap):
         """How much this fragment is darkened: the deeper of the lip and the foot.
@@ -316,22 +362,31 @@ def blocks(path=SCENE, sim_collider_guid=None, default_material_only=True):
 # clicking it WILL produce.
 
 GROUND = dict(top_tile=2.0, side_tile=2.0, top_facing=0.45, top_blend=0.22,
-              sharpness=6.0, overhang=0.05, overhang_fade=1.6, lip_shade=0.35,
+              sharpness=6.0, overhang=0.07, overhang_fade=1.6, lip_shade=0.35,
               lip_shade_depth=0.12, foot_shade=0.18, foot_shade_height=0.25,
               mesh_size=(1.0, 1.0, 1.0),
-              top_tint=(1.15, 1.15, 1.10), side_tint=(1.90, 1.85, 1.75))
+              top_tint=(1.15, 1.15, 1.10), side_tint=(1.90, 1.85, 1.75),
+              edge_round=0.09, edge_round_strength=0.85, warp=0.40,
+              lip_jitter=0.7, lip_jitter_scale=0.30, interlock=0.45, macro_scale=14.0,
+              macro_strength=0.3, macro_warm=0.45, detune=0.22, wear=0.4)
 
 ROCK = dict(top_tile=2.0, side_tile=2.0, top_facing=0.72, top_blend=0.12,
             sharpness=8.0, overhang=0.03, overhang_fade=2.4, lip_shade=0.3,
             lip_shade_depth=0.18, foot_shade=0.3, foot_shade_height=0.45,
             mesh_size=(1.0, 1.0, 1.0),
-            top_tint=(1.15, 1.15, 1.10), side_tint=(1.80, 1.74, 1.62))
+            top_tint=(1.15, 1.15, 1.10), side_tint=(1.80, 1.74, 1.62),
+            edge_round=0.16, edge_round_strength=0.8, warp=0.35,
+            lip_jitter=0.8, lip_jitter_scale=0.45, interlock=0.5, macro_scale=16.0,
+            macro_strength=0.34, macro_warm=0.45, detune=0.2, wear=0.3)
 
 PILLAR = dict(top_tile=1.0, side_tile=1.0, top_facing=1.5, top_blend=0.05,
               sharpness=4.0, overhang=0.0, overhang_fade=1.0, lip_shade=0.0,
               lip_shade_depth=0.1, foot_shade=0.35, foot_shade_height=0.4,
               mesh_size=(1.0, 2.0, 1.0),
-              top_tint=(1.0, 1.0, 1.0), side_tint=(1.0, 1.0, 1.0))
+              top_tint=(1.0, 1.0, 1.0), side_tint=(1.0, 1.0, 1.0),
+              edge_round=0.10, edge_round_strength=0.7, warp=0.15,
+              lip_jitter=0.0, lip_jitter_scale=0.3, interlock=0.3, macro_scale=9.0,
+              macro_strength=0.22, macro_warm=0.3, detune=0.25, wear=0.0)
 
 MATERIALS = {"ground": GROUND, "rock": ROCK, "pillar": PILLAR}
 

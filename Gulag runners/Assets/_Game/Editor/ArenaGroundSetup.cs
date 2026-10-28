@@ -187,15 +187,23 @@ namespace GulagRunners.GameEditor
             m.SetFloat("_TopBlend", 0.22f);
             m.SetFloat("_Sharpness", 6f);
 
-            // Five centimetres of turf over the edge of a 24 cm walkway. This is the
-            // number that decides whether a platform reads as a slab of ground or as a
-            // box with a picture of grass on it.
-            m.SetFloat("_Overhang", 0.05f);
+            // Seven centimetres of turf over the edge of a 24 cm walkway, and the edge
+            // of that turf tears every 30 cm. The raggedness matters more than the
+            // depth: a constant overhang draws a dead straight line of grass the whole
+            // length of a thirty-metre floor, and a straight line is the loudest thing
+            // in the picture saying this is a box.
+            m.SetFloat("_Overhang", 0.07f);
             m.SetFloat("_OverhangFade", 1.6f);
             m.SetFloat("_LipShade", 0.35f);
             m.SetFloat("_LipShadeDepth", 0.12f);
+            m.SetFloat("_LipJitter", 0.7f);
+            m.SetFloat("_LipJitterScale", 0.30f);
             m.SetFloat("_FootShade", 0.18f);
             m.SetFloat("_FootShadeHeight", 0.25f);
+
+            Breakup(m, edgeRound: 0.09f, edgeStrength: 0.85f, warp: 0.40f,
+                    interlock: 0.45f, macroScale: 14f, macroStrength: 0.30f, macroWarm: 0.45f,
+                    detune: 0.22f, wear: 0.40f);
 
             m.SetVector("_MeshSize", new Vector4(1f, 1f, 1f, 0f));
             Save(m);
@@ -229,8 +237,16 @@ namespace GulagRunners.GameEditor
             m.SetFloat("_OverhangFade", 2.4f);
             m.SetFloat("_LipShade", 0.3f);
             m.SetFloat("_LipShadeDepth", 0.18f);
+            m.SetFloat("_LipJitter", 0.8f);
+            m.SetFloat("_LipJitterScale", 0.45f);
             m.SetFloat("_FootShade", 0.3f);
             m.SetFloat("_FootShadeHeight", 0.45f);
+
+            // A bank is bigger than a walkway, so its shoulder is wider and its patches
+            // are further apart.
+            Breakup(m, edgeRound: 0.16f, edgeStrength: 0.80f, warp: 0.35f,
+                    interlock: 0.50f, macroScale: 16f, macroStrength: 0.34f, macroWarm: 0.45f,
+                    detune: 0.20f, wear: 0.30f);
 
             m.SetVector("_MeshSize", new Vector4(1f, 1f, 1f, 0f));
             Save(m);
@@ -262,14 +278,62 @@ namespace GulagRunners.GameEditor
             m.SetFloat("_OverhangFade", 1f);
             m.SetFloat("_LipShade", 0f);
             m.SetFloat("_LipShadeDepth", 0.1f);
+            m.SetFloat("_LipJitter", 0f);
+            m.SetFloat("_LipJitterScale", 0.3f);
             m.SetFloat("_FootShade", 0.35f);
             m.SetFloat("_FootShadeHeight", 0.4f);
+
+            // Wood is milled, so it gets much less of everything: a post that wanders
+            // off its own grain reads as a mistake rather than as weathering.
+            Breakup(m, edgeRound: 0.10f, edgeStrength: 0.70f, warp: 0.15f,
+                    interlock: 0.30f, macroScale: 9f, macroStrength: 0.22f, macroWarm: 0.30f,
+                    detune: 0.25f, wear: 0f);
 
             // Unity's Cylinder mesh is TWO units tall. Left at one, the foot shading
             // would sit halfway up the post.
             m.SetVector("_MeshSize", new Vector4(1f, 2f, 1f, 0f));
             Save(m);
             return m;
+        }
+
+        /// <summary>
+        /// The settings that stop a textured box looking like a textured box.
+        ///
+        /// Each of these fixes something the eye picks up before it reads the texture
+        /// at all, and none of them costs a texture fetch:
+        ///
+        ///   edgeRound   a cube's edge is a step change in the normal, one pixel wide,
+        ///               and nothing in nature does that. Within this many metres of an
+        ///               edge the normal swings round the corner, so the edge catches a
+        ///               highlight like a worn shoulder. The silhouette is still
+        ///               straight -- only geometry fixes that -- but the shading is not.
+        ///   warp        texel density fixed in metres means the texture repeats on a
+        ///               dead straight grid every two metres, and a regular grid is
+        ///               visible long before the texture on it is. Bending the lookup by
+        ///               a smooth noise leaves the density alone and loses the grid.
+        ///   interlock   lets each material's own height argue at the boundary, so turf
+        ///               fills the hollows between stones instead of being ruled across
+        ///               them.
+        ///   macro       large, slow patches of light and shade with a little colour
+        ///               drift, so thirty metres of floor is not thirty metres of one
+        ///               tone. Brightness alone reads as dirt on a lens, hence the
+        ///               drift.
+        ///   wear        bare earth showing through the turf in patches, which is free:
+        ///               the earth is already sampled for the sides.
+        /// </summary>
+        static void Breakup(Material m, float edgeRound, float edgeStrength, float warp,
+                            float interlock, float macroScale, float macroStrength,
+                            float macroWarm, float detune, float wear)
+        {
+            m.SetFloat("_EdgeRound", edgeRound);
+            m.SetFloat("_EdgeRoundStrength", edgeStrength);
+            m.SetFloat("_Warp", warp);
+            m.SetFloat("_Interlock", interlock);
+            m.SetFloat("_MacroScale", macroScale);
+            m.SetFloat("_MacroStrength", macroStrength);
+            m.SetFloat("_MacroWarm", macroWarm);
+            m.SetFloat("_Detune", detune);
+            m.SetFloat("_Wear", wear);
         }
 
         static Material Load(string path, Shader shader, string name)

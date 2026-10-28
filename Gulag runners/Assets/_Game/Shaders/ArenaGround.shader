@@ -77,6 +77,19 @@ Shader "Gulag Runners/Arena Ground"
         _OverhangFade("How abruptly it stops", Range(0.25,6)) = 1.6
         _LipShade("Shadow under the lip", Range(0,1)) = 0.35
         _LipShadeDepth("How far that shadow reaches, metres", Range(0.01,1)) = 0.12
+        _LipJitter("How ragged the overhang edge is", Range(0,1)) = 0.6
+        _LipJitterScale("Size of that raggedness, metres", Range(0.05,4)) = 0.35
+
+        [Header(Stopping it looking like a textured box)][Space(4)]
+        _EdgeRound("Edges shade as if worn round, metres", Range(0,0.6)) = 0.14
+        _EdgeRoundStrength("How far round they go", Range(0,1)) = 0.8
+        _Interlock("How far the cap fingers into the stone", Range(0,1)) = 0.45
+        _Warp("Bend the tiling off its grid, tiles", Range(0,1)) = 0.35
+        _MacroScale("Large patch size, metres", Range(2,40)) = 14
+        _MacroStrength("How much those patches lighten and darken", Range(0,0.8)) = 0.3
+        _MacroWarm("Colour drift between them", Range(0,1)) = 0.45
+        _Detune("Smaller patches, as a share of the large", Range(0.05,0.5)) = 0.22
+        _Wear("Bare earth worn through the cap", Range(0,1)) = 0.4
 
         [Header(Sitting in the world)][Space(4)]
         _FootShade("Darkening at the foot of a block", Range(0,1)) = 0.25
@@ -118,6 +131,17 @@ Shader "Gulag Runners/Arena Ground"
             half   _OverhangFade;
             half   _LipShade;
             float  _LipShadeDepth;
+            half   _LipJitter;
+            float  _LipJitterScale;
+            float  _EdgeRound;
+            half   _EdgeRoundStrength;
+            half   _Interlock;
+            half   _Warp;
+            float  _MacroScale;
+            half   _MacroStrength;
+            half   _MacroWarm;
+            half   _Detune;
+            half   _Wear;
             half   _FootShade;
             float  _FootShadeHeight;
             float4 _MeshSize;
@@ -156,6 +180,118 @@ Shader "Gulag Runners/Arena Ground"
         {
             float3 w = pow(abs(normalWS), _Sharpness);
             return w / max(w.x + w.y + w.z, 1e-4);
+        }
+
+        half Luma(half3 c)
+        {
+            return dot(c, half3(0.2126, 0.7152, 0.0722));
+        }
+
+        // A cheap hash. Not a random number generator -- it only has to not repeat over
+        // the forty metres of one arena.
+        float Hash13(float3 p)
+        {
+            p = frac(p * 0.1031);
+            p += dot(p, p.zyx + 31.32);
+            return frac((p.x + p.y) * p.z);
+        }
+
+        // Trilinear value noise, one wavelength per unit of p. Eight hashes and no
+        // texture fetch, which is the whole reason it is here: every trick below that
+        // breaks up a flat surface is paid for in arithmetic rather than bandwidth,
+        // and bandwidth is what a phone runs out of first.
+        float Noise3(float3 p)
+        {
+            float3 i = floor(p);
+            float3 f = frac(p);
+            f = f * f * (3.0 - 2.0 * f);
+
+            float n000 = Hash13(i + float3(0, 0, 0));
+            float n100 = Hash13(i + float3(1, 0, 0));
+            float n010 = Hash13(i + float3(0, 1, 0));
+            float n110 = Hash13(i + float3(1, 1, 0));
+            float n001 = Hash13(i + float3(0, 0, 1));
+            float n101 = Hash13(i + float3(1, 0, 1));
+            float n011 = Hash13(i + float3(0, 1, 1));
+            float n111 = Hash13(i + float3(1, 1, 1));
+
+            return lerp(lerp(lerp(n000, n100, f.x), lerp(n010, n110, f.x), f.y),
+                        lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
+        }
+
+        // Shades the edges of a box as though they had been worn round.
+        //
+        // This is the one that stops it reading as Minecraft, and the reason is not the
+        // texture at all. A cube's edge is a step change in the normal: the face either
+        // side is perfectly flat and perfectly evenly lit, and the join is one pixel
+        // wide. Nothing in nature does that. Real ground has a shoulder at every edge
+        // that catches the light differently from both faces.
+        //
+        // The geometry stays a box -- the silhouette is still straight, and only real
+        // geometry fixes that -- but within _EdgeRound metres of an edge the normal
+        // swings towards the face around the corner, so the edge picks up a soft
+        // highlight and the block stops looking stamped out of one flat material.
+        //
+        // The distance comes from object space, which is where a box has edges at all.
+        // unity_WorldToObject gets the fragment back there; the per-axis scale turns the
+        // result into metres so a 24 cm walkway and a 1.9 m wall get the same shoulder.
+        float3 RoundEdges(float3 positionWS, float3 normalWS)
+        {
+            if (_EdgeRound <= 0.0 || _EdgeRoundStrength <= 0.0) return normalWS;
+
+            float4x4 toWorld = GetObjectToWorldMatrix();
+            float3 scale = float3(length(float3(toWorld._m00, toWorld._m10, toWorld._m20)),
+                                  length(float3(toWorld._m01, toWorld._m11, toWorld._m21)),
+                                  length(float3(toWorld._m02, toWorld._m12, toWorld._m22)));
+
+            float3 positionOS = mul(GetWorldToObjectMatrix(),
+                                    float4(positionWS, 1.0)).xyz;
+            float3 halfExtents = _MeshSize.xyz * 0.5;
+
+            // How far this fragment is from the face at each end of each axis, in metres.
+            float3 toEdge = (halfExtents - abs(positionOS)) * scale;
+
+            // The axis this face itself points along does not count: every point of the
+            // top IS at the top, and treating that as an edge would round the whole face.
+            float3 own = abs(mul((float3x3)GetWorldToObjectMatrix(), normalWS));
+            float3 ranked = toEdge + own * 1e3;
+
+            float nearest = min(ranked.x, min(ranked.y, ranked.z));
+            half t = saturate(1.0 - nearest / _EdgeRound);
+            if (t <= 0.0) return normalWS;
+
+            // The outward direction of the face around that corner.
+            float3 pick = step(ranked, nearest.xxx);
+            pick /= max(pick.x + pick.y + pick.z, 1.0);
+            float3 dirOS = pick * sign(positionOS);
+            float3 adjacent = normalize(mul((float3x3)toWorld, dirOS) + 1e-6);
+
+            return normalize(lerp(normalWS, normalize(normalWS + adjacent),
+                                  t * _EdgeRoundStrength));
+        }
+
+        // Which of two materials wins, when both get a say.
+        //
+        // A plain lerp between turf and stone draws a soft ruled line across whatever is
+        // underneath, and that line is the thing the eye reads as "a texture on a box".
+        // Letting each material's own HEIGHT argue for it instead makes the boundary
+        // follow the stones: turf fills the hollows between them and stops at their
+        // shoulders, so the two interlock the way they do on real ground.
+        //
+        // Height here is the albedo's luminance, not the pack's height maps. Measured,
+        // the two correlate at 0.66 to 0.83 across these sets while the shipped height
+        // maps have a standard deviation of only 0.04 -- they are nearly flat, so they
+        // would barely move the boundary at all. Luminance has the range AND it is
+        // already in a register.
+        half HeightBlend(half heightA, half heightB, half t, half depth)
+        {
+            depth = max(depth, 1e-4);
+            half a = (1.0 - t) + heightA * depth;
+            half b = t + heightB * depth;
+            half m = max(a, b) - depth;
+            half wa = max(a - m, 0.0);
+            half wb = max(b - m, 0.0);
+            return wb / max(wa + wb, 1e-4);
         }
         ENDHLSL
 
@@ -221,12 +357,34 @@ Shader "Gulag Runners/Arena Ground"
                 float3 geometricWS = normalize(input.normalWS);
                 float3 weights = TriplanarWeights(geometricWS);
 
+                // The face normal, bent towards the face around the corner near an edge.
+                // The projections keep using the GEOMETRIC normal, so the textures stay
+                // put; only the lighting and the grass line follow the rounded shoulder.
+                float3 shadingWS = RoundEdges(input.positionWS, geometricWS);
+
+                // The two noise fields everything below is shaped by. Two calls, reused
+                // five ways: one wavelength the size of the arena's bays and one a few
+                // metres across. This is what stops thirty metres of the same tile from
+                // reading as thirty metres of the same tile.
+                float3 noisePos = input.positionWS;
+                half big = Noise3(noisePos / max(_MacroScale, 0.1));
+                half small = Noise3(noisePos / max(_MacroScale * _Detune, 0.05));
+
                 // One tile is _TopTile (or _SideTile) metres across, whatever the block
                 // is scaled to. Dividing world position by the tile size is the whole
                 // trick: there is no object scale anywhere in this expression.
-                float2 uvX = input.positionWS.zy / max(_SideTile, 1e-3);
-                float2 uvY = input.positionWS.xz / max(_TopTile, 1e-3);
-                float2 uvZ = input.positionWS.xy / max(_SideTile, 1e-3);
+                //
+                // The warp is what stops you counting the tiles. Texel density being
+                // fixed in metres means the texture repeats on a dead straight grid
+                // every two metres, and a regular grid is visible long before the
+                // texture on it is. Bending the lookup by a couple of metres of smooth
+                // noise leaves the density alone -- the grid is still there, it just is
+                // not straight any more, and the eye stops finding it. It costs nothing:
+                // the noise was already needed below.
+                float2 warp = (float2(big, small) * 2.0 - 1.0) * _Warp;
+                float2 uvX = input.positionWS.zy / max(_SideTile, 1e-3) + warp;
+                float2 uvY = input.positionWS.xz / max(_TopTile, 1e-3) + warp;
+                float2 uvZ = input.positionWS.xy / max(_SideTile, 1e-3) + warp;
 
                 half4 texX = SAMPLE_TEXTURE2D(_SideMap, sampler_SideMap, uvX);
                 half4 texY = SAMPLE_TEXTURE2D(_TopMap, sampler_TopMap, uvY);
@@ -237,10 +395,17 @@ Shader "Gulag Runners/Arena Ground"
                 // come out dark, because the Y share of the weight has been spent on a
                 // texture this branch is not using.
                 half sideWeight = max(weights.x + weights.z, 1e-4);
-                half3 sideAlbedo = (texX.rgb * weights.x + texZ.rgb * weights.z) / sideWeight;
-                sideAlbedo *= _SideColor.rgb;
+                half3 sideRaw = (texX.rgb * weights.x + texZ.rgb * weights.z) / sideWeight;
+                half3 topRaw = texY.rgb;
 
-                half3 topAlbedo = texY.rgb * _TopColor.rgb;
+                // Bare earth worn through the turf in patches, which costs nothing
+                // because the earth is already sampled and sitting in a register. An
+                // unbroken carpet of one texture is the other half of the box look.
+                half wear = smoothstep(0.55, 0.95, small) * _Wear;
+                topRaw = lerp(topRaw, sideRaw, wear);
+
+                half3 sideAlbedo = sideRaw * _SideColor.rgb;
+                half3 topAlbedo = topRaw * _TopColor.rgb;
 
                 float belowTop, aboveFoot;
                 ObjectSpan(input.positionWS, belowTop, aboveFoot);
@@ -248,12 +413,19 @@ Shader "Gulag Runners/Arena Ground"
                 // Up-facing surfaces get the cap. Downward ones never do: the underside
                 // of a walkway is earth, and a platform with grass on its belly is the
                 // most obviously wrong thing this shader could draw.
+                // Against the ROUNDED normal, so the turf wraps over the shoulder of an
+                // edge instead of stopping dead on the corner.
                 half cap = smoothstep(_TopFacing - _TopBlend, _TopFacing + _TopBlend,
-                                      geometricWS.y);
+                                      shadingWS.y);
 
                 // The cap spills over the edge. On a vertical face the top projection
                 // varies along only one axis, so it smears downwards -- which is what
                 // turf hanging over a lip looks like, and it costs no extra sample.
+                //
+                // How far it spills VARIES along the edge. A constant overhang draws a
+                // line of turf at a constant height all the way down a thirty-metre
+                // floor, and a perfectly straight line is the single loudest thing in
+                // the picture saying this is a box.
                 //
                 // The _Overhang == 0 case needs the test rather than the max(): at the
                 // top edge belowTop is 0, so saturate(1 - 0/1e-4) is 1, and a material
@@ -263,12 +435,34 @@ Shader "Gulag Runners/Arena Ground"
                 half lip = 0.0;
                 if (_Overhang > 0.0)
                 {
-                    lip = saturate(1.0 - belowTop / _Overhang);
+                    // Its OWN noise, and a short wavelength. Driving this from the macro
+                    // field was the first attempt and it does nothing visible: those
+                    // patches are metres across, so the turf line stays a ruler for the
+                    // whole length of a wall and only drifts up and down between bays.
+                    // A turf edge tears every ten or twenty centimetres, so that is the
+                    // scale the noise has to be at to be seen at all.
+                    half ragged = 1.0 + (Noise3(noisePos / max(_LipJitterScale, 0.02))
+                                         * 2.0 - 1.0) * _LipJitter;
+                    lip = saturate(1.0 - belowTop / (_Overhang * max(ragged, 0.08)));
                     lip = pow(lip, _OverhangFade) * (1.0 - cap);
                 }
 
-                half capMask = max(cap, lip);
+                // How much the cap is PREFERRED here, before the two materials argue.
+                half want = max(cap, lip);
+
+                // And the argument: heights taken before the tints, so a side lifted to
+                // read against the cap does not also win every boundary pixel.
+                half capMask = HeightBlend(Luma(sideRaw), Luma(topRaw), want, _Interlock);
+
                 half3 albedo = lerp(sideAlbedo, topAlbedo, capMask);
+
+                // Large, slow variation over the whole arena: a little lighter here, a
+                // little cooler there. Brightness alone reads as dirt on a lens, so the
+                // patches drift in colour too.
+                half macro = big * 0.65 + small * 0.35;
+                albedo *= lerp(1.0 - _MacroStrength, 1.0 + _MacroStrength, macro);
+                half3 drift = lerp(half3(1.06, 1.00, 0.90), half3(0.92, 0.98, 1.06), macro);
+                albedo *= lerp(half3(1.0, 1.0, 1.0), drift, _MacroWarm);
 
 #ifdef _DEBUG_BLEND
                 // White where the cap wins, black where the earth does. If the lip is not
@@ -312,6 +506,12 @@ Shader "Gulag Runners/Arena Ground"
                 float3 normalWS = normalize(tnX.zyx * weights.x +
                                             tnY.xzy * weights.y +
                                             tnZ.xyz * weights.z);
+
+                // Carry the edge bend onto the detail normal. Doing it here rather than
+                // feeding the rounded normal into the whiteout above keeps the normal
+                // maps oriented by the face they were projected from, which is what
+                // stops the grain sliding around as a block turns.
+                normalWS = normalize(normalWS + (shadingWS - geometricWS));
 
                 InputData lighting = (InputData)0;
                 lighting.positionWS = input.positionWS;
