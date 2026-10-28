@@ -200,6 +200,10 @@ namespace UnityEditor
         public static UnityEngine.Object InstantiatePrefab(
             UnityEngine.Object asset, UnityEngine.SceneManagement.Scene scene) => null;
         public static GameObject GetOutermostPrefabInstanceRoot(UnityEngine.Object o) => null;
+        // True when the instance's source asset is gone -- what the Hierarchy shows as
+        // "Missing Prefab with guid: ...". The usual cause is an importer that cannot
+        // read the file at all, such as a .blend on a machine without Blender.
+        public static bool IsPrefabAssetMissing(UnityEngine.Object o) => false;
         public static T GetCorrespondingObjectFromOriginalSource<T>(T obj)
             where T : UnityEngine.Object => null;
         public static void RecordPrefabInstancePropertyModifications(UnityEngine.Object o) { }
