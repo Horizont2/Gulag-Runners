@@ -98,12 +98,18 @@ namespace GulagRunners.GameEditor
             var traced = new List<string>();
             foreach (GameObject go in broken)
             {
+                // Read the name BEFORE anything can destroy the object. Doing it after
+                // the swap is what stopped this run after a single barrel: Swap ends in
+                // Undo.DestroyObjectImmediate, and the report line then asked the dead
+                // object what it was called. MissingReferenceException, out of the loop,
+                // 75 props left exactly as they were.
+                string label = go.name;
                 string baseName = SourceName(go);
 
                 // The first few, raw name and all. A tool that cannot say WHY it matched
                 // nothing is a tool that gets argued with instead of fixed.
                 if (traced.Count < 5)
-                    traced.Add($"  \"{go.name}\"  ->  looked up \"{baseName}\"");
+                    traced.Add($"  \"{label}\"  ->  looked up \"{baseName}\"");
 
                 if (!models.TryGetValue(baseName, out string path))
                 {
@@ -114,12 +120,22 @@ namespace GulagRunners.GameEditor
 
                 if (dryRun)
                 {
-                    done.Add($"  {go.name}  ->  {path}");
+                    done.Add($"  {label}  ->  {path}");
                     replaced++;
                     continue;
                 }
 
-                if (Swap(go, path)) { replaced++; done.Add($"  {go.name}  ->  {path}"); }
+                // One awkward object must not cost the other seventy-five. A batch tool
+                // that stops dead halfway leaves the scene in a state nobody asked for.
+                try
+                {
+                    if (Swap(go, path)) { replaced++; done.Add($"  {label}  ->  {path}"); }
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"Blend props: {label} could not be replaced " +
+                                     $"({e.GetType().Name}: {e.Message}). Carrying on.");
+                }
             }
 
             if (!dryRun && replaced > 0)
@@ -249,7 +265,10 @@ namespace GulagRunners.GameEditor
 
             Undo.RegisterCreatedObjectUndo(made, "Replace broken .blend props");
 
-            made.name = broken.name;
+            // The CLEANED name. broken.name still carries Unity's
+            // "(Missing Prefab with guid: ...)", and copying that onto a prop that is
+            // now perfectly fine would leave the Hierarchy reading as broken for ever.
+            made.name = MissingSuffix.Replace(broken.name, string.Empty).Trim();
             made.layer = broken.layer;
             made.transform.localPosition = old.localPosition;
             made.transform.localRotation = old.localRotation;

@@ -78,7 +78,9 @@ namespace GulagRunners.GameEditor
                 terrain.detailObjectDistance = 90f;
                 terrain.treeDistance = 180f;
                 terrain.treeBillboardDistance = 40f;
-                terrain.castShadows = false;
+                // castShadows is obsolete; shadowCastingMode replaces it.
+                terrain.shadowCastingMode =
+                    UnityEngine.Rendering.ShadowCastingMode.Off;
             }
 
             // The line that keeps this out of the simulation. Without it the TerrainCollider
