@@ -164,6 +164,8 @@ class Block:
         self.origin = origin                 # the pivot, in world space
         self.basis = basis                   # columns are the local axes, in world space
         self.sim_kind = sim_kind
+        self.placeholder = None              # which placeholder it is still wearing
+        self.materials = []                  # every material guid on the renderer
         # Row 1 of the object-to-world matrix: how each local axis contributes to world Y.
         self.row_y = (basis[1][0], basis[1][1], basis[1][2])
 
@@ -234,14 +236,35 @@ def metres_per_tile(ground, block, face):
 
 # ------------------------------------------------------------------------ the scene
 
+# What counts as "nobody has textured this yet", by material guid.
+#
+# Unity's own grey is the obvious one. The second is not, and missing it would have cost
+# the most important surface in the game. On the art branch the main floor -- the
+# 30.16 x 4.41 m slab the whole fight happens on -- is NOT on Unity's grey: it carries
+# Assets/Materials/Ground.mat, a half-finished first go at this exact job, with the
+# albedo wired into its _BumpMap. A tool that only replaces Unity's default walks
+# straight past it and textures the other eight blocks around it.
+#
+# Deliberate art does not belong in this list. The back wall on that branch is on a
+# material from the dungeon pack, which is somebody's choice and is left alone and
+# reported instead.
+PLACEHOLDERS = {
+    "31321ba15b8f8eb4c954353edc038b1d": "Unity Default-Material",
+    "6fdb8bd2452e35d42b8b3cc7971b9bb5": "Materials/Ground.mat",
+}
+
+
 def blocks(path=SCENE, sim_collider_guid=None, default_material_only=True):
-    """Every marked block in Arena_Demo, read straight out of the scene file."""
+    """Every marked block in Arena_Demo, read straight out of the scene file.
+
+    `default_material_only` means "still a placeholder", which is not the same as
+    "still Unity's grey" -- see PLACEHOLDERS.
+    """
     import arena_demo_geometry as geo
 
     scene = geo.Scene(path)
     docs = geo._docs(open(path, encoding="utf-8").read())
     guid = sim_collider_guid or geo.SIM_COLLIDER_GUID
-    unity_default = "31321ba15b8f8eb4c954353edc038b1d"
 
     primitives = {"10202": "Cube", "10206": "Cylinder", "10207": "Sphere",
                   "10208": "Capsule", "10209": "Plane", "10210": "Quad"}
@@ -271,15 +294,19 @@ def blocks(path=SCENE, sim_collider_guid=None, default_material_only=True):
                 materials = [g or f for f, g in re.findall(
                     r"fileID: (-?\d+)(?:, guid: ([0-9a-f]{32}))?", block_text.group(1))]
 
-        if default_material_only and unity_default not in materials:
+        placeholder = next((PLACEHOLDERS[m] for m in materials if m in PLACEHOLDERS), None)
+        if default_material_only and placeholder is None:
             continue
 
         tf = scene.tr_of_go.get(go)
         if tf is None:
             continue
         origin, basis = scene.basis(tf)
-        out.append(Block(scene.gos.get(go, {}).get("name", "?"), mesh,
-                         origin, basis, marked[go]))
+        block = Block(scene.gos.get(go, {}).get("name", "?"), mesh,
+                      origin, basis, marked[go])
+        block.placeholder = placeholder
+        block.materials = materials
+        out.append(block)
     return out
 
 

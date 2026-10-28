@@ -15,6 +15,7 @@ two neighbouring platforms look like the same material. Those are exactly the qu
 the complaint was about, and none of them needs a light rig to answer.
 
     python3 ground_preview.py [out.png] [--width 1280] [--camera 2] [--wide]
+                              [--scene path/to/Arena_Demo.unity]
 
 --camera is one of the arena's own two cameras, which is what a player sees. --wide
 pulls back far enough to frame every block at once, which is what you want when the
@@ -219,6 +220,7 @@ def wide(blocks, aspect):
 def main(argv):
     out = "arena_ground.png"
     width, which, whole = 1280, 1, False
+    scene_path = gm.SCENE
     rest = []
     i = 0
     while i < len(argv):
@@ -226,6 +228,8 @@ def main(argv):
             width = int(argv[i + 1]); i += 2
         elif argv[i] == "--camera":
             which = int(argv[i + 1]); i += 2
+        elif argv[i] == "--scene":
+            scene_path = argv[i + 1]; i += 2
         elif argv[i] == "--wide":
             whole = True; i += 1
         else:
@@ -233,12 +237,12 @@ def main(argv):
     if rest:
         out = rest[0]
 
-    scene = Scene(gm.SCENE)
-    docs = _docs(open(gm.SCENE, encoding="utf-8").read())
+    scene = Scene(scene_path)
+    docs = _docs(open(scene_path, encoding="utf-8").read())
 
     height = int(width * 9 / 16)
     if whole:
-        eye, basis, fov = wide(gm.blocks(), width / height)
+        eye, basis, fov = wide(gm.blocks(path=scene_path), width / height)
     else:
         eye, basis, fov = camera(scene, docs, which)
     half_h = np.tan(np.radians(fov) * 0.5)
@@ -257,8 +261,9 @@ def main(argv):
     rd = rd / np.linalg.norm(rd, axis=-1, keepdims=True)
     ro = np.broadcast_to(eye, rd.shape)
 
-    solids = [Solid(b) for b in gm.blocks()]
-    print(f"ground_preview: {len(solids)} blocks, camera {which}, {width}x{height}")
+    solids = [Solid(b) for b in gm.blocks(path=scene_path)]
+    print(f"ground_preview: {len(solids)} blocks from {os.path.basename(scene_path)}, "
+          f"{'wide' if whole else 'camera ' + str(which)}, {width}x{height}")
 
     best_t = np.full(rd.shape[:2], np.inf)
     colour = np.zeros(rd.shape)

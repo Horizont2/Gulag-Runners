@@ -106,16 +106,18 @@ namespace GulagRunners.GameEditor
                 Material want = Choose(renderer, filter.sharedMesh, ground, rock, pillar);
 
                 bool touched = false;
+                string was = null;
                 for (int i = 0; i < slots.Length; i++)
                 {
                     if (slots[i] == want) continue;
-                    if (!takeEverything && !IsUnityDefault(slots[i]))
+                    if (!takeEverything && !IsPlaceholder(slots[i]))
                     {
                         if (!IsOurs(slots[i]))
                             kept.Add($"  {renderer.name}: left on " +
                                      $"{(slots[i] != null ? slots[i].name : "no material")}");
                         continue;
                     }
+                    was = was ?? (slots[i] != null ? slots[i].name : "no material");
                     slots[i] = want;
                     touched = true;
                 }
@@ -125,7 +127,7 @@ namespace GulagRunners.GameEditor
                 Undo.RecordObject(renderer, "Texture the arena ground");
                 renderer.sharedMaterials = slots;
                 EditorUtility.SetDirty(renderer);
-                changed.Add($"  {renderer.name} -> {want.name}  " +
+                changed.Add($"  {renderer.name}: {was} -> {want.name}  " +
                             $"({Describe(renderer.bounds)})");
             }
 
@@ -370,12 +372,40 @@ namespace GulagRunners.GameEditor
             return size.y <= narrowest ? ground : rock;
         }
 
-        /// <summary>Unity's own grey, which is what "untextured" looks like in this scene.</summary>
-        static bool IsUnityDefault(Material m)
+        /// <summary>
+        /// A material that stands for "nobody has textured this yet".
+        ///
+        /// Unity's own grey is the obvious one. The second is not, and missing it cost the
+        /// most important surface in the game on the first run of this tool: on the art
+        /// branch the main floor -- the 30.16 x 4.41 m slab the whole fight happens on --
+        /// is not on Unity's grey at all. It carries Assets/Materials/Ground.mat, a
+        /// half-finished first go at this exact job, with the albedo wired into its
+        /// _BumpMap. Checking only for Unity's default walks straight past the floor and
+        /// textures the eight smaller blocks around it, which looks like the tool worked.
+        ///
+        /// Deliberate art is not on this list and is never taken. The back wall on that
+        /// branch wears a material from the dungeon pack: somebody chose that, so it is
+        /// left alone and named in the log instead.
+        /// </summary>
+        static readonly string[] Placeholders =
+        {
+            "Assets/Materials/Ground.mat",
+        };
+
+        static bool IsPlaceholder(Material m)
         {
             if (m == null) return true;
             string path = AssetDatabase.GetAssetPath(m);
-            return string.IsNullOrEmpty(path) || path.StartsWith("Resources/unity_builtin_extra");
+
+            // A built-in material has no asset path of its own; that is how
+            // Default-Material and its siblings are told apart from project assets.
+            if (string.IsNullOrEmpty(path)) return true;
+            if (path.StartsWith("Resources/unity_builtin_extra")) return true;
+
+            foreach (string placeholder in Placeholders)
+                if (path == placeholder) return true;
+
+            return false;
         }
 
         static bool IsOurs(Material m)

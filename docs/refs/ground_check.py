@@ -133,8 +133,18 @@ def texture_contrast():
     return out
 
 
-def main():
+def main(argv=()):
     problems, notes = [], []
+
+    # The arena is dressed on one branch and wired on another, so the scene worth
+    # checking is not always the one in this working tree. --scene points it at a copy.
+    scene = gm.SCENE
+    argv = list(argv)
+    if "--scene" in argv:
+        scene = argv[argv.index("--scene") + 1]
+    if not os.path.exists(scene):
+        print(f"ground_check: {scene} is not there")
+        return 1
 
     if not os.path.exists(SHADER):
         print("ground_check: Assets/_Game/Shaders/ArenaGround.shader is missing")
@@ -142,10 +152,17 @@ def main():
 
     # --- the blocks, and which material each one gets
 
-    blocks = gm.blocks()
+    blocks = gm.blocks(path=scene)
     if not blocks:
-        notes.append("no block in Arena_Demo is still on Unity's Default-Material -- "
-                     "either the tool has been run, or somebody textured them by hand")
+        notes.append(f"no block in {os.path.basename(scene)} is still on a placeholder "
+                     f"-- either the tool has been run, or somebody textured them by hand")
+    else:
+        wearing = {}
+        for b in blocks:
+            wearing.setdefault(b.placeholder, []).append(b.name)
+        for placeholder, names in sorted(wearing.items(), key=lambda kv: -len(kv[1])):
+            notes.append(f"{len(names)} block(s) on {placeholder}: "
+                         + ", ".join(sorted(names)))
 
     for b in blocks:
         kind = b.kind()
@@ -331,4 +348,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
