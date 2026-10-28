@@ -254,8 +254,18 @@ Shader "Gulag Runners/Arena Ground"
                 // The cap spills over the edge. On a vertical face the top projection
                 // varies along only one axis, so it smears downwards -- which is what
                 // turf hanging over a lip looks like, and it costs no extra sample.
-                half lip = saturate(1.0 - belowTop / max(_Overhang, 1e-4));
-                lip = pow(lip, _OverhangFade) * (1.0 - cap);
+                //
+                // The _Overhang == 0 case needs the test rather than the max(): at the
+                // top edge belowTop is 0, so saturate(1 - 0/1e-4) is 1, and a material
+                // asking for NO lip gets a full-strength one exactly one row of pixels
+                // deep. On the pillars that is invisible because their cap and side are
+                // the same wood, which is the only reason it would have shipped.
+                half lip = 0.0;
+                if (_Overhang > 0.0)
+                {
+                    lip = saturate(1.0 - belowTop / _Overhang);
+                    lip = pow(lip, _OverhangFade) * (1.0 - cap);
+                }
 
                 half capMask = max(cap, lip);
                 half3 albedo = lerp(sideAlbedo, topAlbedo, capMask);

@@ -183,6 +183,15 @@ def main():
         if capless and mat.overhang > 0:
             problems.append(f"{b.name} ({kind}): no cap, but still an overhang of "
                             f"{mat.overhang * 100:.0f} cm -- a lip of nothing")
+
+        # The edge case the shader got wrong first time round. At belowTop == 0 the
+        # expression inside the lip is saturate(1 - 0/_Overhang), which is 1 whatever
+        # _Overhang is, so a material asking for no lip gets a full-strength one exactly
+        # at the top edge unless the zero is tested for rather than clamped away.
+        if mat.overhang <= 0 and mat.lip(0.0, cap=0.0) != 0.0:
+            problems.append(f"{b.name} ({kind}): _Overhang is 0 but the lip is "
+                            f"{mat.lip(0.0, cap=0.0):.2f} at the top edge")
+
         if capless:
             continue
 
