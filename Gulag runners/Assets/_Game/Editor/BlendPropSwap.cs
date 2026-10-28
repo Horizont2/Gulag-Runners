@@ -54,6 +54,19 @@ namespace GulagRunners.GameEditor
             Dictionary<string, string> models = ModelsByName();
             List<GameObject> broken = Broken();
 
+            // Say how big the index is. The first version of this silently built an
+            // empty one and then reported "0 of 80 matched", which reads as "your
+            // models are missing" when it meant "I failed to look".
+            if (models.Count == 0)
+            {
+                Debug.LogError(
+                    "Blend props: found no .fbx anywhere under Assets. That cannot be " +
+                    "right in this project, so the fault is in this tool or the asset " +
+                    "database is still importing -- not in your files. Let the import " +
+                    "finish and try again.");
+                return;
+            }
+
             if (broken.Count == 0)
             {
                 Debug.Log("Blend props: nothing is missing its prefab in the open " +
@@ -92,8 +105,10 @@ namespace GulagRunners.GameEditor
             var message = new System.Text.StringBuilder();
             message.AppendLine(dryRun
                 ? $"Blend props (DRY RUN, nothing changed): {replaced} of {broken.Count} " +
-                  "broken objects have an FBX of the same name."
-                : $"Blend props: {replaced} of {broken.Count} replaced.");
+                  $"broken objects have an FBX of the same name, out of {models.Count} " +
+                  "FBX in the project."
+                : $"Blend props: {replaced} of {broken.Count} replaced, from " +
+                  $"{models.Count} FBX in the project.");
 
             // Long lists are worse than useless in the console; the first few say whether
             // the names matched the way you expected, which is the thing to check.
@@ -114,13 +129,21 @@ namespace GulagRunners.GameEditor
             Debug.Log(message.ToString());
         }
 
-        /// <summary>Every .fbx in the project, by its file name without the extension.</summary>
+        /// <summary>
+        /// Every .fbx in the project, by its file name without the extension.
+        ///
+        /// Walks every asset path rather than asking AssetDatabase.FindAssets("t:Model").
+        /// That filter is what the Project window's search box understands; from script
+        /// it returned nothing here, and the tool reported "0 of 80 broken objects have
+        /// an FBX of the same name" while sitting next to 48 FBX with exactly the right
+        /// names. A path ending in .fbx cannot be misread the same way.
+        /// </summary>
         static Dictionary<string, string> ModelsByName()
         {
             var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string guid in AssetDatabase.FindAssets("t:Model"))
+            foreach (string path in AssetDatabase.GetAllAssetPaths())
             {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!path.StartsWith("Assets/", StringComparison.Ordinal)) continue;
                 if (!path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase)) continue;
 
                 string name = Path.GetFileNameWithoutExtension(path);

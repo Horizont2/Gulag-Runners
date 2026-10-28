@@ -143,6 +143,10 @@ namespace UnityEditor
 
     public static class AssetDatabase
     {
+        // Every asset path in the project, packages included. Unlike FindAssets it takes
+        // no filter string to get wrong -- FindAssets("t:Model") is Project-window search
+        // syntax and came back empty from script in this project.
+        public static string[] GetAllAssetPaths() => new string[0];
         public static string[] FindAssets(string filter) => new string[0];
         public static string[] FindAssets(string filter, string[] searchInFolders) => new string[0];
         public static string GUIDToAssetPath(string guid) => "";
