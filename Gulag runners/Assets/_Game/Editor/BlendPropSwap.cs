@@ -43,6 +43,22 @@ namespace GulagRunners.GameEditor
     {
         static readonly Regex Numbered = new Regex(@"\s*\(\d+\)$");
 
+        /// <summary>
+        /// The suffix Unity puts on a broken instance's NAME -- not just on its label in
+        /// the Hierarchy, but on go.name itself, which is why the Inspector shows
+        /// "Cobweb2 (4) (Missing Prefab with guid: 9ce8...)" in the name field.
+        ///
+        /// This is what made the tool report 0 of 80. It stripped a trailing " (4)" and
+        /// looked up the rest, and the rest was the whole decorated string, which
+        /// matches no model ever. The scene file stores the clean name, so nothing about
+        /// the asset or the scene gave it away.
+        ///
+        /// It is also the fix: that suffix carries the SOURCE GUID, which beats any name
+        /// as a key. Resolve it and ask the asset database what the file was called.
+        /// </summary>
+        static readonly Regex MissingSuffix = new Regex(
+            @"\s*\(Missing Prefab with guid:\s*([0-9a-fA-F]{32})\s*\)\s*$");
+
         [MenuItem("Tools/Gulag Runners/Setup/List broken .blend props")]
         public static void List() => Run(dryRun: true);
 
@@ -79,9 +95,16 @@ namespace GulagRunners.GameEditor
             var stuck = new SortedDictionary<string, int>();
             int replaced = 0;
 
+            var traced = new List<string>();
             foreach (GameObject go in broken)
             {
-                string baseName = Numbered.Replace(go.name, string.Empty).Trim();
+                string baseName = SourceName(go);
+
+                // The first few, raw name and all. A tool that cannot say WHY it matched
+                // nothing is a tool that gets argued with instead of fixed.
+                if (traced.Count < 5)
+                    traced.Add($"  \"{go.name}\"  ->  looked up \"{baseName}\"");
+
                 if (!models.TryGetValue(baseName, out string path))
                 {
                     stuck.TryGetValue(baseName, out int n);
@@ -125,6 +148,15 @@ namespace GulagRunners.GameEditor
                 message.AppendLine("Those need Blender installed, or an FBX exported by hand.");
             }
 
+            if (replaced == 0 && traced.Count > 0)
+            {
+                message.AppendLine();
+                message.AppendLine("Nothing matched. What the names turned into:");
+                foreach (string line in traced) message.AppendLine(line);
+                message.AppendLine("If the right-hand side is not a plain model name, " +
+                                   "that is the bug -- send this block.");
+            }
+
             if (dryRun) message.AppendLine("\nRun \"Replace broken .blend props with FBX\" to do it.");
             Debug.Log(message.ToString());
         }
@@ -138,6 +170,30 @@ namespace GulagRunners.GameEditor
         /// an FBX of the same name" while sitting next to 48 FBX with exactly the right
         /// names. A path ending in .fbx cannot be misread the same way.
         /// </summary>
+        /// <summary>
+        /// What the asset behind a broken instance was CALLED.
+        ///
+        /// By guid where the name carries one -- that is exact, and survives somebody
+        /// renaming the object in the Hierarchy. By the name with both of Unity's
+        /// decorations stripped otherwise.
+        /// </summary>
+        static string SourceName(GameObject go)
+        {
+            Match missing = MissingSuffix.Match(go.name);
+
+            if (missing.Success)
+            {
+                string source = AssetDatabase.GUIDToAssetPath(missing.Groups[1].Value);
+                if (!string.IsNullOrEmpty(source))
+                    return Path.GetFileNameWithoutExtension(source);
+            }
+
+            string cleaned = missing.Success
+                ? go.name.Substring(0, missing.Index)
+                : go.name;
+            return Numbered.Replace(cleaned, string.Empty).Trim();
+        }
+
         static Dictionary<string, string> ModelsByName()
         {
             var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
