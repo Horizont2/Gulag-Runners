@@ -233,6 +233,7 @@ namespace UnityEditor
         public Vector4 spriteBorder;
         public int maxTextureSize;
         public bool isReadable;
+        public int anisoLevel;
     }
 
     public enum TextureImporterType { Default, Sprite, NormalMap, GUI }
