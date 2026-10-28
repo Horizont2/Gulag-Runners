@@ -354,6 +354,40 @@ def main(argv=()):
             f"Projected from the world axes it is 1x on every block, because the block "
             f"is not in the expression.")
 
+    guids = guid_map()
+
+    # --- will the tool agree with this check about what "untextured" means?
+    #
+    # This is the one that was missing when the tool textured 2 blocks out of 10. The
+    # check reads guids out of the scene file; the tool asks Unity for an asset PATH and
+    # decides from that. Nothing tied the two together, so they could disagree in total
+    # silence -- and did, because URP's default grey is a package asset whose path looks
+    # exactly like a material somebody chose on purpose.
+    #
+    # The tool's rule is: no path, or a path outside Assets/, or a path in its own
+    # Placeholders list. So every guid named here has to be reachable by one of those.
+    with open(SETUP, encoding="utf-8") as fh:
+        setup_source = fh.read()
+    listed = set(re.findall(r'"(Assets/[^"]+\.mat)"', setup_source))
+    outside_assets = "!path.StartsWith(\"Assets/\")" in setup_source
+
+    for guid, label in sorted(gm.PLACEHOLDERS.items()):
+        asset = guids.get(guid)
+        if asset is None:
+            if not outside_assets:
+                problems.append(
+                    f"{label} ({guid}) is not under Assets, so Unity will hand the tool "
+                    f"a package path for it -- and ArenaGroundSetup no longer treats a "
+                    f"path outside Assets/ as a placeholder, so it will skip every "
+                    f"block wearing it")
+            continue
+        relative = "Assets/" + os.path.relpath(asset, ASSETS).replace(os.sep, "/")
+        if relative not in listed:
+            problems.append(
+                f"{label} is at {relative}, which ArenaGroundSetup does not list as a "
+                f"placeholder -- this check calls those blocks untextured and the tool "
+                f"will leave them alone")
+
     # --- does the mirror still describe the tool?
 
     written = tool_values()
@@ -409,7 +443,6 @@ def main(argv=()):
 
     # --- a colour image in a normal-map slot
 
-    guids = guid_map()
     for path, slots in materials():
         for slot, guid in slots.items():
             if slot not in NORMAL_SLOTS:

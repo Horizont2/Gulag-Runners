@@ -113,8 +113,13 @@ namespace GulagRunners.GameEditor
                     if (!takeEverything && !IsPlaceholder(slots[i]))
                     {
                         if (!IsOurs(slots[i]))
+                            // The PATH, not just the name. When this tool skipped the
+                            // arena floor it was because a material's path was not what
+                            // the test assumed, and the log said only "left on Lit",
+                            // which looks like somebody's choice rather than a bug.
                             kept.Add($"  {renderer.name}: left on " +
-                                     $"{(slots[i] != null ? slots[i].name : "no material")}");
+                                     $"{(slots[i] != null ? slots[i].name : "no material")}" +
+                                     $"  [{AssetDatabase.GetAssetPath(slots[i])}]");
                         continue;
                     }
                     was = was ?? (slots[i] != null ? slots[i].name : "no material");
@@ -461,10 +466,21 @@ namespace GulagRunners.GameEditor
             if (m == null) return true;
             string path = AssetDatabase.GetAssetPath(m);
 
-            // A built-in material has no asset path of its own; that is how
-            // Default-Material and its siblings are told apart from project assets.
+            // Nothing a person made in this project lives outside Assets/. A material
+            // that does is a default handed out by Unity or by a package, and that is
+            // the definition of untextured here.
+            //
+            // The narrow version of this test -- "Resources/unity_builtin_extra" -- is
+            // what the first run of this tool used, and it textured 2 blocks out of 10.
+            // In a URP project the grey on a new primitive is NOT the built-in
+            // Default-Material: it is Lit.mat out of
+            // com.unity.render-pipelines.universal, a package asset with an ordinary
+            // guid and an ordinary path, so the test said "somebody chose this" and
+            // left the whole arena floor alone. scene_check had been saying so all
+            // along, in as many words: "guid 31321ba1... is outside Assets (a package,
+            // or built-in)".
             if (string.IsNullOrEmpty(path)) return true;
-            if (path.StartsWith("Resources/unity_builtin_extra")) return true;
+            if (!path.StartsWith("Assets/")) return true;
 
             foreach (string placeholder in Placeholders)
                 if (path == placeholder) return true;

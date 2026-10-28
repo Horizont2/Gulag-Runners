@@ -294,8 +294,17 @@ def metres_per_tile(ground, block, face):
 # Deliberate art does not belong in this list. The back wall on that branch is on a
 # material from the dungeon pack, which is somebody's choice and is left alone and
 # reported instead.
+#
+# The first guid is worth naming precisely, because getting it wrong cost the arena
+# floor. It is NOT Unity's built-in Default-Material out of unity_builtin_extra: in a
+# URP project the grey on a fresh primitive is Lit.mat from
+# com.unity.render-pipelines.universal, a PACKAGE asset with an ordinary guid and an
+# ordinary path. A tool testing for the built-in path alone decides somebody chose that
+# material on purpose and leaves it, and ground_check -- which reads guids out of the
+# scene file and never asks Unity for a path -- agrees that the block is untextured. The
+# two then disagree in silence, which is what happened.
 PLACEHOLDERS = {
-    "31321ba15b8f8eb4c954353edc038b1d": "Unity Default-Material",
+    "31321ba15b8f8eb4c954353edc038b1d": "URP Lit.mat (the default grey)",
     "6fdb8bd2452e35d42b8b3cc7971b9bb5": "Materials/Ground.mat",
 }
 
