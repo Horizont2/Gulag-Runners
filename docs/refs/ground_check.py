@@ -463,12 +463,43 @@ def main(argv=()):
 
     # --- has anybody clicked the menu item yet
 
-    made = [n for n in ("GR_ArenaGround", "GR_ArenaRock", "GR_ArenaPillar")
-            if not os.path.exists(os.path.join(MATERIAL_FOLDER, n + ".mat"))]
-    if made:
-        notes.append("not built yet: " + ", ".join(made) +
+    built = {"GR_ArenaGround": "ground", "GR_ArenaRock": "rock",
+             "GR_ArenaPillar": "pillar"}
+    missing = [n for n in built if not os.path.exists(
+        os.path.join(MATERIAL_FOLDER, n + ".mat"))]
+    if missing:
+        notes.append("not built yet: " + ", ".join(sorted(missing)) +
                      ". Tools > Gulag Runners > Setup > Texture the arena ground makes "
                      "them and puts them on the blocks. Until then the arena is grey.")
+
+    # Once they exist, check the MATERIALS rather than the C# that writes them. This is
+    # the only link in the chain that has actually been through Unity: the tool could
+    # name a property the shader does not have, or Unity could drop one on import, and
+    # reading the source would never know. It is also where a hand-tweak in the
+    # Inspector shows up, which is a thing to report rather than to forbid.
+    for name, kind in sorted(built.items()):
+        path = os.path.join(MATERIAL_FOLDER, name + ".mat")
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+
+        floats = {m.group(1): float(m.group(2))
+                  for m in re.finditer(r"- (_\w+): ([-\d.eE+]+)\n", text)}
+        described = gm.MATERIALS[kind]
+        for prop, key in sorted(SETTING_NAMES.items()):
+            if prop not in floats:
+                problems.append(f"{name}: has no {prop} -- the shader and the material "
+                                f"have come apart")
+            elif abs(floats[prop] - described[key]) > 1e-4:
+                notes.append(f"{name}: {prop} is {floats[prop]:g} in the material, "
+                             f"{described[key]:g} in ground_mirror -- tweaked by hand?")
+
+        for slot in ("_TopMap", "_SideMap", "_TopNormal", "_SideNormal"):
+            m = re.search(re.escape(slot) + r":\n\s+m_Texture: \{fileID: (\d+)", text)
+            if m is None or m.group(1) == "0":
+                problems.append(f"{name}: {slot} has no texture, so that half of the "
+                                f"surface draws white")
 
     for n in notes:
         print("  note: " + n)
