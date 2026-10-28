@@ -18,6 +18,7 @@ a still frame with nobody standing on anything.
 
 Run it with no arguments. Exits non-zero on a fault.
 """
+import glob
 import os
 import re
 import sys
@@ -34,6 +35,9 @@ COMPONENT = os.path.join(ASSETS, "_Game", "Presentation", "SaggingSpan.cs")
 
 # Frame times worth surviving: a good phone, a tired one, and the stall the component
 # clamps to. A spring that is only stable at 60 is not stable.
+# Names that mean "this hangs", mirroring HangerNames in SaggingSpanSetup.
+HANGER_WORDS = ("chain", "rope", "cable")
+
 FRAME_TIMES = (1.0 / 120.0, 1.0 / 60.0, 1.0 / 30.0, 1.0 / 20.0, 1.0 / 5.0)
 
 
@@ -103,6 +107,38 @@ def main():
             problems.append(
                 f"the component's default {key} is {value} but sag_mirror says "
                 f"{sm.SPAN[key]}")
+
+    # --- did each prop come out as the right KIND of thing?
+    #
+    # Both of these shipped once. The mode was decided per RENDERER from its bounding
+    # box, and these props have several: two uprights of Bridge_5_Brown became hangers
+    # because an upright is tall, and Chain_1_Black became a span because that chain's
+    # longest local axis is not its drop. A bridge post that stretches downwards and a
+    # chain that bends in the middle are both nonsense, and neither is visible in a
+    # still frame with nobody standing on anything.
+    materials = sorted(glob.glob(os.path.join(ASSETS, "_Game", "Materials", "Sag_*.mat")))
+    props = {}
+    for path in materials:
+        stem = os.path.splitext(os.path.basename(path))[0][len("Sag_"):]
+        mode = "hanger" if stem.endswith("_Hanger") else "span"
+        prop = re.sub(r"_(Hanger|Span)$", "", stem)
+        prop = re.sub(r"_Part_\d+$", "", prop)
+        props.setdefault(prop, {}).setdefault(mode, []).append(os.path.basename(path))
+
+    for prop, modes in sorted(props.items()):
+        hangs = any(h in prop.lower() for h in HANGER_WORDS)
+        if hangs and "span" in modes:
+            problems.append(
+                f"{prop} is a {'/'.join(sorted(HANGER_WORDS))} by name but "
+                f"{len(modes['span'])} of its part(s) are rigged as spans -- it will "
+                f"bend in the middle instead of hanging")
+        if not hangs and "hanger" in modes and "span" in modes:
+            problems.append(
+                f"{prop} is split across both modes ({len(modes.get('span', []))} span, "
+                f"{len(modes['hanger'])} hanger) -- one prop's parts have to agree, or "
+                f"half of it stretches downwards while the other half sags")
+    if materials:
+        notes.append(f"{len(materials)} rigged material(s) across {len(props)} prop(s)")
 
     # --- the hover budget
 

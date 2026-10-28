@@ -52,6 +52,19 @@ namespace GulagRunners.GameEditor
         // rather than being slung between two ends.
         const float HangerTilt = 0.7f;
 
+        // Things that hang, whatever their bounding box says.
+        //
+        // The geometric test alone got this wrong on the real models and the mistake is
+        // instructive: it ran per RENDERER, and these props have several. Two uprights
+        // of Bridge_5_Brown came out as hangers because an upright is tall, and
+        // Chain_1_Black came out as a span because that chain's longest local axis is
+        // not its drop. A bridge post that stretches downwards and a chain that bends
+        // in the middle are both nonsense.
+        //
+        // So the mode is decided once per prefab instance, and a name that says "chain"
+        // beats any amount of measuring. The list is short and visible on purpose.
+        static readonly string[] HangerNames = { "chain", "rope", "cable" };
+
         [MenuItem("Tools/Gulag Runners/Setup/Set up sagging spans")]
         public static void Apply()
         {
@@ -82,8 +95,9 @@ namespace GulagRunners.GameEditor
                 MeshFilter filter = renderer.GetComponent<MeshFilter>();
                 if (filter == null || filter.sharedMesh == null) continue;
 
+                bool hanger = Hangs(renderer);
                 SaggingSpan span = Rig(renderer, filter.sharedMesh, shader, fighters,
-                                       out bool hanger, out string note);
+                                       hanger, out string note);
                 if (span == null) continue;
 
                 made.Add(span);
@@ -135,6 +149,36 @@ namespace GulagRunners.GameEditor
             return found;
         }
 
+        /// <summary>
+        /// Does this thing hang from its top, or is it slung between two ends?
+        ///
+        /// Decided for the whole prop, not for each piece of it, and by name first. See
+        /// HangerNames for what that saves.
+        /// </summary>
+        static bool Hangs(MeshRenderer renderer)
+        {
+            GameObject root = PrefabUtility.GetOutermostPrefabInstanceRoot(renderer.gameObject);
+            if (root == null) root = renderer.gameObject;
+
+            string name = root.name.ToLowerInvariant();
+            foreach (string hint in HangerNames)
+                if (name.Contains(hint)) return true;
+
+            // Nothing in the name, so measure -- but measure the whole prop. A tall
+            // piece of a wide thing is still part of a wide thing.
+            Bounds whole = new Bounds(root.transform.position, Vector3.zero);
+            bool any = false;
+            foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (!any) { whole = r.bounds; any = true; }
+                else whole.Encapsulate(r.bounds);
+            }
+            if (!any) return false;
+
+            Vector3 size = whole.size;
+            return size.y > Mathf.Max(size.x, size.z) * HangerTilt + 1e-4f;
+        }
+
         static Transform[] Fighters()
         {
             var list = new List<Transform>();
@@ -147,28 +191,41 @@ namespace GulagRunners.GameEditor
         // ------------------------------------------------------------------- the rig
 
         static SaggingSpan Rig(MeshRenderer renderer, Mesh mesh, Shader shader,
-                               Transform[] fighters, out bool hanger, out string note)
+                               Transform[] fighters, bool hanger, out string note)
         {
             Transform t = renderer.transform;
             Bounds box = mesh.bounds;
+            Vector3 axisOS;
+            float lengthOS;
 
-            // The longest edge of the mesh's own box is the direction the thing runs.
-            Vector3 size = box.size;
-            int longest = size.x >= size.y && size.x >= size.z ? 0 : (size.y >= size.z ? 1 : 2);
-            Vector3 axisOS = longest == 0 ? Vector3.right
-                           : longest == 1 ? Vector3.up : Vector3.forward;
-            float lengthOS = size[longest];
+            if (hanger)
+            {
+                // A chain runs DOWNWARDS. Not along its longest local axis -- that is
+                // whatever the modeller happened to build it along, and on this pack's
+                // chain it is not the drop. Taking world down and bringing it back into
+                // object space needs no guess and cannot be wrong about which way a
+                // hanging thing hangs.
+                axisOS = t.InverseTransformDirection(Vector3.down).normalized;
+                lengthOS = Mathf.Abs(box.size.x * axisOS.x)
+                         + Mathf.Abs(box.size.y * axisOS.y)
+                         + Mathf.Abs(box.size.z * axisOS.z);
+            }
+            else
+            {
+                // Slung: the longest edge of its own box is the way it runs.
+                Vector3 size = box.size;
+                int longest = size.x >= size.y && size.x >= size.z
+                            ? 0 : (size.y >= size.z ? 1 : 2);
+                axisOS = longest == 0 ? Vector3.right
+                       : longest == 1 ? Vector3.up : Vector3.forward;
+                lengthOS = size[longest];
+            }
 
             if (lengthOS <= 1e-4f)
             {
-                hanger = false;
                 note = "skipped, its mesh has no length to speak of";
                 return null;
             }
-
-            // Which way that axis actually points once the object is placed.
-            Vector3 axisWS = t.TransformDirection(axisOS).normalized;
-            hanger = Mathf.Abs(axisWS.y) >= HangerTilt;
 
             Vector3 low = box.center - axisOS * (lengthOS * 0.5f);
             Vector3 high = box.center + axisOS * (lengthOS * 0.5f);
@@ -290,6 +347,17 @@ namespace GulagRunners.GameEditor
         {
             string name = $"Sag_{Sanitise(mesh.name)}_{(hanger ? "Hanger" : "Span")}";
             string path = $"{MaterialFolder}/{name}.mat";
+
+            // A mesh that changes mode between runs leaves its old material behind, and
+            // a stale Sag_Chain_..._Span.mat sitting next to a correct
+            // Sag_Chain_..._Hanger.mat looks exactly like the bug that made it. Nothing
+            // uses it any more, so say so rather than deleting somebody's asset.
+            string stale = $"{MaterialFolder}/Sag_{Sanitise(mesh.name)}" +
+                           $"_{(hanger ? "Span" : "Hanger")}.mat";
+            if (AssetDatabase.LoadAssetAtPath<Material>(stale) != null)
+                Debug.LogWarning($"Sagging spans: {stale} is left over from a run when " +
+                                 $"{mesh.name} was rigged the other way round. Nothing " +
+                                 "uses it now -- delete it.");
 
             Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null)
