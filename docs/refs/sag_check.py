@@ -116,7 +116,29 @@ def main():
     # longest local axis is not its drop. A bridge post that stretches downwards and a
     # chain that bends in the middle are both nonsense, and neither is visible in a
     # still frame with nobody standing on anything.
-    materials = sorted(glob.glob(os.path.join(ASSETS, "_Game", "Materials", "Sag_*.mat")))
+    # Only materials something in a scene actually WEARS. Re-rigging a prop the other
+    # way round leaves its old material behind, and an orphan that nothing references
+    # looks exactly like the bug that made it -- which had this check reporting three
+    # faults when the scene was carrying one.
+    used = set()
+    for scene in glob.glob(os.path.join(ASSETS, "Scenes", "*.unity")):
+        with open(scene, encoding="utf-8", errors="ignore") as fh:
+            body = fh.read()
+        used.update(re.findall(r"guid: ([0-9a-f]{32})", body))
+
+    materials = []
+    for path in sorted(glob.glob(os.path.join(ASSETS, "_Game", "Materials", "Sag_*.mat"))):
+        meta = path + ".meta"
+        if not os.path.exists(meta):
+            continue
+        with open(meta, encoding="utf-8") as fh:
+            m = re.search(r"guid: ([0-9a-f]{32})", fh.read())
+        if m and m.group(1) in used:
+            materials.append(path)
+        elif m:
+            notes.append(f"{os.path.basename(path)} is not used by any scene -- left "
+                         f"over from a run that rigged that prop the other way round")
+
     props = {}
     for path in materials:
         stem = os.path.splitext(os.path.basename(path))[0][len("Sag_"):]

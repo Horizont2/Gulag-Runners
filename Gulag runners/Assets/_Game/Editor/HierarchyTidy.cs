@@ -139,6 +139,13 @@ namespace GulagRunners.GameEditor
             // solid. Worth its own group: it is the part anybody tuning the level edits.
             if (go.GetComponentInChildren<SimCollider>(true) != null) return Geometry;
 
+            // A prop whose asset failed to import has no renderer and no components at
+            // all -- Unity keeps the GameObject and its transform and nothing else. By
+            // the renderer test below it is indistinguishable from a spawn marker, so
+            // the first run of this filed 76 barrels under Systems. It is scenery that
+            // is waiting to be repaired, and it belongs with the scenery.
+            if (PrefabUtility.IsPrefabAssetMissing(go)) return Props;
+
             // A prop is something you can SEE. Anything with nothing to draw and nothing
             // recognised on it is machinery -- the post-process volume, a spawn marker,
             // an empty somebody parents things to -- and belongs with the machinery

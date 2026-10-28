@@ -48,21 +48,19 @@ namespace GulagRunners.GameEditor
             "Bridge_5_Brown", "Chain_1_Black", "Cage_1_Black", "Floor_5_Brown",
         };
 
-        // Above this much of its length being vertical, a thing hangs from its top
-        // rather than being slung between two ends.
-        const float HangerTilt = 0.7f;
-
-        // Things that hang, whatever their bounding box says.
+        // Things that hang. This list is the WHOLE test, and it is a list rather than a
+        // measurement because measuring was tried twice and was wrong both times.
         //
-        // The geometric test alone got this wrong on the real models and the mistake is
-        // instructive: it ran per RENDERER, and these props have several. Two uprights
-        // of Bridge_5_Brown came out as hangers because an upright is tall, and
+        // First it ran per RENDERER, off each one's bounding box: two uprights of
+        // Bridge_5_Brown came out as hangers because an upright is tall, and
         // Chain_1_Black came out as a span because that chain's longest local axis is
-        // not its drop. A bridge post that stretches downwards and a chain that bends
-        // in the middle are both nonsense.
+        // not its drop. Measuring the whole prop instead fixed those and promptly made
+        // the CAGE a hanger, because a cage is taller than it is wide.
         //
-        // So the mode is decided once per prefab instance, and a name that says "chain"
-        // beats any amount of measuring. The list is short and visible on purpose.
+        // The thing a box cannot tell you is the one that matters: a chain hangs, and a
+        // cage, a bridge and a floor are slung between two ends and stood on. That is
+        // about what the object IS for, and the only honest source for it here is its
+        // name. Short, visible, and wrong in a way somebody can see and fix.
         static readonly string[] HangerNames = { "chain", "rope", "cable" };
 
         [MenuItem("Tools/Gulag Runners/Setup/Set up sagging spans")]
@@ -164,19 +162,7 @@ namespace GulagRunners.GameEditor
             foreach (string hint in HangerNames)
                 if (name.Contains(hint)) return true;
 
-            // Nothing in the name, so measure -- but measure the whole prop. A tall
-            // piece of a wide thing is still part of a wide thing.
-            Bounds whole = new Bounds(root.transform.position, Vector3.zero);
-            bool any = false;
-            foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
-            {
-                if (!any) { whole = r.bounds; any = true; }
-                else whole.Encapsulate(r.bounds);
-            }
-            if (!any) return false;
-
-            Vector3 size = whole.size;
-            return size.y > Mathf.Max(size.x, size.z) * HangerTilt + 1e-4f;
+            return false;
         }
 
         static Transform[] Fighters()
