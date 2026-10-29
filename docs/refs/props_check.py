@@ -77,6 +77,7 @@ def main():
         by_format = collections.Counter()
         absent = 0
         repairable, orphaned = 0, collections.Counter()
+        carried = collections.Counter()
 
         for block in re.finditer(r"^--- !u!1001 &\d+\n(.*?)(?=\n--- !u!|\Z)",
                                  scene, re.M | re.S):
@@ -101,6 +102,12 @@ def main():
             stem = NUMBERED.sub("", stem).strip().lower()
             if stem in models:
                 repairable += 1
+                # A component added to the instance survives the prefab going missing,
+                # and the plain swap cannot carry one across. Those are a different job:
+                # on the ladders the component IS the ladder.
+                if re.search(r"m_AddedComponents:\n\s+- targetCorrespondingSourceObject",
+                             body):
+                    carried[stem] += 1
             else:
                 orphaned[stem] += 1
 
@@ -129,6 +136,14 @@ def main():
         if orphaned:
             notes.append(f"{name}: no .fbx twin for " +
                          ", ".join(f"{k} x{v}" for k, v in sorted(orphaned.items())))
+
+        if carried:
+            notes.append(
+                f"{name}: {sum(carried.values())} of those carry a component the plain "
+                f"swap would drop (" +
+                ", ".join(f"{k} x{v}" for k, v in sorted(carried.items())) +
+                "), so it leaves them alone -- they are built by Tools > Gulag Runners > "
+                "Setup > Build the arena ladders, which keeps the marker")
 
     notes.append(f"{len(models)} .fbx visible to Unity across the project")
 

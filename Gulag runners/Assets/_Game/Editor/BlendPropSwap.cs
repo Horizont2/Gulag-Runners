@@ -29,15 +29,22 @@ namespace GulagRunners.GameEditor
     /// instance's own transform across rather than trusting that, and the dry run exists
     /// so you can read the list before anything moves.
     ///
-    /// WHAT IT CANNOT DO. A missing prefab instance has no components and no children
-    /// loaded -- Unity keeps the GameObject and its transform and nothing else. So this
-    /// restores position, rotation, scale, name, parent, sibling order, layer and active
-    /// state, and it cannot restore a component somebody added to one of those instances,
-    /// because that information is not in the scene any more either. For plain scenery
-    /// that is everything there was.
+    /// WHAT IT CANNOT DO. A missing prefab instance has no children loaded -- Unity
+    /// keeps the GameObject, its transform and any component that was ADDED to the
+    /// instance, and nothing else. So this restores position, rotation, scale, name,
+    /// parent, sibling order, layer and active state, and it cannot carry a component
+    /// across. For plain scenery that is everything there was; for anything that was
+    /// marked up, it is the markup.
     ///
-    /// Anything with no .fbx of its own is listed and left alone. In this project that is
-    /// St.blend and St2.blend, which are not from the pack and have no twin.
+    /// So a broken object that still carries a component is left alone and listed, which
+    /// is the whole difference between this and LadderSetup. The four ladders are marked
+    /// SimCollider / Kind = Ladder, and a swap that dropped that would turn the arena's
+    /// only routes between storeys into scenery -- invisible to the simulation, and in a
+    /// way nothing in the scene view would show.
+    ///
+    /// Anything with no .fbx of its own is listed and left alone too. St.blend and
+    /// St2.blend used to be the whole of that list; docs/refs/blend_to_fbx.py has since
+    /// exported them.
     /// </summary>
     public static class BlendPropSwap
     {
@@ -93,6 +100,7 @@ namespace GulagRunners.GameEditor
 
             var done = new List<string>();
             var stuck = new SortedDictionary<string, int>();
+            var marked = new List<string>();
             int replaced = 0;
 
             var traced = new List<string>();
@@ -106,6 +114,19 @@ namespace GulagRunners.GameEditor
                 // 75 props left exactly as they were.
                 string label = go.name;
                 string baseName = SourceName(go);
+
+                // Markup outranks the prop. Unity keeps a component that was added to an
+                // instance even when the prefab behind it is gone -- that is why the
+                // Inspector can show SimCollider / Kind = Ladder on an object with no
+                // mesh -- and this tool has no way to put one back. Replacing such an
+                // object trades a prop you cannot see for collision the simulation can
+                // no longer find, which is the worse of the two.
+                if (go.GetComponents<Component>().Length > 1)
+                {
+                    marked.Add($"  {label}  ({go.GetComponents<Component>().Length - 1} " +
+                               "component(s) on it)");
+                    continue;
+                }
 
                 // The first few, raw name and all. A tool that cannot say WHY it matched
                 // nothing is a tool that gets argued with instead of fixed.
@@ -221,6 +242,17 @@ namespace GulagRunners.GameEditor
             int show = Mathf.Min(done.Count, 12);
             for (int i = 0; i < show; i++) message.AppendLine(done[i]);
             if (done.Count > show) message.AppendLine($"  ... and {done.Count - show} more");
+
+            if (marked.Count > 0)
+            {
+                message.AppendLine();
+                message.AppendLine("Left alone because a plain swap would drop what is " +
+                                   "on them:");
+                foreach (string line in marked) message.AppendLine(line);
+                message.AppendLine("Those are built by Tools > Gulag Runners > Setup > " +
+                                   "Build the arena ladders, which carries the marker " +
+                                   "across and sizes its box to the model.");
+            }
 
             if (stuck.Count > 0)
             {
