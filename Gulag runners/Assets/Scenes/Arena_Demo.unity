@@ -25290,7 +25290,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &315852030
 RectTransform:
   m_ObjectHideFlags: 0
@@ -139932,7 +139932,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a96a27f0eefc27e7b188c1594a03a03d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.FighterBrain
-  takeOver: 1
+  takeOver: 0
   skill: 1
   self: {fileID: 1900000130}
   target: {fileID: 0}
