@@ -21711,7 +21711,7 @@ Light:
   serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
-  m_Intensity: 1.6
+  m_Intensity: 1
   m_Range: 4.5
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -21959,7 +21959,7 @@ Light:
   serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
-  m_Intensity: 1.6
+  m_Intensity: 1
   m_Range: 4.5
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -22207,7 +22207,7 @@ Light:
   serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
-  m_Intensity: 2.6
+  m_Intensity: 1.5
   m_Range: 5.5
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -22302,7 +22302,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34373d66badfeddb37db5923c96c4876, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  baseIntensity: 1
+  baseIntensity: 1.5
   swing: 0.14
   speed: 1.7
   drift: 0.015
@@ -23717,7 +23717,7 @@ MonoBehaviour:
   maximumFogDistance: 40
   nearFadeDistance: 2.2
   farFadeStart: 0
-  fogColor: {r: 0.52, g: 0.6, b: 0.7, a: 1}
+  fogColor: {r: 0, g: 0.44444442, b: 1, a: 1}
   followSceneFogColor: 0
   ambientColor: {r: 0.22, g: 0.27, b: 0.36, a: 1}
   followSceneAmbientColor: 0
