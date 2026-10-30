@@ -23717,7 +23717,7 @@ MonoBehaviour:
   maximumFogDistance: 40
   nearFadeDistance: 2.2
   farFadeStart: 0
-  fogColor: {r: 0, g: 0.44444442, b: 1, a: 1}
+  fogColor: {r: 0.6460733, g: 0.6954704, b: 0.7660377, a: 1}
   followSceneFogColor: 0
   ambientColor: {r: 0.22, g: 0.27, b: 0.36, a: 1}
   followSceneAmbientColor: 0
