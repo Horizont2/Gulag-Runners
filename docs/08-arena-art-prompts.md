@@ -143,6 +143,51 @@ furniture, rows of windows, roof shingles
 
 ---
 
+## Глибина поверхів (v3) — те, чого промт v2 не казав
+
+Усе вище описує, що видно **в кадрі**. Але арена — не картинка, вона 3D, і камера стоїть
+збоку. Кожен поверх має свою **глибину по Z**, і це не декорація: симуляція питає в кожного
+боксу «на якому ти зрізі», і боєць стоїть на тому зрізі, який йому дає підлога. Якщо глибини
+поверхів зроблені навмання, двоє бійців на одній підлозі опиняються на різних зрізах і
+махають одне крізь одного.
+
+**Принцип сходових поверхів:** чим вище поверх, тим далі він від камери. Спуск — це рух на
+глядача, підйом — від нього. Кнопки для цього нема і не буде: гра читає це з рівня.
+
+Виміряно на `Arena_Demo` (метри, Z росте вглиб):
+
+| | ближня грань | де стоїть боєць | до площини бою |
+|---|---|---|---|
+| Нижній поверх | −4.14 | **−3.16** | 0 (це і є площина) |
+| Верхня галерея | −2.63 | **−2.33** | 0.83 м углиб |
+| Торцеві майданчики *(на галереї)* | −3.06 | — | **на 0.43 м попереду галереї, на якій стоять** |
+
+Перші два рядки — правильні: різниця 0.83 м читається як крок углиб і не ламає бій. Третій —
+помилка моделювання: майданчик виступає **поперед** підлоги, на якій він стоїть, тому зістриб
+із нього штовхає бійця назад, а не вперед.
+
+### Правила для нової локації
+
+1. **Одна площина на поверх.** Ближня грань усієї підлоги поверху — один плаский зріз,
+   паралельний камері. Не сходинками, не зиґзаґом.
+2. **Крок углиб 0.8–1.0 м на поверх.** Менше — не читається, більше — верхній поверх
+   відривається від бою.
+3. **Ніщо вище не виступає поперед того, на чому стоїть.** Це єдина помилка в `Arena_Demo`,
+   і вона коштує відчуття спуску.
+4. **Глибина підлоги щонайменше 1.2 м.** Боєць — 0.6 м завтовшки і мусить стояти цілком на
+   підлозі, тож тонша підлога притискає його до самого краю.
+5. **Драбина = люк.** Там, де драбина проходить крізь підлогу, лишай **проріз щонайменше
+   0.7 м**. Без діри драбиною можна тільки піднятися — вниз з поверху не зістрибнути.
+6. **Нога драбини — на підлозі, верх — урівень або на 0.2 м вище** за ту, куди вона веде.
+   Утоплена на 15 см драбина пробиває люк не в тій підлозі (саме це і сталося з правою парою
+   в `Arena_Demo`).
+7. **Фон — за −0.5 м від площини бою і далі.** Усе ближче закриває бійця собою.
+
+Перевіряється не на око: `python3 docs/refs/depth_check.py --scene "<ім'я>.unity"` міряє
+кожен поверх і кожен зістриб між ними.
+
+---
+
 ## Блоки біомів
 
 Підставляй у `SUBJECT`, `PROPS` і `палітра` шаблона вище.
@@ -416,6 +461,90 @@ PROPS: three glowing cyan military crates and one glowing gold vault box, flat o
 ПАЛІТРА: wet grey concrete, institutional green paint, one rotating amber alarm light,
 cold cyan emergency strips
 ```
+
+### 9. Зимова лісопилка на замерзлій річці 🪵❄️ ⭐ наступна — середньовічний
+
+Наступна локація після `Arena_Nordic fortress`. Обрана не навмання, а з трьох причин:
+
+- **Ділить набір ассетів із Nordic** — дерев'яні зруби, сходи, сніг (`GR_SnowGround`,
+  `Cloth_Banner_wall_Nordic`), бочки й ящики вже в проєкті. Нова локація коштує дорожче
+  всього саме новими ассетами, а не геометрією.
+- **Поверхи самі собою різні за глибиною**: лід попереду, цех за ним, сушарні ще далі —
+  принцип сходових поверхів тут не треба вигадувати, він є у самій будівлі.
+- **Дає те, чого нема в жодній із двох готових арен** — *відкриту воду під ногами* як
+  нижній поверх і два довгі жолоби замість драбин.
+
+Повний готовий промт (**забудований** біом, форма `dollhouse`):
+
+```
+Stylized low poly 3D game environment render, side-view cutaway of a three-story timber
+sawmill standing on a frozen river, cut open like a dollhouse, modeled in Blender,
+flat-shaded faceted geometry.
+
+SUBJECT: an abandoned winter sawmill of a fictional northern labour camp, built out over a
+frozen river on heavy timber piles, cut open so all three floors are visible at once. A
+frozen waterfall and a stopped water wheel at one end.
+
+STRUCTURE: exactly three stacked floors, each floor 2.5 meters high.
+Bottom floor, the river: flat blue-white river ice between the piles, with one open black
+water hole and a snowdrift bank at each end; one iron holding cage at the far left end on
+the ice and one at the far right, their doors raised open.
+Middle floor, the mill: three enclosed workrooms divided by solid plank walls — a saw hall
+with a long stopped blade, a log store stacked with cut timber, and a small stove room.
+Top floor, the drying lofts: three open-sided lofts under a steep snow-laden roof, joined by
+a plank catwalk, with stacked drying boards and open pale sky above.
+
+DEPTH: each floor sits further back than the one below it, stepped back about one meter per
+floor, so the river ice is nearest the viewer and the drying lofts are furthest away. The
+near edge of each floor is one flat plane parallel to the camera. Nothing on an upper floor
+overhangs forward past the floor it stands on.
+
+CONNECTIONS: two wooden ladders and two long sloped log flumes clearly join the three floors,
+and a square hatch at the top of each ladder leaves a clear gap in the floor above it.
+
+SCALE: a small dark 1.8 meter tall human silhouette stands on the river ice for scale. Each
+workroom is about four times his height wide and just over his height tall.
+
+RULES: every walkable surface is perfectly flat and horizontal, no tilted or diagonal walking
+surfaces. Every platform rests on visible timber piles, beams or ice. Nothing floats in
+mid-air. The left and right ends have the same number of spaces but different shapes, not a
+mirror image. Keep the object count low and every object physically supported.
+
+PROPS: three glowing cyan wooden crates and one glowing gold strongbox, each sitting flat on
+a floor. Saw blades, barrels, coils of rope and an iron stove, all resting on the floor.
+
+LIGHT AND COLOR: flat saturated color fills, hard edges between facets, no texture detail.
+Cold blue-white snow and ice, dark tarred timber, bleached grey planks, one warm orange
+stove glow in the mill. Strong value separation — the distant far bank very pale and low
+contrast, the three gameplay floors dark and high contrast. Fog only behind the mill, never
+in front of it.
+
+CAMERA: strict side elevation, near-orthographic, camera perpendicular to the facade,
+12 degree downward tilt, the whole mill fits in frame with clear margins.
+
+--ar 21:9 --style raw --stylize 150
+```
+
+Негатив — базовий v2 **плюс**:
+```
+open water everywhere, flowing river, summer, green foliage, warm sunlight, cosy interior,
+smoke, steam clouds in the foreground
+```
+
+**Що з цього промта робить геймплей, а не настрій:**
+
+| Рядок | Навіщо |
+|---|---|
+| `DEPTH: ... stepped back about one meter per floor` | Принцип сходових поверхів, просто в промт. Без нього генератор ставить усі три поверхи в одну площину, і зістриб вниз не читається. |
+| `The near edge of each floor is one flat plane` | Боєць стоїть на зрізі підлоги. Зубчаста ближня грань = різні зрізи на одній підлозі. |
+| `Nothing ... overhangs forward past the floor it stands on` | Єдина помилка глибини в `Arena_Demo`, виправлена ще в промті. |
+| `a square hatch ... leaves a clear gap in the floor above it` | Без діри з поверху не зістрибнути — драбина працює тільки вгору. |
+| `one open black water hole` | Єдина небезпека на нижньому поверсі, яку видно здалеку. |
+| `two long sloped log flumes` | Другий шлях між поверхами, який не драбина — щоб втеча не була завжди однією і тією самою. |
+
+> Жолоби — **похилі**, а правило каже `no tilted walking surfaces`. Це не суперечність:
+> жолоб у кадрі похилий, а в грі ріжеться на горизонтальні сходинки по 0.2 м
+> (`SimWorldBaker.slopeStep`), рівно як уже зроблено з двома сходами в `Arena_Demo`.
 
 ---
 

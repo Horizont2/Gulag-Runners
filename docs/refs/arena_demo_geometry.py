@@ -487,7 +487,7 @@ class Scene:
         body = next((b for fid, (cls, b) in self.docs.items()
                      if cls == 114 and f'guid: {BAKER_GUID}' in b), None)
         if body is None:
-            raise SystemExit('Arena_Demo has no SimWorldBaker')
+            raise SystemExit('this scene has no SimWorldBaker in it')
         return _field(body, name, cast, default)
 
     def trigger(self, go):
@@ -626,7 +626,7 @@ def bake(scene=None, report=False):
     baker = next((b for fid, (cls, b) in sc.docs.items()
                   if cls == 114 and f'guid: {BAKER_GUID}' in b), None)
     if baker is None:
-        raise SystemExit('Arena_Demo has no SimWorldBaker')
+        raise SystemExit('this scene has no SimWorldBaker in it')
     plane_z = _field(baker, 'planeZ', float, 0.0)
     thickness = _field(baker, 'planeThickness', float, 1.5)
     restrict = _field(baker, 'restrictToPlane', int, 1)

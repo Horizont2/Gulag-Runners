@@ -329,11 +329,21 @@ namespace UnityEditor
 
 namespace UnityEditor.SceneManagement
 {
+    public enum OpenSceneMode { Single, Additive, AdditiveWithoutLoading }
+
     public static class EditorSceneManager
     {
         public static void MarkSceneDirty(UnityEngine.SceneManagement.Scene scene) { }
         public static void MarkAllScenesDirty() { }
         public static bool SaveOpenScenes() => true;
+
+        // Opening a second scene alongside the open one, and closing it again without
+        // saving, is how ArenaSceneSetup lifts the match systems out of the arena that
+        // already works instead of rebuilding them from a list somebody maintains.
+        public static UnityEngine.SceneManagement.Scene OpenScene(
+            string path, OpenSceneMode mode) => default;
+        public static bool CloseScene(UnityEngine.SceneManagement.Scene scene,
+                                      bool removeScene) => true;
     }
 
 }

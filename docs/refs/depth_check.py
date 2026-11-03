@@ -52,6 +52,10 @@ READS_AS_A_MOVE = 0.15
 DURING_THE_FALL = 0.6
 
 
+class NotAnArena(Exception):
+    """This scene has no simulation in it yet, so there are no storeys to measure."""
+
+
 def world(path, hatches):
     text = open(path, encoding="utf-8", errors="ignore").read()
     if hatches:
@@ -60,7 +64,13 @@ def world(path, hatches):
         open(path, "w", encoding="utf-8").write(text)
     try:
         scene = geometry.Scene(path)
-        baked = geometry.bake(scene)
+        try:
+            baked = geometry.bake(scene)
+        except SystemExit as why:
+            # A scene with no SimWorldBaker in it is art, not an arena. Saying which,
+            # rather than dying with the baker's own message about a different scene,
+            # is the difference between a check and a stack trace.
+            raise NotAnArena(str(why)) from None
     finally:
         if hatches and os.path.exists(path):
             os.remove(path)
@@ -166,7 +176,14 @@ def main(argv):
         print(f"  depth_check: no scene at {path}")
         return 1
 
-    w, baked = world(path, hatches)
+    try:
+        w, baked = world(path, hatches)
+    except NotAnArena as why:
+        print(f"  note: {scene_name} is dressed art, not an arena yet: {why}.")
+        print("  note: run Tools > Gulag Runners > Setup > Make this scene playable, "
+              "mark its floors with SimCollider, and this has something to measure.")
+        print("depth_check: 0 problem(s) over 0 drop(s)")
+        return 0
     floors = storeys(baked)
     problems, notes = [], []
 
