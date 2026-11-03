@@ -54,7 +54,7 @@ SCENES = os.path.join(ASSETS, "Scenes")
 
 # Which scene carries which screen, for the report.
 LOOKING_AT = {
-    "Arena_Demo.unity": "the combat HUD",
+    "Arena_Forest.unity": "the combat HUD",
     "Menu.unity": "the menu and the search screen",
 }
 

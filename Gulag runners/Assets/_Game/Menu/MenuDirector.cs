@@ -65,7 +65,7 @@ namespace GulagRunners.Game
                  "controls and nothing to read.\n\n" +
                  "This is a NAME, checked by nobody. A scene missing from the build list " +
                  "loads fine in the editor and fails on the device.")]
-        public string matchScene = "Arena_Demo";
+        public string matchScene = "Arena_Forest";
 
         [Tooltip("Start loading at this point of the walk, 0 to 1, and show the next scene " +
                  "only once the walk has finished. Loading early hides the wait inside the " +

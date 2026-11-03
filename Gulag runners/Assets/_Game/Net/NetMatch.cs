@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using GulagRunners.Game;
@@ -332,6 +333,7 @@ namespace GulagRunners.Net
             }
 
             BeMe(link.LocalPlayer);
+            OneCamera(true);
 
             // Both devices throw away whatever match they were in the middle of and deal
             // the same one, from the number the host chose. Without this the two phones
@@ -464,6 +466,50 @@ namespace GulagRunners.Net
         /// The guest is player two, and until this runs the guest is watching player one's
         /// camera, reading player one's health bar, and about to bank player one's win.
         /// </summary>
+        /// <summary>
+        /// One screen, one camera.
+        ///
+        /// The arena is built for one phone with two people on it, so it carries a
+        /// camera per fighter stacked half a screen each. That is right there and
+        /// wrong the moment there are two phones: this player owns the whole screen
+        /// and the other fighter's camera is rendering a second view of a match
+        /// nobody on this device is watching, over the top half of it.
+        ///
+        /// The Camera component rather than the object, because the object also
+        /// carries the round intro and outro shots, and switching those off would
+        /// take the opening of the match with it.
+        ///
+        /// Put back on release, so disconnecting hands the scene back the way it was
+        /// found and a one-phone match still has both halves.
+        /// </summary>
+        void OneCamera(bool alone)
+        {
+            foreach (SideViewCamera cam in FindObjectsByType<SideViewCamera>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                Camera drawn = cam.GetComponent<Camera>();
+                bool mine = cam == view;
+
+                if (!alone)
+                {
+                    if (drawn != null) drawn.enabled = true;
+                    cam.viewportRect = _splitScreen.TryGetValue(cam, out Rect was)
+                        ? was : cam.viewportRect;
+                    continue;
+                }
+
+                if (drawn != null) drawn.enabled = mine;
+                if (!mine) continue;
+
+                if (!_splitScreen.ContainsKey(cam)) _splitScreen[cam] = cam.viewportRect;
+                cam.applyViewportRect = true;
+                cam.viewportRect = new Rect(0f, 0f, 1f, 1f);
+            }
+        }
+
+        readonly Dictionary<SideViewCamera, Rect> _splitScreen =
+            new Dictionary<SideViewCamera, Rect>();
+
         void BeMe(int player)
         {
             PlayerController mine = At(player);
@@ -504,6 +550,7 @@ namespace GulagRunners.Net
             _substituted = false;
             _wasPaused = false;
             _controls = null;
+            OneCamera(false);
             Say("");
             if (result != null) result.someoneElseRestarts = false;
             if (match == null) return;

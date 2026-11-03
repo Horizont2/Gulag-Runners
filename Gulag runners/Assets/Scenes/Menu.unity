@@ -11887,7 +11887,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   matchScene: Arena_Forest
   loadStartsAt: 0.2
-  pool: {fileID: 0}
+  pool: {fileID: 11400000, guid: 7b132368186e5700347ef1bc63251e68, type: 2}
   mapSeed: 0
   waitForRelease: 0
   state: waiting

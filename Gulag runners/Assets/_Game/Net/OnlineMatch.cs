@@ -64,9 +64,20 @@ namespace GulagRunners.Net
         public bool weAreLoaded;
         public bool theyAreLoaded;
 
+        [Header("Rules")]
+        [Tooltip("Seconds to wait for the other phone to say its arena is up before " +
+                 "going in anyway. 0 waits for ever, which is a hang and not a " +
+                 "safety feature: one lost datagram and both players sit on the " +
+                 "search screen with an opponent found and nothing happening.\n\n" +
+                 "Going early costs little. Lockstep will not run a tick until both " +
+                 "inputs are in, so whoever arrives first waits in the arena instead " +
+                 "of in the menu.")]
+        [Range(0f, 30f)] public float readyTimeout = 6f;
+
         RelayTransport _wire;
         readonly byte[] _loaded = { PacketLoaded };
         float _nextSay;
+        float _loadedAt;
         CancellationTokenSource _cancel;
         MatchFound _pairing;
         bool _have;
@@ -97,7 +108,23 @@ namespace GulagRunners.Net
         /// have. Against a bot there is nobody to wait for and this is true at once.
         /// </summary>
         public bool OpponentReady =>
-            _have && (_pairing.AgainstBot || (relayOpen && theyAreLoaded));
+            _have && (_pairing.AgainstBot || !relayOpen || theyAreLoaded || GaveUpWaiting);
+
+        /// <summary>
+        /// We have been standing at the gate long enough that waiting is now the worse
+        /// of the two mistakes.
+        ///
+        /// A gate with no way past it is not a safety feature, it is a hang, and that
+        /// is what the first version of this was: lose one byte on a datagram relay and
+        /// both players sit on the search screen for ever with an opponent found. The
+        /// cost of going early is measured and small -- lockstep will not run a tick
+        /// until both inputs are in, so the device that arrives first waits in the
+        /// arena instead of in the menu, and NetMatch no longer banks that wait. The
+        /// cost of not going is the match.
+        /// </summary>
+        public bool GaveUpWaiting =>
+            weAreLoaded && readyTimeout > 0f &&
+            Time.unscaledTime - _loadedAt > readyTimeout;
 
         void Awake()
         {
@@ -131,13 +158,18 @@ namespace GulagRunners.Net
             if (_wire == null) return;
             _wire.Pump();
 
-            // Datagrams, and the one that matters is a single byte sent once. So it is
-            // sent again four times a second until the other side's answer comes back,
-            // which costs nothing and removes the case where the whole match waits on
-            // one lost packet.
-            if (!weAreLoaded || theyAreLoaded) return;
+            if (!weAreLoaded) return;
+
+            // KEEP SAYING IT, even after they have answered. This stopped at
+            // `theyAreLoaded` and that one word is why a match connected on one phone
+            // and hung on the other: whichever device loaded SECOND received the
+            // first one's announcement, set theyAreLoaded, and then returned here
+            // before ever sending its own. The first device waited for a packet that
+            // was now never going to be sent. Exactly one player got in.
+            //
+            // Announcing is one byte. There is no version of this worth saving it on.
             if (Time.unscaledTime < _nextSay) return;
-            _nextSay = Time.unscaledTime + 0.25f;
+            _nextSay = Time.unscaledTime + (theyAreLoaded ? 1f : 0.25f);
             _wire.Send(_loaded, 1);
         }
 
@@ -147,9 +179,15 @@ namespace GulagRunners.Net
         /// </summary>
         public void WeHaveLoaded()
         {
+            if (weAreLoaded) return;
             weAreLoaded = true;
+            _loadedAt = Time.unscaledTime;
             _nextSay = 0f;
         }
+
+        /// <summary>How long this side has been holding at the gate, for the screen.</summary>
+        public float WaitedFor =>
+            weAreLoaded ? Time.unscaledTime - _loadedAt : 0f;
 
         void Heard(byte[] data, int length)
         {
@@ -249,6 +287,7 @@ namespace GulagRunners.Net
             relayOpen = false;
             weAreLoaded = false;
             theyAreLoaded = false;
+            _loadedAt = 0f;
             _have = false;
             Say("idle");
         }

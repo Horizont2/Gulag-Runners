@@ -72,6 +72,14 @@ namespace GulagRunners.Game
         [Tooltip("Seconds the found opponent is shown before the walk begins.")]
         [Range(0.2f, 3f)] public float foundSeconds = 1.1f;
 
+        [Tooltip("Shown while your arena is up and theirs is not. {0} is who, {1} is " +
+                 "the seconds left before the match starts without waiting any " +
+                 "longer.\n\n" +
+                 "This phase used to say nothing and hold a full bar, which is the " +
+                 "shape of a crash whether or not it is one -- and for a while it was " +
+                 "one, because the gate had no way past a lost packet.")]
+        public string waitingForThem = "{0} IS STILL LOADING… {1}";
+
         /// <summary>
         /// The pool, and the only copy of it. SearchBuilder used to carry its own and
         /// overwrite this one, which is two lists that have to agree -- the same trap as
@@ -319,13 +327,39 @@ namespace GulagRunners.Game
             if (phase == SearchPhase.Starting) Done();
         }
 
+        /// <summary>
+        /// Your arena is up and theirs is not. The one moment on this screen where
+        /// nothing is happening that you can see.
+        ///
+        /// It used to say nothing at all and hold a full bar, which is the shape of a
+        /// hang whether or not it is one -- and for a while it WAS one, because the
+        /// gate had no way past a lost packet. A full still bar with no words is the
+        /// only state on this screen a player cannot tell from a crash.
+        ///
+        /// So it names who is being waited for, and counts. The count is the real
+        /// timeout, not decoration: when it runs out the match starts anyway.
+        /// </summary>
         void Waiting()
         {
-            Say("");
             Fill(1f);
-            if (!OpponentReady) return;
-            Enter(SearchPhase.Starting);
-            Done();
+
+            if (OpponentReady)
+            {
+                Enter(SearchPhase.Starting);
+                Done();
+                return;
+            }
+
+            string who = string.IsNullOrEmpty(_opponent.OpponentName)
+                ? "THE OTHER RUNNER" : _opponent.OpponentName.ToUpperInvariant();
+
+            float left = _gate is OnlineMatch online && online.readyTimeout > 0f
+                ? online.readyTimeout - online.WaitedFor
+                : 0f;
+
+            Say(left > 0f
+                ? string.Format(waitingForThem, who, Mathf.CeilToInt(left))
+                : string.Format(waitingForThem, who, 0).Split('…')[0].TrimEnd());
         }
 
         void Done()
