@@ -67,11 +67,31 @@ def guid_index():
 
 
 def counts(text, guids):
+    """How many of each script this scene has, components AND prefab instances.
+
+    The second half matters more than it sounds. The moment the fighters became a
+    prefab -- which is the right way round, two arenas should not each carry their own
+    copy of a fighter -- their PlayerController stopped being written into the scene
+    file, and this reported "PlayerController: 0 of 2, a 1v1 needs two fighters" at a
+    scene with two fighters standing in it. A readiness list that cannot see the thing
+    it is asking about is worse than no list: it sends somebody to fix what is not
+    broken.
+
+    An instance is counted by the NAME it was given, against the names the reference
+    arena's own instances use, because a prefab's contents are in another file and the
+    scene only records what it was called and what it was changed from.
+    """
     out = {}
     for name, guid in guids.items():
         n = len(re.findall(r"m_Script: \{fileID: 11500000, guid: " + guid, text))
         if n:
             out[name] = n
+
+    # Prefab instances, by the name on the instance. "Player 1" and "Player 2" are
+    # fighters wherever they turn up; nothing else in these scenes is called that.
+    fighters = len(re.findall(r"propertyPath: m_Name\n\s+value: Player \d+\s*\n", text))
+    if fighters:
+        out["PlayerController.cs"] = max(out.get("PlayerController.cs", 0), fighters)
     return out
 
 

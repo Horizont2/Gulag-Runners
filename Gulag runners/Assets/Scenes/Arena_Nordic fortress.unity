@@ -21879,7 +21879,7 @@ MonoBehaviour:
     m_Bits: 0
   includeTriggers: 0
   restrictToPlane: 1
-  planeZ: -0.5
+  planeZ: 1.2
   planeThickness: 3
   planeFiltersMarked: 1
   dropBackdrop: 1

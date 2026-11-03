@@ -59,6 +59,15 @@ def _vec(body, name, default=None):
     return d
 
 
+class _ZeroMatch:
+    @staticmethod
+    def group(_):
+        return 0
+
+
+_ZERO = _ZeroMatch()
+
+
 def _ref(body, name):
     m = re.search(r'^\s{2}' + re.escape(name) + r':\s*\{fileID: (-?\d+)', body, re.M)
     return int(m.group(1)) if m else 0
@@ -220,7 +229,16 @@ class Scene:
                     rot={a: mod('m_LocalRotation.' + a, 1.0 if a == 'w' else 0.0)
                          for a in 'xyzw'},
                     scale={a: mod('m_LocalScale.' + a, 1.0) for a in 'xyz'},
-                    parent=_ref(body, 'm_TransformParent'))
+                    # NOT _ref: inside a PrefabInstance this field lives under
+                    # m_Modification at four spaces, and _ref only matches two. It
+                    # therefore read 0 -- "parented to the scene root" -- for every
+                    # instance in the project. Invisible in Arena_Forest, whose Arena
+                    # root sits at the origin, and worth twenty-one metres in the
+                    # Nordic arena, whose Arena root is at z +21.19: the two ladders
+                    # came out stranded in empty space and were duly culled off the
+                    # plane, which looked exactly like somebody having misplaced them.
+                    parent=int((re.search(r'm_TransformParent: \{fileID: (-?\d+)\}',
+                                          body) or _ZERO).group(1)))
                 self.tr_of_go[owner] = tfid
                 self.gos[owner] = dict(
                     name=mods.get('m_Name', '').strip() or f'instance {fid}',
