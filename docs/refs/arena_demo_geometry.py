@@ -158,6 +158,76 @@ class Scene:
                                      active=_field(body, 'm_IsActive', int, 1),
                                      comps=comps)
         self.tr_of_go = {v['go']: k for k, v in self.transforms.items() if v['go']}
+        self.instanced = self._adopt_instances()
+
+    def _adopt_instances(self):
+        """Markers that were added to a PREFAB INSTANCE, which the loop above cannot see.
+
+        A prefab instance does not write its GameObjects into the scene. It writes one
+        PrefabInstance block, and a "stripped" GameObject -- no name, no components, no
+        transform -- for each one the scene refers to. So a SimCollider added to an
+        instance lands in the file as an ordinary MonoBehaviour whose m_GameObject points
+        at a shell, and reading only real GameObjects misses it completely.
+
+        That is not an edge case here. It is how all four ladders are marked, and the
+        harness duly reported zero ladders in an arena that has four of them -- the whole
+        route between storeys, invisible to every test in this folder while Unity had it
+        right all along. The Nordic arena is 165 prefab instances and would be a blank
+        sheet for the same reason.
+
+        What it CANNOT do is place a marker added to a child of an instance: that needs
+        the prefab's own hierarchy, and a model prefab's internals are inside the .fbx.
+        Every marker this project adds goes on the instance root -- that is what the
+        setup tools do, and what Unity shows you when you select one -- so the root's
+        transform is used and `assumed_root` counts how often that assumption was made,
+        rather than letting it pass silently.
+        """
+        self.assumed_root = 0
+        found = {}
+        for fid, (cls, body) in self.docs.items():
+            if cls != 1001:
+                continue
+            added = re.findall(r'addedObject: \{fileID: (-?\d+)\}', body)
+            if not added:
+                continue
+
+            mods = dict(re.findall(r'propertyPath: (\S+)\n\s+value: ([^\n]*)', body))
+            def mod(name, default):
+                try:
+                    return float(mods[name].strip())
+                except (KeyError, ValueError):
+                    return default
+
+            owners = {}
+            for ref in added:
+                cls2, comp = self.docs.get(int(ref), (0, ''))
+                if not comp:
+                    continue
+                owners.setdefault(_ref(comp, 'm_GameObject'), []).append(int(ref))
+
+            for owner, comps in owners.items():
+                # A stripped GameObject IS in self.gos -- the loop above reads it, finds
+                # no name and no components, and files an empty shell. That shell is the
+                # thing to fill in, so "already known" is not a reason to skip: it is the
+                # symptom. Only an object with a transform of its own is left alone.
+                if not owner or owner in self.tr_of_go:
+                    continue
+                self.assumed_root += 1
+                tfid = -abs(fid)                       # a transform id of its own
+                self.transforms[tfid] = dict(
+                    go=owner,
+                    pos={a: mod('m_LocalPosition.' + a, 0.0) for a in 'xyz'},
+                    rot={a: mod('m_LocalRotation.' + a, 1.0 if a == 'w' else 0.0)
+                         for a in 'xyzw'},
+                    scale={a: mod('m_LocalScale.' + a, 1.0) for a in 'xyz'},
+                    parent=_ref(body, 'm_TransformParent'))
+                self.tr_of_go[owner] = tfid
+                self.gos[owner] = dict(
+                    name=mods.get('m_Name', '').strip() or f'instance {fid}',
+                    active=int(mod('m_IsActive', 1.0)),
+                    comps=comps)
+                found[owner] = fid
+        return found
 
     # --- transforms
 

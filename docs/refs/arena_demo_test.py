@@ -125,7 +125,12 @@ def approach(cx, base, side, reach=2.6, depth=LANE):
 # ---------------------------------------------------------------- the bake itself
 print("\nThe bake")
 check("the arena has a floor", len(W["solid"]) > 20, f"{len(W['solid'])} solid boxes")
-check("both ladders survived the bake", len(W["ladder"]) == 2)
+# Four, not the two this used to say. The number was written when the harness could not
+# see a marker added to a prefab instance and the bake read zero ladders -- the arena has
+# always had two St ladders from the ground floor to the walkway and two St2 ladders from
+# the end platforms upwards.
+check("all four ladders survived the bake", len(W["ladder"]) == 4,
+      f"{len(W['ladder'])} ladder(s)")
 check("all six chests baked", len(CHESTS) == 6, f"{len(CHESTS)}")
 
 floor = max((b for b in solids_here() if F(b[3]) < 0.2), key=lambda b: b[2] - b[0])
