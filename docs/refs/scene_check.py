@@ -173,9 +173,59 @@ def check(path, guids):
             bad.append("has a MatchState but nothing listening to its Ended event, so "
                        "winning the match plays no differently from pausing it")
 
+        bad += no_camera(docs, src)
+
     for b in bad:
         print(f"  {rel}: {b}")
     return len(bad)
+
+
+def no_camera(docs, src):
+    """Is there anything in this scene that will actually draw it.
+
+    Asked because of the black screen with a live HUD on it -- "Display 1, No cameras
+    rendering", a round timer counting down behind nothing. A Screen Space Overlay canvas
+    draws with no camera at all, so the HUD being there says nothing about whether the
+    arena is. The four ways a scene renders nothing are all visible in the file: no camera
+    at all, every camera switched off, the object carrying one switched off, or a camera
+    pointed at a render texture instead of the screen. A fifth, URP's Overlay render type,
+    is a camera that only draws when it is stacked on a Base one.
+    """
+    problems = []
+    cameras, drawing = 0, 0
+    overlay = sum(1 for cls, _fid, _s, body in docs
+                  if cls == "114" and "UniversalAdditionalCameraData" in body
+                  and re.search(r'^\s*m_CameraType: [^0]', body, re.M))
+
+    for cls, _fid, _stripped, body in docs:
+        if cls != "20":
+            continue
+        cameras += 1
+        if re.search(r'^\s*m_Enabled: 0', body, re.M):
+            continue
+        if not re.search(r'm_TargetTexture: \{fileID: 0\b', body):
+            continue
+        rect = re.search(r'm_NormalizedViewPortRect:\n(?:.*\n){0,2}?\s*serializedVersion: 2'
+                         r'\n\s*x: ([-\d.e]+)\n\s*y: ([-\d.e]+)\n\s*width: ([-\d.e]+)'
+                         r'\n\s*height: ([-\d.e]+)', body)
+        if rect and (float(rect.group(3)) <= 0.001 or float(rect.group(4)) <= 0.001):
+            continue
+        drawing += 1
+
+    if cameras == 0:
+        problems.append("has no camera in it, so it draws nothing. A HUD canvas still "
+                        "appears, which is what makes this look like a rendering bug "
+                        "rather than a missing object")
+    elif drawing == 0:
+        problems.append(f"has {cameras} camera(s) and not one of them draws to the "
+                        "screen: switched off, pointed at a render texture, or given an "
+                        "empty viewport")
+    elif overlay == cameras:
+        problems.append(f"all {cameras} of its cameras are URP Overlay cameras, which "
+                        "only draw when stacked on a Base one -- on its own this scene "
+                        "shows \"No cameras rendering\"")
+
+    return problems
 
 
 def tuning_drift():

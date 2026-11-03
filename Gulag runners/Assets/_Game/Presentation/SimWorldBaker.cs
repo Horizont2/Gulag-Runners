@@ -413,13 +413,27 @@ namespace GulagRunners.Game
                 Fill(solidZ, solids.Count, Span.Everywhere);
             }
 
-            int hatches = ladderCutsHatch ? CutHatches(solids, ladders) : 0;
+            // The depths go THROUGH the cut with their own boxes. They are a parallel array
+            // by index, and the cut inserts, removes and reorders -- so padding the list
+            // afterwards, which is what this used to do, left every solid past the first
+            // hole wearing another solid's slice of the level. The walkway came out with
+            // the ground floor's depth and the ground floor with the back wall's, so a
+            // fighter dropping through a hatch met nothing he was on the same slice as and
+            // fell out of the arena. Which is presumably why ladderCutsHatch is switched
+            // off in Arena_Demo, and why there is no way down from the walkway at all.
+            int hatches = ladderCutsHatch ? CutHatches(solids, solidZ, ladders) : 0;
 
-            // CutHatches rewrites the solid list, so the depths have to be rebuilt against
-            // whatever came out of it rather than assumed to still line up.
-            while (solidZ.Count < solids.Count) solidZ.Add(Span.Everywhere);
-            if (solidZ.Count > solids.Count) solidZ.RemoveRange(solids.Count,
-                                                                solidZ.Count - solids.Count);
+            // A safety net now rather than the mechanism: if these two ever disagree again
+            // the bake is wrong, and a silent pad is how that stays hidden for months.
+            if (solidZ.Count != solids.Count)
+            {
+                Debug.LogError($"Bake: {solids.Count} solid(s) but {solidZ.Count} depth(s). " +
+                               "Every box past the shorter list is on the wrong slice of " +
+                               "the level. This is a bug in the bake, not in the scene.");
+                while (solidZ.Count < solids.Count) solidZ.Add(Span.Everywhere);
+                if (solidZ.Count > solids.Count)
+                    solidZ.RemoveRange(solids.Count, solidZ.Count - solids.Count);
+            }
 
             // The shutters go on last, after CutHatches has finished rewriting the solid list,
             // and never through it: a ladder crossing a shutter is a level-authoring mistake,
@@ -738,7 +752,7 @@ namespace GulagRunners.Game
         /// it, because hand-built levels have ladder feet a centimetre inside their own platform
         /// and a hole there is a fighter falling out of the arena.
         /// </summary>
-        int CutHatches(List<Aabb> solids, List<Aabb> ladders)
+        int CutHatches(List<Aabb> solids, List<Span> depths, List<Aabb> ladders)
         {
             if (ladders.Count == 0 || solids.Count == 0) return 0;
 
@@ -749,6 +763,7 @@ namespace GulagRunners.Game
             int cut = 0;
 
             List<Aabb> working = new List<Aabb>(solids.Count + ladders.Count);
+            List<Span> workingZ = new List<Span>(solids.Count + ladders.Count);
 
             foreach (Aabb ladder in ladders)
             {
@@ -756,8 +771,15 @@ namespace GulagRunners.Game
                 Fix holeMax = ladder.MaxX + margin;
 
                 working.Clear();
-                foreach (Aabb solid in solids)
+                workingZ.Clear();
+                for (int s = 0; s < solids.Count; s++)
                 {
+                    Aabb solid = solids[s];
+
+                    // The box's own slice, carried across every rewrite below. Both halves
+                    // of a cut floor are the same floor and keep it.
+                    Span z = s < depths.Count ? depths[s] : Span.Everywhere;
+
                     bool crossesX = solid.MinX < holeMax && solid.MaxX > holeMin;
 
                     // How much of the solid's height the ladder actually occupies. A ladder
@@ -766,19 +788,32 @@ namespace GulagRunners.Game
                     Fix overlapY = Fix.Min(solid.MaxY, ladder.MaxY)
                                  - Fix.Max(solid.MinY, ladder.MinY);
 
-                    if (!crossesX || overlapY <= minOverlap) { working.Add(solid); continue; }
+                    if (!crossesX || overlapY <= minOverlap)
+                    {
+                        working.Add(solid);
+                        workingZ.Add(z);
+                        continue;
+                    }
 
                     cut++;
 
                     if (holeMin - solid.MinX > sliver)
+                    {
                         working.Add(new Aabb(solid.MinX, solid.MinY, holeMin, solid.MaxY));
+                        workingZ.Add(z);
+                    }
 
                     if (solid.MaxX - holeMax > sliver)
+                    {
                         working.Add(new Aabb(holeMax, solid.MinY, solid.MaxX, solid.MaxY));
+                        workingZ.Add(z);
+                    }
                 }
 
                 solids.Clear();
                 solids.AddRange(working);
+                depths.Clear();
+                depths.AddRange(workingZ);
             }
 
             return cut;

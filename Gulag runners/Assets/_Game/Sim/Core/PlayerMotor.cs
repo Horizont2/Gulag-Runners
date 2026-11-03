@@ -140,7 +140,23 @@ namespace GulagRunners.Sim
                      - halfLadder - cfg.LadderStandOff;
             }
             else if (s.Mode != MoveMode.Grounded)
-                return;                                   // mid-air you keep the slice you left
+            {
+                // FALLING, the body leans towards the storey it is dropping onto.
+                //
+                // This used to keep the slice you left until your feet touched, and then
+                // slide you forward where you stood. That is the wrong order and it is
+                // what "he drops to the floor below and stays in the background" means:
+                // the whole move happened after the landing, as a slide, instead of
+                // during the fall where the eye reads it as leaning into the drop.
+                //
+                // Only on the way DOWN. Coming down is a move towards the camera and the
+                // storey below is already underneath you; jumping UP at a ledge and being
+                // dragged backwards before you are over it would put your shoulders
+                // through its front face.
+                if (s.Velocity.Y > Fix.Zero ||
+                    !TryLandingLane(ref s, world, in cfg, out want))
+                    return;
+            }
             else if (!TryLaneAhead(ref s, world, in cfg, out want) &&
                      !TryFloorLane(ref s, world, in cfg, out want))
                 return;
@@ -256,6 +272,44 @@ namespace GulagRunners.Sim
             //
             // So the lane follows the floor, which is a thing you are standing on, and the
             // rungs are taken at the moment you take them.
+            return found;
+        }
+
+        /// <summary>
+        /// The slice of the floor this body is falling onto: the highest solid under its
+        /// feet that it could change lane onto from here.
+        ///
+        /// No look-down distance, on purpose. There is nothing to tune: whatever is
+        /// directly below is what the fall ends on, and if there is nothing below then
+        /// there is no lane to aim at and the body keeps the one it has. The lane reach
+        /// is the only limit, and it is the same one that governs stepping sideways onto
+        /// a ramp — a fighter cannot slide two metres through the air to a slice he could
+        /// not have walked to.
+        /// </summary>
+        static bool TryLandingLane(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                   out Fix lane)
+        {
+            lane = s.Depth;
+            Fix half = cfg.BodyWidth / 2;
+
+            bool found = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;
+                Aabb solid = world.Solids[i];
+                if (solid.MaxY > s.Position.Y + Skin) continue;        // not below the feet
+                if (solid.MaxX <= s.Position.X - half ||
+                    solid.MinX >= s.Position.X + half) continue;
+                if (found && solid.MaxY <= top) continue;
+
+                Fix want = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
+                if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
+
+                top = solid.MaxY;
+                lane = want;
+                found = true;
+            }
             return found;
         }
 

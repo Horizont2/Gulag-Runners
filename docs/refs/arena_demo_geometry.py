@@ -572,32 +572,42 @@ def slope_steps(corners, step, min_rise):
     return out or None
 
 
-def cut_hatches(solids, ladders, margin, min_overlap):
+def cut_hatches(solids, depths, ladders, margin, min_overlap):
     """SimWorldBaker.CutHatches: a ladder opens a hole through anything it runs through.
 
     A solid the ladder only stands on keeps its floor: the ladder has to reach min_overlap into
     it first. Vlad's right-hand ladder is modelled one centimetre inside its own platform, and
     without that test the fighter who spawns there drops through a 0.78 m hole.
+
+    The DEPTHS come through with their boxes. They are a parallel array by index and this
+    inserts, removes and reorders, so padding the list afterwards -- which is what the baker
+    used to do -- left every solid past the first hole wearing another solid's slice of the
+    level: the walkway with the ground floor's depth, the ground floor with the back wall's.
+    A fighter dropping through a hatch then met nothing on his own slice and fell out of the
+    arena, which is measurable here and is why ladderCutsHatch is switched off in the scene.
     """
     m = X(margin)
     tol = X(min_overlap)
     sliver = X(0.05)
     cut = 0
     for lad in ladders:
-        working = []
-        for s in solids:
+        working, workingz = [], []
+        for s, z in zip(solids, depths):
             lo, hi = lad[0] - m, lad[2] + m
             overlap_y = min(s[3], lad[3]) - max(s[1], lad[1])
             if not (s[0] < hi and s[2] > lo) or overlap_y <= tol:
                 working.append(s)
+                workingz.append(z)
                 continue
             cut += 1
             if lo - s[0] > sliver:
                 working.append((s[0], s[1], lo, s[3]))
+                workingz.append(z)
             if s[2] - hi > sliver:
                 working.append((hi, s[1], s[2], s[3]))
-        solids = working
-    return solids, cut
+                workingz.append(z)
+        solids, depths = working, workingz
+    return solids, depths, cut
 
 
 def _gate_of(sc, go):
@@ -758,11 +768,13 @@ def bake(scene=None, report=False):
 
     hatches = 0
     if cuts_hatch:
-        solids, hatches = cut_hatches(solids, ladders, margin, min_overlap)
+        solids, solidz, hatches = cut_hatches(solids, solidz, ladders, margin, min_overlap)
 
-    while len(solidz) < len(solids):
-        solidz.append((X(-1000.0), X(1000.0)))
-    del solidz[len(solids):]
+    # A safety net now rather than the mechanism. The two disagreeing means boxes are
+    # wearing each other's depths, and a silent pad is how that stayed hidden.
+    if len(solidz) != len(solids):
+        raise SystemExit(f'bake: {len(solids)} solid(s) but {len(solidz)} depth(s) -- '
+                         'every box past the shorter list is on the wrong slice')
 
     # Now the shutters, on the end, in the order they will shut — which is the sort, because
     # gate n is bit n of one word and the clock spreads them across the shutter window in

@@ -337,7 +337,17 @@ def update_depth(s, w):
         want = (ladder_depth_at(w, s.ladder, s.y, s.depth, inset)
                 - (sp[1] - sp[0]) // 2 - C["LSTANDOFF"])
     elif s.mode != "ground":
-        return
+        # Falling, the body leans towards the storey it is dropping onto. This used to
+        # keep the slice you left until your feet touched and then slide you forward on
+        # the spot, which is what "he drops to the floor below and stays in the
+        # background" means: the move happened after the landing instead of during the
+        # fall. Only on the way down -- being dragged backwards while jumping UP at a
+        # ledge would put the shoulders through its front face.
+        if s.vy > 0:
+            return
+        want = landing_lane(s, w)
+        if want is None:
+            return
     else:
         want = lane_ahead(s, w)
         if want is None:
@@ -411,6 +421,28 @@ def lane_on(sp, depth):
     home = C["HOME"]
     return nearest_in(sp, home, halfz) if reaches(sp, home, halfz) \
         else nearest_in(sp, depth, halfz)
+
+def landing_lane(s, w):
+    """The slice of the floor this body is falling onto: the highest solid under its feet
+    that it could change lane onto from here.
+
+    No look-down distance, on purpose. Whatever is directly below is what the fall ends
+    on, and with nothing below there is no lane to aim at. The lane reach is the only
+    limit, and it is the same one that governs stepping sideways onto a ramp."""
+    half = C["W"] // 2
+    best = None
+    top = 0
+    for i, sol in enumerate(w["solid"]):
+        if not solid_live(w, i): continue
+        if sol[3] > s.y + SKIN: continue                 # not below the feet
+        if sol[2] <= s.x - half or sol[0] >= s.x + half: continue
+        if best is not None and sol[3] <= top: continue
+        want = lane_on(span(w, "solid", i), s.depth)
+        if abs(want - s.depth) > C["LANEREACH"]: continue
+        top = sol[3]
+        best = want
+    return best
+
 
 def floor_lane(s, w):
     half = C["W"] // 2; halfz = C["BODYZ"] // 2
