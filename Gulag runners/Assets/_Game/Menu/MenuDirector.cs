@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using GulagRunners.Meta;
 
 namespace GulagRunners.Game
 {
@@ -71,6 +72,20 @@ namespace GulagRunners.Game
                  "move; showing early throws the move away.")]
         [Range(0f, 1f)] public float loadStartsAt = 0.2f;
 
+        [Tooltip("The arenas a match may be played in. Empty plays Match Scene below, " +
+                 "which is how this behaved when there was only one.\n\n" +
+                 "The pool is dealt from Map Seed, not chosen here: both devices have " +
+                 "that number before either starts loading, so they arrive at the same " +
+                 "arena without sending anything. Which also means both devices must " +
+                 "carry the SAME pool asset -- two builds whose pools differ connect, " +
+                 "count down and never start.")]
+        public MapPool pool;
+
+        [Tooltip("The number the match is dealt from, set by MatchSearch when a pairing " +
+                 "arrives. Left at 0 against a practice opponent, which is fine: there " +
+                 "is nobody to agree with.")]
+        public uint mapSeed;
+
         [Tooltip("Hold the finished load until Release() is called.\n\n" +
                  "Off, the walk ends and the arena appears, which is right when there is " +
                  "nobody else in it. On, the scene waits — because the other runner may " +
@@ -89,6 +104,29 @@ namespace GulagRunners.Game
 
         /// <summary>Let the arena through. Only meaningful with Wait For Release on.</summary>
         public void Release() => _released = true;
+
+        /// <summary>
+        /// The arena this match is in: the pool's answer for this seed, or the single
+        /// scene below when there is no pool. Asked once and remembered, because the
+        /// name is wanted twice -- to load, and to tell the player where they are going
+        /// -- and a pool that answered differently the second time would be a very
+        /// quiet way to load one arena and name another.
+        /// </summary>
+        public string SceneToLoad
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(_chosen)) return _chosen;
+                _chosen = pool != null ? pool.Choose(mapSeed) : matchScene;
+                return _chosen;
+            }
+        }
+
+        /// <summary>What to call it on the screen.</summary>
+        public string SceneShown =>
+            pool != null ? pool.NameOf(SceneToLoad) : SceneToLoad;
+
+        string _chosen;
 
         bool _released;
         bool _leaving;
@@ -193,10 +231,10 @@ namespace GulagRunners.Game
 
                 // Loading starts inside the move, so the wait happens while there is
                 // something to look at, and the move is never cut short by it.
-                if (load == null && w >= loadStartsAt && !string.IsNullOrEmpty(matchScene))
+                if (load == null && w >= loadStartsAt && !string.IsNullOrEmpty(SceneToLoad))
                 {
-                    state = "loading";
-                    load = SceneManager.LoadSceneAsync(matchScene);
+                    state = "loading " + SceneShown;
+                    load = SceneManager.LoadSceneAsync(SceneToLoad);
                     if (load != null) load.allowSceneActivation = false;
                 }
 
@@ -210,7 +248,7 @@ namespace GulagRunners.Game
 
             if (load == null)
             {
-                state = string.IsNullOrEmpty(matchScene) ? "done (no scene set)" : "done";
+                state = string.IsNullOrEmpty(SceneToLoad) ? "done (no scene set)" : "done";
                 yield break;
             }
 

@@ -215,7 +215,25 @@ namespace GulagRunners.Net
                     int left = Mathf.CeilToInt(substituteAfter - _silent);
                     Say(string.Format(waitingFor, left));
                     state = $"tick {tick}: no answer for {_silent:0.0}s";
-                    return;                       // hold the accumulator; try next frame
+
+                    // A stall must not BANK the time it costs.
+                    //
+                    // This used to hold the accumulator, and the comment that said so
+                    // read like thrift. It is the lurch: half a second of waiting for
+                    // the other phone is thirty ticks owed, and they are repaid six to
+                    // a frame as soon as the input arrives, so the match replays that
+                    // half second at six times speed. The player who was waited FOR
+                    // sees none of it, which is precisely the report -- one player is
+                    // fine and the other lags.
+                    //
+                    // Lockstep's clock is the tick, not the wall, and both devices run
+                    // the same ticks either way. So the wait is simply spent: a stall
+                    // becomes a brief hold at normal speed instead of a hold followed
+                    // by a fast-forward. One tick of slack is kept so an input that
+                    // lands mid-frame is not pushed into the next one.
+                    _accumulator = Mathf.Min(_accumulator,
+                                             PlayerController.SecondsPerTick);
+                    return;
                 }
 
                 _silent = 0f;

@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Events;
 using GulagRunners.Meta;
+using GulagRunners.Net;
 
 namespace GulagRunners.Game
 {
@@ -276,6 +277,13 @@ namespace GulagRunners.Game
             Say(string.IsNullOrEmpty(_opponent.OpponentName)
                 ? "OPPONENT FOUND" : _opponent.OpponentName);
             Fill(1f);
+
+            // The arena is dealt from the pairing's own number, before either device
+            // starts loading and without either telling the other. Set here rather than
+            // in Found(), because Play() is one frame away and a director that loaded
+            // on seed 0 would load the wrong arena perfectly reliably.
+            if (director != null) director.mapSeed = _opponent.Seed;
+
             Paired?.Invoke(_opponent.AgainstBot);
         }
 
@@ -300,6 +308,13 @@ namespace GulagRunners.Game
             Fill(director.LoadProgress);
 
             if (!director.ReadyToHandOver) return;
+
+            // Say so, once this side is holding at the gate. The other device's screen
+            // is waiting on exactly this, and until it was sent the gate opened on "the
+            // relay is up" -- which is true well before either arena has finished
+            // loading, and is what let one phone start the match alone.
+            if (_gate is OnlineMatch online) online.WeHaveLoaded();
+
             Enter(OpponentReady ? SearchPhase.Starting : SearchPhase.Waiting);
             if (phase == SearchPhase.Starting) Done();
         }
