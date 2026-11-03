@@ -9,7 +9,7 @@ EditorBuildSettings:
     path: Assets/Scenes/Menu.unity
     guid: 453cf31ad52c664479a1b0b6231ac8c8
   - enabled: 1
-    path: Assets/Scenes/Arena_Demo.unity
+    path: Assets/Scenes/Arena_Forest.unity
     guid: 40e2c5ebe8ce6e89a10d5771553cddf6
   - enabled: 1
     path: Assets/Scenes/Arena_Nordic fortress.unity
