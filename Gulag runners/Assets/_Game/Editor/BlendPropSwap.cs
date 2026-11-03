@@ -404,13 +404,61 @@ namespace GulagRunners.GameEditor
             var importer = AssetImporter.GetAtPath(path) as ModelImporter;
             if (importer == null || !importer.useFileScale) return false;
 
+            // Everything already placed, BEFORE the model changes under it. A model's
+            // import scale is a project-wide setting and every instance in every scene
+            // was placed against whatever it was: making the model a hundred times
+            // bigger makes all of them a hundred times bigger, in scenes nobody has
+            // open. That is not a hypothetical. This line, run once for seventeen
+            // dungeon models, left the loot chests in Arena_Demo and the menu at six
+            // millimetres, because their instances were at a scale of 0.005 to cancel
+            // out the old import. Nobody touched those scenes and nothing said a word.
+            //
+            // So the instances in the OPEN scene are divided by the same factor in the
+            // same breath, and nothing visibly moves. Scenes that are not open cannot
+            // be reached from here, and PropScaleFix is the tool for those -- it
+            // measures rather than remembers, so it works whenever it is run.
+            var placed = new List<Transform>();
+            foreach (GameObject go in UnityEngine.Object.FindObjectsByType<GameObject>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (PrefabUtility.GetOutermostPrefabInstanceRoot(go) != go) continue;
+                UnityEngine.Object from =
+                    PrefabUtility.GetCorrespondingObjectFromOriginalSource(go);
+                if (from != null && AssetDatabase.GetAssetPath(from) == path)
+                    placed.Add(go.transform);
+            }
+
             importer.useFileScale = false;
             importer.globalScale = 1f;
             importer.SaveAndReimport();
 
+            // The factor the model just grew by, measured rather than assumed: it is
+            // 100 for every file in this pack, and assuming 100 is how the next pack
+            // with a different lie in it gets silently mangled.
+            GameObject after = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            float now = 0f;
+            if (after != null)
+                foreach (MeshFilter filter in after.GetComponentsInChildren<MeshFilter>(true))
+                    if (filter.sharedMesh != null)
+                        now = Mathf.Max(now, filter.sharedMesh.bounds.size.magnitude);
+
+            float grew = now > 0f && biggest > 0f ? now / biggest : 1f;
+            if (grew > 1.01f || grew < 0.99f)
+                foreach (Transform t in placed)
+                {
+                    Undo.RecordObject(t, "Replace broken .blend props");
+                    t.localScale /= grew;
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(t);
+                }
+
             Debug.Log($"Blend props: {Path.GetFileName(path)} imported at " +
                       $"{biggest:0.###} m across -- its file claims centimetres but is " +
-                      "modelled in metres. Switched that model to 1 unit = 1 metre.");
+                      $"modelled in metres. Switched that model to 1 unit = 1 metre, " +
+                      $"which made it {grew:0.#} times bigger, and divided the " +
+                      $"{placed.Count} instance(s) of it in this scene by the same, so " +
+                      "nothing moved. Instances in OTHER scenes have NOT been corrected " +
+                      "-- open each and run Tools > Gulag Runners > Setup > Fix props " +
+                      "the wrong size.");
             return true;
         }
 

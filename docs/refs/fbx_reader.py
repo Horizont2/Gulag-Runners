@@ -123,6 +123,50 @@ def geometry(path):
     return meshes
 
 
+def meshes(path):
+    """[(name, (lo, hi))] per mesh in the file, named as the FBX names it.
+
+    Needed because a pack ships as ONE .fbx holding forty props, and the union of
+    everything in it is the size of the pack rather than the size of a prop. Measuring
+    the ladder and the barrel box as the same fifteen metres is what that looks like
+    from the outside.
+
+    Named after the MODEL node, not the geometry. A geometry in a Blender export is
+    called "Plane.433" and the thing Unity calls a mesh is the model node hanging off
+    it -- "Ladder_A_LOD 2". The two are joined only through the Connections section, so
+    that is read too; without it the names are useless for matching a prefab.
+    """
+    _version, roots = parse(path)
+
+    boxes, models, geometry_id = {}, {}, None
+    for where, props in walk(roots):
+        if where.endswith("/Objects/Geometry") and len(props) > 1:
+            geometry_id = props[0] if isinstance(props[0], int) else None
+        elif where.endswith("/Geometry/Vertices") and props and geometry_id is not None:
+            v = props[0]
+            xs, ys, zs = v[0::3], v[1::3], v[2::3]
+            boxes[geometry_id] = ((min(xs), min(ys), min(zs)),
+                                  (max(xs), max(ys), max(zs)))
+            geometry_id = None
+        elif where.endswith("/Objects/Model") and len(props) > 1:
+            raw = props[1] if isinstance(props[1], str) else ""
+            models[props[0]] = raw.split("\x00\x01")[0].split("::")[-1].strip()
+
+    joined = {}
+    for where, props in walk(roots):
+        if not where.endswith("/Connections/C") or len(props) < 3:
+            continue
+        child, parent = props[1], props[2]
+        if child in boxes and parent in models:
+            joined[models[parent]] = boxes[child]
+
+    out = [(name, box) for name, box in joined.items()]
+    for gid, box in boxes.items():                       # unconnected, named by id
+        if not any(b is box for _n, b in out):
+            out.append((None, box))
+    return out
+
+
 def describe(path):
     """The handful of facts worth testing: units, axes, node turns, mesh boxes."""
     _version, roots = parse(path)
