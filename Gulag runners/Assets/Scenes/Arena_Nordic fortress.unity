@@ -14282,6 +14282,22 @@ PrefabInstance:
       propertyPath: InitialModule.startSize.minScalar
       value: 0.05
       objectReference: {fileID: 0}
+    - target: {fileID: 744636647232826501, guid: 44434bc2519cf5a4796c947fc974fff8, type: 3}
+      propertyPath: EmissionModule.rateOverTime.scalar
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 744636647232826501, guid: 44434bc2519cf5a4796c947fc974fff8, type: 3}
+      propertyPath: InitialModule.startLifetime.scalar
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 744636647232826501, guid: 44434bc2519cf5a4796c947fc974fff8, type: 3}
+      propertyPath: VelocityModule.speedModifier.scalar
+      value: 0.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 744636647232826501, guid: 44434bc2519cf5a4796c947fc974fff8, type: 3}
+      propertyPath: InitialModule.startLifetime.minScalar
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 1499162322944919746, guid: 44434bc2519cf5a4796c947fc974fff8, type: 3}
       propertyPath: m_Name
       value: Snow Particles
