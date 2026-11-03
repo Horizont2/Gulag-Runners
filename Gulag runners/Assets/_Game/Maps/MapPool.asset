@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: MapPool
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Meta.MapPool
   arenas:
-  - scene: Arena_Demo
+  - scene: Arena_Forest
     shown: THE PIT
     enabled: 1
     weight: 4
@@ -21,4 +21,4 @@ MonoBehaviour:
     shown: NORDIC FORTRESS
     enabled: 0
     weight: 1
-  fallback: Arena_Demo
+  fallback: Arena_Forest

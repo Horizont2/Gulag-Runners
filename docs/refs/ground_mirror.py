@@ -24,7 +24,7 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENE = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes",
-                     "Arena_Demo.unity")
+                     "Arena_Forest.unity")
 
 # Unity's primitives, as the size of the mesh in its OWN space. The Cylinder being TWO
 # units tall is not a detail: it is the same trap SimCollider.LocalBox documents, and

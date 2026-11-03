@@ -161,7 +161,7 @@ def drop(w, x, from_y, from_z):
 
 
 def main(argv):
-    scene_name, hatches = "Arena_Demo.unity", False
+    scene_name, hatches = "Arena_Forest.unity", False
     i = 0
     while i < len(argv):
         if argv[i] == "--scene":

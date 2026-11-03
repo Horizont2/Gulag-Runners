@@ -42,7 +42,7 @@ GAME = os.path.join(ASSETS, "_Game")
 # A name that is not there any more is not a fault -- SetupScene was deleted once it had
 # served its purpose -- but a list with NOTHING left in it is, because then this check
 # passes while checking nothing.
-GAMEPLAY = ("Arena_Demo.unity", "SetupScene.unity")
+GAMEPLAY = ("Arena_Forest.unity", "SetupScene.unity")
 
 VOLUME_SCRIPT = "172515602e62fb746b5d573b38a5fe58"
 

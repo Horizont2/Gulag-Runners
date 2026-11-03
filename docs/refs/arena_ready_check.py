@@ -24,7 +24,7 @@ SCENES = os.path.join(PROJECT, "Assets", "Scenes")
 GAME = os.path.join(PROJECT, "Assets", "_Game")
 BUILD = os.path.join(PROJECT, "ProjectSettings", "EditorBuildSettings.asset")
 
-REFERENCE = "Arena_Demo.unity"
+REFERENCE = "Arena_Forest.unity"
 
 # What a match cannot start without, and how many. Anything else Arena_Demo happens to
 # carry is dressing, and a new arena is not held to it.

@@ -1,4 +1,4 @@
-"""Bakes Arena_Demo.unity the way SimWorldBaker does, so the harness measures the real level.
+"""Bakes Arena_Forest.unity the way SimWorldBaker does, so the harness measures the real level.
 
 The location in Arena_Demo was built in 3D by hand. The simulation is flat, so what the fight
 actually happens on is not the geometry in the scene view — it is the set of boxes the bake
@@ -15,7 +15,7 @@ import re
 from sim_motor_mirror import X, C
 
 SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     "..", "..", "Gulag runners", "Assets", "Scenes", "Arena_Demo.unity")
+                     "..", "..", "Gulag runners", "Assets", "Scenes", "Arena_Forest.unity")
 
 SIM_COLLIDER_GUID = "a92ea500d0103a36b3143c8a534b18b2"
 CHEST_GUID = "b133d746e1ad16c0613fc1ce415afb0c"
