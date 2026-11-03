@@ -91,7 +91,66 @@ namespace GulagRunners.GameEditor
             if (match != null) Arena(match, faults);
             if (menu != null) MenuScene(faults);
 
+            Rendering(faults);
+
             return faults;
+        }
+
+        /// <summary>
+        /// Is anything going to draw this scene.
+        ///
+        /// Added after a screenshot of a match in progress -- health bars, round counter,
+        /// a timer counting down from 1:24, the joysticks -- over a completely black
+        /// screen saying "Display 1: No cameras rendering". A Screen Space Overlay canvas
+        /// needs no camera at all, so a live HUD says nothing whatever about whether the
+        /// arena behind it is being drawn, and that combination reads as a graphics bug
+        /// when it is an object that is switched off.
+        ///
+        /// Checked in the RUNNING scene and not in the file, because that is where it
+        /// went wrong: all three scenes in this project have a camera that draws,
+        /// serialized, exactly as they should. So whatever turned it off did it at play
+        /// time, and the only thing in a position to notice is something running then.
+        ///
+        /// Each case says what is wrong with THAT camera, because "no cameras rendering"
+        /// is the one sentence Unity will give you and it covers five different faults.
+        /// </summary>
+        static void Rendering(List<string> faults)
+        {
+            Camera[] all = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include,
+                                                            FindObjectsSortMode.None);
+            if (all.Length == 0)
+            {
+                faults.Add("there is no camera in this scene, so it draws nothing. The " +
+                           "HUD still appears -- an overlay canvas needs no camera -- " +
+                           "which is what makes this look like a rendering bug.");
+                return;
+            }
+
+            var why = new List<string>();
+            int drawing = 0;
+
+            foreach (Camera cam in all)
+            {
+                if (!cam.gameObject.activeInHierarchy)
+                { why.Add($"\"{cam.name}\": its object is switched off"); continue; }
+                if (!cam.enabled)
+                { why.Add($"\"{cam.name}\": the Camera component is unticked"); continue; }
+                if (cam.targetTexture != null)
+                { why.Add($"\"{cam.name}\": drawing into a render texture, not the screen"); continue; }
+                if (cam.rect.width <= 0.001f || cam.rect.height <= 0.001f)
+                { why.Add($"\"{cam.name}\": its viewport rect is {cam.rect}, which has no area"); continue; }
+                if (cam.targetDisplay != 0)
+                { why.Add($"\"{cam.name}\": pointed at Display {cam.targetDisplay + 1}"); continue; }
+                drawing++;
+            }
+
+            if (drawing > 0) return;
+
+            faults.Add($"not one of this scene's {all.Length} camera(s) draws to the " +
+                       "screen, so the arena is black behind a HUD that works:\n    " +
+                       string.Join("\n    ", why) +
+                       "\n  (a URP camera set to Overlay instead of Base also shows this, " +
+                       "and only draws when stacked on a Base one.)");
         }
 
         static void Arena(MatchState match, List<string> faults)
