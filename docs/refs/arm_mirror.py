@@ -36,7 +36,7 @@ WEAPONS = {
 CFG = dict(
     shoulder=721, arm_length_pm=350,
     sweep_frames=15, reference_frames=15,
-    deadzone=220, min_swing=250, carry_drop=700,
+    deadzone=220, aim_band=180, settle_arc=360, min_swing=250, carry_drop=700,
     aim_relative=0, aim_floor_pm=500, aim_tilt_pm=1000,
     full_sweep_pm=400, recovery_pm=450,
     haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
@@ -274,8 +274,18 @@ def step(f, aim, foe=None):
     """ArmMotor.Step."""
     push = F.length_sq(aim)
     dead = F.milli(CFG["deadzone"])
+    easing = ONE
     if push > F.mul(dead, dead):
         want = assist(f, aim, foe)
+        # How hard the stick is pushed, just past the deadzone, decides how fast the
+        # arm leaves the carry pose. Without it the deadzone is a cliff: measured, the
+        # arm sat in the carry pose through 0.22 of the ring and was at +90 degrees by
+        # 0.23 -- 125 degrees of arm for a hundredth of a thumb.
+        band = F.milli(CFG["aim_band"])
+        if band > 0:
+            over = F.sqrt(push) - dead
+            if over < band:
+                easing = 0 if over <= 0 else F.div(over, band)
     else:
         want = carry(f)
         f.assist_held = False
@@ -291,6 +301,17 @@ def step(f, aim, foe=None):
     rate = f.slew()
     if f.hit_lock > 0:
         rate = F.mul(rate, F.milli(CFG["recovery_pm"]))
+    if easing < ONE:
+        rate = F.mul(rate, easing)
+
+    # The last few degrees arrive instead of creeping: inside this arc the arm is not
+    # swinging, it is placing itself. Cannot be used as a free attack -- SwingPermille
+    # is speed TIMES commitment and nothing in a 25 degree arc earns a sixth of it.
+    settle = F.milli(CFG["settle_arc"])
+    if settle > 0 and F.length_sq(want) != 0 and F.length_sq(f.arm) != 0:
+        left = abs(F.cross(f.arm, want))
+        if F.dot(f.arm, want) > 0 and left <= settle and left > rate:
+            rate = left
 
     before = f.arm
     f.arm = turn(f.arm, want, rate, f.facing or 1)
@@ -337,6 +358,9 @@ def swing_permille(f):
     if top <= 0:
         return 0
     speed = f.tip_speed * 1000 // top
+    # A weapon cannot be swung faster than the weapon can be swung: TopTipSpeed is that
+    # limit by definition, and the settle arc makes going over it reachable by shaking.
+    speed = min(speed, 1000)
     if speed <= 0:
         return 0
 

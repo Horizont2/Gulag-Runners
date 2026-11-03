@@ -58,10 +58,23 @@ namespace GulagRunners.Game
                  "out of the back of the fist.")]
         [Range(0f, 1f)] public float rotationWeight = 0.85f;
 
-        [Tooltip("Lean the chest after the arm, as a share of the arm's own angle. A " +
-                 "shoulder that never moves makes the whole body look bolted down -- but " +
-                 "too much and the legs skate, because the hips come with it.")]
-        [Range(0f, 0.6f)] public float bodyFollow = 0.22f;
+        [Tooltip("How much of the arm's aim the fighter FOLLOWS at all. 0 switches the " +
+                 "whole thing off and the body ignores the weapon entirely.\n\n" +
+                 "What this actually buys is the head: a fighter who never looks at " +
+                 "what he is swinging reads as bolted down. The torso is the part that " +
+                 "makes the legs skate, and it has its own share below.")]
+        [Range(0f, 1f)] public float bodyFollow = 0.6f;
+
+        [Tooltip("How much of that the TORSO takes, against the head.\n\n" +
+                 "Split out because these two were one number doing both jobs, and the " +
+                 "complaint was the body bending as the stick turns. They want opposite " +
+                 "settings: the head should follow the blade almost fully, because that " +
+                 "is a fighter watching his own weapon, and the chest should barely move " +
+                 "at all, because the hips come with it and a fighter whose hips follow " +
+                 "his sword cannot stand on a ledge.\n\n" +
+                 "0 is a torso that never turns and a head that still does. Put it up " +
+                 "only if the fighter looks stiff from the side.")]
+        [Range(0f, 1f)] public float torsoFollow = 0.05f;
 
         [Tooltip("How much of the arm's UP-AND-DOWN the chest is allowed to copy.\n\n" +
                  "The chest used to be aimed at the weapon's tip, and the tip goes all " +
@@ -193,7 +206,11 @@ namespace GulagRunners.Game
             if (aim.sqrMagnitude <= 1e-8f) return;
 
             Vector3 at = grip + aim.normalized * lookDistance;
-            animator.SetLookAtWeight(bodyFollow, bodyFollow, 1f, 0f, lookClamp);
+            // Overall weight, then BODY, then head, then eyes, then the clamp. The
+            // second and third used to be the same field, so asking for less bend in
+            // the chest also took the head off the weapon and the fighter went dead
+            // behind the eyes. They want opposite settings and now have them.
+            animator.SetLookAtWeight(bodyFollow, torsoFollow, 1f, 0f, lookClamp);
             animator.SetLookAtPosition(at);
         }
 

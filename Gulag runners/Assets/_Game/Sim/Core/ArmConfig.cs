@@ -92,6 +92,55 @@ namespace GulagRunners.Sim
         public int DeadzonePermille;
 
         /// <summary>
+        /// How far past the deadzone the stick has to be pushed before the arm answers
+        /// at the weapon's full speed, in thousandths.
+        ///
+        /// A deadzone with nothing after it is a cliff, and this was the loudest thing
+        /// wrong with aiming. Measured, thumb held straight up and edged out from the
+        /// centre a hundredth of the ring at a time: the arm sat in the carry pose all
+        /// the way to 0.22 and was at +90 degrees by 0.23. A hundred and twenty-five
+        /// degrees of arm for a hundredth of a thumb, right where a thumb lives while
+        /// it is adjusting -- and the blade was never anywhere the player had put it,
+        /// it was in one of two places neither of which was under the thumb.
+        ///
+        /// Across this band the arm's TURN RATE is scaled instead, which costs one
+        /// multiply and no trigonometry: a lightly held stick draws the blade slowly
+        /// out of the carry, a firm one moves it at the weapon's own speed, and there
+        /// is no step anywhere between the two.
+        ///
+        /// 180 puts full speed at 0.40 of the ring. Shorter is sharper and brings the
+        /// cliff back; longer makes a half-pushed stick feel like treacle.
+        /// </summary>
+        public int AimBandPermille;
+
+        /// <summary>
+        /// The arc, in thousandths of a radian, inside which the arm stops being
+        /// weapon-paced and simply arrives.
+        ///
+        /// Within a couple of degrees of its target the arm is not swinging, it is
+        /// placing itself, and a weapon's weight has nothing to say about that: a
+        /// warhammer is slow to bring round and is not slow to hold still somewhere.
+        /// Without this the last ticks of every aim creep a degree at a time and the
+        /// blade never quite sits where the thumb is, which reads as the aim being
+        /// approximate when it is not.
+        ///
+        /// It cannot be used as a free attack, and that is arithmetic rather than
+        /// hope. SwingPermille is tip speed TIMES commitment, commitment being the
+        /// angle swept since the arm last reversed over <see cref="FullSweepPermille"/>
+        /// of a half circle. At 400 that is 72 degrees; nothing inside this arc earns
+        /// a sixth of it, so a shivering thumb still does nothing whatever.
+        ///
+        /// 360 is 20.6 degrees, and it is a measured ceiling rather than a taste: at 440
+        /// a vibrating sword goes from 7.7 to 8.8 against 6.4 for a committed swing, so
+        /// the shake gets BETTER. At 360 that number is exactly what it was before any
+        /// of this, which is the test for a change that costs nothing.
+        ///
+        /// Larger and a heavy weapon stops feeling heavy over short
+        /// moves, which is the one thing the whole weapon table is for.
+        /// </summary>
+        public int SettleArcPermille;
+
+        /// <summary>
         /// How far BELOW horizontal the weapon is carried when the stick is centred, in
         /// thousandths of a right angle's worth of drop.
         ///
@@ -270,6 +319,8 @@ namespace GulagRunners.Sim
             c.ReferenceFrames = 15;
 
             c.DeadzonePermille = 220;
+            c.AimBandPermille = 180;       // full speed at 0.40 of the ring
+            c.SettleArcPermille = 360;     // the last 20 degrees arrive rather than creep
             c.CarryDropPermille = 700;     // about 35 degrees below level: a lowered blade
             // ZERO: the arm goes exactly where the thumb points, and nothing is
             // re-framed. The frame was 1000 and it read beautifully on paper -- "forward

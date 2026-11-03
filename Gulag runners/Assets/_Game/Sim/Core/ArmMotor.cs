@@ -145,9 +145,34 @@ namespace GulagRunners.Sim
             FixVec2 want;
             Fix push = aim.LengthSq;
             Fix dead = Fix.FromMilli(cfg.DeadzonePermille);
+            Fix easing = Fix.FromInt(1);
 
             if (push > dead * dead)
+            {
                 want = Assist(ref s, aim, foeShoulder, hasFoe, in move, in cfg);
+
+                // HOW HARD the stick is pushed, just past the deadzone, decides how
+                // fast the arm leaves the carry pose. Without this the deadzone is a
+                // cliff and it is the loudest thing wrong with aiming: measured with a
+                // thumb held straight up and edged out from the centre a hundredth of
+                // the ring at a time, the arm sat at the carry pose through 0.22 and
+                // was at +90 degrees by 0.23. ONE HUNDRED AND TWENTY-FIVE DEGREES for
+                // a hundredth of a thumb's travel, right where a thumb spends most of
+                // its time while it is adjusting. The arm did not go where the player
+                // turned it; it snapped between two places that had nothing to do with
+                // where the thumb was.
+                //
+                // On the RATE rather than the target, which is what makes it one line
+                // and no trigonometry: a lightly held stick moves the blade slowly out
+                // of the carry, a firm one at the weapon's own speed, and there is no
+                // step anywhere in between.
+                Fix band = Fix.FromMilli(cfg.AimBandPermille);
+                if (band.Raw > 0)
+                {
+                    Fix over = Fix.Sqrt(push) - dead;
+                    if (over < band) easing = over <= Fix.Zero ? Fix.Zero : over / band;
+                }
+            }
             else
             {
                 want = Carry(in s, in cfg);
@@ -167,6 +192,31 @@ namespace GulagRunners.Sim
             // it is the same information.
             Fix rate = Slew(in s, in cfg);
             if (s.HitLock > 0) rate = rate * Fix.FromMilli(cfg.RecoveryPermille);
+            if (easing < Fix.FromInt(1)) rate = rate * easing;
+
+            // THE LAST FEW DEGREES ARRIVE instead of creeping. Inside this arc the arm
+            // is not swinging, it is placing itself, and a weapon's weight has nothing
+            // to say about that: a warhammer is slow to bring round and is not slow to
+            // hold still somewhere. Without it the arm spends its final ticks covering
+            // a degree at a time and never quite sits where the thumb is, which reads
+            // as the aim being approximate even when it is not.
+            //
+            // Safe against being used as a free attack, and that is arithmetic rather
+            // than hope: SwingPermille is speed TIMES commitment, where commitment is
+            // the angle swept since the arm last reversed over 40% of a half circle.
+            // Nothing inside a 25 degree arc earns more than a sixth of that, so a
+            // shivering thumb still does nothing at all.
+            //
+            // cross is the sine of the angle left and dot its cosine; under 25 degrees
+            // the sine IS the angle to better than three percent, so no trigonometry
+            // is needed to know when to do this or by how much.
+            Fix settle = Fix.FromMilli(cfg.SettleArcPermille);
+            if (settle.Raw > 0 && want.LengthSq.Raw != 0 && s.Arm.LengthSq.Raw != 0)
+            {
+                Fix left = Fix.Abs(FixVec2.Cross(s.Arm, want));
+                if (FixVec2.Dot(s.Arm, want).Raw > 0 && left <= settle && left > rate)
+                    rate = left;
+            }
 
             FixVec2 was = s.Arm;
             s.Arm = Turn(s.Arm, want, rate, s.Facing == 0 ? 1 : s.Facing);
@@ -403,6 +453,16 @@ namespace GulagRunners.Sim
 
             long speed = (long)s.TipSpeed.Raw * 1000 / top.Raw;
             if (speed <= 0) return 0;
+
+            // A weapon cannot be swung faster than the weapon can be swung. TopTipSpeed
+            // is that limit by definition, so anything over it is the arm doing
+            // something that is not a swing -- and since the settle arc lets the last
+            // few degrees arrive at once, that is now reachable: a warhammer shaken
+            // inside 25 degrees scored 14.0 against 14.0 for swinging it properly,
+            // because a fifth of the commitment at five times the speed is the same
+            // product. Capping the speed leaves the shake with its real commitment,
+            // which is a third of a swing's, and the swing wins by three to one.
+            if (speed > 1000) speed = 1000;
 
             // Speed TIMES commitment. Speed alone is maximised by shaking the thumb over
             // a sliver, which beat a real swing on every weapon in the table; ArmConfig
