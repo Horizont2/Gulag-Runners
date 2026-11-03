@@ -9039,7 +9039,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuBackdrop
   back: {fileID: 418520445}
   front: {fileID: 1486418594}
-  stills: []
+  stills:
+  - {fileID: 21300000, guid: d9d787af3b2b8e344920d92ad49a9b67, type: 3}
+  - {fileID: 21300000, guid: d716b75213672b14aba703386a67a7d1, type: 3}
+  - {fileID: 21300000, guid: b531ccd6a76b88149b3d9e2df48930c0, type: 3}
+  - {fileID: 21300000, guid: e02ee7ee4bd62104a82e5f892eb6bc52, type: 3}
   fadeSeconds: 1.2
   drift: 0.04
 --- !u!114 &820177704
@@ -9305,6 +9309,8 @@ MonoBehaviour:
   state: idle
   localPlayer: 0
   relayOpen: 0
+  weAreLoaded: 0
+  theyAreLoaded: 0
   Ready:
     m_PersistentCalls:
       m_Calls: []
@@ -11879,8 +11885,10 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  matchScene: Arena_Demo
+  matchScene: Arena_Forest
   loadStartsAt: 0.2
+  pool: {fileID: 0}
+  mapSeed: 0
   waitForRelease: 0
   state: waiting
 --- !u!4 &1053348789
