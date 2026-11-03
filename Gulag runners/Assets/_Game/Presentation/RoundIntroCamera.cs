@@ -20,6 +20,11 @@ namespace GulagRunners.Game
     /// Which means the cinematic and the rule are the same move: the pull-back IS the reveal,
     /// and what it reveals is deliberately only half the arena.
     ///
+    /// That is one of two shots, and which one an arena gets is a fact about the arena rather
+    /// than a preference — see <see cref="IntroStyle"/>. The whole shot above is built on
+    /// there being a cage door to be hauled up, and the Nordic arena has no cages in it, so
+    /// it gets the crane instead.
+    ///
     /// It runs after SideViewCamera has placed itself and moves that result, so every bit of
     /// framing, dead zone and smoothing underneath keeps working and there is one camera rather
     /// than two fighting over the same transform.
@@ -28,7 +33,42 @@ namespace GulagRunners.Game
     [DisallowMultipleComponent]
     public sealed class RoundIntroCamera : MonoBehaviour
     {
+        /// <summary>
+        /// Which opening this arena gets. The two are not settings of one shot, they are
+        /// two shots, and which one is right is a fact about the LOCATION.
+        /// </summary>
+        public enum IntroStyle
+        {
+            /// <summary>
+            /// The cage door, close and shoved twice. Everything above describes it, and
+            /// all of it depends on there being a cage: the jerks are somebody hauling a
+            /// grille up in front of you, and in an arena with no grille they are a
+            /// camera twitching at nothing.
+            /// </summary>
+            CageDoor = 0,
+
+            /// <summary>
+            /// A crane, high and pitched down, booming down to the playing framing.
+            ///
+            /// For a location that opens onto itself rather than out of a box -- the
+            /// Nordic arena has no cages in it at all, so the cage shot's two shoves
+            /// there are a camera flinching at nothing, which is exactly what they look
+            /// like.
+            ///
+            /// It swings about the fighter rather than lifting away from them, so it
+            /// keeps them the subject and the frame the width it is in play; what comes
+            /// into shot is the ground you are standing on and the way up from it.
+            /// Whether the far end is in frame is a question about the arena's size
+            /// rather than about this shot, and intro_check.py is what answers it.
+            /// </summary>
+            Crane = 1,
+        }
+
         [Header("Wiring")]
+        [Tooltip("Which opening. CageDoor is the close, shoved shot that needs a cage to " +
+                 "be shoving; Crane is a descent from above for an arena that has none.")]
+        public IntroStyle style = IntroStyle.CageDoor;
+
         [Tooltip("Leave empty to use the MatchState in the scene.")]
         public MatchState matchState;
 
@@ -99,8 +139,47 @@ namespace GulagRunners.Game
         [Range(0.02f, 0.4f)] public float jerkFor = 0.1f;
 
         [Tooltip("How far past the playing framing the pull-back carries before settling, as " +
-                 "a share of the opening distance.")]
+                 "a share of the opening distance.\n\n" +
+                 "It runs in the gap between Settled By and the end of the phase, so it both " +
+                 "starts and FINISHES on the mark. That matters more than it sounds: this " +
+                 "overshoot used to be hung off the same clamped progress as the pull-back, " +
+                 "which meant it reached its peak and stayed there — the camera sat 57 cm " +
+                 "off the playing framing for the rest of the phase and then snapped onto " +
+                 "it, in one frame, exactly as the fighters got control. Leave Settled By " +
+                 "some room or there is no release, just an arrival.\n\n" +
+                 "CageDoor only. A share of a five-metre opening is a two-thirds-of-a-metre " +
+                 "move, and in the 0.3 s it has that is 7 m/s — fine as part of a shot that " +
+                 "is already being shoved about, and the single most violent thing in the " +
+                 "shot otherwise. The crane does not need it: smootherstep arrives with no " +
+                 "speed AND no acceleration, which is a settle. A jib on hydraulics does " +
+                 "not bounce.")]
         [Range(0f, 0.4f)] public float release = 0.12f;
+
+        [Header("The crane (Style: Crane only)")]
+        [Tooltip("How far over the top the shot starts, in degrees.\n\n" +
+                 "It is an ANGLE and not a height, because the shot is a boom: the camera " +
+                 "swings up over the thing it is already looking at and keeps its distance " +
+                 "from it. That is what a crane arm does, and it is what keeps the FIGHTER " +
+                 "the subject — they stay the size they are in play the whole way down, and " +
+                 "the frame never widens to take in more of the room than the game does.\n\n" +
+                 "It is not what hides the other runner, and it is worth being exact about " +
+                 "that rather than reassured by it. The spawns are 16.6 m apart in the " +
+                 "Nordic arena and the frame is 9.7 m across, so nothing in this shot comes " +
+                 "close to reaching them: intro_check.py sweeps this angle from 5 to 80 " +
+                 "degrees, and a lifted-and-pulled-back shot from 8 to 42 as well, and the " +
+                 "opponent is out of frame in every one. The rule is kept by the arena's own " +
+                 "size here. The check is what will say so in an arena where it is not.")]
+        [Range(5f, 80f)] public float craneAngle = 42f;
+
+        [Tooltip("A beat at the top before the descent starts, as a share of the cage phase. " +
+                 "Long enough to read where you are, short enough that it is not a pause.")]
+        [Range(0f, 0.6f)] public float craneHold = 0.14f;
+
+        [Tooltip("How far along the arena the shot starts, in metres, measured BEHIND the " +
+                 "fighter — so the descent drifts forward past them into the wing they are " +
+                 "about to search, and never the other way, which is where the other runner " +
+                 "is. Small: this is a hint of parallax, not a dolly.")]
+        public float craneLead = 1.4f;
 
         void Reset()
         {
@@ -124,21 +203,78 @@ namespace GulagRunners.Game
             if (m.Phase != MatchPhase.Cages) return;      // the shot is over; hands off
 
             float t = m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne;
+            bool crane = style == IntroStyle.Crane;
 
-            // 1 while the close shot holds, easing to 0 by the time the doors are up — and
+            // 1 while the opening frame holds, easing to 0 by the time the phase is up — and
             // overshooting a little past the end, so the camera is RELEASED rather than
             // parked. A shot that arrives exactly on its mark reads as a camera; one that
             // goes a hair too far and comes back reads as somebody letting go of a breath.
-            float k = Mathf.InverseLerp(holdUntil, settledBy, t);
-            float close = 1f - Smooth(k);
-            if (k > 0f && k < 1.6f) close -= release * Mathf.Sin(Mathf.Clamp01(k / 1.6f) * Mathf.PI);
-            if (close <= 0.001f && jerkPush <= 0f) return;
+            //
+            // The crane eases on smootherstep rather than smoothstep. Smoothstep leaves the
+            // ACCELERATION discontinuous at both ends: the camera is standing still and then
+            // is pulling a tenth of a g, which on a two-second move you see as a flinch at
+            // the start and a clip at the finish. Smootherstep is zero in the second
+            // derivative as well, so the boom takes up its own weight. It costs one multiply.
+            float k = Mathf.InverseLerp(crane ? craneHold : holdUntil, settledBy, t);
+            float close = 1f - (crane ? Smoother(k) : Smooth(k));
+
+            // The release: out past the mark and back onto it, inside the gap between
+            // settling and the end of the phase. Squared so the bump leaves and returns
+            // with no speed of its own — a plain half-sine steps the camera's velocity
+            // at both ends, which is the one thing an easing curve is for avoiding.
+            //
+            // Measured rather than reasoned: this used to hang off k, which Mathf
+            // clamps, so it peaked and STAYED, parking the camera 57 cm off the playing
+            // framing until the phase ended and then snapping onto it in a single frame
+            // — on the frame the fighters got control, in both arenas.
+            float r = crane ? 0f : Mathf.InverseLerp(settledBy, 1f, t);
+            if (r > 0f)
+            {
+                float bump = Mathf.Sin(r * Mathf.PI);
+                close -= release * bump * bump;
+            }
+
+            if (Mathf.Abs(close) <= 0.001f && (crane || jerkPush <= 0f)) return;
 
             Transform cam = view.transform;
             Vector3 at = cam.position;
             Quaternion facing_ = cam.rotation;
 
-            if (openingShot != null)
+            if (crane)
+            {
+                // What the shot booms about: the thing the camera is already looking at.
+                // Everything else is derived from it, so the descent lands exactly on the
+                // playing framing however SideViewCamera has chosen to frame this frame.
+                Vector3 forward = cam.forward;
+                Vector3 focus = FocusPoint(at, forward);
+                Vector3 arm = at - focus;
+
+                // No player to orbit — a point down the sightline stands in for one, so the
+                // shot still reads; it is just not centred on anybody.
+                if (arm.sqrMagnitude < 4f) { arm = -forward * 8f; focus = at - arm; }
+
+                // The axis the arm swings on: horizontal, across the sightline. Taken as
+                // arm × up rather than the other way round so that positive degrees raise
+                // the camera from whichever side of the fight plane it stands on.
+                Vector3 axis = Vector3.Cross(arm, Vector3.up);
+                axis = axis.sqrMagnitude > 1e-6f ? axis.normalized : Vector3.right;
+
+                at = focus + Quaternion.AngleAxis(craneAngle * close, axis) * arm;
+
+                // And a drift along the arena, behind the fighter, so the boom comes down
+                // THROUGH an angle rather than straight down one line. Applied before the
+                // aim is worked out, so the camera keeps looking at the fight across it.
+                int facing = view.player != null ? view.player.State.Facing : 1;
+                at += new Vector3(-craneLead * facing * close, 0f, 0f);
+
+                // Aim re-derived from where the camera now is, then blended back to the
+                // playing rotation by the share of the shot that is left. At close = 0 that
+                // is exactly the playing rotation, which is what makes the hand-over
+                // invisible: there is no frame where two cameras disagree.
+                facing_ = Quaternion.Slerp(
+                    facing_, Quaternion.LookRotation(focus - at, Vector3.up), close);
+            }
+            else if (openingShot != null)
             {
                 // The authored shot, blended out. Rotation as well as position, which is the
                 // whole difference: moving along one line is a zoom, and turning while you
@@ -170,9 +306,17 @@ namespace GulagRunners.Game
             // the harder one: by then whoever is out there has taken the weight once and is
             // committing to it, and the camera flinching twice is what says somebody is DOING
             // this rather than a mechanism running its cycle.
-            Vector3 push = facing_ * Vector3.forward;
-            at += push * (jerkPush * Shove(t, jerkAt) * close);
-            at += push * (jerkPush * 1.3f * Shove(t, jerkAt2) * close);
+            //
+            // Not on the crane, and this is the whole reason the style exists. A shove is a
+            // camera answering a pull on a grille. In an arena with no grille there is
+            // nothing pulling, so the same two shoves are a camera twitching at nothing —
+            // which is exactly what they read as.
+            if (!crane)
+            {
+                Vector3 push = facing_ * Vector3.forward;
+                at += push * (jerkPush * Shove(t, jerkAt) * close);
+                at += push * (jerkPush * 1.3f * Shove(t, jerkAt2) * close);
+            }
 
             cam.SetPositionAndRotation(at, facing_);
         }
@@ -202,6 +346,19 @@ namespace GulagRunners.Game
         {
             k = Mathf.Clamp01(k);
             return k * k * (3f - 2f * k);
+        }
+
+        /// <summary>
+        /// Smootherstep: flat in the first AND second derivative at both ends.
+        ///
+        /// The difference from <see cref="Smooth"/> is only visible on a long move, which is
+        /// what a crane is. Smoothstep starts with zero speed but full acceleration, so a
+        /// two-second descent begins with a flinch and ends with the camera being caught.
+        /// </summary>
+        static float Smoother(float k)
+        {
+            k = Mathf.Clamp01(k);
+            return k * k * k * (k * (6f * k - 15f) + 10f);
         }
     }
 }

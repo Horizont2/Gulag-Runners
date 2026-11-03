@@ -2588,8 +2588,8 @@ MonoBehaviour:
       pitchRange: {x: 0.94, y: 1.06}
       minInterval: 0
   listeners:
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 920100040}
+  - {fileID: 920100041}
   autoSubscribe: 1
   logSounds: 0
 --- !u!1001 &192130795
@@ -11596,6 +11596,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e8b15c0d7a2496fb3e09c742a5d1f68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  style: 1
   matchState: {fileID: 0}
   view: {fileID: 1064138585}
   openingShot: {fileID: 0}
@@ -11611,6 +11612,9 @@ MonoBehaviour:
   jerkAt2: 0.4
   jerkFor: 0.1
   release: 0.12
+  craneAngle: 42
+  craneHold: 0.14
+  craneLead: 1.4
 --- !u!114 &1064138584
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11623,7 +11627,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db5113f0da90f0f463f1ffb8c2d4480b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  listener: {fileID: 0}
+  listener: {fileID: 920100040}
   icon: {fileID: 0}
   size: 34
   minSize: 14
@@ -23607,6 +23611,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e8b15c0d7a2496fb3e09c742a5d1f68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  style: 1
   matchState: {fileID: 0}
   view: {fileID: 2110629161}
   openingShot: {fileID: 0}
@@ -23622,6 +23627,9 @@ MonoBehaviour:
   jerkAt2: 0.4
   jerkFor: 0.1
   release: 0.12
+  craneAngle: 42
+  craneHold: 0.14
+  craneLead: 1.4
 --- !u!114 &2110629160
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23634,7 +23642,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db5113f0da90f0f463f1ffb8c2d4480b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  listener: {fileID: 0}
+  listener: {fileID: 920100041}
   icon: {fileID: 0}
   size: 34
   minSize: 14
@@ -24032,6 +24040,28 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &920100040 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4925050269011565506, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 851161343}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0610c21ee6c4f0efdd16906c85f73e28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &920100041 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3540666692097146972, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
+  m_PrefabInstance: {fileID: 594224259}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0610c21ee6c4f0efdd16906c85f73e28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
