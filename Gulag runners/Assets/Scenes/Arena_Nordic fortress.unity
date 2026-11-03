@@ -3675,6 +3675,7 @@ GameObject:
   - component: {fileID: 301405964}
   - component: {fileID: 301405963}
   - component: {fileID: 301405962}
+  - component: {fileID: 930100001}
   m_Layer: 0
   m_Name: Plane (5)
   m_TagString: Untagged
@@ -3716,7 +3717,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &301405963
 MeshRenderer:
@@ -4294,6 +4295,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+  - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: fd8f83cfa6528750bf7c1d095dd94c5e, type: 3}
+    insertIndex: -1
+    addedObject: {fileID: 920100030}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: fd8f83cfa6528750bf7c1d095dd94c5e, type: 3}
       insertIndex: -1
       addedObject: {fileID: 352528759}
@@ -4833,6 +4837,7 @@ GameObject:
   - component: {fileID: 402346325}
   - component: {fileID: 402346324}
   - component: {fileID: 402346323}
+  - component: {fileID: 930100002}
   m_Layer: 0
   m_Name: Plane (1)
   m_TagString: Untagged
@@ -4874,7 +4879,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &402346324
 MeshRenderer:
@@ -11640,8 +11645,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b921a9be9303a1887f282de341a5ae31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 0}
-  target: {fileID: 0}
+  player: {fileID: 294922983}
+  target: {fileID: 920100020}
   secondTarget: {fileID: 0}
   autoFindPlayer: 0
   bodyScreenFraction: 0.22
@@ -14494,6 +14499,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+  - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: fd8f83cfa6528750bf7c1d095dd94c5e, type: 3}
+    insertIndex: -1
+    addedObject: {fileID: 920100031}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: fd8f83cfa6528750bf7c1d095dd94c5e, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1367697941}
@@ -15394,6 +15402,7 @@ GameObject:
   - component: {fileID: 1444082058}
   - component: {fileID: 1444082057}
   - component: {fileID: 1444082056}
+  - component: {fileID: 930100003}
   m_Layer: 0
   m_Name: Plane (3)
   m_TagString: Untagged
@@ -15435,7 +15444,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &1444082057
 MeshRenderer:
@@ -16878,6 +16887,7 @@ GameObject:
   - component: {fileID: 1582978735}
   - component: {fileID: 1582978734}
   - component: {fileID: 1582978733}
+  - component: {fileID: 930100004}
   m_Layer: 0
   m_Name: Plane (2)
   m_TagString: Untagged
@@ -16919,7 +16929,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &1582978734
 MeshRenderer:
@@ -17476,6 +17486,7 @@ GameObject:
   - component: {fileID: 1630116016}
   - component: {fileID: 1630116015}
   - component: {fileID: 1630116014}
+  - component: {fileID: 930100005}
   m_Layer: 0
   m_Name: Plane (4)
   m_TagString: Untagged
@@ -17517,7 +17528,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &1630116015
 MeshRenderer:
@@ -18929,8 +18940,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff6dbf8f625c60d4b867931f91808b56, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.HudView
-  player1: {fileID: 0}
-  player2: {fileID: 0}
+  player1: {fileID: 294922983}
+  player2: {fileID: 1474405248}
   matchState: {fileID: 2012403445}
   localPlayer: 0
   hideOpponentStamina: 1
@@ -22021,6 +22032,7 @@ GameObject:
   - component: {fileID: 2006148352}
   - component: {fileID: 2006148351}
   - component: {fileID: 2006148350}
+  - component: {fileID: 930100006}
   m_Layer: 0
   m_Name: Plane
   m_TagString: Untagged
@@ -22062,7 +22074,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &2006148351
 MeshRenderer:
@@ -22330,8 +22342,8 @@ MonoBehaviour:
   roundsToWin: 2
   restartSeconds: 5
   fighters:
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 294922983}
+  - {fileID: 1474405248}
   logOpenings: 1
   logMatch: 1
 --- !u!114 &2012403446
@@ -23644,8 +23656,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b921a9be9303a1887f282de341a5ae31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 0}
-  target: {fileID: 0}
+  player: {fileID: 1474405248}
+  target: {fileID: 920100021}
   secondTarget: {fileID: 0}
   autoFindPlayer: 0
   bodyScreenFraction: 0.22
@@ -24034,3 +24046,133 @@ SceneRoots:
   - {fileID: 1435569604}
   - {fileID: 1228796897}
   - {fileID: 777502941}
+--- !u!4 &920100020 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3022287978760347011, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
+  m_PrefabInstance: {fileID: 851161343}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &920100021 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5461329368802995934, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
+  m_PrefabInstance: {fileID: 594224259}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &920100030
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 352528757}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 135.21677, y: 5.2963324, z: 3.1613853}
+  m_Center: {x: 61.387833, y: -0.000013828278, z: 0.051033616}
+--- !u!65 &920100031
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1367697939}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 135.21677, y: 5.2963324, z: 3.1613853}
+  m_Center: {x: 61.387833, y: -0.000013828278, z: 0.051033616}
+--- !u!114 &930100001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 301405960}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 402346321}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1444082054}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1582978731}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1630116012}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2006148348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0

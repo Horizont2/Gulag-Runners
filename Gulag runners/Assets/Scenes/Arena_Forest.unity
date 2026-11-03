@@ -28644,6 +28644,7 @@ GameObject:
   - component: {fileID: 496474082}
   - component: {fileID: 496474081}
   - component: {fileID: 496474083}
+  - component: {fileID: 930100007}
   m_Layer: 0
   m_Name: Plane (1)
   m_TagString: Untagged
@@ -28742,7 +28743,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1001 &497769273
 PrefabInstance:
@@ -34257,6 +34258,7 @@ GameObject:
   - component: {fileID: 537831750}
   - component: {fileID: 537831749}
   - component: {fileID: 537831751}
+  - component: {fileID: 930100008}
   m_Layer: 0
   m_Name: Plane (2)
   m_TagString: Untagged
@@ -34355,7 +34357,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1001 &540641869
 PrefabInstance:
@@ -65831,6 +65833,7 @@ GameObject:
   - component: {fileID: 910075540}
   - component: {fileID: 910075539}
   - component: {fileID: 910075541}
+  - component: {fileID: 930100009}
   m_Layer: 0
   m_Name: Plane (4)
   m_TagString: Untagged
@@ -65929,7 +65932,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1001 &910664859
 PrefabInstance:
@@ -80644,6 +80647,7 @@ GameObject:
   - component: {fileID: 1212061304}
   - component: {fileID: 1212061303}
   - component: {fileID: 1212061305}
+  - component: {fileID: 930100010}
   m_Layer: 0
   m_Name: Plane
   m_TagString: Untagged
@@ -80742,7 +80746,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1212517987
 GameObject:
@@ -104534,6 +104538,7 @@ GameObject:
   - component: {fileID: 1502275299}
   - component: {fileID: 1502275298}
   - component: {fileID: 1502275300}
+  - component: {fileID: 930100011}
   m_Layer: 0
   m_Name: Plane (3)
   m_TagString: Untagged
@@ -104632,7 +104637,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1504450404
 GameObject:
@@ -105513,6 +105518,7 @@ GameObject:
   - component: {fileID: 1536366336}
   - component: {fileID: 1536366335}
   - component: {fileID: 1536366337}
+  - component: {fileID: 930100012}
   m_Layer: 0
   m_Name: Plane (5)
   m_TagString: Untagged
@@ -105611,7 +105617,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 10.000002, y: 2.2204466e-16, z: 9.999999}
+  m_Size: {x: 10.000002, y: 0.4, z: 9.999999}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1001 &1541352260
 PrefabInstance:
@@ -151176,3 +151182,81 @@ SceneRoots:
   - {fileID: 1527177648}
   - {fileID: 183033763}
   - {fileID: 414771809}
+--- !u!114 &930100007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 496474078}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 537831746}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910075536}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1212061300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1502275295}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
+--- !u!114 &930100012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1536366332}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
