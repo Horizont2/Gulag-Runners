@@ -46,6 +46,25 @@ MIN_WIDTH = 2.0
 # what decided the match.
 FAIR_SECONDS = 1.0
 
+# Bias that is known, measured, and deliberately kept.
+#
+# The point of writing a number down rather than widening the tolerance: a wider
+# tolerance blinds the check everywhere and says nothing about why. A recorded figure
+# keeps the check sharp -- the bias may not GROW, and if it ever shrinks this says the
+# entry can be deleted -- and it puts the reason next to the number, so the next person
+# to read it knows it was a decision rather than an oversight.
+ACCEPTED = {
+    "Arena_Nordic fortress.unity": (
+        4.60,
+        "the arena has one way up to each floor, and the ground one at x -6.71 is 1.40 m "
+        "from Player 1's spawn and 15.19 m from Player 2's. Both players enter the upper "
+        "floors through that same ladder, so the cost is identical at every x along both "
+        "of them (measured) and no chest position can compensate -- only a second route "
+        "up could, and the layout is being kept as authored. The chests are mirrored "
+        "pairs regardless, which costs nothing here and is already right if the ladders "
+        "ever change"),
+}
+
 TICK = 1.0 / 60.0
 
 # Long enough to cross this arena twice at a run, per leg.
@@ -266,8 +285,27 @@ def main(argv):
         notes.append(f"  P2 offered: " +
                      ", ".join(f"{kinds.get(k, '?')} at {t:.2f}s" for t, k, _n in second))
 
+        # The two players' nth-soonest chests, compared rank by rank. Where a scene
+        # carries a recorded bias the ranks interleave by tier as a CONSEQUENCE of it --
+        # P2's whole upper floor slides past P1's ground floor -- so the gap is measured
+        # between the same tiers rather than the same ranks, and the tier mismatch is not
+        # a second finding about the same one fact.
+        allowance, why = ACCEPTED.get(name, (0.0, None))
+
         worst, where = 0.0, None
-        for rank, (a, b) in enumerate(zip(first, second)):
+        if why is None:
+            pairs = list(enumerate(zip(first, second)))
+        else:
+            pairs = []
+            rank = 0
+            for tier in sorted({k for _t, k, _n in first}):
+                mine = [c for c in first if c[1] == tier]
+                theirs = [c for c in second if c[1] == tier]
+                for a, b in zip(mine, theirs):
+                    pairs.append((rank, (a, b)))
+                    rank += 1
+
+        for rank, (a, b) in pairs:
             if a[1] != b[1]:
                 problems.append(
                     f"{name}: the {rank + 1}th chest each player can reach is a "
@@ -277,8 +315,27 @@ def main(argv):
             if abs(a[0] - b[0]) > worst:
                 worst, where = abs(a[0] - b[0]), (rank, a, b)
 
-        notes.append(f"  worst matched pair differs by {worst:.2f}s")
-        if worst > FAIR_SECONDS:
+        notes.append(f"  worst matched pair differs by {worst:.2f}s" +
+                     (f", against {allowance:.2f}s recorded as accepted" if why else ""))
+
+        if why is not None:
+            notes.append(f"  accepted bias: {why}.")
+            if worst > allowance + FAIR_SECONDS:
+                rank, a, b = where
+                problems.append(
+                    f"{name}: the bias has GROWN to {worst:.2f}s, from the {allowance:.2f}s "
+                    f"recorded as accepted -- their {rank + 1}th "
+                    f"{kinds.get(a[1], '?')}s are {a[0]:.2f}s and {b[0]:.2f}s away "
+                    f"({a[2]} against {b[2]}). Something moved: a spawn, a ladder, or "
+                    f"these chests. The accepted figure covers the layout as authored, "
+                    f"not whatever it is now.")
+            elif worst < allowance - FAIR_SECONDS:
+                problems.append(
+                    f"{name}: the bias is down to {worst:.2f}s from the {allowance:.2f}s "
+                    f"recorded as accepted, so the arena is fairer than this file says. "
+                    f"Delete its entry from ACCEPTED -- a stale allowance hides the next "
+                    f"real one.")
+        elif worst > FAIR_SECONDS:
             rank, a, b = where
             ahead = "P1" if a[0] < b[0] else "P2"
             problems.append(
