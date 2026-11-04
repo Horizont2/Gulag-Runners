@@ -54,7 +54,7 @@ FAIR_SECONDS = 1.0
 # entry can be deleted -- and it puts the reason next to the number, so the next person
 # to read it knows it was a decision rather than an oversight.
 ACCEPTED = {
-    "Demo loc2.unity": (
+    "Arena_Mine.unity": (
         6.02,
         "the same shape as the Nordic arena and from the same cause: one way up to each "
         "floor, and the ground one at x -9.14 is 5.1 m from Player 1's spawn and 23.1 m "

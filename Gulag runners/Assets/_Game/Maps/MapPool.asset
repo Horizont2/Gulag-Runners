@@ -19,9 +19,9 @@ MonoBehaviour:
     weight: 4
   - scene: Arena_Nordic fortress
     shown: NORDIC FORTRESS
-    enabled: 0
+    enabled: 1
     weight: 1
-  - scene: Demo loc2
+  - scene: Arena_Mine
     shown: THE MINE
     enabled: 1
     weight: 3
