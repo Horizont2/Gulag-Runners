@@ -29,6 +29,7 @@ import arena_demo_geometry as geometry           # noqa: E402
 from sim_motor_mirror import F                   # noqa: E402
 
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
+SETTINGS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Settings")
 
 # How far behind the fighters the haze must begin. Less and it is on them; a fighter is
 # 0.6 m thick and leans, so a metre of clearance is the floor and three is comfortable.
@@ -138,9 +139,113 @@ def volumetric(name, text, scene, problems, notes):
                     f"Ground Fog Height.")
 
 
+def budget():
+    """(per-object limit, rendering mode) from every render pipeline asset in Settings.
+
+    URP does not light an object with every light that reaches it. It picks the nearest
+    `Additional Lights > Per Object Limit` and drops the rest, so a lamp can be lit, in
+    range, and simply not there on one wall -- with no error anywhere, which is the exact
+    shape of fault the rest of this folder exists to catch.
+    """
+    out = {}
+    if not os.path.isdir(SETTINGS):
+        return out
+    for f in sorted(os.listdir(SETTINGS)):
+        if not f.endswith(".asset"):
+            continue
+        t = open(os.path.join(SETTINGS, f), encoding="utf-8", errors="ignore").read()
+        lim = re.search(r"\n  m_AdditionalLightsPerObjectLimit: (\d+)", t)
+        mode = re.search(r"\n  m_AdditionalLightsRenderingMode: (\d+)", t)
+        if lim:
+            out[f[:-6]] = (int(lim.group(1)), int(mode.group(1)) if mode else None)
+    return out
+
+
+def crowding(name, text, scene, limit, problems, notes):
+    """How many lamps reach one point, against how many URP will actually use.
+
+    A point light here is an additional light, and the per-object limit is a hard count
+    of them. Six lamps lighting one corridor is not six lamps: it is four lamps and two
+    that come and go as the renderer re-sorts them, which reads as flicker nobody wrote.
+
+    The lights it can PLACE are the ones whose whole transform chain is written in the
+    scene. A torch hung on a wall INSIDE a prefab instance is not: its parent is a
+    stripped transform, whose own position lives in the prefab, and the geometry module
+    says so by standing the object at the instance root instead. Which is a plausible
+    place, and wrong -- all eight Nordic torches resolve to the same point, and taking
+    that at face value says eight lamps light one spot and the arena is over budget.
+
+    That mattered on the first run of this check: it duly reported Arena_Forest over the
+    limit, from nine lights it had piled up at the origin. So the chain is walked for a
+    stripped link and those lights are counted as unplaceable rather than measured.
+    """
+    stripped = {int(m) for m in re.findall(r"--- !u!4 &(-?\d+) stripped", text)}
+
+    def placeable(tr):
+        cur, seen = tr, 0
+        while cur in scene.transforms and seen < 64:
+            if cur in stripped:
+                return False
+            cur = scene.transforms[cur]["parent"]
+            seen += 1
+        return cur not in stripped
+
+    placed, lost = [], 0
+    for m in re.finditer(r"--- !u!108 &(-?\d+)\nLight:\n(.*?)(?=\n--- !u!|\Z)", text, re.S):
+        body = m.group(2)
+        kind = field(body, "m_Type", int, 1)
+        if kind == 1:                           # Directional: it reaches everything
+            continue
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        tr = scene.tr_of_go.get(int(go.group(1))) if go else None
+        if tr is None or not placeable(tr):
+            lost += 1
+            continue
+        placed.append((scene.basis(tr)[0], field(body, "m_Range", float, 10.0)))
+
+    if not placed and not lost:
+        return
+    notes.append(f"  {len(placed) + lost} point/spot light(s), {lost} of them hung inside "
+                 f"a prefab and not placeable from the scene; the limit is {limit} per object")
+    if not placed:
+        return
+
+    # Where the most of them land on one spot. A quarter-metre grid over their own
+    # spread: finer buys nothing, because what is being counted is spheres metres wide.
+    import itertools
+    lo = [min(p[i] - r for p, r in placed) for i in range(3)]
+    hi = [max(p[i] + r for p, r in placed) for i in range(3)]
+    step = 0.25
+    axes = [[lo[i] + k * step for k in range(int((hi[i] - lo[i]) / step) + 1)]
+            for i in range(3)]
+    worst, where = 0, None
+    for q in itertools.product(*axes):
+        n = 0
+        for p, r in placed:
+            if (q[0]-p[0])**2 + (q[1]-p[1])**2 + (q[2]-p[2])**2 <= r * r:
+                n += 1
+        if n > worst:
+            worst, where = n, q
+    notes.append(f"  most lamps reaching one point: {worst}")
+    if worst > limit:
+        problems.append(
+            f"{name}: {worst} lights reach ({where[0]:+.1f}, {where[1]:+.1f}, "
+            f"{where[2]:+.1f}) and URP uses {limit} per object, so {worst - limit} of "
+            f"them is dropped there -- and which one is dropped changes as the renderer "
+            f"re-sorts, which is a lamp going on and off with nothing driving it. Raise "
+            f"Additional Lights > Per Object Limit (8 is URP's maximum) or shorten the "
+            f"ranges until no more than {limit} overlap.")
+
+
 def main(argv):
     wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
+
+    limits = budget()
+    for who, (lim, mode) in sorted(limits.items()):
+        notes.append(f"{who}: {lim} additional light(s) per object, rendered "
+                     f"{['off', 'per vertex', 'per pixel'][mode] if mode in (0, 1, 2) else mode}")
+    limit = min((v[0] for v in limits.values()), default=8)
 
     camera_guid = None
     for base, dirs, files in os.walk(os.path.join(SCENES, "..", "_Game")):
@@ -220,6 +325,7 @@ def main(argv):
                 f"not know which light is the key one")
 
         volumetric(name, text, scene, problems, notes)
+        crowding(name, text, scene, limit, problems, notes)
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)

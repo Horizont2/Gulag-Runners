@@ -234,6 +234,100 @@ def cameras(text):
     return out
 
 
+def rivals(name, text, problems, notes):
+    """Cameras in the scene that the game does not drive, and what they take with them.
+
+    Everything below this rebuilds one shot in great detail, and all of it is beside the
+    point if a THIRD camera renders over the top of it. Arena_Mine kept the camera Unity
+    puts in a new scene -- (0, 1, -10), full screen, depth -1, tagged MainCamera, an
+    AudioListener on it -- next to the two half-screen cameras the game plays through, at
+    the same depth. Unity does not define the order of cameras at equal depth, so the
+    leftover one painted over both views and the match was played from the default
+    position with neither fighter in frame.
+
+    Which arrives as "the players do not appear at the spawn points and the camera just
+    stands in its default place": two symptoms, in the two systems that are hardest to
+    debug, from one object that nothing in the scene refers to. Nor does it stop there --
+    two AudioListeners make positional sound undefined, and two objects tagged MainCamera
+    make Camera.main whichever Unity finds first.
+
+    So: every camera the game can see through has to be one the game steers.
+    """
+    gos = {}
+    for m in re.finditer(r"--- !u!1 &(-?\d+)\nGameObject:\n(.*?)(?=\n--- !u!|\Z)", text, re.S):
+        body = m.group(2)
+        gos[int(m.group(1))] = dict(
+            name=(re.search(r"m_Name: (.*)", body) or re.match(r"(?:)()", "")).group(1).strip(),
+            tag=(re.search(r"m_TagString: (.*)", body) or re.match(r"(?:)()", "")).group(1).strip(),
+            active=(re.search(r"m_IsActive: (\d)", body) or re.match(r"(1)", "1")).group(1) == "1")
+
+    steered = set()
+    for _id, f in components(text, SIDE_VIEW):
+        m = re.search(r"--- !u!114 &%d\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)" % _id, text, re.S)
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", m.group(1))
+        if go:
+            steered.add(int(go.group(1)))
+
+    shots = []
+    for m in re.finditer(r"--- !u!20 &(-?\d+)\nCamera:\n(.*?)(?=\n--- !u!|\Z)", text, re.S):
+        body = m.group(2)
+        go = int(re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body).group(1))
+        if not gos.get(go, {}).get("active", True):
+            continue
+        if (re.search(r"\n  m_Enabled: (\d)", body) or re.match(r"(1)", "1")).group(1) != "1":
+            continue
+        rect = re.search(r"m_NormalizedViewPortRect:\n(?:.*\n)*?\s+x: ([-\d.eE+]+)\n"
+                         r"\s+y: ([-\d.eE+]+)\n\s+width: ([-\d.eE+]+)\n\s+height: ([-\d.eE+]+)",
+                         body)
+        depth = float((re.search(r"\n  m_Depth: ([-\d.eE+]+)", body)
+                       or re.match(r"(0)", "0")).group(1))
+        shots.append((go, gos.get(go, {}).get("name", "?"),
+                      tuple(float(v) for v in rect.groups()) if rect else (0., 0., 1., 1.),
+                      depth, go in steered))
+
+    notes.append(f"  {len(shots)} camera(s) rendering: " +
+                 ", ".join(f"{n} {w * 100:.0f}x{h * 100:.0f}% at depth {d:g}"
+                           f"{'' if s else ' NOT STEERED'}"
+                           for _g, n, (_x, _y, w, h), d, s in shots))
+
+    for go, who, rect, depth, is_steered in shots:
+        if is_steered:
+            continue
+        over = [n for g2, n, r2, d2, s2 in shots
+                if s2 and abs(d2 - depth) < 1e-6
+                and rect[0] < r2[0] + r2[2] and r2[0] < rect[0] + rect[2]
+                and rect[1] < r2[1] + r2[3] and r2[1] < rect[1] + rect[3]]
+        problems.append(
+            f"{name}: '{who}' is a camera with no SideViewCamera on it, so the game "
+            f"never moves it" +
+            (f" -- and it shares depth {depth:g} with {' and '.join(over)}, whose pixels "
+             f"it overlaps. Unity does not define which of two cameras at the same depth "
+             f"renders last, so this one can paint over the whole match from wherever it "
+             f"was left. Delete it, or give it a depth below the ones the game plays "
+             f"through."
+             if over else
+             ". Delete it, or put a SideViewCamera on it if it is meant to be played "
+             "through."))
+
+    listeners = [int(re.search(r"m_GameObject: \{fileID: (-?\d+)\}", m.group(1)).group(1))
+                 for m in re.finditer(r"--- !u!81 &-?\d+\nAudioListener:\n(.*?)(?=\n--- !u!|\Z)",
+                                      text, re.S)]
+    listeners = [g for g in listeners if gos.get(g, {}).get("active", True)]
+    if len(listeners) > 1:
+        problems.append(
+            f"{name}: {len(listeners)} AudioListeners, on "
+            f"{', '.join(repr(gos.get(g, {}).get('name', '?')) for g in listeners)}. "
+            f"Unity uses one and warns about the rest, and which one it keeps decides "
+            f"where every sound in the arena is heard FROM -- which is the whole of this "
+            f"game's first twenty seconds.")
+
+    tagged = [d["name"] for d in gos.values() if d["tag"] == "MainCamera" and d["active"]]
+    if len(tagged) > 1:
+        problems.append(
+            f"{name}: {len(tagged)} objects tagged MainCamera ({', '.join(tagged)}), so "
+            f"Camera.main returns whichever Unity finds first.")
+
+
 # ------------------------------------------------------------------------------ the shot
 
 def playing(spawn, view, body_height):
@@ -352,6 +446,8 @@ def main(argv):
         spawns = geometry.spawns(scene)
 
         found = cameras(text)
+        notes.append(f"{name}: {len(found)} side-view camera(s)")
+        rivals(name, text, problems, notes)
         if not found:
             notes.append(f"{name}: no side-view camera in it yet")
             continue
