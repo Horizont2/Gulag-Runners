@@ -58,6 +58,41 @@ def guid_index():
     return out
 
 
+def added_components(docs_text, body, guids, names):
+    """Which components this arena ADDS to a fighter, by script name.
+
+    Separate from the wiring, and the harder half to see. PlayerArm, PlayerIK and
+    PlayerEffects are not in the fighter prefabs at all: every arena adds its own, so a
+    new one has a fighter whose arm nothing points -- the aim stick moves, the fighter
+    does not -- and whose hits make no blood. A missing component is not a null field,
+    so comparing wiring alone walks straight past it.
+    """
+    found = set()
+    for m in re.finditer(r"addedObject: \{fileID: (-?\d+)\}", body):
+        d = re.search(r"--- !u!114 &%s\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)" % m.group(1),
+                      docs_text, re.S)
+        if not d:
+            continue
+        g = re.search(r"m_Script: \{fileID: 11500000, guid: ([0-9a-f]{32})", d.group(1))
+        if g and g.group(1) in names:
+            found.add(names[g.group(1)])
+    return found
+
+
+def script_names():
+    out = {}
+    for base, dirs, files in os.walk(os.path.join(ASSETS, "_Game")):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for f in files:
+            if not f.endswith(".cs.meta"):
+                continue
+            g = re.search(r"guid: ([0-9a-f]{32})",
+                          open(os.path.join(base, f), encoding="utf-8").read())
+            if g:
+                out[g.group(1)] = f[:-8]
+    return out
+
+
 def fighters(text, guids):
     """Each fighter in the scene: (name, {field: is it pointed at something})."""
     out = []
@@ -77,6 +112,7 @@ def fighters(text, guids):
             continue
 
         name = re.search(r"propertyPath: m_Name\n\s+value: ([^\n]*)", body)
+        parts = added_components(text, body, guids, SCRIPTS)
         wired = {}
         for mm in re.finditer(r"propertyPath: (\S+)\n\s+value: ([^\n]*)\n"
                               r"\s+objectReference: \{fileID: (-?\d+)\}", body):
@@ -86,7 +122,8 @@ def fighters(text, guids):
             # An array of models is one decision, not eleven findings.
             field = re.sub(r"\.Array\.data\[\d+\]", "[]", field)
             wired[field] = wired.get(field, False) or mm.group(3) != "0"
-        out.append((name.group(1).strip() if name else os.path.basename(src), wired))
+        out.append((name.group(1).strip() if name else os.path.basename(src),
+                    wired, parts))
     return out
 
 
@@ -94,6 +131,8 @@ def main(argv):
     wanted = argv or [f for f in sorted(os.listdir(SCENES))
                       if f.endswith(".unity") and f.startswith("Arena")]
     guids = guid_index()
+    global SCRIPTS
+    SCRIPTS = script_names()
     problems, notes = [], []
 
     seen = {}
@@ -104,7 +143,7 @@ def main(argv):
     # What any arena wires is what every arena is expected to wire.
     expected = set()
     for rows in seen.values():
-        for _who, wired in rows:
+        for _who, wired, _p in rows:
             expected |= {f for f, on in wired.items() if on}
 
     for name, rows in seen.items():
@@ -114,7 +153,7 @@ def main(argv):
             continue
 
         holders = 0
-        for who, wired in rows:
+        for who, wired, _p in rows:
             have = sorted(f for f, on in wired.items() if on)
             notes.append(f"  {who}: {', '.join(have) if have else 'nothing wired'}")
             if all(wired.get(c) for c in CONTROLS):
@@ -139,13 +178,26 @@ def main(argv):
                 f"{name}: {holders} fighters have the HUD's controls wired, so one thumb "
                 f"drives both of them.")
 
+        # The components each arena ADDS, compared the same way.
+        mine = set().union(*[p for _w, _x, p in rows]) if rows else set()
+        for other, orows in seen.items():
+            if other == name or not orows:
+                continue
+            theirs = set().union(*[p for _w, _x, p in orows])
+            for part in sorted(theirs - mine):
+                problems.append(
+                    f"{name}: no fighter here has a {part}, and every fighter in "
+                    f"{other} does. It is not in the fighter prefab, so each arena adds "
+                    f"its own -- miss it and the feature it drives silently does not "
+                    f"happen.")
+
         # And the comparison: what the other arenas wire and this one does not.
         here = set()
-        for _who, wired in rows:
+        for _who, wired, _p in rows:
             here |= {f for f, on in wired.items() if on}
         for field in sorted(expected - here):
             where = [n for n, r in seen.items()
-                     if n != name and any(w.get(field) for _x, w in r)]
+                     if n != name and any(w.get(field) for _x, w, _p in r)]
             if not where:
                 continue
             notes.append(f"  nothing in {name} sets {field}, which "

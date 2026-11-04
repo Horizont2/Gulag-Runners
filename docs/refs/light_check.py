@@ -50,9 +50,15 @@ def field(body, name, cast=float, default=None):
 
 FOG_SCRIPT = "7a8a4f589d342f24fbade49a21a154f2"      # BK PureVolumetricFog
 
-# How much clear air a fighter needs under the lowest floor before the cloud layer
-# below counts as being in the arena rather than beneath it.
-CLOUD_CLEARANCE = 0.5
+# How far the cloud may rise ABOVE the lowest walkable surface before the fight is
+# happening inside it rather than above it.
+#
+# Not a clearance below the floor, which is what this asked for first and which was
+# wrong: cloud lapping at the arena's underside is the whole point of standing on
+# nothing, and the layer being level with the floor slab reads as exactly that. What
+# matters is the fighter, who is 0.91 m tall and stands ON the surface -- mist round the
+# ankles is weather, mist over the chest is a fight nobody can see.
+CLOUD_OVER_FLOOR = 0.3
 
 
 def volumetric(name, text, scene, problems, notes):
@@ -119,14 +125,16 @@ def volumetric(name, text, scene, problems, notes):
             base, drawn = terrains[t]
             top = base + height
             notes.append(f"  volumetric fog {base:+.2f} to {top:+.2f} m"
-                         + (f", {lowest - top:.2f} m under the lowest floor "
+                         + (f", {lowest - top:+.2f} m under the lowest floor "
                             f"at y {lowest:+.2f}" if lowest is not None else "")
                          + (" (terrain drawn)" if drawn else " (terrain not drawn)"))
-            if lowest is not None and top > lowest - CLOUD_CLEARANCE:
+            if lowest is not None and top > lowest + CLOUD_OVER_FLOOR:
                 problems.append(
-                    f"{name}: the fog layer reaches y {top:+.2f} and the lowest floor is "
-                    f"at y {lowest:+.2f}, so the fight happens inside the cloud rather "
-                    f"than above it. Lower the terrain, or take the depth off "
+                    f"{name}: the fog layer reaches y {top:+.2f}, which is "
+                    f"{top - lowest:.2f} m over the lowest floor at y {lowest:+.2f}. A "
+                    f"fighter is 0.91 m tall, so that is cloud up to their "
+                    f"{'chest' if top - lowest > 0.5 else 'knees'} and a fight nobody "
+                    f"can see. Lower the terrain, or take the depth off "
                     f"Ground Fog Height.")
 
 
