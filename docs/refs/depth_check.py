@@ -102,6 +102,10 @@ STOREY_STEP = 0.90
 # it is the ladder plus whatever else the marker swept up.
 RAILS_AT_MOST = 0.30
 
+# How much the lane may still move after the feet have landed. The move itself belongs
+# in the air, where the eye reads it as leaning into the drop.
+SLIDE_AFTER = 0.15
+
 
 def storeys(baked):
     """The LEVELS worth standing on, highest first, with the slice each one offers.
@@ -255,6 +259,74 @@ def only_by_ladder(w, floors, problems, notes):
     notes.append(f"  {tried} jump(s) tried from along the storeys; none reached the one above")
 
 
+def off_a_perch(w, baked, problems, notes):
+    """Step off a prop that stands behind the fight, and arrive where the fight is.
+
+    The storeys are one case of the lane rule and the easy one, because a storey is wide
+    and runs the length of the arena. The hard case is a PROP: Arena_Forest's hanging
+    cages are 0.68 m deep at z -0.97..-0.29, two and a half metres behind the plane, and
+    they are solid, which makes them platforms a fighter can stand and fight on.
+
+    Coming off one, the lane has to be back at the fight by the time the feet land, and
+    it used not to move at all. LaneOn fell back to "the nearest part of that floor to
+    where the body already is" whenever the floor did not reach the plane, and the
+    terrace it lands on is 4.4 m deep and stops 23 cm short: a body arriving at z -0.67
+    was already inside that span, so the nearest part of it was where it already was. He
+    landed two and a half metres behind the man he was fighting and stayed there for the
+    rest of the round.
+
+    So every perch that stands off the plane is stepped off, on the real motor, and what
+    is measured is where the feet land and whether anything slides afterwards.
+    """
+    half = F(C["BODYZ"] // 2)
+    home = F(C["HOME"])
+    tried = 0
+    for i, box in enumerate(baked["solid"]):
+        x0, y0, x1, y1 = [F(v) for v in box]
+        if x1 - x0 > 4.0 or x1 - x0 < 0.5:
+            # Wider than this is a storey, which stagger() measures; narrower is the
+            # top edge of a border wall, which is not somewhere anybody stands -- the
+            # jump sweep above is what proves nobody can get onto one.
+            continue
+        z0, z1 = [F(v) for v in baked["solidz"][i]]
+        lane = max(z0 + half, min(home, z1 - half))
+        if abs(lane - home) < 0.5:
+            continue                               # near enough the fight already
+        for push, way in ((m.L, "left"), (m.R, "right")):
+            s = S((x0 + x1) / 2, y1 + 0.15)
+            s.depth = X(lane)
+            for _ in range(40):
+                step(s, 0, w)
+            if abs(F(s.y) - y1) > 0.3:
+                break                              # cannot actually stand on it
+            tried += 1
+            landed = None
+            for _ in range(240):
+                was = s.mode
+                step(s, push, w)
+                if landed is None and was == "air" and s.mode == "ground":
+                    landed = (F(s.y), F(s.depth))
+            if landed is None:
+                continue
+            slide = abs(F(s.depth) - landed[1])
+            notes.append(f"  off the perch at x {x0:+.1f} y {y1:+.2f} (z {lane:+.2f}), "
+                         f"{way}: lands on y {landed[0]:+.2f} at z {landed[1]:+.2f}, "
+                         f"{slide * 100:.0f} cm of slide after")
+            # The slide is the whole measurement. Landing on the SAME slice is not
+            # wrong on its own -- a perch standing over a storey that is itself a lane
+            # behind the plane lands on that storey's lane and should not move -- but
+            # a lane move that happens after the feet touch is the lane move happening
+            # in the wrong place, and that is what reads as being dragged.
+            if slide > SLIDE_AFTER:
+                problems.append(
+                    f"stepping {way} off the perch at x {x0:+.1f}, y {y1:+.2f} slides "
+                    f"{slide * 100:.0f} cm AFTER the feet land, which is the lane move "
+                    f"happening on the ground instead of in the air -- the thing that "
+                    f"reads as the fighter landing wrong and then being dragged.")
+    if tried:
+        notes.append(f"  {tried} perch(es) stepped off")
+
+
 def stagger(floors, problems, notes):
     """How far each storey stands from the fight, and from the one below it.
 
@@ -396,6 +468,7 @@ def main(argv):
     climbs(w, baked, problems, notes)
     stagger(floors, problems, notes)
     only_by_ladder(w, floors, problems, notes)
+    off_a_perch(w, baked, problems, notes)
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)

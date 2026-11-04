@@ -180,10 +180,22 @@ namespace GulagRunners.Sim
         /// </summary>
         static Fix LaneOn(Span span, Fix depth, in MoveConfig cfg)
         {
-            Fix halfZ = cfg.BodyDepth / 2;
-            return span.Reaches(cfg.HomeDepth, halfZ)
-                ? span.Nearest(cfg.HomeDepth, halfZ)
-                : span.Nearest(depth, halfZ);
+            // Always the part of this surface NEAREST THE FIGHT, and never the part
+            // nearest wherever the body happens to have arrived from.
+            //
+            // The second branch is what this used to do when a surface did not reach the
+            // plane, and it is the same bug the rule above was written against, wearing
+            // the clothes of a fix. Arena_Forest's terrace is 4.4 m deep and stops 23 cm
+            // short of the plane: a fighter who steps off a hanging cage at z -0.67 is
+            // already INSIDE that span, so "the nearest part of it" was where he already
+            // was, and he landed on the terrace two and a half metres behind the man he
+            // is fighting and stayed there for the rest of the round.
+            //
+            // Nothing is lost by dropping it. A ramp or a walkway modelled behind the
+            // plane still holds the body -- on its front edge, which is the part of it
+            // closest to the fight, which is where a fighter standing on a walkway
+            // wants to be anyway.
+            return span.Nearest(cfg.HomeDepth, cfg.BodyDepth / 2);
         }
 
         /// <summary>
@@ -1010,10 +1022,42 @@ namespace GulagRunners.Sim
                     ? 1 : -1;
             }
 
-            // A sideways climb-out stays on its own slice: it is a step along this floor, not
-            // onto the next one.
-            StartScripted(ref s, side > 0 ? landRight : landLeft, side, s.Depth, in cfg);
+            // Onto the lane the floor it lands on actually holds a body at.
+            //
+            // This used to keep the body's own slice, on the grounds that a sideways
+            // climb-out is a step along THIS floor rather than onto the next one. It is
+            // not: the body coming off a ladder is standing on the rungs' stand-off,
+            // which is in front of the floor, so the climb-out finished and UpdateDepth
+            // then pulled it back at the full lane speed -- a lurch at the landing,
+            // eight times faster than the move that had just ended. TryStepOut already
+            // promises the standing lane for the same reason.
+            FixVec2 onto = side > 0 ? landRight : landLeft;
+            StartScripted(ref s, onto, side, LaneUnder(onto, s.Depth, world, in cfg), in cfg);
             return true;
+        }
+
+        /// <summary>The lane a body standing at this landing would be held on.</summary>
+        static Fix LaneUnder(FixVec2 at, Fix fallback, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            bool found = false;
+            Fix top = Fix.Zero, lane = fallback;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;
+                Aabb solid = world.Solids[i];
+                if (solid.MaxX <= at.X - half || solid.MinX >= at.X + half) continue;
+                if (solid.MaxY > at.Y + Skin) continue;
+                if (found && solid.MaxY <= top) continue;
+
+                Fix want = LaneOn(world.SolidSpan(i), fallback, in cfg);
+                if (Fix.Abs(want - fallback) > cfg.LaneReach) continue;
+
+                top = solid.MaxY;
+                lane = want;
+                found = true;
+            }
+            return lane;
         }
 
         /// <summary>Hands the body to the climb-out animation, wherever it is climbing out to.</summary>

@@ -411,18 +411,24 @@ def lane_ahead(s, w):
 
 
 def lane_on(sp, depth):
-    """Which slice of a box to stand on: the gameplay plane whenever the box reaches it, and
-    otherwise the nearest part of the box to where the body already is.
+    """Which slice of a box to stand on: always the part of it NEAREST THE FIGHT.
 
     The plane is where the fight happens. Lanes exist so a fighter can step back onto a ramp
     or a walkway modelled behind it, not so he can live there — and a floor wide enough to
     hold both lanes used to hold him on whichever one he arrived with. Drop off the upper
     walkway and you landed on the ground floor still on the walkway's slice, a metre behind
-    your opponent, and nothing either of you did would connect for the rest of the round."""
-    halfz = C["BODYZ"] // 2
-    home = C["HOME"]
-    return nearest_in(sp, home, halfz) if reaches(sp, home, halfz) \
-        else nearest_in(sp, depth, halfz)
+    your opponent, and nothing either of you did would connect for the rest of the round.
+
+    This used to fall back to "the nearest part to where the body is" whenever the surface
+    did not reach the plane, which is the same bug wearing the clothes of a fix: the forest's
+    terrace is 4.4 m deep and stops 23 cm short of the plane, so a fighter stepping off a
+    hanging cage at z -0.67 was already inside it and stayed there."""
+    # A world with no depths at all is a world where every box is on every slice, which
+    # is what the greybox tests are: C# answers Span.Everywhere there, whose nearest
+    # point to the plane is the plane. Same answer, without the subscript.
+    if sp is None:
+        return C["HOME"]
+    return nearest_in(sp, C["HOME"], C["BODYZ"] // 2)
 
 def landing_lane(s, w):
     """The slice of the floor this body is falling onto: the highest solid under its feet
@@ -852,9 +858,28 @@ def try_mantle(s, prefer, ladder, w):
     elif l is None: side=1
     elif r is None: side=-1
     else: side = 1 if floor_run(r,1,w,s.depth) >= floor_run(l,-1,w,s.depth) else -1
-    # A sideways climb-out stays on its own slice: a step along this floor, not onto the next.
-    start_scripted(s, r if side>0 else l, side, s.depth)
+    # Onto the lane the floor it lands on actually holds a body at. Keeping the body's own
+    # slice -- "a step along this floor, not onto the next" -- is wrong coming off a ladder:
+    # the body is standing on the rungs' stand-off, in front of the floor, so the climb-out
+    # finished and update_depth then pulled it back at the full lane speed.
+    onto = r if side > 0 else l
+    start_scripted(s, onto, side, lane_under(onto, s.depth, w))
     return True
+
+
+def lane_under(at, fallback, w):
+    """The lane a body standing at this landing would be held on."""
+    half = C["W"]//2
+    top, lane = None, fallback
+    for i, sol in enumerate(w["solid"]):
+        if not solid_live(w, i): continue
+        if sol[2] <= at[0]-half or sol[0] >= at[0]+half: continue
+        if sol[3] > at[1] + SKIN: continue
+        if top is not None and sol[3] <= top: continue
+        want = lane_on(span(w, "solid", i), fallback)
+        if abs(want - fallback) > C["LANEREACH"]: continue
+        top, lane = sol[3], want
+    return lane
 
 def ground_below(x, y, maxd, w, depth):
     """The floor under a body on that body's own slice. Depth is not optional: searching every

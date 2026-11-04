@@ -192,9 +192,17 @@ Shader "Gulag Runners/Sagging Span"
             // And the swing, about the anchor it hangs from. Applied to the stretched
             // position rather than beside it, so a chain that is both loaded and
             // swinging does one move and not two.
+            //
+            // Scaled by t, which is what makes it a CHAIN and not a rod. The top link is
+            // on its hook and stays there; the angle opens up down the length, so the
+            // bottom arrives at the full swing -- exactly where the cage is -- and the
+            // bracket at the top does not move at all. A rigid turn about the anchor
+            // moves every link by its share of the arc, which reads as the whole chain
+            // pivoting in its fixing, and anything modelled ABOVE the anchor swings the
+            // other way.
             float3 arm = stretched - _SwingPivot.xyz;
             float3 spun = _SwingPivot.xyz
-                        + Turn(arm, normalize(_SwingAxis.xyz + 1e-6), _SwingAngle);
+                        + Turn(arm, normalize(_SwingAxis.xyz + 1e-6), _SwingAngle * t);
             return spun - positionOS;
 #else
             float drop = SpanDrop(t);
@@ -274,9 +282,10 @@ Shader "Gulag Runners/Sagging Span"
                                                          normalize(_SagDir.xyz + 1e-6))))));
 
 #ifdef _HANGER
-                // A swinging chain turns, so its shading turns with it. The span mode
-                // only slides, and a translation leaves normals alone.
-                bentOS = Turn(bentOS, normalize(_SwingAxis.xyz + 1e-6), _SwingAngle);
+                // A swinging chain turns, so its shading turns with it -- by as much as
+                // the link it belongs to turns, which near the fixed top is nothing.
+                bentOS = Turn(bentOS, normalize(_SwingAxis.xyz + 1e-6),
+                              _SwingAngle * SpanT(input.positionOS.xyz));
 #endif
 
                 VertexPositionInputs p = GetVertexPositionInputs(moved);
