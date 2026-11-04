@@ -133,8 +133,11 @@ namespace GulagRunners.Sim
                 // centre line, so the stand-off is only ever the character's own thickness.
                 // A thick ladder and a thin one then hold the body at the same visible
                 // distance, which is the thing an eye actually checks.
-                Span rungs = world.LadderSpan(s.LadderIndex);
-                Fix halfLadder = (rungs.Max - rungs.Min) / 2;
+                // Half the RAILS, not half the span. The span of a leaning ladder is its
+                // thickness plus the whole lean, and halving that put the body 0.45 m in
+                // front of the rungs on the mine's ladders, which lean 0.9 m over their
+                // height: a climb up thin air beside a ladder the fighter was holding.
+                Fix halfLadder = world.LadderHalfThickness(s.LadderIndex);
 
                 want = world.LadderDepthAt(s.LadderIndex, s.Position.Y, s.Depth, inset)
                      - halfLadder - cfg.LadderStandOff;

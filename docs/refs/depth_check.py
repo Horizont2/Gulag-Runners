@@ -36,6 +36,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import arena_demo_geometry as geometry           # noqa: E402
+import sim_motor_mirror as m                     # noqa: E402
 from sim_motor_mirror import S, step, X, F, C    # noqa: E402
 
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
@@ -90,6 +91,16 @@ def world(path, hatches):
 def _takes_scene():
     import inspect
     return "scene" in inspect.signature(geometry.spawns).parameters
+
+
+# How far a storey may step back from the one below before the climb reads as being
+# thrown into the background rather than as moving up a level. Arena_Forest's own
+# step, which nobody has ever complained about, is 0.66 m.
+STOREY_STEP = 0.90
+
+# No ladder has rails thicker than this. Past it the baked box is not the ladder --
+# it is the ladder plus whatever else the marker swept up.
+RAILS_AT_MOST = 0.30
 
 
 def storeys(baked):
@@ -160,7 +171,93 @@ def drop(w, x, from_y, from_z):
     return dict(y=F(s.y), on_landing=landed_z, settled=F(s.depth))
 
 
+def climbs(w, baked, problems, notes):
+    """Is the baked ladder the LADDER, or the space it leans through?
+
+    The motor holds the body LadderStandOff in front of the rungs, and works the rungs out
+    from the box's depth span minus however far the box leans. That is exact when the box
+    IS the ladder. It is nonsense when the box is the whole mesh's bounds and the mesh
+    leans inside it: Arena_Mine's ladders are 0.10 m of rails modelled leaning 14 degrees
+    inside an upright 0.97 m box, so the subtraction left 0.68 m of "thickness" and the
+    fighter climbed 45 cm of air beside a ladder he was holding.
+
+    Nothing on screen says so. The climb animation plays, the ladder is right there, and
+    from the camera's own angle the gap reads as the character model being slightly off.
+    So the thickness is measured instead, and a ladder whose rails come out thicker than
+    any ladder has rails is a box that is not the ladder.
+    """
+    for i, box in enumerate(baked["ladder"]):
+        x0, y0, x1, y1 = box
+        z0, z1 = baked["ladderz"][i]
+        lz = baked["ladderleanz"][i]
+        half = m.ladder_half_thickness(w, i)
+        thick, span, lean = F(half) * 2, F(z1 - z0), abs(F(lz[1] - lz[0]))
+        notes.append(f"  ladder at x {F(x0):+.2f}: {span:.2f} m of depth span, "
+                     f"{lean:.2f} m of it lean -> rails {thick * 1000:.0f} mm thick, "
+                     f"the body climbs {(thick / 2 + F(m.C['LSTANDOFF'])) * 100:.0f} cm "
+                     f"off the centre line")
+        if thick > RAILS_AT_MOST:
+            problems.append(
+                f"the ladder at x {F(x0):+.2f} bakes {thick * 1000:.0f} mm of rails, and "
+                f"no ladder is {thick:.2f} m thick. Its box is {span:.2f} m deep with "
+                f"{lean:.2f} m of measured lean, so the rest is mesh the marker swept up "
+                f"-- brackets, or a model that leans inside its own upright bounds. The "
+                f"climb stands off half of it, so the fighter will hold the rungs from "
+                f"{(thick / 2 + F(m.C['LSTANDOFF'])) * 100:.0f} cm away. Give it a thin "
+                f"collider that follows the rungs.")
+
+
+def stagger(floors, problems, notes):
+    """How far each storey stands from the fight, and from the one below it.
+
+    The staircase principle says the storeys step back as they rise. It does not say how
+    far, and the number matters more than it looks: the camera frames the gameplay plane,
+    so a storey two metres behind it is a fighter two metres further from the lens than
+    the man he is fighting -- smaller, dimmer, and behind the floor edge in between. In
+    the mine the third storey stood 2.35 m back, which reads exactly as being thrown into
+    the background on the way up.
+
+    A storey can only come as far forward as the lane of the storey BELOW it, plus half a
+    body: closer than that and it is a ceiling over that storey rather than a floor above
+    it, and the fighter underneath loses half his jump to a roof nobody drew. So the
+    budget is what that rule leaves, not a preference.
+    """
+    if len(floors) < 2:
+        return
+    home = F(m.C["HOME"])
+    half = F(m.C["BODYZ"] // 2)
+    for f in sorted(floors, key=lambda r: r["top"]):
+        notes.append(f"  storey y {f['top']:+.2f} stands at z {f['z']:+.2f}, "
+                     f"{f['z'] - home:+.2f} m from the fight plane")
+
+    order = sorted(floors, key=lambda r: r["top"])
+    for below, above in zip(order, order[1:]):
+        step = above["z"] - below["z"]
+        # As far forward as it may come without roofing the storey under it.
+        best = below["z"] + half
+        notes.append(f"  y {below['top']:+.2f} -> y {above['top']:+.2f}: steps "
+                     f"{step:+.2f} m back; it could come to z {best:+.2f} "
+                     f"({above['zmin'] - best:+.2f} m of room in its front edge)")
+        if step > STOREY_STEP and above["zmin"] > best + 0.05:
+            problems.append(
+                f"the storey at y {above['top']:+.2f} stands {step:.2f} m behind the one "
+                f"below it, and it does not have to: its front edge is modelled at z "
+                f"{above['zmin']:+.2f} and could come to {best:+.2f} without becoming a "
+                f"ceiling over that storey. As it is, climbing one floor throws the "
+                f"fighter {step:.2f} m into the background, away from the man he is "
+                f"fighting and from the plane the camera frames.")
+
+
 def main(argv):
+    # Every arena in the pool unless one is named. It used to be Arena_Forest alone, which
+    # is how the mine shipped with its upper storeys 1.37 m and 2.35 m behind the fight:
+    # a depth check that looks at one location measures that location's depth.
+    if "--scene" not in argv:
+        bad = 0
+        for name in geometry.arena_scenes():
+            bad += main(["--scene", name] + list(argv))
+        return 1 if bad else 0
+
     scene_name, hatches = "Arena_Forest.unity", False
     i = 0
     while i < len(argv):
@@ -247,6 +344,9 @@ def main(argv):
         notes.append("  no storey in this scene can be dropped onto from the one above "
                      "it, so there is nothing to measure. With ladderCutsHatch off and "
                      "no gap in the upper floor, the only way down is the ladder.")
+
+    climbs(w, baked, problems, notes)
+    stagger(floors, problems, notes)
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)

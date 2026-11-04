@@ -308,6 +308,31 @@ namespace GulagRunners.Sim
             return LeanAt(LadderLeanZ[index], in l, y);
         }
 
+        /// <summary>
+        /// Half a ladder's own THICKNESS — the rails, not the space it leans through.
+        ///
+        /// The depth span of a leaning ladder is its thickness PLUS however far it leans, and
+        /// taking half of that for a stand-off is the whole of "he climbs the air beside it".
+        /// Arena_Mine's ladders are 0.10 m thick and lean 0.9 m, so half the span is 0.50 and
+        /// the body was parked 0.45 m in front of the rungs it was supposedly holding.
+        ///
+        /// The lean is already measured per ladder, so subtracting it is exact rather than a
+        /// guess, and an upright ladder — where the lean is zero — is unchanged.
+        /// </summary>
+        public Fix LadderHalfThickness(int index)
+        {
+            Span rungs = LadderSpan(index);
+            Fix depth = rungs.Max - rungs.Min;
+            if (index >= 0 && index < LadderLeanZ.Length)
+            {
+                Span lean = LadderLeanZ[index];
+                Fix walked = lean.Max - lean.Min;
+                if (walked < Fix.Zero) walked = -walked;        // foot and head, not min and max
+                depth = depth > walked ? depth - walked : Fix.Zero;
+            }
+            return depth / 2;
+        }
+
         /// <summary>Where a lean line stands at a height, clamped to the box's own ends.</summary>
         static Fix LeanAt(Span lean, in Aabb box, Fix y)
         {

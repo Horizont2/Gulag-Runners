@@ -333,9 +333,11 @@ def update_depth(s, w):
         # passes through.
         # Off the ladder's NEAR FACE, not its centre line: the stand-off is only ever the
         # character's own thickness, so a thick ladder and a thin one hold it the same way.
-        sp = span(w, "ladder", s.ladder)
+        # Half the RAILS, not half the span: a leaning ladder's span is its thickness plus
+        # the whole lean, and halving that parked the body 0.45 m in front of the rungs on
+        # the mine's ladders, which lean 0.9 m over their height.
         want = (ladder_depth_at(w, s.ladder, s.y, s.depth, inset)
-                - (sp[1] - sp[0]) // 2 - C["LSTANDOFF"])
+                - ladder_half_thickness(w, s.ladder) - C["LSTANDOFF"])
     elif s.mode != "ground":
         # Falling, the body leans towards the storey it is dropping onto. This used to
         # keep the slice you left until your feet touched and then slide you forward on
@@ -575,6 +577,21 @@ def ladder_depth_at(w, i, y, fallback, inset):
     leans = w.get("ladderleanz") or []
     if i >= len(leans): return nearest_in(span(w, "ladder", i), fallback, inset)
     return lean_at(leans[i], w["ladder"][i], y)
+
+def ladder_half_thickness(w, i):
+    """Half a ladder's own THICKNESS -- the rails, not the space it leans through.
+
+    The depth span of a leaning ladder is its thickness PLUS the lean, so halving it for a
+    stand-off is the whole of "he climbs the air beside it". The lean is measured per
+    ladder already, so subtracting it is exact, and an upright ladder is unchanged."""
+    sp = span(w, "ladder", i)
+    depth = sp[1] - sp[0]
+    leans = w.get("ladderleanz") or []
+    if 0 <= i < len(leans):
+        walked = abs(leans[i][1] - leans[i][0])     # foot and head, not min and max
+        depth = depth - walked if depth > walked else 0
+    return depth // 2
+
 
 def lean_at(lean, box, y):
     """Where a lean line stands at a height, clamped to the box's own ends."""
