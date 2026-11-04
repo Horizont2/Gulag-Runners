@@ -19,6 +19,7 @@ nobody has thought to write down -- including the ones added after this was writ
 
     python3 fighter_check.py
 """
+import math
 import os
 import re
 import sys
@@ -95,6 +96,85 @@ def script_names():
     return out
 
 
+def sized(text, guids, name, problems, notes):
+    """Is the fighter in this arena the size the game thinks it is?
+
+    The fighter's height is not a fact about the room, so an arena that overrides the
+    fighter's SCALE is overriding something that does not belong to it -- and overriding
+    it changes only the art. Nothing else in the project reads that transform:
+
+      the simulation is fixed-point over boxes baked from the ARENA's colliders, so the
+      fight runs at the right size whatever the model does;
+
+      SideViewCamera frames on the body height in the fighter's TUNING, not on the
+      transform, so the shot is composed for a 0.91 m fighter either way;
+
+      the HUD, the timer and the round counter come from MatchState, which never looks.
+
+    So a bad scale here is the quietest fault in the project. Arena_Mine shipped with its
+    two fighters at 0.005 -- a 0.91 m fighter drawn four and a half millimetres tall --
+    and what that looks like from the outside is a match that starts, counts down, runs
+    its intro and follows two fighters correctly, with nobody on screen.
+    """
+    for m in re.finditer(r"--- !u!1001 &(-?\d+)\nPrefabInstance:\n(.*?)(?=\n--- !u!|\Z)",
+                         text, re.S):
+        body = m.group(2)
+        g = re.search(r"m_SourcePrefab: \{fileID: \d+, guid: ([0-9a-f]{32})", body)
+        if not g:
+            continue
+        src = guids.get(g.group(1))
+        if not src or not src.endswith(".prefab"):
+            continue
+        try:
+            if PLAYER_SCRIPT not in open(src, encoding="utf-8", errors="ignore").read():
+                continue
+        except OSError:
+            continue
+
+        nm = re.search(r"propertyPath: m_Name\n\s+value: ([^\n]*)", body)
+        who = nm.group(1).strip() if nm else os.path.basename(src)
+        got = {}
+        for a in "xyz":
+            v = re.search(r"propertyPath: m_LocalScale\.%s\n\s+value: ([-\d.eE+]+)" % a, body)
+            if v:
+                got[a] = float(v.group(1))
+        if not got:
+            continue
+
+        # What the prefab itself says, which is what every working arena uses.
+        #
+        # The ROOT transform, found by walking the documents one at a time. The first
+        # version of this matched `Transform:` and then `m_Father: {fileID: 0}` across a
+        # dotall gap, which runs straight past the end of the document and picks up a
+        # later object's father -- it read Player 1's root as 1 where the file says 0.5,
+        # and would have passed an arena that really had scaled it to 1.
+        base = 1.0
+        for pm in re.finditer(r"--- !u!4 &-?\d+\nTransform:\n(.*?)(?=\n--- !u!|\Z)",
+                              open(src, encoding="utf-8", errors="ignore").read(), re.S):
+            if not re.search(r"^  m_Father: \{fileID: 0\}$", pm.group(1), re.M):
+                continue
+            pv = re.search(r"^  m_LocalScale: \{x: ([-\d.eE+]+)", pm.group(1), re.M)
+            if pv:
+                base = float(pv.group(1))
+            break
+
+        worst = max(got.values(), key=lambda v: abs(math.log(max(abs(v), 1e-6) / base)))
+        off = worst / base if base else 0.0
+        if abs(off - 1.0) < 0.02:
+            notes.append(f"  {who} is scaled {worst:g}, which is what its prefab says")
+            continue
+        problems.append(
+            f"{name}: {who} is scaled {worst:g} where its prefab says {base:g} -- "
+            f"{off:.3g}x. The fighter's size is a fact about the FIGHTER, and nothing "
+            f"else reads this transform: the sim runs on boxes baked from the arena, the "
+            f"camera frames on the body height in the tuning, and the HUD comes from "
+            f"MatchState. So the match starts, counts down and follows two fighters "
+            f"correctly" +
+            (" with nobody on screen." if off < 0.2 else
+             " with the fighters the wrong size.") +
+            " Take the scale override off and let the prefab decide.")
+
+
 def fighters(text, guids):
     """Each fighter in the scene: (name, {field: is it pointed at something})."""
     out = []
@@ -140,6 +220,7 @@ def main(argv):
     for name in wanted:
         text = open(os.path.join(SCENES, name), encoding="utf-8", errors="ignore").read()
         seen[name] = fighters(text, guids)
+        sized(text, guids, name, problems, notes)
 
     # What any arena wires is what every arena is expected to wire.
     expected = set()

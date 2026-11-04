@@ -10572,18 +10572,6 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 960000734}
     - target: {fileID: 5461329368802995934, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 0.005
-      objectReference: {fileID: 0}
-    - target: {fileID: 5461329368802995934, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 0.005
-      objectReference: {fileID: 0}
-    - target: {fileID: 5461329368802995934, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 0.005
-      objectReference: {fileID: 0}
-    - target: {fileID: 5461329368802995934, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
       propertyPath: m_LocalPosition.x
       value: 13.986525
       objectReference: {fileID: 0}
@@ -13118,18 +13106,6 @@ PrefabInstance:
       propertyPath: sparksOnBlock
       value: 
       objectReference: {fileID: 960000320}
-    - target: {fileID: 3022287978760347011, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 0.005
-      objectReference: {fileID: 0}
-    - target: {fileID: 3022287978760347011, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 0.005
-      objectReference: {fileID: 0}
-    - target: {fileID: 3022287978760347011, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 0.005
-      objectReference: {fileID: 0}
     - target: {fileID: 3022287978760347011, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
       propertyPath: m_LocalPosition.x
       value: -14.237188
