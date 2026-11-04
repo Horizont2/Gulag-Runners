@@ -131115,7 +131115,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e8b15c0d7a2496fb3e09c742a5d1f68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  style: 1
+  style: 2
   matchState: {fileID: 0}
   view: {fileID: 960000470}
   openingShot: {fileID: 0}
@@ -131123,7 +131123,7 @@ MonoBehaviour:
   startHeight: -0.3
   startLead: 0
   holdUntil: 0.52
-  settledBy: 0.9
+  settledBy: 0.92
   sway: 0.035
   swaySpeed: 0.45
   jerkPush: 0.26
@@ -131134,6 +131134,9 @@ MonoBehaviour:
   craneAngle: 42
   craneHold: 0.14
   craneLead: 1.4
+  shaftHeight: 9
+  shaftBack: 6
+  shaftHold: 0.04
 --- !u!114 &960000469
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -138133,7 +138136,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e8b15c0d7a2496fb3e09c742a5d1f68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  style: 1
+  style: 2
   matchState: {fileID: 0}
   view: {fileID: 960000781}
   openingShot: {fileID: 0}
@@ -138141,7 +138144,7 @@ MonoBehaviour:
   startHeight: -0.3
   startLead: 0
   holdUntil: 0.52
-  settledBy: 0.9
+  settledBy: 0.92
   sway: 0.035
   swaySpeed: 0.45
   jerkPush: 0.26
@@ -138152,6 +138155,9 @@ MonoBehaviour:
   craneAngle: 42
   craneHold: 0.14
   craneLead: 1.4
+  shaftHeight: 9
+  shaftBack: 6
+  shaftHold: 0.04
 --- !u!114 &960000780
 MonoBehaviour:
   m_ObjectHideFlags: 0

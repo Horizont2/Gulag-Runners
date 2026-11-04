@@ -62,6 +62,22 @@ namespace GulagRunners.Game
             /// rather than about this shot, and intro_check.py is what answers it.
             /// </summary>
             Crane = 1,
+
+            /// <summary>
+            /// A descent down the shaft: the camera starts high over the fighter,
+            /// looking down, and is lowered onto the playing framing.
+            ///
+            /// For a location you arrive at from ABOVE. Where the crane swings round
+            /// the fighter at a constant distance, this comes straight down and the
+            /// distance shrinks with it, so the fighter grows from a figure far below
+            /// into the one you are about to play -- which is what being lowered into a
+            /// mine looks like from inside the cage.
+            ///
+            /// It starts the furthest from the fight of the three, so it is also the one
+            /// most able to show the other runner. The height is the number that decides
+            /// that, and intro_check.py is what answers it for a given arena.
+            /// </summary>
+            Shaft = 2,
         }
 
         [Header("Wiring")]
@@ -181,6 +197,25 @@ namespace GulagRunners.Game
                  "is. Small: this is a hint of parallax, not a dolly.")]
         public float craneLead = 1.4f;
 
+        [Header("The shaft (Style: Shaft only)")]
+        [Tooltip("How far above the fighter the descent starts, in metres.\n\n" +
+                 "This is the one number in the whole component that can give the match " +
+                 "away: looking down from high enough takes in the far end of the arena " +
+                 "and the other runner with it. Raise it and check, do not raise it and " +
+                 "hope — intro_check.py walks the whole shot and says whether they are in " +
+                 "frame.")]
+        [Range(2f, 40f)] public float shaftHeight = 13f;
+
+        [Tooltip("How far back from straight overhead it starts, in metres.\n\n" +
+                 "Never zero. Directly above is a degenerate look-at — the camera has no " +
+                 "way to know which way up it is — and it also loses the fighter's own " +
+                 "silhouette, which is the thing the shot is arriving at. A couple of " +
+                 "metres is enough to keep them side-on and the floor readable.")]
+        public float shaftBack = 2.5f;
+
+        [Tooltip("A beat at the top before the descent, as a share of the cage phase.")]
+        [Range(0f, 0.6f)] public float shaftHold = 0.1f;
+
         void Reset()
         {
             view = GetComponent<SideViewCamera>();
@@ -204,6 +239,8 @@ namespace GulagRunners.Game
 
             float t = m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne;
             bool crane = style == IntroStyle.Crane;
+            bool shaft = style == IntroStyle.Shaft;
+            bool eased = crane || shaft;      // both arrive under their own weight
 
             // 1 while the opening frame holds, easing to 0 by the time the phase is up — and
             // overshooting a little past the end, so the camera is RELEASED rather than
@@ -215,8 +252,9 @@ namespace GulagRunners.Game
             // is pulling a tenth of a g, which on a two-second move you see as a flinch at
             // the start and a clip at the finish. Smootherstep is zero in the second
             // derivative as well, so the boom takes up its own weight. It costs one multiply.
-            float k = Mathf.InverseLerp(crane ? craneHold : holdUntil, settledBy, t);
-            float close = 1f - (crane ? Smoother(k) : Smooth(k));
+            float k = Mathf.InverseLerp(shaft ? shaftHold : crane ? craneHold : holdUntil,
+                                        settledBy, t);
+            float close = 1f - (eased ? Smoother(k) : Smooth(k));
 
             // The release: out past the mark and back onto it, inside the gap between
             // settling and the end of the phase. Squared so the bump leaves and returns
@@ -227,14 +265,14 @@ namespace GulagRunners.Game
             // clamps, so it peaked and STAYED, parking the camera 57 cm off the playing
             // framing until the phase ended and then snapping onto it in a single frame
             // — on the frame the fighters got control, in both arenas.
-            float r = crane ? 0f : Mathf.InverseLerp(settledBy, 1f, t);
+            float r = eased ? 0f : Mathf.InverseLerp(settledBy, 1f, t);
             if (r > 0f)
             {
                 float bump = Mathf.Sin(r * Mathf.PI);
                 close -= release * bump * bump;
             }
 
-            if (Mathf.Abs(close) <= 0.001f && (crane || jerkPush <= 0f)) return;
+            if (Mathf.Abs(close) <= 0.001f && (eased || jerkPush <= 0f)) return;
 
             Transform cam = view.transform;
             Vector3 at = cam.position;
@@ -271,6 +309,32 @@ namespace GulagRunners.Game
                 // playing rotation by the share of the shot that is left. At close = 0 that
                 // is exactly the playing rotation, which is what makes the hand-over
                 // invisible: there is no frame where two cameras disagree.
+                facing_ = Quaternion.Slerp(
+                    facing_, Quaternion.LookRotation(focus - at, Vector3.up), close);
+            }
+            else if (shaft)
+            {
+                // Straight down onto the fight. The crane above keeps its distance and
+                // swings; this one closes it, so the fighter grows into the frame rather
+                // than turning in it.
+                Vector3 forward = cam.forward;
+                Vector3 focus = FocusPoint(at, forward);
+                Vector3 arm = at - focus;
+                if (arm.sqrMagnitude < 4f) { arm = -forward * 8f; focus = at - arm; }
+
+                // Kept on the side of the plane the camera already plays from, so the
+                // descent never crosses to the far side and shows the fight from behind.
+                Vector3 flat = new Vector3(arm.x, 0f, arm.z);
+                flat = flat.sqrMagnitude > 0.0001f
+                    ? flat.normalized * shaftBack
+                    : Vector3.back * shaftBack;
+
+                Vector3 high = focus + Vector3.up * shaftHeight + flat;
+                at = Vector3.Lerp(at, high, close);
+
+                // Aimed from wherever it currently is, then blended back to the playing
+                // rotation by what is left of the shot, so the hand-over has no frame
+                // where two cameras disagree.
                 facing_ = Quaternion.Slerp(
                     facing_, Quaternion.LookRotation(focus - at, Vector3.up), close);
             }
@@ -311,7 +375,7 @@ namespace GulagRunners.Game
             // camera answering a pull on a grille. In an arena with no grille there is
             // nothing pulling, so the same two shoves are a camera twitching at nothing —
             // which is exactly what they read as.
-            if (!crane)
+            if (!eased)
             {
                 Vector3 push = facing_ * Vector3.forward;
                 at += push * (jerkPush * Shove(t, jerkAt) * close);

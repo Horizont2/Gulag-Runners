@@ -264,19 +264,35 @@ def playing(spawn, view, body_height):
 def shot(t, at, rot, intro, pivot, facing):
     """RoundIntroCamera's answer for one frame. Mirrors LateUpdate, in its order."""
     crane = intro.get("style") == "1"
+    shaft = intro.get("style") == "2"
+    eased = crane or shaft
 
-    hold = number(intro, "craneHold", 0.14) if crane else number(intro, "holdUntil", 0.52)
+    hold = (number(intro, "shaftHold", 0.1) if shaft else
+            number(intro, "craneHold", 0.14) if crane else
+            number(intro, "holdUntil", 0.52))
     k = inverse_lerp(hold, number(intro, "settledBy", 0.86), t)
-    close = 1.0 - (smoother(k) if crane else smooth(k))
+    close = 1.0 - (smoother(k) if eased else smooth(k))
 
-    r = 0.0 if crane else inverse_lerp(number(intro, "settledBy", 0.86), 1.0, t)
+    r = 0.0 if eased else inverse_lerp(number(intro, "settledBy", 0.86), 1.0, t)
     if r > 0.0:
         bump = math.sin(r * math.pi)
         close -= number(intro, "release", 0.12) * bump * bump
 
     forward = q_mul_v(rot, (0.0, 0.0, 1.0))
 
-    if crane:
+    if shaft:
+        focus = pivot
+        arm = sub(at, focus)
+        if dot(arm, arm) < 4.0:
+            arm = mul(forward, -8.0)
+            focus = sub(at, arm)
+        flat = (arm[0], 0.0, arm[2])
+        back = number(intro, "shaftBack", 2.5)
+        flat = mul(norm(flat), back) if dot(flat, flat) > 1e-4 else (0.0, 0.0, -back)
+        high = add(add(focus, (0.0, number(intro, "shaftHeight", 13.0), 0.0)), flat)
+        at = add(mul(at, 1.0 - close), mul(high, close))
+        rot = q_slerp(rot, q_look(sub(focus, at)), close)
+    elif crane:
         focus = pivot
         arm = sub(at, focus)
         if dot(arm, arm) < 4.0:
@@ -302,7 +318,7 @@ def shot(t, at, rot, intro, pivot, facing):
     # Sway is Perlin noise on a clock, so it cannot be reproduced here; it is bounded by
     # `sway` metres and is 0.035 in both arenas, which is below everything measured below.
 
-    if not crane:
+    if not eased:
         push = q_mul_v(rot, (0.0, 0.0, 1.0))
         jerk = number(intro, "jerkPush", 0.22)
         span = number(intro, "jerkFor", 0.1)
@@ -359,7 +375,9 @@ def main(argv):
             theirs = spawns[1 - min(i, 1)]
             facing = mine[2]
             crane = intro.get("style") == "1"
-            label = f"  camera {i + 1} ({'crane' if crane else 'cage door'})"
+            shaft = intro.get("style") == "2"
+            label = (f"  camera {i + 1} "
+                     f"({'shaft' if shaft else 'crane' if crane else 'cage door'})")
 
             at0, rot0, view_height, fov = playing(mine, view, 0.91)
             pivot = (mine[0], mine[1], mine[3])
@@ -405,7 +423,7 @@ def main(argv):
                     f"into the opening. docs/01 is built on not knowing where they are, "
                     f"and this hands it over before the fight starts.")
 
-            if crane and ratio > STEP_RATIO:
+            if (crane or shaft) and ratio > STEP_RATIO:
                 problems.append(
                     f"{name}{label}: the peak acceleration grows x{ratio:.2f} when the "
                     f"shot is sampled twice as finely, which means the camera's SPEED "
@@ -413,7 +431,7 @@ def main(argv):
                     f"the device runs. A crane that snaps is what this style exists to "
                     f"stop doing.")
 
-            if crane and peak_a > VIOLENT:
+            if (crane or shaft) and peak_a > VIOLENT:
                 problems.append(
                     f"{name}{label}: peaks at {peak_a:.1f} m/s^2. Smooth, but that is a "
                     f"camera being thrown rather than boomed.")
