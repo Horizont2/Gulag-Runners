@@ -26,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import arena_demo_geometry as geometry           # noqa: E402
+from sim_motor_mirror import F                   # noqa: E402
 
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
 
@@ -45,6 +46,88 @@ def field(body, name, cast=float, default=None):
         return cast(m.group(1))
     except ValueError:
         return default
+
+
+FOG_SCRIPT = "7a8a4f589d342f24fbade49a21a154f2"      # BK PureVolumetricFog
+
+# How much clear air a fighter needs under the lowest floor before the cloud layer
+# below counts as being in the arena rather than beneath it.
+CLOUD_CLEARANCE = 0.5
+
+
+def volumetric(name, text, scene, problems, notes):
+    """The ground-fog layer, and whether the fight happens inside it.
+
+    This fog takes its height from a Terrain, which makes it a thing with a POSITION --
+    unlike RenderSettings fog, which is a distance from the camera. Put the terrain a few
+    metres too high and the arena fills with cloud; put it too low and there is no
+    mountain to be high up on. Neither is visible in the inspector, because the layer is
+    the terrain's Y plus a depth set on a different object.
+    """
+    fogs = [m for m in re.finditer(
+        r"--- !u!114 &(-?\d+)\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)", text, re.S)
+        if FOG_SCRIPT in m.group(2)]
+    if not fogs:
+        return
+
+    # Each terrain's own Y, from the transform of the object the Terrain sits on.
+    terrains = {}
+    for m in re.finditer(r"--- !u!218 &(-?\d+)\nTerrain:\n(.*?)(?=\n--- !u!|\Z)", text, re.S):
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", m.group(2))
+        if not go:
+            continue
+        tr = re.search(r"--- !u!4 &-?\d+\nTransform:\n(?:.*?\n)*?"
+                       r"  m_GameObject: \{fileID: %s\}\n(?:.*?\n)*?"
+                       r"  m_LocalPosition: \{x: [-\d.eE+]+, y: ([-\d.eE+]+)" % go.group(1),
+                       text)
+        drawn = re.search(r"m_DrawHeightmap: (\d)", m.group(2))
+        terrains[int(m.group(1))] = (float(tr.group(1)) if tr else 0.0,
+                                     drawn.group(1) == "1" if drawn else True)
+
+    floors = [F(b[3]) for b in geometry.bake(scene)["solid"]
+              if F(b[2]) - F(b[0]) >= 2.0]
+    lowest = min(floors) if floors else None
+
+    for m in fogs:
+        body = m.group(2)
+        height = float((re.search(r"  groundFogHeight: ([-\d.eE+]+)", body)
+                        or re.match(r"(0)", "0")).group(1))
+        auto = re.search(r"  findActiveTerrainsAutomatically: (\d)", body)
+        listed = [int(x) for x in re.findall(r"  - \{fileID: (-?\d+)\}",
+                                             (re.search(r"  terrains:\n((?:  - \{fileID: -?\d+\}\n)*)",
+                                                        body) or re.match(r"()", "")).group(1) or "")]
+        listed = [t for t in listed if t]
+
+        if not listed and (not auto or auto.group(1) == "0"):
+            problems.append(
+                f"{name}: a volumetric fog with no terrain assigned and automatic "
+                f"discovery off. This fog takes its height from a Terrain, so with "
+                f"neither it draws nothing at all.")
+            continue
+        use = listed or list(terrains)
+        if not use:
+            problems.append(
+                f"{name}: a volumetric fog and no Terrain in the scene for it to stand "
+                f"on, so nothing is drawn.")
+            continue
+
+        for t in use:
+            if t not in terrains:
+                problems.append(f"{name}: its volumetric fog points at {t}, which is not "
+                                f"a Terrain in this scene")
+                continue
+            base, drawn = terrains[t]
+            top = base + height
+            notes.append(f"  volumetric fog {base:+.2f} to {top:+.2f} m"
+                         + (f", {lowest - top:.2f} m under the lowest floor "
+                            f"at y {lowest:+.2f}" if lowest is not None else "")
+                         + (" (terrain drawn)" if drawn else " (terrain not drawn)"))
+            if lowest is not None and top > lowest - CLOUD_CLEARANCE:
+                problems.append(
+                    f"{name}: the fog layer reaches y {top:+.2f} and the lowest floor is "
+                    f"at y {lowest:+.2f}, so the fight happens inside the cloud rather "
+                    f"than above it. Lower the terrain, or take the depth off "
+                    f"Ground Fog Height.")
 
 
 def main(argv):
@@ -128,6 +211,8 @@ def main(argv):
             problems.append(
                 f"{name}: RenderSettings has no Sun wired, so ambient and the skybox do "
                 f"not know which light is the key one")
+
+        volumetric(name, text, scene, problems, notes)
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)
