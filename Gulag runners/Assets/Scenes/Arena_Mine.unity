@@ -7573,10 +7573,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Net.NetMatch
   link: {fileID: 960000031}
   match: {fileID: 960000733}
-  view: {fileID: 0}
-  hud: {fileID: 0}
-  result: {fileID: 0}
-  recorder: {fileID: 0}
+  view: {fileID: 960000470}
+  hud: {fileID: 960000638}
+  result: {fileID: 960000011}
+  recorder: {fileID: 960000611}
   catchUpLimit: 6
   substituteAfter: 2.5
   waitingFor: "OPPONENT NOT RESPONDING\u2026 {0}"

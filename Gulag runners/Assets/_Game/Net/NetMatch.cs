@@ -513,6 +513,28 @@ namespace GulagRunners.Net
         void BeMe(int player)
         {
             PlayerController mine = At(player);
+
+            // This player's OWN camera, found by the fighter it already follows.
+            //
+            // The arena carries one camera per fighter for a match played on one phone,
+            // and Awake takes whichever FindFirstObjectByType hands back when the field
+            // is left empty -- an order Unity does not define. Both devices then run the
+            // SAME arbitrary camera and point it at their own fighter, which works right
+            // up until it does not: the two cameras are not interchangeable, they carry
+            // their own framing, shake and opening shot, and the one that is left is the
+            // one OneCamera keeps. Choosing by the fighter makes it this player's shot on
+            // both phones, whatever the field was left at.
+            if (mine != null)
+            {
+                foreach (SideViewCamera cam in FindObjectsByType<SideViewCamera>(
+                             FindObjectsInactive.Include, FindObjectsSortMode.None))
+                {
+                    if (cam.player != mine) continue;
+                    view = cam;
+                    break;
+                }
+            }
+
             if (view != null && mine != null)
             {
                 view.player = mine;

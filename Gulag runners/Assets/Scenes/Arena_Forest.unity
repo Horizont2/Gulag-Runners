@@ -88135,10 +88135,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Net.NetMatch
   link: {fileID: 1370685656}
   match: {fileID: 1900000400}
-  view: {fileID: 0}
-  hud: {fileID: 0}
-  result: {fileID: 0}
-  recorder: {fileID: 0}
+  view: {fileID: 1900000135}
+  hud: {fileID: 1868245310}
+  result: {fileID: 1194090987}
+  recorder: {fileID: 1994619513}
   catchUpLimit: 6
   substituteAfter: 2.5
   waitingFor: "OPPONENT NOT RESPONDING\u2026 {0}"

@@ -119,6 +119,64 @@ def in_build(name):
     return None
 
 
+def wired(name, text, guids, problems, notes):
+    """Is the arena's NetMatch pointed at this arena's own things?
+
+    Four references -- the camera, the HUD, the result panel and the match recorder --
+    and every one of them was empty in all three arenas. NetMatch then falls back to
+    FindFirstObjectByType in Awake, and Unity does not define which object that returns.
+
+    It matters most for the camera. An arena carries one per fighter, stacked half a
+    screen each, because the first way two people played this was on one phone; the
+    moment there are two phones, NetMatch keeps the local player's camera and switches
+    the other off. "The local player's" is whichever one that lottery handed back, and
+    the two are not interchangeable -- each is built around its own fighter. The symptom
+    is a player watching the other man's half of the screen, or both halves, on one arena
+    and not on another, with nothing different between them to point at.
+
+    So the references are a wiring fault like any other, and this is the list that says
+    an arena is ready.
+    """
+    net = guids.get("NetMatch.cs")
+    if not net:
+        return
+    for m in re.finditer(r"--- !u!114 &(-?\d+)\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)",
+                         text, re.S):
+        if net not in m.group(2):
+            continue
+        empty = [f for f in ("view", "hud", "result", "recorder")
+                 if re.search(r"^  %s: \{fileID: 0\}$" % f, m.group(2), re.M)]
+        if empty:
+            problems.append(
+                f"NetMatch has {', '.join(empty)} left empty, so Awake takes whatever "
+                f"FindFirstObjectByType hands back -- an order Unity does not define. "
+                f"With two phones it decides which camera the player keeps and which is "
+                f"switched off, and this arena's two are not interchangeable.")
+        else:
+            notes.append("NetMatch is wired to this arena's own camera, HUD, result "
+                         "panel and recorder")
+
+    # One camera per fighter, and no two on the same one.
+    cam = guids.get("SideViewCamera.cs")
+    if not cam:
+        return
+    follows = []
+    for m in re.finditer(r"--- !u!114 &(-?\d+)\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)",
+                         text, re.S):
+        if cam not in m.group(2):
+            continue
+        p = re.search(r"^  player: \{fileID: (-?\d+)\}$", m.group(2), re.M)
+        follows.append(int(p.group(1)) if p else 0)
+    if follows and len(set(follows)) != len(follows):
+        problems.append(
+            f"{len(follows)} side-view cameras and only {len(set(follows))} fighter(s) "
+            f"between them, so one fighter has no camera of their own and the player "
+            f"who is dealt them watches somebody else's fight.")
+    if 0 in follows:
+        problems.append("a side-view camera with no fighter on it: it will sit where it "
+                        "was left and follow nothing.")
+
+
 def check(name, guids, reference):
     path = os.path.join(SCENES, name)
     text = open(path, encoding="utf-8", errors="ignore").read()
@@ -147,6 +205,8 @@ def check(name, guids, reference):
                         "on the device")
     elif not build:
         problems.append("in the build list but switched off")
+
+    wired(name, text, guids, problems, notes)
 
     extra = sorted(set(have) - set(REQUIRED) - {SIM_COLLIDER})
     if extra:
