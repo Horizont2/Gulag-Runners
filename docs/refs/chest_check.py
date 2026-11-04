@@ -54,6 +54,15 @@ FAIR_SECONDS = 1.0
 # entry can be deleted -- and it puts the reason next to the number, so the next person
 # to read it knows it was a decision rather than an oversight.
 ACCEPTED = {
+    "Demo loc2.unity": (
+        6.02,
+        "the same shape as the Nordic arena and from the same cause: one way up to each "
+        "floor, and the ground one at x -9.14 is 5.1 m from Player 1's spawn and 23.1 m "
+        "from Player 2's. Both players enter the upper floors through it, so the cost is "
+        "identical at every x along them and no chest position can compensate. The ground "
+        "pair measures dead level at 2.10 s each way; everything above it is the ladders. "
+        "A second way up, mirrored, is the only thing that changes this, and the level is "
+        "being kept as its author built it"),
     "Arena_Nordic fortress.unity": (
         4.60,
         "the arena has one way up to each floor, and the ground one at x -6.71 is 1.40 m "
@@ -208,8 +217,7 @@ def reach(w, spawn, rungs, cx, land):
 
 
 def main(argv):
-    wanted = argv or [f for f in sorted(os.listdir(SCENES))
-                      if f.endswith(".unity") and f.startswith("Arena")]
+    wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
     kinds = {0: "crate", 1: "locker", 2: "safe"}
 

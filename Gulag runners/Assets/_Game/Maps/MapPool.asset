@@ -21,4 +21,8 @@ MonoBehaviour:
     shown: NORDIC FORTRESS
     enabled: 0
     weight: 1
+  - scene: Demo loc2
+    shown: THE MINE
+    enabled: 1
+    weight: 3
   fallback: Arena_Forest

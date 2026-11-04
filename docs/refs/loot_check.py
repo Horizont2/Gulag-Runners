@@ -56,8 +56,7 @@ def ground_item_models():
 
 
 def main(argv):
-    wanted = argv or [f for f in sorted(os.listdir(SCENES))
-                      if f.endswith(".unity") and f.startswith("Arena")]
+    wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
 
     match_guid = guid_of("MatchState")

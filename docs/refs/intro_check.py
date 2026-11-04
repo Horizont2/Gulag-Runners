@@ -326,8 +326,7 @@ def inside(at, rot, fov, point):
 
 
 def main(argv):
-    wanted = argv or [f for f in sorted(os.listdir(SCENES))
-                      if f.endswith(".unity") and f.startswith("Arena")]
+    wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
 
     for name in wanted:

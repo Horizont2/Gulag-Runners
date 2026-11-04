@@ -47,6 +47,7 @@ BODY_W, BODY_H, BODY_D = 0.6, 0.91, 0.6
 # fighters' own swords as the walls they are standing inside. SimWorldBaker asks
 # GetComponentInParent for each; from a file, the equivalent is "this prefab is one of
 # those things", which holds because both live at the root of their own prefab.
+SIM_COLLIDER = "a92ea500d0103a36b3143c8a534b18b2"
 PLAYER_SCRIPT = "882fe3a922af38d6658c85cd54734955"
 CHEST_SCRIPT = "b133d746e1ad16c0613fc1ce415afb0c"
 
@@ -109,18 +110,27 @@ def guid_index():
 _MESH = {}
 
 
-def mesh_bounds(guid):
+def mesh_bounds(guid, prefer=None):
     """(lo, hi) of a mesh asset in metres, or None. Keyed by the asset's guid."""
-    if guid in _MESH:
-        return _MESH[guid]
+    key = (guid, prefer)
+    if key in _MESH:
+        return _MESH[key]
     path = guid_index().get(guid)
     out = None
     if path and os.path.exists(path) and path.lower().endswith(".fbx"):
         try:
             facts = fbx_reader.describe(path)
             if facts["meshes"]:
-                lo = [min(m[0][k] for m in facts["meshes"]) for k in range(3)]
-                hi = [max(m[1][k] for m in facts["meshes"]) for k in range(3)]
+                # One .fbx holds a whole pack, so the union of the file is the size of
+                # the PACK. Where the object carrying the collider shares a name with
+                # one of the meshes, that is the one it is wearing.
+                boxes = facts["meshes"]
+                if prefer:
+                    named = [b for n, b in fbx_reader.meshes(path) if n == prefer]
+                    if named:
+                        boxes = named
+                lo = [min(m[0][k] for m in boxes) for k in range(3)]
+                hi = [max(m[1][k] for m in boxes) for k in range(3)]
                 # Convert Units and Scale Factor are applied in SERIES by the importer,
                 # so they multiply. Picking one is wrong by the other, and the rock that
                 # started this sets both: it measured half size, which is the difference
@@ -138,7 +148,7 @@ def mesh_bounds(guid):
                 out = ([v * factor for v in lo], [v * factor for v in hi])
         except Exception:
             out = None
-    _MESH[guid] = out
+    _MESH[key] = out
     return out
 
 
@@ -282,9 +292,14 @@ def prefab_colliders(path, depth=0):
                 # m_Mesh: {fileID: 0}. An empty MeshCollider, which has no geometry and
                 # so no bounds -- not something this failed to read.
                 continue
-            got = mesh_bounds(m.group(2))
+            owner = None
+            og = ref(body, "m_GameObject")
+            if og in docs:
+                on = re.search(r"m_Name: (.*)", docs[og]["body"])
+                owner = on.group(1) if on else None
+            got = mesh_bounds(m.group(2), owner)
             if got is None:
-                found.append((mat, None, None, f"{d['kind']} (mesh not readable)", fid))
+                found.append((mat, None, None, f"{d['kind']} (mesh not readable)", fid, go))
                 continue
             lo, hi = got
         else:
@@ -295,7 +310,7 @@ def prefab_colliders(path, depth=0):
             c = vec(body, "m_Center")
             lo = [c[0] - r, c[1] - h / 2, c[2] - r]
             hi = [c[0] + r, c[1] + h / 2, c[2] + r]
-        found.append((mat, lo, hi, d["kind"], fid))
+        found.append((mat, lo, hi, d["kind"], fid, go))
 
     # And whatever hangs off a prefab nested inside this one.
     for m in re.finditer(r"--- !u!1001 &(-?\d+)\nPrefabInstance:\n(.*?)(?=\n--- !u!|\Z)",
@@ -325,8 +340,8 @@ def prefab_colliders(path, depth=0):
         parent = ref(ib, "m_TransformParent")
         if parent and parent in docs:
             here = mul(to_root(parent), here)
-        for cmat, lo, hi, what, cfid in prefab_colliders(child, depth + 1):
-            found.append((mul(here, cmat), lo, hi, what, cfid))
+        for cmat, lo, hi, what, cfid, cgo in prefab_colliders(child, depth + 1):
+            found.append((mul(here, cmat), lo, hi, what, cfid, cgo))
 
     _PREFAB[path] = found
     return found
@@ -413,6 +428,28 @@ def scene_colliders(path):
         q.append(float(mods.get((t, "m_LocalRotation.w"), 1.0)))
         return trs(p, q, s)
 
+    # A SimCollider CLAIMS its object: the baker's marked pass takes it and the ordinary
+    # collider pass skips whatever it claimed. So a marked ladder's own MeshCollider is
+    # not a wall, and a marked-Ignore crystal is not collision at all. The claim is
+    # recorded in the SCENE, on a stripped window onto an object inside a prefab, while
+    # the collider is read from the PREFAB -- so the two only meet as the pair
+    # (which instance, which object inside it).
+    claimed = set()
+    for fid, d in docs.items():
+        if d["kind"] != "MonoBehaviour" or SIM_COLLIDER not in d["body"]:
+            continue
+        go = ref(d["body"], "m_GameObject")
+        gd = docs.get(go)
+        if gd is None:
+            continue
+        if gd["stripped"]:
+            src = re.search(r"m_CorrespondingSourceObject: \{fileID: (-?\d+)", gd["body"])
+            inst = ref(gd["body"], "m_PrefabInstance")
+            if src and inst:
+                claimed.add((inst, int(src.group(1))))
+        else:
+            claimed.add((None, go))
+
     out = []
     for fid, d in docs.items():
         if d["kind"] != "PrefabInstance":
@@ -445,8 +482,10 @@ def scene_colliders(path):
         if parent:
             here = mul(world_of_transform(parent), here)
 
-        for cmat, lo, hi, what, cfid in prefab_colliders(src):
+        for cmat, lo, hi, what, cfid, cgo in prefab_colliders(src):
             if cfid in gone or cfid in off:
+                continue
+            if (fid, cgo) in claimed:
                 continue
             mat = mul(here, cmat)
             if lo is None:
@@ -463,8 +502,7 @@ def scene_colliders(path):
 
 
 def main(argv):
-    wanted = argv or [f for f in sorted(os.listdir(SCENES))
-                      if f.endswith(".unity") and f.startswith("Arena")]
+    wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
 
     for name in wanted:

@@ -61,9 +61,9 @@ SCENES = os.path.join(ASSETS, "Scenes")
 # every arena is checked, and a new one is covered the day it exists.
 def _looking_at():
     found = {"Menu.unity": "the menu and the search screen"}
-    for f in sorted(os.listdir(SCENES)):
-        if f.endswith(".unity") and f.startswith("Arena"):
-            found[f] = "the combat HUD"
+    import arena_demo_geometry as geometry
+    for f in geometry.arena_scenes():
+        found[f] = "the combat HUD"
     return found
 
 

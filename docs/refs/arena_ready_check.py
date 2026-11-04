@@ -19,6 +19,10 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import arena_demo_geometry as geometry           # noqa: E402
+
 PROJECT = os.path.join(HERE, "..", "..", "Gulag runners")
 SCENES = os.path.join(PROJECT, "Assets", "Scenes")
 GAME = os.path.join(PROJECT, "Assets", "_Game")
@@ -157,8 +161,7 @@ def main(argv):
     reference = counts(open(os.path.join(SCENES, REFERENCE),
                             encoding="utf-8", errors="ignore").read(), guids)
 
-    wanted = argv or [f for f in sorted(os.listdir(SCENES))
-                      if f.endswith(".unity") and f.startswith("Arena")]
+    wanted = argv or geometry.arena_scenes()
 
     total = 0
     for name in wanted:

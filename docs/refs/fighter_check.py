@@ -26,6 +26,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+import arena_demo_geometry as geometry   # noqa: E402
+
 ASSETS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets")
 SCENES = os.path.join(ASSETS, "Scenes")
 PRESENT = os.path.join(ASSETS, "_Game", "Presentation")
@@ -128,8 +130,7 @@ def fighters(text, guids):
 
 
 def main(argv):
-    wanted = argv or [f for f in sorted(os.listdir(SCENES))
-                      if f.endswith(".unity") and f.startswith("Arena")]
+    wanted = argv or geometry.arena_scenes()
     guids = guid_index()
     global SCRIPTS
     SCRIPTS = script_names()

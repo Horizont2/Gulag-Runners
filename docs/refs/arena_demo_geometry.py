@@ -240,10 +240,19 @@ class Scene:
                     parent=int((re.search(r'm_TransformParent: \{fileID: (-?\d+)\}',
                                           body) or _ZERO).group(1)))
                 self.tr_of_go[owner] = tfid
+                # Where it came from, so local_box can go and read the prefab when the
+                # scene has nothing to measure. Without this the object is a unit cube.
+                src = re.search(
+                    r'm_CorrespondingSourceObject: \{fileID: (-?\d+), guid: ([0-9a-f]{32})',
+                    self.docs.get(owner, (0, ''))[1])
+                prefab = re.search(r'm_SourcePrefab: \{fileID: \d+, guid: ([0-9a-f]{32})', body)
                 self.gos[owner] = dict(
                     name=mods.get('m_Name', '').strip() or f'instance {fid}',
                     active=int(mod('m_IsActive', 1.0)),
-                    comps=comps)
+                    comps=comps,
+                    source=src.group(1) if src else None,
+                    guid=(src.group(2) if src else
+                          (prefab.group(1) if prefab else None)))
                 found[owner] = fid
         return found
 
@@ -335,7 +344,63 @@ class Scene:
             if m and m.group(1) in PRIMITIVE_BOX:
                 return PRIMITIVE_BOX[m.group(1)]
             break
+        got = self._prefab_box(go)
+        if got is not None:
+            return got
         return ([0.0, 0.0, 0.0], [0.5, 0.5, 0.5])
+
+    def _prefab_box(self, go):
+        """The box of an object that lives inside a prefab, read from the prefab.
+
+        Everything above looks at the SCENE, and an object adopted from a prefab
+        instance has almost nothing there -- its collider and its mesh are in the prefab
+        file. Falling through to a unit cube is how both of Demo loc2's ladders came out
+        0.61 m tall: a cube the size of the instance's scale, where the real ladder is
+        2.2 m and the only way between floors. At runtime SimCollider.WorldBounds asks
+        the Collider component and gets the right answer, so a harness that guesses a
+        cube disagrees with the game about whether the arena can be climbed at all.
+        """
+        import os as _os
+        src = self.gos[go].get('source')
+        guid = self.gos[go].get('guid')
+        if not src or not guid:
+            return None
+        try:
+            from collider_check import guid_index, mesh_bounds
+        except Exception:
+            return None
+        path = guid_index().get(guid)
+        if not path or not _os.path.exists(path) or not path.endswith('.prefab'):
+            return None
+        text = open(path, encoding='utf-8', errors='ignore').read()
+
+        name = None
+        gm = re.search(r'--- !u!1 &%s\nGameObject:\n((?:.*\n)*?)(?=--- !u!)' % src, text)
+        if gm:
+            nm = re.search(r'm_Name: (.*)', gm.group(1))
+            name = nm.group(1) if nm else None
+
+        for cls, kind in ((65, 'BoxCollider'), (64, 'MeshCollider'), (33, 'MeshFilter')):
+            for m in re.finditer(r'--- !u!%d &-?\d+\n%s:\n((?:.*\n)*?)(?=--- !u!|\Z)'
+                                 % (cls, kind), text):
+                body = m.group(1)
+                if _ref(body, 'm_GameObject') != int(src):
+                    continue
+                if kind == 'BoxCollider':
+                    c = _vec(body, 'm_Center', {'x': 0, 'y': 0, 'z': 0})
+                    s = _vec(body, 'm_Size', {'x': 1, 'y': 1, 'z': 1})
+                    return ([c['x'], c['y'], c['z']],
+                            [s['x'] / 2, s['y'] / 2, s['z'] / 2])
+                mm = re.search(r'm_Mesh: \{fileID: (-?\d+), guid: ([0-9a-f]{32})', body)
+                if not mm:
+                    continue
+                got = mesh_bounds(mm.group(2), name)
+                if got is None:
+                    continue
+                lo, hi = got
+                return ([(lo[k] + hi[k]) / 2 for k in range(3)],
+                        [(hi[k] - lo[k]) / 2 for k in range(3)])
+        return None
 
     def bounds(self, go):
         """World-space Collider.bounds of the first collider on this object, or None."""
@@ -1007,3 +1072,33 @@ if __name__ == '__main__':
               f"X {box[0]/65536:6.2f}..{box[2]/65536:6.2f}  Y {box[1]/65536:5.2f}..{box[3]/65536:5.2f}")
     print("\nspawns:", [f"p{i + 1} ({x:.2f}, {y:.2f}, z {z:.2f}) facing {f:+d}"
                         for i, (x, y, f, z) in enumerate(spawns())])
+
+
+def arena_scenes():
+    """The scenes a match can actually be played in, found rather than listed.
+
+    Every check here used to default to the files whose NAME begins with "Arena", which
+    is a convention and not a fact: the mine is called "Demo loc2" and was invisible to
+    all of them. What makes a scene an arena is being in the map pool -- that is the
+    list the game itself deals from -- so that is the list. The name prefix stays as
+    well, for an arena built but not yet dealt.
+    """
+    import os as _os
+    import re as _re
+
+    here = _os.path.dirname(_os.path.abspath(__file__))
+    scenes = _os.path.join(here, '..', '..', 'Gulag runners', 'Assets', 'Scenes')
+    found = []
+
+    pool = _os.path.join(here, '..', '..', 'Gulag runners', 'Assets', '_Game',
+                         'Maps', 'MapPool.asset')
+    if _os.path.exists(pool):
+        text = open(pool, encoding='utf-8', errors='ignore').read()
+        for name in _re.findall(r'^\s*- scene: (.+?)\s*$', text, _re.M):
+            if _os.path.exists(_os.path.join(scenes, name + '.unity')):
+                found.append(name + '.unity')
+
+    for f in sorted(_os.listdir(scenes)):
+        if f.endswith('.unity') and f.startswith('Arena') and f not in found:
+            found.append(f)
+    return found
