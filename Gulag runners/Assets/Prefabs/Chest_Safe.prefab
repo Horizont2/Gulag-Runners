@@ -69,7 +69,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   kind: 2
-  contents: 3
+  contents: 0
   hasPuzzle: 1
   tintByTier: 1
   tintTarget: {fileID: 0}

@@ -55,6 +55,61 @@ def ground_item_models():
     return items, bool(fallback and fallback.group(1) != "0")
 
 
+def rolls(problems, notes):
+    """Will the chests ever pay out anything different?
+
+    Two ways for a looter to deal the same hand for ever, and the arenas had both.
+
+    A chest prefab can PIN its contents, which LootTable allows on purpose -- "pinning
+    one chest is how a test, or a tutorial, stops being at the mercy of a roll". All
+    three of them shipped pinned, to items 2, 21 and 3. Arena_Forest overrode its six
+    instances back to a roll; the fortress and the mine did not, so twelve chests had
+    three items between them, and the kind -- crate, locker, safe, each with its own
+    tier odds -- was doing nothing at all.
+
+    And the rolling seed starts from a constant written into MatchState, so round ONE of
+    every session deals the same six chests. Only round one, because each round rolls
+    the seed forward, which is why it reads as "the loot never changes" rather than as a
+    seed somebody could change.
+    """
+    import glob
+    for path in sorted(glob.glob(os.path.join(ASSETS, "Prefabs", "Chest_*.prefab"))):
+        text = open(path, encoding="utf-8", errors="ignore").read()
+        m = re.search(r"^  contents: (\d+)$", text, re.M)
+        if not m:
+            continue
+        who = os.path.basename(path)[:-7]
+        if m.group(1) == "0":
+            notes.append(f"{who} rolls its contents from the drop table")
+            continue
+        problems.append(
+            f"{who} has contents pinned to item {m.group(1)}, so every chest of that "
+            f"kind in every arena pays out the same thing in every round -- and its "
+            f"Kind, which is the thing that decides its tier odds, decides nothing. "
+            f"Pin an INSTANCE for a test; leave the prefab rolling.")
+
+    for path in sorted(glob.glob(os.path.join(SCENES, "Arena_*.unity"))):
+        text = open(path, encoding="utf-8", errors="ignore").read()
+        for m in re.finditer(r"--- !u!114 &-?\d+\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)",
+                             text, re.S):
+            if guid_of("MatchState") not in m.group(1):
+                continue
+            seed = re.search(r"^  seed: (\d+)$", m.group(1), re.M)
+            fresh = re.search(r"^  freshEachRun: (\d)$", m.group(1), re.M)
+            who = os.path.basename(path)
+            if seed and seed.group(1) != "0":
+                notes.append(f"{who}: seed pinned to {seed.group(1)}, so every match "
+                             f"deals the same rounds -- deliberate, and repeatable")
+            elif fresh is not None and fresh.group(1) == "0":
+                problems.append(
+                    f"{who}: the loot seed is not pinned and not randomised either, so "
+                    f"the rolling seed starts from the constant in MatchState and round "
+                    f"ONE of every session deals the same six chests. Switch Fresh Each "
+                    f"Run on, or pin Seed if the repetition is wanted.")
+            else:
+                notes.append(f"{who}: a new seed every session, rolled forward each round")
+
+
 def main(argv):
     wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
@@ -62,6 +117,8 @@ def main(argv):
     match_guid = guid_of("MatchState")
     loot_guid = guid_of("LootView")
     view_guid = guid_of("GroundItemView")
+
+    rolls(problems, notes)
 
     drawable, has_fallback = ground_item_models()
     notes.append(f"GroundItem.prefab draws item(s) {sorted(drawable)} directly" +

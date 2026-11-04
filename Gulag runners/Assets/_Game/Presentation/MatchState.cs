@@ -50,6 +50,17 @@ namespace GulagRunners.Game
                  "looking at, and both devices dealt from the same number will agree (docs/06).")]
         public uint seed;
 
+        [Tooltip("Deal a different round ONE every time the scene is played.\n\n" +
+                 "Without it the rolling seed starts from a constant in the source, so the " +
+                 "first scavenge of every session is the same six chests -- and only the " +
+                 "first, because every round after it rolls the seed forward, which is why " +
+                 "it reads as \"the loot never changes\" rather than as a seed.\n\n" +
+                 "It gives up no determinism: two phones throw their state away when they " +
+                 "pair and deal from the number the host chose. Switch it off to make a " +
+                 "session repeatable without pinning Seed, which would deal the identical " +
+                 "chests every round rather than the same SEQUENCE of rounds.")]
+        public bool freshEachRun = true;
+
         [Header("The fight (docs/02)")]
         public CombatTuning combat = new CombatTuning();
 
@@ -221,6 +232,20 @@ namespace GulagRunners.Game
             }
 
             Config = chests.ToConfig();
+
+            // Round one of the FIRST match was the same round one every time. The rolling
+            // seed starts from a constant written into this file, so the chests a player
+            // opens in their first scavenge are the chests they opened yesterday -- which
+            // is the whole of "the loot is always the same", and it only shows on round
+            // one because every round after it rolls the seed forward.
+            //
+            // Nothing determinism-shaped is given up by this. Two phones throw their
+            // state away the moment they pair: StartFresh sets the rolling seed from the
+            // number the host chose, so from there both devices deal the same rounds from
+            // the same number. This is the seed of a match nobody else is in yet.
+            if (seed == 0 && freshEachRun)
+                _rollingSeed = (uint)System.DateTime.UtcNow.Ticks ^ 0x9E3779B9u;
+
             // A fresh scene is a fresh match, so the series starts at nil-nil. ResetRound
             // on its own re-deals the SAME round and deliberately leaves the score alone.
             ResetSeries();

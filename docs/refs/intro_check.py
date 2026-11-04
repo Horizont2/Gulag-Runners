@@ -328,6 +328,50 @@ def rivals(name, text, problems, notes):
             f"Camera.main returns whichever Unity finds first.")
 
 
+def own_shot(name, text, scene, found, spawns, problems, notes):
+    """Does each camera open on ITS OWN fighter's cage?
+
+    docs/01 spends the first twenty seconds of a match on not knowing where the other
+    runner is, and the opening shot is the one moment the game has a free camera. An
+    opening shot composed at the wrong end of the arena does not merely look odd: it
+    opens the round on the opponent's cage and then flies the length of the level to
+    your own, which gives away the one thing the next twenty seconds are about.
+
+    The wiring is per camera and there are two of each -- two cameras, two shots, two
+    spawns -- so crossing them is one drag in the inspector and nothing says so
+    afterwards. It is caught here by distance: an opening shot belongs to the spawn it
+    is nearest.
+    """
+    if len(spawns) < 2:
+        return
+    for i, (fid, view, intro) in enumerate(found):
+        if not intro:
+            continue
+        ref = intro.get("openingShot", "")
+        shot = re.search(r"fileID: (-?\d+)", ref) if ref else None
+        if not shot or shot.group(1) == "0":
+            continue
+        tr = int(shot.group(1))
+        if tr not in scene.transforms:
+            problems.append(f"{name}: camera {i + 1}'s opening shot points at "
+                            f"{tr}, which is not a transform in this scene")
+            continue
+        at = scene.basis(tr)[0]
+        mine = spawns[min(i, len(spawns) - 1)]
+        theirs = spawns[1 - min(i, 1)]
+        to_mine = abs(at[0] - mine[0])
+        to_theirs = abs(at[0] - theirs[0])
+        notes.append(f"  camera {i + 1} opens at x {at[0]:+.2f}: {to_mine:.1f} m from its "
+                     f"own fighter, {to_theirs:.1f} m from the other")
+        if to_theirs < to_mine:
+            problems.append(
+                f"{name}: camera {i + 1} follows the fighter at x {mine[0]:+.2f} and "
+                f"opens at x {at[0]:+.2f}, which is {to_theirs:.1f} m from the OTHER "
+                f"fighter and {to_mine:.1f} m from its own. The round opens on the "
+                f"opponent's cage and then travels to yours, which is the one thing "
+                f"docs/01 spends the first twenty seconds not telling you.")
+
+
 # ------------------------------------------------------------------------------ the shot
 
 def playing(spawn, view, body_height):
@@ -461,6 +505,7 @@ def main(argv):
             cage = float(m.group(1))
 
         notes.append(f"{name}: {len(found)} camera(s), {cage:.1f} s of cage phase")
+        own_shot(name, text, scene, found, spawns, problems, notes)
 
         for i, (_id, view, intro) in enumerate(found):
             if intro is None:

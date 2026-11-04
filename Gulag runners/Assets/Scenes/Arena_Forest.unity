@@ -132314,6 +132314,7 @@ MonoBehaviour:
     dropLock: 0.5
   groundItemCapacity: 6
   seed: 0
+  freshEachRun: 1
   combat:
     maxHealth: 100
     shoulderHeight: 0.721
