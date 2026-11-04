@@ -41,6 +41,18 @@ namespace GulagRunners.Game
         [Tooltip("Z of the gameplay plane the loot sits on, when it is not taken from them.")]
         public float planeZ;
 
+        [Tooltip("Lay each item on the slice of the STOREY it fell on, rather than all of " +
+                 "them on the gameplay plane.\n\n" +
+                 "A location built in 3D does not have one floor at one depth, and the " +
+                 "fighter already knows that -- the lane rule stands him on the part of the " +
+                 "floor nearest the fight, which on the mine's top storey is 1.40 m behind " +
+                 "the plane. The loot did not know it: every item was drawn ON the plane, so " +
+                 "a chest two storeys up paid out onto the floor and the item appeared a " +
+                 "metre and a half in front of it, hanging over the drop towards the camera. " +
+                 "Picking it up still worked, because the simulation is flat.\n\n" +
+                 "Off, everything lies on the plane as it used to.")]
+        public bool restOnTheirStorey = true;
+
         bool _warned;
 
         void Awake()
@@ -111,10 +123,54 @@ namespace GulagRunners.Game
                 GroundItemView view = views[i];
                 if (view == null) continue;
 
-                if (i < items.Length && items[i].Live) view.Show(in items[i], planeZ, i);
+                if (i < items.Length && items[i].Live)
+                    view.Show(in items[i], StoreyZ(in items[i]), i);
                 else if (view.Visible) view.PlayTaken();      // it was there a frame ago
                 else view.Hide();
             }
+        }
+
+        /// <summary>
+        /// The depth to lay one item at: the slice of the floor it is lying ON.
+        ///
+        /// The same rule the fighter is held by, deliberately -- the part of that floor
+        /// nearest the fight, kept a body's half-depth off its lip. It has to be the same
+        /// rule and not merely a similar one, because the point of it is that the item
+        /// ends up exactly where the fighter who comes to take it will be standing.
+        ///
+        /// Falls back to the plane when there is nothing under the item, which is every
+        /// frame of the arc it flies out of the chest on: a thing in the air has no
+        /// storey, and the plane is the right guess until it lands.
+        /// </summary>
+        float StoreyZ(in GroundItem item)
+        {
+            if (!restOnTheirStorey || matchState == null) return planeZ;
+
+            SimWorldBaker baker = matchState.worldBaker;
+            SimWorld world = baker != null ? baker.World : null;
+            if (world == null || world.Solids.Length == 0) return planeZ;
+
+            Fix home = Fix.FromMilli(Mathf.RoundToInt(planeZ * 1000f));
+            Fix half = matchState.fighters.Count > 0 && matchState.fighters[0] != null
+                ? matchState.fighters[0].Config.BodyDepth / 2
+                : Fix.FromMilli(300);
+
+            Fix x = item.Position.X, y = item.Position.Y;
+            bool found = false;
+            Fix top = Fix.Zero, lane = home;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;
+                Aabb solid = world.Solids[i];
+                if (solid.MinX > x || solid.MaxX < x) continue;
+                if (solid.MaxY > y + Fix.FromMilli(60)) continue;     // above it, not under
+                if (found && solid.MaxY <= top) continue;
+
+                top = solid.MaxY;
+                lane = world.SolidSpan(i).Nearest(home, half);
+                found = true;
+            }
+            return found ? lane.Raw / (float)Fix.RawOne : planeZ;
         }
 
         /// <summary>
