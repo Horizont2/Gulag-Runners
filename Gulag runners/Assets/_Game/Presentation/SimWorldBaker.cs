@@ -861,6 +861,68 @@ namespace GulagRunners.Game
             }
         }
 
+        /// <summary>
+        /// Which object in the scene a baked box came from.
+        ///
+        /// Written because the warning that needed it did not have it. Both fighters in the
+        /// Nordic arena were thrown 21 m into the air at the start of every round, and the
+        /// console said so precisely -- "spawned inside a baked solid (x -27.33..25.91,
+        /// y -1.65..21.72)" -- and then stopped, leaving four numbers and a scene with four
+        /// hundred objects in it. A box with no name is a hunt; a box with a name is a fix.
+        ///
+        /// Deliberately a SEARCH rather than a list kept alongside the boxes. A parallel
+        /// array is exactly what went wrong with the depth spans: CutHatches inserts,
+        /// removes and reorders, so anything kept by index drifts out of step and then lies
+        /// confidently. This re-measures the scene when something has already gone wrong, so
+        /// it costs nothing in a working build and cannot fall out of step with anything.
+        /// </summary>
+        public string Blame(Aabb box)
+        {
+            float x0 = box.MinX.ToMilli() / 1000f, x1 = box.MaxX.ToMilli() / 1000f;
+            float y0 = box.MinY.ToMilli() / 1000f, y1 = box.MaxY.ToMilli() / 1000f;
+
+            string best = null;
+            float bestMiss = float.MaxValue;
+
+            foreach (GameObject root in RootObjects())
+            {
+                root.GetComponentsInChildren(true, _markedBuffer);
+                foreach (SimCollider c in _markedBuffer)
+                {
+                    if (c == null) continue;
+                    Consider(c.name + " (marked " + c.kind + ")", c.WorldBounds,
+                             c.transform, ref best, ref bestMiss, x0, y0, x1, y1);
+                }
+
+                root.GetComponentsInChildren(true, _colliderBuffer);
+                foreach (Collider col in _colliderBuffer)
+                {
+                    if (col == null) continue;
+                    Consider(col.name + " (" + col.GetType().Name + " on the art)",
+                             col.bounds, col.transform, ref best, ref bestMiss, x0, y0, x1, y1);
+                }
+            }
+
+            if (best == null) return "nothing in the scene matches that box";
+            return bestMiss <= 0.02f
+                ? best
+                : best + $" — the nearest match, {bestMiss:0.00} m out, so the bake may have " +
+                  "cut or merged it (slopes become steps, ladders cut hatches)";
+        }
+
+        static void Consider(string what, Bounds b, Transform t,
+                             ref string best, ref float bestMiss,
+                             float x0, float y0, float x1, float y1)
+        {
+            float miss = Mathf.Abs(b.min.x - x0) + Mathf.Abs(b.max.x - x1)
+                       + Mathf.Abs(b.min.y - y0) + Mathf.Abs(b.max.y - y1);
+            if (miss >= bestMiss) return;
+            bestMiss = miss;
+            best = Path(t) + " — " + what +
+                   $", {b.size.x:0.00} x {b.size.y:0.00} x {b.size.z:0.00} m at z " +
+                   $"{b.min.z:0.00}..{b.max.z:0.00}";
+        }
+
         /// <summary>Name fragments that mean somebody modelled a ladder. Lower case.</summary>
         static readonly string[] LadderWords =
             { "ladder", "rung", "драбин", "лестниц", "сходин" };

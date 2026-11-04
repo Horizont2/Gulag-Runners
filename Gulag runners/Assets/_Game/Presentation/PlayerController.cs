@@ -398,9 +398,13 @@ namespace GulagRunners.Game
                     $"{name}: spawned inside a baked solid " +
                     $"(x {stuckIn.MinX.ToMilli() / 1000f:0.00}..{stuckIn.MaxX.ToMilli() / 1000f:0.00}, " +
                     $"y {stuckIn.MinY.ToMilli() / 1000f:0.00}..{stuckIn.MaxY.ToMilli() / 1000f:0.00}) " +
-                    $"and was lifted out to y {_state.Position.Y.ToMilli() / 1000f:0.00}. " +
-                    "Something in the scene is marked solid that should not be: check that box " +
-                    "against the gameplay plane, or mark it Ignore.\n" +
+                    $"and was lifted out to y {_state.Position.Y.ToMilli() / 1000f:0.00}.\n" +
+                    "  that box came from: " +
+                    (worldBaker != null ? worldBaker.Blame(stuckIn) : "no baker to ask") + "\n" +
+                    "  Mark that object Ignore with a SimCollider, or take its collider off. " +
+                    "Remember the simulation is flat boxes: a MeshCollider becomes its " +
+                    "BOUNDS, so an arch, a rock or anything with a hole in it is solid all " +
+                    "the way through.\n" +
                     (worldBaker != null ? worldBaker.LastReport : "no baker"), this);
             }
             else if (_world != null && _world.Solids.Length > 0 &&
