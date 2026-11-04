@@ -265,6 +265,17 @@ namespace GulagRunners.GameEditor
             span.spanOrigin = originOS;
             span.spanAxis = axisOS.normalized;
             span.spanLength = lengthOS;
+
+            // The same down the material got, on the COMPONENT as well -- and that is
+            // the half that matters, because the material is shared per mesh and this is
+            // a fact about one object. Four chains off one model are each rotated
+            // differently, so writing it only to the material gave three of them the
+            // fourth one's idea of which way is down.
+            span.sagDir = t.InverseTransformDirection(Vector3.down).normalized;
+
+            // A chain turns about its top, which is the fixed end the rig just measured.
+            if (hanger) span.swingPivot = originOS;
+
             span.watch = fighters;
             span.swayPerLoad = hanger ? 0.06f : 0f;
             EditorUtility.SetDirty(span);
@@ -311,12 +322,35 @@ namespace GulagRunners.GameEditor
                 if (best == null) continue;
                 Undo.RecordObject(hanger, "Set up sagging spans");
                 hanger.follow = best;
+                hanger.pendulumLength = 0f;      // it takes the span's swing, not its own
                 EditorUtility.SetDirty(hanger);
                 wired++;
-                report.Add($"  {hanger.name} -> carries {best.name} " +
-                           $"({bestDistance:0.00} m below its free end)");
+
+                // And how far the thing it holds hangs below the anchor, in metres: the
+                // length that fixes the period. Measured rather than tuned, from the top
+                // of this chain down to the middle of what it carries, and the SHORTEST
+                // chain wins so four of unequal length do not each claim a different
+                // period for one cage.
+                Vector3 anchor = hanger.transform.TransformPoint(hanger.spanOrigin);
+                float drop = anchor.y - Middle(best).y;
+                if (drop > 0.05f &&
+                    (best.pendulumLength <= 0f || drop < best.pendulumLength))
+                {
+                    Undo.RecordObject(best, "Set up sagging spans");
+                    best.pendulumLength = drop;
+                    EditorUtility.SetDirty(best);
+                }
             }
             return wired;
+        }
+
+        /// <summary>The middle of what a span carries: its renderer's centre, not its pivot.</summary>
+        static Vector3 Middle(SaggingSpan span)
+        {
+            if (span.skin != null && span.skin.Length > 0 && span.skin[0] != null)
+                return span.skin[0].bounds.center;
+            return span.transform.TransformPoint(
+                span.spanOrigin + span.spanAxis.normalized * (span.spanLength * 0.5f));
         }
 
         // --------------------------------------------------------------- the materials

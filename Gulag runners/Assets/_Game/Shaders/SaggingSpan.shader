@@ -29,11 +29,30 @@
 //   anchor. A chain that stayed vertical while the cage under it dropped would read as
 //   the cage having come loose.
 //
+// AND IT SWINGS. The sag above is what weight does to a slung thing; it is not what a
+// cage on four chains DOES. That hangs, and a hanging thing moves: a drift in the air
+// with nobody near it, a lurch when somebody lands on it, and a long slow ring-down
+// afterwards. Without that the cage reads as welded to the sky, and adding sag alone
+// made it read as welded to the sky and slightly bent.
+//
+// A four-chain sling is not a pendulum about one point, which matters because the obvious
+// implementation is wrong: four chains from four corners are a parallel linkage, so the
+// cage stays LEVEL and slides along an arc while each chain turns about its own top. So
+// the two modes swing differently -- a HANGER rotates about its anchor, a SPAN is simply
+// offset -- and SaggingSpan works both out of one angle so they cannot disagree.
+//
 // The rig -- which way the span runs, how long it is, which way is down in object space
 // -- is measured off each mesh by Tools > Gulag Runners > Setup > Set up sagging spans.
 // It cannot be guessed: these props came out of several packs with different axis
 // conventions, and a chain whose length the shader thinks runs along X stretches
 // sideways into the tree.
+//
+// The rig is per-OBJECT and the material is shared, so SaggingSpan writes it into a
+// property block every frame and the values below are defaults for a preview. That is
+// not tidiness either: the eight chains in this arena wear one material, they are each
+// rotated differently, and object-space down is therefore a different vector for every
+// one of them. Six of the eight were being stretched up to 29 degrees off true, which
+// is what a chain that bends sideways into the tree looks like.
 Shader "Gulag Runners/Sagging Span"
 {
     Properties
@@ -59,6 +78,12 @@ Shader "Gulag Runners/Sagging Span"
         _LoadAt("Where the weight is, 0 to 1 along the span", Range(0,1)) = 0.5
         _LoadAmount("How much of it there is", Range(0,1)) = 0
         _Sway("Sideways lean of a hanger, metres", Range(0,0.5)) = 0
+
+        [Header(Swing    written by SaggingSpan each frame)][Space(4)]
+        _SwingAngle("How far it hangs off plumb, radians", Float) = 0
+        _SwingPivot("What a hanger turns about, object space", Vector) = (0,0,0,0)
+        _SwingAxis("What it turns about, object space unit", Vector) = (0,0,1,0)
+        _SwingOffset("Where a span has slid to, object space", Vector) = (0,0,0,0)
 
         [Header(Mode)][Space(4)]
         [Toggle(_HANGER)] _Hanger("Hangs from one end (a chain)", Float) = 0
@@ -93,8 +118,21 @@ Shader "Gulag Runners/Sagging Span"
             half   _LoadAt;
             half   _LoadAmount;
             float  _Sway;
+            float  _SwingAngle;
+            float4 _SwingPivot;
+            float4 _SwingAxis;
+            float4 _SwingOffset;
             float  _Hanger;
         CBUFFER_END
+
+        // Rodrigues, about a unit axis through the origin. Four instructions more than
+        // a matrix would be, and it needs no matrix uploading per renderer.
+        float3 Turn(float3 v, float3 axis, float angle)
+        {
+            float s, c;
+            sincos(angle, s, c);
+            return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
+        }
 
         // How far along the span a vertex sits, 0 at the fixed end and 1 at the far one.
         float SpanT(float3 positionOS)
@@ -149,7 +187,15 @@ Shader "Gulag Runners/Sagging Span"
             // along its own length and leans after the weight it is carrying.
             float drop = (_RestSag + _LoadSag * _LoadAmount) * t;
             float3 lean = normalize(cross(down, float3(0, 0, 1)) + 1e-6);
-            return down * drop + lean * (_Sway * t);
+            float3 stretched = positionOS + down * drop + lean * (_Sway * t);
+
+            // And the swing, about the anchor it hangs from. Applied to the stretched
+            // position rather than beside it, so a chain that is both loaded and
+            // swinging does one move and not two.
+            float3 arm = stretched - _SwingPivot.xyz;
+            float3 spun = _SwingPivot.xyz
+                        + Turn(arm, normalize(_SwingAxis.xyz + 1e-6), _SwingAngle);
+            return spun - positionOS;
 #else
             float drop = SpanDrop(t);
 
@@ -160,7 +206,10 @@ Shader "Gulag Runners/Sagging Span"
             float step = 0.02;
             slope = (SpanDrop(saturate(t + step)) - drop) / (step * max(_SpanLength, 1e-4));
 
-            return down * drop;
+            // Slid, not turned. Four chains from four corners hold the cage LEVEL and
+            // carry it along an arc; rotating it instead tips the floor the fighter is
+            // standing on, which is both wrong and the one thing the sim cannot follow.
+            return down * drop + _SwingOffset.xyz;
 #endif
         }
         ENDHLSL
@@ -223,6 +272,12 @@ Shader "Gulag Runners/Sagging Span"
                 bentOS = normalize(lerp(input.normalOS, bentOS,
                                         saturate(abs(dot(input.normalOS,
                                                          normalize(_SagDir.xyz + 1e-6))))));
+
+#ifdef _HANGER
+                // A swinging chain turns, so its shading turns with it. The span mode
+                // only slides, and a translation leaves normals alone.
+                bentOS = Turn(bentOS, normalize(_SwingAxis.xyz + 1e-6), _SwingAngle);
+#endif
 
                 VertexPositionInputs p = GetVertexPositionInputs(moved);
                 VertexNormalInputs n = GetVertexNormalInputs(bentOS);

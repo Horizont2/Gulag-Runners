@@ -624,6 +624,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.5575964, y: 0.088316105, z: 0.011912882}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 3.115869
+  sagDir: {x: 0.301857, y: -0.953353, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -650,6 +651,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.5575964, y: 0.088316105, z: -0.00019228458}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 3.115869
+  sagDir: {x: 0.301857, y: -0.953353, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -911,15 +913,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.02112093, y: 0.5024443, z: -0.22851618}
   spanAxis: {x: 0.0882883, y: 0.28239152, z: 0.95522785}
   spanLength: 0.47845376
+  sagDir: {x: 0.088288, y: 0.282391, z: 0.955228}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0.06
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 1372700468}
 --- !u!4 &34846547 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -13673,6 +13682,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.28, y: 2, z: -1.5}
   spanAxis: {x: -0, y: -1, z: -0}
   spanLength: 4
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -13699,6 +13709,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.28, y: 2, z: 1.5}
   spanAxis: {x: -0, y: -1, z: -0}
   spanLength: 4
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -13725,6 +13736,7 @@ MonoBehaviour:
   spanOrigin: {x: -0.0016977191, y: -0.0027021915, z: -3.0899997}
   spanAxis: {x: 0, y: 0, z: 1}
   spanLength: 6.09
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -14718,15 +14730,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.031129852, y: 0.5932614, z: -0.1619582}
   spanAxis: {x: 0.18690419, y: -0.13966203, z: 0.97239983}
   spanLength: 0.3331103
+  sagDir: {x: 0.186904, y: -0.139662, z: 0.9724}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0.06
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 980100004}
 --- !u!4 &270285042 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -28571,6 +28590,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.28, y: 2, z: -1.5}
   spanAxis: {x: -0, y: -1, z: -0}
   spanLength: 4
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -28597,6 +28617,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.28, y: 2, z: 1.5}
   spanAxis: {x: -0, y: -1, z: -0}
   spanLength: 4
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -28623,6 +28644,7 @@ MonoBehaviour:
   spanOrigin: {x: -0.0016977191, y: -0.0027021915, z: -3.0899997}
   spanAxis: {x: 0, y: 0, z: 1}
   spanLength: 6.09
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -45923,15 +45945,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.044914577, y: 0.5438767, z: -0.16775115}
   spanAxis: {x: 0.25575775, y: 0.14875412, z: 0.95522785}
   spanLength: 0.35122752
+  sagDir: {x: 0.255758, y: 0.148754, z: 0.955228}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0.06
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 980100004}
 --- !u!4 &625761578 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -47054,6 +47083,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.28, y: 2, z: -1.5}
   spanAxis: {x: -0, y: -1, z: -0}
   spanLength: 4
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -47080,6 +47110,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.28, y: 2, z: 1.5}
   spanAxis: {x: -0, y: -1, z: -0}
   spanLength: 4
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -47106,6 +47137,7 @@ MonoBehaviour:
   spanOrigin: {x: -0.0016977191, y: -0.0027021915, z: -3.0899997}
   spanAxis: {x: 0, y: 0, z: 1}
   spanLength: 6.09
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -58482,15 +58514,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.02112093, y: 0.5024443, z: -0.22851618}
   spanAxis: {x: 0.0882883, y: 0.28239152, z: 0.95522785}
   spanLength: 0.47845376
+  sagDir: {x: 0.088288, y: 0.282391, z: 0.955228}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0.06
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 980100004}
 --- !u!4 &743851741 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -66122,15 +66161,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.044914577, y: 0.5438767, z: -0.16775115}
   spanAxis: {x: 0.25575775, y: 0.14875412, z: 0.95522785}
   spanLength: 0.35122752
+  sagDir: {x: 0.255758, y: 0.148754, z: 0.955228}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0.06
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 1372700468}
 --- !u!4 &921054233 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -87957,15 +88003,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.014539974, y: 0.61555415, z: -0.19929011}
   spanAxis: {x: 0.07094517, y: -0.22227335, z: 0.97239983}
   spanLength: 0.40989336
+  sagDir: {x: 0.070945, y: -0.222273, z: 0.9724}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0.06
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 980100004}
 --- !u!4 &1362744658 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -88264,15 +88317,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.73019695, y: 0.75000006, z: 0.000000059604645}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 1.4603939
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 1372700468}
 --- !u!114 &1372700468
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -88290,14 +88350,21 @@ MonoBehaviour:
   spanOrigin: {x: -0.75, y: 0.745, z: 0}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 1.5
+  sagDir: {x: 0, y: -1, z: 0}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0
+  pendulumLength: 0.45
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
   follow: {fileID: 0}
 --- !u!114 &1372700473
 MonoBehaviour:
@@ -111114,15 +111181,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.022953227, y: 0.60978854, z: -0.19143908}
   spanAxis: {x: 0.116589144, y: -0.20210287, z: 0.97239983}
   spanLength: 0.3937456
+  sagDir: {x: 0.116589, y: -0.202103, z: 0.9724}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0.06
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 1372700468}
 --- !u!4 &1583825140 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -112205,15 +112279,22 @@ MonoBehaviour:
   spanOrigin: {x: -0.031129852, y: 0.5932614, z: -0.1619582}
   spanAxis: {x: 0.18690419, y: -0.13966203, z: 0.97239983}
   spanLength: 0.3331103
+  sagDir: {x: 0.186904, y: -0.139662, z: 0.9724}
   watch:
   - {fileID: 1900000119}
   - {fileID: 1900000127}
   carryHeight: 0.75
   overhang: 0.08
-  stiffness: 70
-  damping: 7
+  stiffness: 45
+  damping: 5
   swayPerLoad: 0.06
-  follow: {fileID: 0}
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 1372700468}
 --- !u!4 &1644726342 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -115211,6 +115292,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.5575964, y: 0.088316105, z: 0.011912882}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 3.115869
+  sagDir: {x: -0.296814, y: -0.954935, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -115237,6 +115319,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.5575964, y: 0.088316105, z: -0.00019228458}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 3.115869
+  sagDir: {x: -0.296814, y: -0.954935, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -150875,26 +150958,24 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cage_1_Black
       objectReference: {fileID: 0}
-    - target: {fileID: 3511832289879037614, guid: fae174c52310f104f9572fb78d889f4b, type: 3}
-      propertyPath: 'watch.Array.data[0]'
+    - target: {fileID: 7752869147688974958, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 1900000119}
-    - target: {fileID: 3511832289879037614, guid: fae174c52310f104f9572fb78d889f4b, type: 3}
-      propertyPath: 'watch.Array.data[1]'
+      objectReference: {fileID: 2100000, guid: bfae809860605724d9a0489e6bb3a74f, type: 2}
+    - target: {fileID: -5718934016109707745, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 1900000127}
-    - target: {fileID: 3951583970283348127, guid: fae174c52310f104f9572fb78d889f4b, type: 3}
-      propertyPath: 'watch.Array.data[0]'
-      value: 
-      objectReference: {fileID: 1900000119}
-    - target: {fileID: 3951583970283348127, guid: fae174c52310f104f9572fb78d889f4b, type: 3}
-      propertyPath: 'watch.Array.data[1]'
-      value: 
-      objectReference: {fileID: 1900000127}
+      objectReference: {fileID: 2100000, guid: 426d5870a54f97140b98f25c54ea47fb, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -2117188530202603140, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 980100003}
+    - targetCorrespondingSourceObject: {fileID: 3978640675780065682, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 980100004}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 422985326}
@@ -151151,6 +151232,87 @@ MonoBehaviour:
   lookDistance: 2.5
   socket: {fileID: 7772177323803372881}
   drawGizmo: 1
+--- !u!1 &980100000 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -2117188530202603140, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 5789700700997916214}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &980100001 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7752869147688974958, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 5789700700997916214}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &980100002 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -5718934016109707745, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+  m_PrefabInstance: {fileID: 5789700700997916214}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &980100004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1068137099}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 980100002}
+  spanOrigin: {x: -0.75, y: 0.745, z: 0}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 1.5
+  sagDir: {x: 0, y: -1, z: 0}
+  watch:
+  - {fileID: 1900000119}
+  - {fileID: 1900000127}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 45
+  damping: 5
+  swayPerLoad: 0
+  pendulumLength: 0.45
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 0}
+--- !u!114 &980100003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 980100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
+  skin:
+  - {fileID: 980100001}
+  spanOrigin: {x: -0.73019695, y: 0.75000006, z: 0.000000059604645}
+  spanAxis: {x: 1, y: 0, z: 0}
+  spanLength: 1.4603939
+  sagDir: {x: 0, y: -1, z: 0}
+  watch:
+  - {fileID: 1900000119}
+  - {fileID: 1900000127}
+  carryHeight: 0.75
+  overhang: 0.08
+  stiffness: 45
+  damping: 5
+  swayPerLoad: 0
+  pendulumLength: 0
+  idleSwing: 3
+  landSwing: 6
+  swingDamping: 0.08
+  leanPerLoad: 2.5
+  swingPivot: {x: 0, y: 0, z: 0}
+  follow: {fileID: 980100004}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
