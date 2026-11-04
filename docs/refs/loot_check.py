@@ -168,6 +168,48 @@ def _material(guid):
     return None
 
 
+def every_item_drawn(drawable, problems, notes):
+    """Does everything the chests can roll have something of its own to be drawn as?
+
+    GroundItemView falls back to a stand-in cube for an item with no model, and the
+    tooltip is right that a stand-in is the truth until there is art. What it is not is
+    an answer to the question the scavenge phase asks: a player deciding whether to
+    cross the room for something has to be able to tell a sword from a helmet from the
+    other end of it, and nine identical cubes say only "something".
+
+    So the rule is per ITEM and not per mesh: anything the drop table can roll needs its
+    own entry, even if that entry is a box of its own shape. The eleven weapons have
+    real prefabs -- the same ones the fighters hold -- and body armour, helmets and
+    belts have no mesh anywhere in the project, so they get a slab, a small deep box and
+    a strap. Greybox that says what KIND it is.
+    """
+    table = os.path.join(ASSETS, "_Game", "Sim", "Items", "ItemTable.cs")
+    ids = os.path.join(ASSETS, "_Game", "Sim", "Items", "ItemId.cs")
+    if not (os.path.exists(table) and os.path.exists(ids)):
+        return
+    numbers = {n: int(v) for n, v in
+               re.findall(r"^\s+(\w+) = (\d+),?$", open(ids, encoding="utf-8").read(), re.M)}
+    body = open(table, encoding="utf-8", errors="ignore").read()
+    rollable = {}
+    for m in re.finditer(r"t\[\(int\)ItemId\.(\w+)\] = new ItemDef\n\s*\{(.*?)\n\s*\};",
+                         body, re.S):
+        w = re.search(r"Weight = (\d+)", m.group(2))
+        if w and int(w.group(1)) > 0 and m.group(1) in numbers:
+            rollable[numbers[m.group(1)]] = m.group(1)
+
+    missing = sorted(i for i in rollable if i not in drawable)
+    notes.append(f"{len(rollable)} item(s) the drop table can roll, "
+                 f"{len(rollable) - len(missing)} of them with a model of their own")
+    if missing:
+        problems.append(
+            "the drop table can roll " + ", ".join(f"{rollable[i]} ({i})" for i in missing)
+            + " and GroundItem.prefab has no model for "
+            + ("any of them" if len(missing) > 1 else "it")
+            + ", so " + ("they all land" if len(missing) > 1 else "it lands")
+            + " as the same stand-in cube. A player across the room cannot tell one "
+              "from another, which is the whole decision the scavenge phase is made of.")
+
+
 def main(argv):
     wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
@@ -183,6 +225,8 @@ def main(argv):
     notes.append(f"GroundItem.prefab draws item(s) {sorted(drawable)} directly" +
                  (" and everything else as the stand-in" if has_fallback
                   else " and has NO stand-in"))
+
+    every_item_drawn(drawable, problems, notes)
 
     for name in wanted:
         path = os.path.join(SCENES, name)

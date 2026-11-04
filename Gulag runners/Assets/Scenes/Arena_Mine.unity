@@ -14196,6 +14196,7 @@ MonoBehaviour:
   - {fileID: 960000299}
   planeFromFighters: 1
   planeZ: -2.12
+  restOnTheirStorey: 1
 --- !u!1001 &960000282
 PrefabInstance:
   m_ObjectHideFlags: 0
