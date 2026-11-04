@@ -37,7 +37,7 @@ sys.path.insert(0, HERE)
 
 import arena_demo_geometry as geometry           # noqa: E402
 import sim_motor_mirror as m                     # noqa: E402
-from sim_motor_mirror import S, step, X, F, C    # noqa: E402
+from sim_motor_mirror import S, step, X, F, C, JMP   # noqa: E402
 
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
 
@@ -207,6 +207,54 @@ def climbs(w, baked, problems, notes):
                 f"collider that follows the rungs.")
 
 
+def only_by_ladder(w, floors, problems, notes):
+    """Can a storey be reached by jumping, when the only way up is meant to be a ladder?
+
+    This is a rule about the LEVEL and not about the jump: the gap between storeys is
+    bigger than a jump in every arena here, so the answer ought to be no everywhere, and
+    where it is yes it is because of something standing in between. In Arena_Forest it
+    was the border wall itself -- it ended at y +0.10, two centimetres under the terrace
+    at +0.12, so the wall that is supposed to END the ground floor was a step onto the
+    floor above it. The feet peak at -0.17 and Step Up Height is 0.30, so running into
+    it while jumping put the fighter on top, and from there he simply walked on.
+
+    Nothing about that is visible in the scene: the wall is the right height to be a
+    wall, the gap is too big to jump, and the exploit lives in the 0.02 m between two
+    numbers nobody would think to compare. So it is jumped, on the real motor, from
+    along every storey and in all three directions.
+    """
+    if len(floors) < 2:
+        return
+    order = sorted(floors, key=lambda r: r["top"])
+    tried = 0
+    for i, f in enumerate(order[:-1]):
+        above = order[i + 1]["top"]
+        x = f["x0"] + 0.4
+        while x <= f["x1"] - 0.4:
+            for push, way in ((0, "straight up"), (m.L, "running left"), (m.R, "running right")):
+                s = S(x, f["top"] + 0.1)
+                s.depth = X(f["z"])
+                for _ in range(20):
+                    step(s, 0, w)
+                if abs(F(s.y) - f["top"]) > 0.4:
+                    break                       # not actually standing here
+                tried += 1
+                for tick in range(170):
+                    step(s, push | (JMP if tick < 3 else 0), w)
+                if F(s.y) >= above - 0.2:
+                    problems.append(
+                        f"from x {x:+.1f} on the storey at y {f['top']:+.2f}, {way} and "
+                        f"jumping ends at y {F(s.y):+.2f} -- on the storey at "
+                        f"y {above:+.2f}, which is meant to be reachable only by ladder. "
+                        f"The gap is {above - f['top']:.2f} m and a jump is "
+                        f"{F(C['JUMP']) ** 2 / (2 * F(C['GRAV'])):.2f} m, so something in "
+                        f"between is being stood on.")
+                    x = f["x1"]                 # one finding per storey is enough
+                    break
+            x += 1.0
+    notes.append(f"  {tried} jump(s) tried from along the storeys; none reached the one above")
+
+
 def stagger(floors, problems, notes):
     """How far each storey stands from the fight, and from the one below it.
 
@@ -347,6 +395,7 @@ def main(argv):
 
     climbs(w, baked, problems, notes)
     stagger(floors, problems, notes)
+    only_by_ladder(w, floors, problems, notes)
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)
