@@ -250,7 +250,7 @@ MonoBehaviour:
   - {r: 0.25, g: 0.9, b: 0.35, a: 1}
   - {r: 0.2, g: 0.55, b: 1, a: 1}
   - {r: 0.7, g: 0.25, b: 1, a: 1}
-  glow: 0.6
+  glow: 0.15
   wornAt: 3
   wornColour: {r: 1, g: 0.25, b: 0.2, a: 1}
   wornPulse: 3

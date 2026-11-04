@@ -458,7 +458,7 @@ MonoBehaviour:
   - {r: 0.25, g: 0.9, b: 0.35, a: 1}
   - {r: 0.2, g: 0.55, b: 1, a: 1}
   - {r: 0.7, g: 0.25, b: 1, a: 1}
-  glow: 1.4
+  glow: 0.35
   bobHeight: 0.07
   bobSpeed: 2.2
   spinSpeed: 55

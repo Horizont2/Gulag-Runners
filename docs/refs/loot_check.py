@@ -110,6 +110,64 @@ def rolls(problems, notes):
                 notes.append(f"{who}: a new seed every session, rolled forward each round")
 
 
+def tier_shows(problems, notes):
+    """Can the tier colour reach the screen at all?
+
+    GroundItemView and PlayerLoadoutView both say what an item is worth by writing
+    _EmissionColor into a MaterialPropertyBlock. A block can set a property; it cannot
+    turn on a shader KEYWORD, and URP's Lit compiles emission out unless the material's
+    own Emission box is ticked. So on a material with emission off the tier is written
+    every frame and lands nowhere -- the loot is the same grey whatever it is worth, and
+    nothing anywhere says so.
+
+    GroundItemView's own tooltip knows this: "Emission through a MaterialPropertyBlock
+    does nothing AT ALL unless the material has its Emission tick box on". It is checked
+    here because a material is one tick box away from silently undoing the feature.
+    """
+    import glob
+    seen = []
+    for path in sorted(glob.glob(os.path.join(ASSETS, "Prefabs", "GroundItem.prefab"))):
+        text = open(path, encoding="utf-8", errors="ignore").read()
+        for g in sorted(set(re.findall(r"guid: ([0-9a-f]{32}), type: 2\}", text))):
+            mat = _material(g)
+            if mat is None:
+                continue
+            seen.append((os.path.basename(mat), _emits(mat)))
+    for who, on in seen:
+        if on:
+            notes.append(f"{who}: emission on, so the tier colour reaches it")
+        else:
+            problems.append(
+                f"{who} is worn by the loot on the floor and has its Emission box OFF, so "
+                f"the tier colour GroundItemView writes into _EmissionColor every frame "
+                f"is compiled out of the shader and never drawn. Every find looks the "
+                f"same whatever it is worth.")
+
+
+def _emits(mat):
+    """Is this material's Emission box on.
+
+    Two serialisations, and reading only the old one is how this check first reported
+    the opposite of the truth. Unity wrote keywords as a single m_ShaderKeywords string
+    and now writes m_ValidKeywords as a list; a material saved by a current editor has
+    an empty old field whatever its emission is set to.
+    """
+    body = open(mat, encoding="utf-8", errors="ignore").read()
+    valid = re.search(r"  m_ValidKeywords:\n((?:  - \S+\n)*)", body)
+    if valid and "_EMISSION" in valid.group(1):
+        return True
+    old = re.search(r"  m_ShaderKeywords: (.*)", body)
+    return bool(old and "_EMISSION" in old.group(1))
+
+
+def _material(guid):
+    import glob
+    for meta in glob.glob(os.path.join(ASSETS, "**", "*.mat.meta"), recursive=True):
+        if f"guid: {guid}" in open(meta, encoding="utf-8", errors="ignore").read():
+            return meta[:-5]
+    return None
+
+
 def main(argv):
     wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
@@ -119,6 +177,7 @@ def main(argv):
     view_guid = guid_of("GroundItemView")
 
     rolls(problems, notes)
+    tier_shows(problems, notes)
 
     drawable, has_fallback = ground_item_models()
     notes.append(f"GroundItem.prefab draws item(s) {sorted(drawable)} directly" +
