@@ -237,6 +237,127 @@ def crowding(name, text, scene, limit, problems, notes):
             f"ranges until no more than {limit} overlap.")
 
 
+SIDE_VIEW = "b921a9be9303a1887f282de341a5ae31"      # SideViewCamera
+
+
+def under_the_feet(text):
+    """How much of the frame is below a standing fighter's feet, in metres.
+
+    Taken off the camera rather than guessed: the view is the fighter's body height over
+    bodyScreenFraction, and the camera aims aimHeightBodies of a body ABOVE his feet, so
+    what is under them is half the view minus that aim. At the arena's own numbers --
+    0.91 m of fighter, 0.22 of the screen, 0.6 of a body -- it is 1.52 m.
+    """
+    frac, aim = None, 0.6
+    for m in re.finditer(r"--- !u!114 &-?\d+\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)",
+                         text, re.S):
+        if SIDE_VIEW not in m.group(1):
+            continue
+        f = re.search(r"^  bodyScreenFraction: ([\d.]+)$", m.group(1), re.M)
+        a = re.search(r"^  aimHeightBodies: ([\d.]+)$", m.group(1), re.M)
+        if f:
+            frac = float(f.group(1))
+        if a:
+            aim = float(a.group(1))
+        break
+    if not frac:
+        return 2.0
+    body = 0.91                                    # PlayerTuning.bodyHeight
+    return body / frac / 2.0 - body * aim
+
+
+def _cloud(text, scene):
+    """(bottom, top) of the volumetric cloud layer in world metres, or None.
+
+    It is drawn by PureVolumetricFog out of a terrain's height rather than by a
+    renderer, so nothing that walks the renderers finds it -- and it is the whole of
+    the Nordic fortress's answer to what is under its lowest floor.
+    """
+    best = None
+    for m in re.finditer(r"--- !u!114 &-?\d+\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)",
+                         text, re.S):
+        if FOG_SCRIPT not in m.group(1):
+            continue
+        height = re.search(r"  groundFogHeight: ([-\d.eE+]+)", m.group(1))
+        if not height:
+            continue
+        for tm in re.finditer(r"--- !u!218 &(-?\d+)\nTerrain:\n(.*?)(?=\n--- !u!|\Z)",
+                              text, re.S):
+            go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", tm.group(2))
+            tr = scene.tr_of_go.get(int(go.group(1))) if go else None
+            if tr is None:
+                continue
+            base = scene.basis(tr)[0][1]
+            if best is None or base < best[0]:
+                best = (base, base + float(height.group(1)))
+    return best
+
+
+def void_below(name, text, scene, problems, notes):
+    """Standing on the bottom floor, is there anything under it, or is that the sky?
+
+    An arena is a cross-section of somewhere bigger, and the bottom edge of the cut is
+    the one the camera actually shows: the frame is about five metres tall and the
+    fighter stands in the middle of it, so two and a half metres below his feet are on
+    screen the whole match. Arena_Mine drew nothing at all under y +0.88 and the bottom
+    of every shot on the ground floor was skybox -- which reads as the level having run
+    out rather than as a mine.
+
+    The Nordic fortress answers it with a cloud layer, because it is on a mountain. The
+    mine answers it with more mine. What matters here is only that something answers it.
+    """
+    want = under_the_feet(text)
+    lowest_floor = None
+    for b in geometry.bake(scene)["solid"]:
+        if F(b[2]) - F(b[0]) < 2.0:
+            continue
+        top = F(b[3])
+        if lowest_floor is None or top < lowest_floor:
+            lowest_floor = top
+    if lowest_floor is None:
+        return
+
+    drawn = None
+    for go, d in scene.gos.items():
+        tr = scene.tr_of_go.get(go)
+        if tr is None or not scene.renders(go):
+            continue
+        if scene.ancestor_has(go, geometry.PLAYER_GUID):
+            continue
+        origin, basis = scene.basis(tr)
+        if abs(origin[0]) < 0.01 and abs(origin[1]) < 0.01 and abs(origin[2]) < 0.01:
+            continue                               # a part parked at the origin
+        centre, half = scene.local_box(go)
+        low = (origin[1] + geometry._apply(basis, centre)[1]
+               - sum(abs(basis[1][k]) * half[k] for k in range(3)))
+        if drawn is None or low < drawn:
+            drawn = low
+
+    # A cloud layer counts. It is drawn by PureVolumetricFog off a terrain's height
+    # rather than by a renderer, so nothing above finds it, and it is the whole of the
+    # Nordic fortress's answer to this question.
+    # The layer fills the view from its top down to its base, so what counts is the
+    # BASE -- but only when its top actually reaches the floor. One hanging in space
+    # below a gap leaves the gap.
+    cloud = _cloud(text, scene)
+    if cloud is not None and cloud[1] >= lowest_floor - want \
+            and (drawn is None or cloud[0] < drawn):
+        drawn = cloud[0]
+
+    room = lowest_floor - drawn if drawn is not None else 0.0
+    notes.append(f"  lowest floor y {lowest_floor:+.2f}, lowest thing drawn y "
+                 f"{drawn:+.2f} -- {room:.2f} m of something under the bottom "
+                 f"storey, against {want:.2f} m of frame below his feet")
+    if room < want:
+        problems.append(
+            f"{name}: the lowest floor is at y {lowest_floor:+.2f} and nothing is drawn "
+            f"below y {drawn:+.2f}, which is {room:.2f} m. The camera frames five metres "
+            f"of height around the fighter, so standing on that floor he is looking at "
+            f"{want - room:.2f} m of skybox under his own feet -- the level "
+            f"running out rather than carrying on. Put something there: the fortress "
+            f"uses a cloud layer, the mine uses more shaft.")
+
+
 def main(argv):
     wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
@@ -325,6 +446,7 @@ def main(argv):
                 f"not know which light is the key one")
 
         volumetric(name, text, scene, problems, notes)
+        void_below(name, text, scene, problems, notes)
         crowding(name, text, scene, limit, problems, notes)
 
     for n in notes:
