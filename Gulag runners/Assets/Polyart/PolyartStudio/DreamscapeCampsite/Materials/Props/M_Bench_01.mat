@@ -202,7 +202,7 @@ Material:
     - _Glossiness: 0.5
     - _GlossyReflections: 1
     - _Metallic: 0
-    - _MetallicIntensity: 1
+    - _MetallicIntensity: 0
     - _MetallicMultiplier: 1
     - _Mode: 0
     - _NoiseTextureSize: 100
@@ -211,7 +211,7 @@ Material:
     - _Parallax: 0.02
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _RoughnessIntensity: 0.75
+    - _RoughnessIntensity: 2
     - _SloapContrast: 1
     - _SloapOffset: 0
     - _SmoothnessMultiplier: 0.6
