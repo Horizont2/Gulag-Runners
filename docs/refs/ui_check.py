@@ -53,10 +53,21 @@ GAME = os.path.join(ASSETS, "_Game")
 SCENES = os.path.join(ASSETS, "Scenes")
 
 # Which scene carries which screen, for the report.
-LOOKING_AT = {
-    "Arena_Forest.unity": "the combat HUD",
-    "Menu.unity": "the menu and the search screen",
-}
+#
+# FOUND, not listed. This was two names typed by hand, and the Nordic arena shipped in
+# the build with a combat HUD nothing had ever looked at -- wired to the right fighters
+# and reacting to none of them -- because adding an arena and adding it to this dict are
+# two separate acts and only one of them is obvious. Every arena carries the same HUD, so
+# every arena is checked, and a new one is covered the day it exists.
+def _looking_at():
+    found = {"Menu.unity": "the menu and the search screen"}
+    for f in sorted(os.listdir(SCENES)):
+        if f.endswith(".unity") and f.startswith("Arena"):
+            found[f] = "the combat HUD"
+    return found
+
+
+LOOKING_AT = _looking_at()
 
 # Unity's own types, which have no .cs here to read. Only the methods we actually wire.
 BUILTIN = {
