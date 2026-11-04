@@ -95,13 +95,20 @@ def fbx_bbox(path):
     meta = path + ".meta"
     if os.path.exists(meta):
         text = open(meta, encoding="utf-8", errors="ignore").read()
+        # Both, MULTIPLIED, not one or the other. Convert Units and Scale Factor are two
+        # separate levers in the importer and Unity applies them in series: a file in
+        # centimetres with Scale Factor 2 comes in at a fiftieth of its numbers, not a
+        # hundredth. Choosing between them, which is what this did, is wrong by exactly
+        # the Scale Factor whenever both are set -- and SM_RockFormation_01 sets both.
+        # It measured that rock at half its real size, and half of it is the difference
+        # between a backdrop and a 53 m wall across the arena.
         use_file = re.search(r"useFileScale: (\d)", text)
         glob = re.search(r"\n    globalScale: ([\d.]+)", text)
         factor = 1.0
         if use_file and use_file.group(1) == "1":
-            factor = (facts["unit"] or 100.0) / 100.0
-        elif glob:
-            factor = float(glob.group(1))
+            factor *= (facts["unit"] or 100.0) / 100.0
+        if glob:
+            factor *= float(glob.group(1))
         size = [v * factor for v in size]
         named = {n: [v * factor for v in s] for n, s in named.items()}
     return size, named

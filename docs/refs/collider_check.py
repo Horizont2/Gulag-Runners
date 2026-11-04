@@ -121,6 +121,10 @@ def mesh_bounds(guid):
             if facts["meshes"]:
                 lo = [min(m[0][k] for m in facts["meshes"]) for k in range(3)]
                 hi = [max(m[1][k] for m in facts["meshes"]) for k in range(3)]
+                # Convert Units and Scale Factor are applied in SERIES by the importer,
+                # so they multiply. Picking one is wrong by the other, and the rock that
+                # started this sets both: it measured half size, which is the difference
+                # between something safely behind the arena and a wall across it.
                 factor = 1.0
                 meta = path + ".meta"
                 if os.path.exists(meta):
@@ -128,9 +132,9 @@ def mesh_bounds(guid):
                     use_file = re.search(r"useFileScale: (\d)", t)
                     glob = re.search(r"\n    globalScale: ([\d.]+)", t)
                     if use_file and use_file.group(1) == "1":
-                        factor = (facts["unit"] or 100.0) / 100.0
-                    elif glob:
-                        factor = float(glob.group(1))
+                        factor *= (facts["unit"] or 100.0) / 100.0
+                    if glob:
+                        factor *= float(glob.group(1))
                 out = ([v * factor for v in lo], [v * factor for v in hi])
         except Exception:
             out = None
@@ -197,7 +201,7 @@ _PREFAB = {}
 
 
 def prefab_colliders(path, depth=0):
-    """Every non-trigger collider in a prefab, as (matrix to the prefab root, lo, hi, what).
+    """Every non-trigger collider in a prefab: (matrix to the root, lo, hi, what, fileID).
 
     Recurses into prefabs nested inside it, which is not a nicety: the chests in this
     project are a thin wrapper around a model prefab, and both of that model's colliders
@@ -280,7 +284,7 @@ def prefab_colliders(path, depth=0):
                 continue
             got = mesh_bounds(m.group(2))
             if got is None:
-                found.append((mat, None, None, f"{d['kind']} (mesh not readable)"))
+                found.append((mat, None, None, f"{d['kind']} (mesh not readable)", fid))
                 continue
             lo, hi = got
         else:
@@ -291,7 +295,7 @@ def prefab_colliders(path, depth=0):
             c = vec(body, "m_Center")
             lo = [c[0] - r, c[1] - h / 2, c[2] - r]
             hi = [c[0] + r, c[1] + h / 2, c[2] + r]
-        found.append((mat, lo, hi, d["kind"]))
+        found.append((mat, lo, hi, d["kind"], fid))
 
     # And whatever hangs off a prefab nested inside this one.
     for m in re.finditer(r"--- !u!1001 &(-?\d+)\nPrefabInstance:\n(.*?)(?=\n--- !u!|\Z)",
@@ -321,14 +325,38 @@ def prefab_colliders(path, depth=0):
         parent = ref(ib, "m_TransformParent")
         if parent and parent in docs:
             here = mul(to_root(parent), here)
-        for cmat, lo, hi, what in prefab_colliders(child, depth + 1):
-            found.append((mul(here, cmat), lo, hi, what))
+        for cmat, lo, hi, what, cfid in prefab_colliders(child, depth + 1):
+            found.append((mul(here, cmat), lo, hi, what, cfid))
 
     _PREFAB[path] = found
     return found
 
 
 # --------------------------------------------------------------------------- the scene
+
+def removed_by(body):
+    """Source fileIDs this instance has DELETED, from m_RemovedComponents.
+
+    Taking a component off a prefab instance does not edit the prefab: the instance
+    records that it is gone. Reading the prefab alone therefore sees a collider that is
+    not in the scene, which is how this check first reported a rock whose colliders had
+    already been taken off -- and a check that cries wolf is one nobody reads.
+    """
+    block = re.search(r"m_RemovedComponents:\n((?:\s+-.*\n)*)", body)
+    if not block:
+        return set()
+    return {int(x) for x in re.findall(r"\{fileID: (-?\d+)", block.group(1))}
+
+
+def disabled_by(body):
+    """Source fileIDs this instance has switched OFF, and whether the object itself is."""
+    off = set()
+    for m in re.finditer(r"- target: \{fileID: (-?\d+)[^\n]*\n\s+propertyPath: m_Enabled\n"
+                         r"\s+value: 0", body):
+        off.add(int(m.group(1)))
+    inactive = re.search(r"propertyPath: m_IsActive\n\s+value: 0", body) is not None
+    return off, inactive
+
 
 def owned_by_fighter_or_chest(docs, fid):
     """Is this instance, or anything above it, a fighter or a chest?"""
@@ -407,12 +435,19 @@ def scene_colliders(path):
         name = re.search(r"propertyPath: m_Name\n\s+value: ([^\n]*)", d["body"])
         name = name.group(1).strip() if name else os.path.basename(src)
 
+        gone = removed_by(d["body"])
+        off, inactive = disabled_by(d["body"])
+        if inactive:
+            continue
+
         here = instance_trs(docs, fid)
         parent = ref(d["body"], "m_TransformParent")
         if parent:
             here = mul(world_of_transform(parent), here)
 
-        for cmat, lo, hi, what in prefab_colliders(src):
+        for cmat, lo, hi, what, cfid in prefab_colliders(src):
+            if cfid in gone or cfid in off:
+                continue
             mat = mul(here, cmat)
             if lo is None:
                 out.append((name, None, None, what))
