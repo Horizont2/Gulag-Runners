@@ -150889,12 +150889,13 @@ MonoBehaviour:
   animator: {fileID: 3585453818357731689}
   rightHanded: 1
   handWeight: 1
-  rotationWeight: 0.85
+  rotationWeight: 1
   bodyFollow: 0.22
   verticalFollow: 0.3
   lookClamp: 0.6
   lookDistance: 2.5
   socket: {fileID: 3585453818357731688}
+  faceTheCamera: 1
   drawGizmo: 1
 --- !u!1001 &5789700700997916214
 PrefabInstance:
@@ -151227,12 +151228,13 @@ MonoBehaviour:
   animator: {fileID: 7772177323803372882}
   rightHanded: 1
   handWeight: 1
-  rotationWeight: 0.85
+  rotationWeight: 1
   bodyFollow: 0.22
   verticalFollow: 0.3
   lookClamp: 0.6
   lookDistance: 2.5
   socket: {fileID: 7772177323803372881}
+  faceTheCamera: 1
   drawGizmo: 1
 --- !u!1 &980100000 stripped
 GameObject:

@@ -14,6 +14,23 @@ namespace GulagRunners.Game
     {
         public ItemId item = ItemId.None;
         public GameObject root;
+
+        [Tooltip("Which way this model points, in its own space. Leave it at zero and it is " +
+                 "MEASURED off the model's own meshes, which is right for every weapon in " +
+                 "the pack this game ships — see ModelShape for how, and for the two rules " +
+                 "that were not.\n\n" +
+                 "Fill it in for a model the measurement cannot read: one authored along a " +
+                 "diagonal, or one as wide as it is long. (0, 1, 0) is a weapon held at the " +
+                 "bottom and pointing up its own +Y, which is how a weapon pack normally " +
+                 "authors one.")]
+        public Vector3 bladeAxis;
+
+        [Tooltip("And the normal of its flat — the direction you would look at the blade " +
+                 "from. Zero measures it, and a measurement of zero means the model is " +
+                 "round and its roll is nobody's business.\n\n" +
+                 "This is what stops a sword being drawn edge-on to the camera: the hand is " +
+                 "turned so this axis faces the player.")]
+        public Vector3 flatAxis;
     }
 
     /// <summary>Shared helper: show one model out of a set and hide the rest.</summary>
@@ -76,7 +93,48 @@ namespace GulagRunners.Game
             if (root == null) return;
 
             Fix blade = ArmMotor.BladeLength(in move, in arm, ItemTable.Get(item).Reach);
-            Fit(root, blade.Raw > 0 ? blade.Raw / (float)Fix.RawOne : fallback);
+            if (blade.Raw > 0) FitBlade(root, blade.Raw / (float)Fix.RawOne);
+            else Fit(root, fallback);
+        }
+
+        /// <summary>
+        /// Scales a weapon so the steel PAST THE GRIP is <paramref name="want"/> world metres.
+        ///
+        /// Which is a different number to the one this used to fit, and the difference was
+        /// visible in the one place it must not be: a weapon's whole model was scaled to the
+        /// blade length, butt included, so every weapon in the game was drawn SHORTER than
+        /// the segment the simulation swings -- by 14% for the sword, 26% for the axe and
+        /// 33% for the spear, whose model is held a third of the way up its own haft.
+        ///
+        /// A tip that is a third of a blade short of where it hits is not a cosmetic
+        /// complaint. It is the fight: the player reads the distance off the picture, steps
+        /// to what looks like just-out-of-range, and is hit. "Hard to fight with" was the
+        /// report, and it was right.
+        ///
+        /// So the thing being matched is the reach out of the fist, measured along the
+        /// model's own blade axis, and the butt is left to hang out the back of the hand
+        /// where it belongs.
+        /// </summary>
+        public static void FitBlade(GameObject root, float want)
+        {
+            if (root == null || want <= 0f) return;
+
+            if (!ModelShape.Measure(root, out ModelShape.Grip grip))
+            {
+                // No clear blade. The longest axis is the older, blunter answer and still
+                // better than leaving a pack weapon at the size it shipped at.
+                Fit(root, want);
+                return;
+            }
+
+            // In WORLD metres, through the root's own scale AND the hand and the fighter
+            // above it -- same reason as Fit, and the same two faults if it is skipped.
+            Vector3 scale = Abs(root.transform.lossyScale);
+            float along = Mathf.Abs(Vector3.Dot(Vector3.Scale(grip.Blade, scale), grip.Blade));
+            float drawn = grip.Reach * along;
+            if (drawn <= 0.0001f) return;
+
+            root.transform.localScale *= want / drawn;
         }
 
         /// <summary>Scales a model's longest axis to <paramref name="want"/> world metres.</summary>
@@ -85,9 +143,7 @@ namespace GulagRunners.Game
             if (root == null) return;
             if (want <= 0f) return;
 
-            if (!LocalBounds(root, out Bounds local)) return;
-
-            if (local.size.sqrMagnitude <= 0.0000001f) return;
+            if (!ModelShape.Box(root, out Bounds local)) return;
 
             // In WORLD metres, which means through the root's own scale AND everything
             // above it. Two separate faults lived in not doing this.
@@ -115,49 +171,6 @@ namespace GulagRunners.Game
 
         static Vector3 Abs(Vector3 v) =>
             new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
-
-        /// <summary>
-        /// The model's extent in its own root's space, from the meshes rather than from the
-        /// renderers, so it can be measured while the whole thing is switched off.
-        /// </summary>
-        static bool LocalBounds(GameObject root, out Bounds bounds)
-        {
-            bounds = default;
-            bool any = false;
-            Matrix4x4 toRoot = root.transform.worldToLocalMatrix;
-
-            foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
-            {
-                if (mf.sharedMesh == null) continue;
-                any |= Accumulate(ref bounds, any, mf.sharedMesh.bounds,
-                                  toRoot * mf.transform.localToWorldMatrix);
-            }
-
-            foreach (SkinnedMeshRenderer smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-            {
-                if (smr.sharedMesh == null) continue;
-                any |= Accumulate(ref bounds, any, smr.sharedMesh.bounds,
-                                  toRoot * smr.transform.localToWorldMatrix);
-            }
-
-            return any;
-        }
-
-        static bool Accumulate(ref Bounds bounds, bool any, Bounds mesh, Matrix4x4 m)
-        {
-            Vector3 c = mesh.center, e = mesh.extents;
-            for (int i = 0; i < 8; i++)
-            {
-                Vector3 corner = c + new Vector3(
-                    (i & 1) == 0 ? -e.x : e.x,
-                    (i & 2) == 0 ? -e.y : e.y,
-                    (i & 4) == 0 ? -e.z : e.z);
-                Vector3 p = m.MultiplyPoint3x4(corner);
-                if (!any && i == 0) bounds = new Bounds(p, Vector3.zero);
-                else bounds.Encapsulate(p);
-            }
-            return true;
-        }
 
         /// <summary>Sizes every model in a set, once. Call it from Awake.</summary>
         public static void FitAll(ItemModel[] models, in MoveConfig move, in ArmConfig arm,

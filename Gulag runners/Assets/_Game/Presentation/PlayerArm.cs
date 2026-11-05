@@ -53,10 +53,15 @@ namespace GulagRunners.Game
                  "and wrong for playing: the drawn blade would not be the real one.")]
         [Range(0f, 1f)] public float handWeight = 1f;
 
-        [Tooltip("How strongly the hand is TWISTED to line up with the weapon. The " +
-                 "position is what decides a hit; this only stops the blade pointing " +
-                 "out of the back of the fist.")]
-        [Range(0f, 1f)] public float rotationWeight = 0.85f;
+        [Tooltip("How strongly the hand is TWISTED onto the weapon's goal.\n\n" +
+                 "1, and not the 0.85 it used to be. Unity blends from the clip's own " +
+                 "wrist to the goal by this, so anything short of 1 leaves that share of " +
+                 "the correction UNDONE — and the correction is no longer a nudge. It now " +
+                 "carries the weapon's roll as well as its line, and the clip's roll is " +
+                 "arbitrary, so a tenth of it left standing is a visibly crooked weapon.\n\n" +
+                 "Turn it down to see what the clips alone were doing; leave it at 1 to " +
+                 "play, because the goal is the hitbox and the hitbox is not negotiable.")]
+        [Range(0f, 1f)] public float rotationWeight = 1f;
 
         [Tooltip("How much of the arm's aim the fighter FOLLOWS at all. 0 switches the " +
                  "whole thing off and the body ignores the weapon entirely.\n\n" +
@@ -100,6 +105,16 @@ namespace GulagRunners.Game
                  "to put it on the arm's line without anyone typing an axis per weapon " +
                  "pack. Empty, or bare-handed, and the hand's rotation is left to the clip.")]
         public WeaponSocket socket;
+
+        [Tooltip("Also roll the weapon so its FLAT faces the player.\n\n" +
+                 "This is a side-on game: a sword turned edge-on to the camera is a line, " +
+                 "and an axe head pointed into the screen is a stick. Putting the blade on " +
+                 "the arm's line leaves that roll free, and free meant whatever the clip's " +
+                 "wrist happened to be doing — the same weapon flat-on in one pose and " +
+                 "edge-on in the next.\n\n" +
+                 "Only weapons with a flat to face are touched; a mace has none and keeps " +
+                 "the clip's own roll. Turn it off to see what the clips alone do.")]
+        public bool faceTheCamera = true;
 
         [Header("Debug")]
         [Tooltip("Draw the simulated arm and the weapon segment in the scene view. This " +
@@ -215,19 +230,38 @@ namespace GulagRunners.Game
         }
 
         /// <summary>
-        /// Turns the hand so the WEAPON lies along the arm the simulation is swinging.
+        /// Turns the hand so the WEAPON lies along the arm the simulation is swinging,
+        /// and so the player is looking at the flat of it rather than at its edge.
         ///
-        /// By the smallest rotation that does it, applied on top of whatever the clip
-        /// and the grip already produced -- so the fist keeps holding the thing the way
-        /// it was authored to, and only swings onto the right line.
+        /// Applied on top of whatever the clip and the grip already produced, so the fist
+        /// keeps holding the thing the way it was authored to and only swings onto the
+        /// right line.
         ///
         /// It used to be a world LookRotation down the arm, which forced the hand's own
-        /// +Z onto the blade line. A hand bone's forward is not the direction anything
-        /// is held in, so the weapon sat crooked in the fist, and it went wrong in a
+        /// +Z onto the blade line. A hand bone's forward is not the direction anything is
+        /// held in, so the weapon sat crooked in the fist, and it went wrong in a
         /// different way for every clip because the correction ignored the pose entirely.
         ///
-        /// The blade direction is MEASURED by WeaponSocket off the model's own mesh, so
-        /// nothing here has to know which axis a given weapon pack points down.
+        /// Then it was the SMALLEST rotation that puts the blade on the line, which is
+        /// right about the blade and says nothing about the roll -- and the roll is a
+        /// whole axis of "hangs crooked". The smallest rotation leaves it wherever the
+        /// clip had the wrist, so the same sword was flat-on in one pose and edge-on in
+        /// the next, and an axe head pointed into the screen as often as across it.
+        ///
+        /// So the rotation is built from both axes at once when the weapon has a flat:
+        ///
+        ///   the BLADE goes on the arm's line, which is the hitbox and is not negotiable;
+        ///   the FLAT faces the camera, which is the only direction in a side-on game
+        ///       that shows the player what they are holding.
+        ///
+        /// Which of the two faces is immaterial -- a blade looks the same from either
+        /// side -- so the choice is made by the fighter's FACING, and only by that. It
+        /// has to be something that cannot change mid-swing: pick by anything the arm is
+        /// doing and the weapon flips over in the middle of a blow.
+        ///
+        /// Round weapons have no flat, and ModelShape says so rather than inventing one.
+        /// There the smallest rotation is exactly right: nothing about a mace's roll is
+        /// worth taking off the clip.
         /// </summary>
         void Twist(AvatarIKGoal goal, Vector3 grip, Vector3 tip)
         {
@@ -242,11 +276,48 @@ namespace GulagRunners.Game
             if (socket == null) socket = GetComponentInChildren<WeaponSocket>(true);
 
             // Bare hands have no blade to line up: the fist is the weapon and the clip's
-            // own wrist is better than anything computed here.
-            if (socket == null || !socket.TryBladeDirection(out Vector3 blade)) return;
-            if (blade.sqrMagnitude <= 1e-8f) return;
+            // own wrist is better than anything computed here. SAID OUT LOUD, with a
+            // weight of zero, rather than returning: an IK weight stands until it is
+            // written again, so a silent return left the hand twisted for the weapon it
+            // was holding a moment ago -- which is how putting down a sword and picking
+            // up an axe left the axe sitting at the sword's angle.
+            if (socket == null || !socket.TryGrip(out Vector3 blade, out Vector3 flat) ||
+                blade.sqrMagnitude <= 1e-8f)
+            {
+                animator.SetIKRotationWeight(goal, 0f);
+                return;
+            }
 
-            Quaternion swing = Quaternion.FromToRotation(blade.normalized, want);
+            blade.Normalize();
+            Quaternion swing;
+
+            if (faceTheCamera && flat.sqrMagnitude > 1e-8f)
+            {
+                // Square the two up before they are used as a basis. They are the model's
+                // own axes and so already square, until somebody scales a weapon unevenly
+                // and hands us a skewed pair.
+                flat = flat - blade * Vector3.Dot(flat, blade);
+                if (flat.sqrMagnitude > 1e-8f)
+                {
+                    flat.Normalize();
+                    float side = player.State.Facing < 0 ? -1f : 1f;
+                    Vector3 toCamera = Vector3.forward * side;
+
+                    // The rotation that takes (flat, blade) onto (toCamera, want): go back
+                    // through the model's own basis and out through the one we want.
+                    swing = Quaternion.LookRotation(toCamera, want)
+                            * Quaternion.Inverse(Quaternion.LookRotation(flat, blade));
+                }
+                else
+                {
+                    swing = Quaternion.FromToRotation(blade, want);
+                }
+            }
+            else
+            {
+                swing = Quaternion.FromToRotation(blade, want);
+            }
+
             animator.SetIKRotationWeight(goal, rotationWeight);
             animator.SetIKRotation(goal, swing * hand.rotation);
         }
@@ -310,11 +381,20 @@ namespace GulagRunners.Game
             // will not go below horizontal on some weapons and not others. Green along the
             // white line is right; green across it is the bug, and now it is visible
             // rather than something to be felt through the controls.
-            if (socket != null && socket.TryBladeDirection(out Vector3 blade) &&
+            if (socket != null && socket.TryGrip(out Vector3 blade, out Vector3 flat) &&
                 blade.sqrMagnitude > 1e-8f)
             {
                 Gizmos.color = new Color(0.3f, 1f, 0.4f, 0.9f);
                 Gizmos.DrawLine(_grip, _grip + blade.normalized * (_tip - _grip).magnitude);
+
+                // And which way it is flat, which is the other half of sitting straight in
+                // the fist. This one should point at the camera; across the screen means
+                // the player is being shown the edge of a blade.
+                if (flat.sqrMagnitude > 1e-8f)
+                {
+                    Gizmos.color = new Color(0.4f, 0.7f, 1f, 0.9f);
+                    Gizmos.DrawLine(_grip, _grip + flat.normalized * 0.15f);
+                }
             }
         }
     }

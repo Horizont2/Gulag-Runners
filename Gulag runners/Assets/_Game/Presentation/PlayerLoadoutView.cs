@@ -124,6 +124,31 @@ namespace GulagRunners.Game
             ItemModels.FitAll(armour, fallbackLength);
         }
 
+        /// <summary>
+        /// Hands the socket the model being carried, and the grip its list entry asks for.
+        ///
+        /// The entry is the only place that knows: the socket can see the model but not
+        /// which <see cref="ItemModel"/> it came from, and the axes live next to the model
+        /// in the inspector because that is where somebody looking at a crooked weapon
+        /// would go to fix it.
+        /// </summary>
+        void Equip(GameObject root)
+        {
+            if (socket == null) return;
+
+            Vector3 blade = Vector3.zero, flat = Vector3.zero;
+            if (weapons != null && root != null)
+                foreach (ItemModel m in weapons)
+                {
+                    if (m == null || m.root != root) continue;
+                    blade = m.bladeAxis;
+                    flat = m.flatAxis;
+                    break;
+                }
+
+            socket.Hold(root, blade, flat);
+        }
+
         void LateUpdate()
         {
             if (player == null) return;
@@ -137,6 +162,11 @@ namespace GulagRunners.Game
                 _weaponRenderer = _weaponRoot != null
                     ? _weaponRoot.GetComponentInChildren<Renderer>() : null;
                 _block = null;
+
+                // Which grip this model was authored with, if anyone typed one. The socket
+                // measures the model when nobody has, which is the case for every weapon
+                // in the project; this is the way out for one the measurement cannot read.
+                Equip(_weaponRoot);
             }
 
             if (inv.Armour != _armour)

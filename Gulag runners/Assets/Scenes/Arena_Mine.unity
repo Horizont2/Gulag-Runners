@@ -70813,13 +70813,14 @@ MonoBehaviour:
   animator: {fileID: 960000372}
   rightHanded: 1
   handWeight: 1
-  rotationWeight: 0.85
+  rotationWeight: 1
   bodyFollow: 0.22
   torsoFollow: 0.05
   verticalFollow: 0.3
   lookClamp: 0.6
   lookDistance: 2.5
   socket: {fileID: 960000373}
+  faceTheCamera: 1
   drawGizmo: 1
 --- !u!1 &960000371 stripped
 GameObject:
@@ -125471,13 +125472,14 @@ MonoBehaviour:
   animator: {fileID: 960000443}
   rightHanded: 1
   handWeight: 1
-  rotationWeight: 0.85
+  rotationWeight: 1
   bodyFollow: 0.22
   torsoFollow: 0.05
   verticalFollow: 0.3
   lookClamp: 0.6
   lookDistance: 2.5
   socket: {fileID: 960000444}
+  faceTheCamera: 1
   drawGizmo: 1
 --- !u!1 &960000442 stripped
 GameObject:
