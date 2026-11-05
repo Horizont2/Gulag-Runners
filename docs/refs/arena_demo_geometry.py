@@ -167,7 +167,135 @@ class Scene:
                                      active=_field(body, 'm_IsActive', int, 1),
                                      comps=comps)
         self.tr_of_go = {v['go']: k for k, v in self.transforms.items() if v['go']}
+        self._fixed = {}                     # synthetic transforms, already in world
         self.instanced = self._adopt_instances()
+        self.inside_prefabs = self._adopt_prefab_markers()
+        self._art = None
+
+    def prefab_art(self):
+        """Where every prefab instance in the scene STANDS, with its name.
+
+        The scene lists an instance and nothing else -- no renderers, no bounds -- so a
+        check that walks the scene's renderers sees an arena made of whatever was built
+        by hand and none of what it was dressed with. In Arena_Mine that is almost all
+        of it, and the first thing it cost was a false alarm: a rule asking what is
+        drawn below the lowest floor reported a void under a mine somebody had just
+        spent an afternoon filling with rock.
+
+        Positions and not boxes, deliberately. Reading every mesh is slow and, for the
+        one case that matters most, wrong: a weapon hangs off a hand bone at whatever
+        size the model came in at, because ItemModels.Fit sizes it when the game runs,
+        so the file says a spear is 158 m tall. Where a thing stands is in the scene,
+        is exact, and is enough to answer whether anything is down there at all.
+
+        Kept out of self.gos on purpose: art is not collision, and anything the bake
+        walks becomes collision.
+        """
+        if self._art is not None:
+            return self._art
+
+        self._art = []
+        self.art_unplaceable = 0
+        for fid, (cls, body) in sorted(self.docs.items()):
+            if cls != 1001:
+                continue
+            placed = _instance_basis(self, fid)
+            if placed is None:
+                self.art_unplaceable += 1
+                continue
+            name = re.search(r'propertyPath: m_Name\n\s+value: ([^\n]*)', body)
+            self._art.append((placed[0], name.group(1).strip() if name else 'a prefab'))
+        return self._art
+
+    def _adopt_prefab_markers(self):
+        """Markers that live INSIDE a prefab, which the scene file does not mention at all.
+
+        Everything above reads the scene. A component added to an INSTANCE is in the scene
+        as an ordinary MonoBehaviour, and _adopt_instances finds it. A component that is
+        part of the PREFAB is not in the scene in any form -- no document, no stripped
+        shell, nothing -- and this harness was simply blind to it.
+
+        Unity is not: SimWorldBaker walks GetComponentsInChildren, which does not care
+        where a component came from. So the two disagreed, and the way that fails is the
+        worst available -- the arena works in the editor while the checks report an arena
+        with no ladders in it, which is indistinguishable from the checks being right.
+
+        It matters now because the right place for a ladder's climbable box is INSIDE the
+        ladder. A box kept in step with art by hand goes out of step with it the first
+        time somebody nudges the art, which is exactly what happened to the mine's two.
+
+        What this cannot do is resolve a prefab nested inside another prefab, so it counts
+        those rather than quietly measuring a smaller arena.
+        """
+        self.nested_skipped = 0
+        found = {}
+        for fid, (cls, body) in sorted(self.docs.items()):
+            if cls != 1001:
+                continue
+            src = re.search(r'm_SourcePrefab: \{fileID: \d+, guid: ([0-9a-f]{32})', body)
+            if not src:
+                continue
+            path = _asset_of(src.group(1))
+            if path is None or not path.endswith('.prefab'):
+                continue
+            try:
+                inner = _docs(open(path, encoding='utf-8', errors='ignore').read())
+            except OSError:
+                continue
+            if not any(c == 114 and SIM_COLLIDER_GUID in b for c, b in inner.values()):
+                continue
+
+            placed = _instance_basis(self, fid)
+            if placed is None:
+                continue
+            origin, basis = placed
+            gone = {int(v) for v in re.findall(
+                r'm_RemovedComponents:\n((?:  - \{fileID: -?\d+, guid: [0-9a-f]{32}, '
+                r'type: \d\}\n)+)', body) for v in re.findall(r'fileID: (-?\d+)', v)}
+            nested = any(c == 1001 for c, _b in inner.values())
+
+            for cfid, (ccls, cbody) in sorted(inner.items()):
+                if ccls != 114 or SIM_COLLIDER_GUID not in cbody or cfid in gone:
+                    continue
+                owner = _ref(cbody, 'm_GameObject')
+                chain = _prefab_chain(inner, owner)
+                if chain is None:
+                    self.nested_skipped += 1 if nested else 0
+                    continue
+                lo, lb = chain
+
+                tfid = -(abs(hash((fid, cfid))) % (1 << 50)) - (1 << 52)
+                while tfid in self.transforms or tfid in self._fixed:
+                    tfid -= 1
+                gfid, cid = tfid - 1, tfid - 2
+                while gfid in self.gos:
+                    gfid -= 3
+                while cid in self.docs:
+                    cid -= 3
+
+                self._fixed[tfid] = ([origin[i] + _apply(basis, lo)[i] for i in range(3)],
+                                     _mul(basis, lb))
+                self.transforms[tfid] = dict(go=gfid, pos={'x': 0, 'y': 0, 'z': 0},
+                                             rot={'x': 0, 'y': 0, 'z': 0, 'w': 1},
+                                             scale={'x': 1, 'y': 1, 'z': 1}, parent=0)
+                self.tr_of_go[gfid] = tfid
+                self.docs[cid] = (114, cbody)
+
+                comps = [cid]
+                boxer = _prefab_box_doc(inner, owner)
+                if boxer is not None:
+                    bid = cid - 1
+                    while bid in self.docs:
+                        bid -= 1
+                    self.docs[bid] = boxer
+                    comps.append(bid)
+
+                self.gos[gfid] = dict(
+                    name=_field(inner.get(owner, (0, ''))[1], 'm_Name', str, 'inside a prefab'),
+                    active=1, comps=comps, source=str(owner), guid=src.group(1))
+                found[gfid] = fid
+        return found
+
 
     def _adopt_instances(self):
         """Markers that were added to a PREFAB INSTANCE, which the loop above cannot see.
@@ -259,6 +387,13 @@ class Scene:
     # --- transforms
 
     def basis(self, tfid):
+        # A marker that lives INSIDE a prefab has no transform chain in the scene, so its
+        # world placement is worked out once and kept here rather than composed on the
+        # way up. Decomposing a chain back into one position, rotation and scale is only
+        # exact when nothing in it shears, and there is no reason to find out the hard way.
+        if tfid in self._fixed:
+            return self._fixed[tfid]
+
         chain = []
         cur = tfid
         while cur in self.transforms:
@@ -1102,3 +1237,174 @@ def arena_scenes():
         if f.endswith('.unity') and f.startswith('Arena') and f not in found:
             found.append(f)
     return found
+
+
+# ------------------------------------------------- reading inside a prefab
+
+_ASSETS = {}
+
+
+def _asset_of(guid):
+    """The file a guid names. Built once, for the whole Assets tree."""
+    import os as _os
+    if not _ASSETS:
+        root = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                             '..', '..', 'Gulag runners', 'Assets')
+        for base, dirs, files in _os.walk(root):
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for f in files:
+                if not f.endswith('.meta'):
+                    continue
+                try:
+                    head = open(_os.path.join(base, f), encoding='utf-8',
+                                errors='ignore').read(400)
+                except OSError:
+                    continue
+                m = re.search(r'guid: ([0-9a-f]{32})', head)
+                if m:
+                    _ASSETS[m.group(1)] = _os.path.join(base, f[:-5])
+    return _ASSETS.get(guid)
+
+
+def _instance_basis(scene, fid):
+    """Where a prefab instance stands in the world, out of its own modifications."""
+    body = scene.docs[fid][1]
+    mods = dict(re.findall(r'propertyPath: (\S+)\n\s+value: ([^\n]*)', body))
+
+    def mod(name, default):
+        try:
+            return float(mods[name].strip())
+        except (KeyError, ValueError):
+            return default
+
+    pos = [mod('m_LocalPosition.' + a, 0.0) for a in 'xyz']
+    rot = (mod('m_LocalRotation.x', 0.0), mod('m_LocalRotation.y', 0.0),
+           mod('m_LocalRotation.z', 0.0), mod('m_LocalRotation.w', 1.0))
+    scl = [mod('m_LocalScale.' + a, 1.0) for a in 'xyz']
+
+    basis = _qmat(rot)
+    basis = [[basis[i][0] * scl[0], basis[i][1] * scl[1], basis[i][2] * scl[2]]
+             for i in range(3)]
+
+    parent = int((re.search(r'm_TransformParent: \{fileID: (-?\d+)\}', body)
+                  or _ZERO).group(1))
+    if not parent:
+        return pos, basis
+    if parent not in scene.transforms:
+        # Hung off a bone inside ANOTHER prefab -- a weapon in a fighter's hand. Its
+        # placement is in a third file and this is not the function to guess it in.
+        # Saying so beats answering with the instance's own local position, which is
+        # what this used to do: it put a spear 158 m tall at the bottom of the mine and
+        # a check duly reported the mine as full of spear.
+        return None
+    porigin, pbasis = scene.basis(parent)
+    return ([porigin[i] + _apply(pbasis, pos)[i] for i in range(3)],
+            _mul(pbasis, basis))
+
+
+def _prefab_chain(inner, owner):
+    """(position, basis) of an object inside a prefab, relative to that prefab's root.
+
+    None when the chain does not reach a root -- a nested prefab, whose own transform
+    lives in a third file and is not this function's to guess at.
+    """
+    trs = {fid: body for fid, (cls, body) in inner.items() if cls == 4}
+    by_go = {_ref(b, 'm_GameObject'): fid for fid, b in trs.items()}
+    cur = by_go.get(owner)
+    if cur is None:
+        return None
+    chain = []
+    for _ in range(64):
+        chain.append(trs[cur])
+        nxt = _ref(trs[cur], 'm_Father')
+        if not nxt:
+            break
+        if nxt not in trs:
+            return None
+        cur = nxt
+    else:
+        return None
+
+    origin, basis = [0.0, 0.0, 0.0], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    for body in reversed(chain):
+        p = _vec(body, 'm_LocalPosition', {'x': 0, 'y': 0, 'z': 0})
+        s = _vec(body, 'm_LocalScale', {'x': 1, 'y': 1, 'z': 1})
+        r = _vec(body, 'm_LocalRotation', {'x': 0, 'y': 0, 'z': 0, 'w': 1})
+        lp = _apply(basis, [p['x'], p['y'], p['z']])
+        origin = [origin[i] + lp[i] for i in range(3)]
+        basis = _mul(basis, _qmat((r['x'], r['y'], r['z'], r.get('w', 1))))
+        basis = [[basis[i][0] * s['x'], basis[i][1] * s['y'], basis[i][2] * s['z']]
+                 for i in range(3)]
+    return origin, basis
+
+
+def _prefab_box_doc(inner, owner):
+    """The BoxCollider document on an object inside a prefab, if it has one."""
+    for _fid, (cls, body) in inner.items():
+        if cls == 65 and _ref(body, 'm_GameObject') == owner:
+            return (65, body)
+    return None
+
+
+
+def _prefab_bounds(guid):
+    """The union of every mesh inside a prefab, in the prefab's own space. Cached."""
+    if guid in _PREFAB_BOUNDS:
+        return _PREFAB_BOUNDS[guid]
+    _PREFAB_BOUNDS[guid] = None
+
+    path = _asset_of(guid)
+    if path is None or not path.endswith('.prefab'):
+        return None
+    try:
+        inner = _docs(open(path, encoding='utf-8', errors='ignore').read())
+    except OSError:
+        return None
+    try:
+        from collider_check import mesh_bounds
+    except Exception:
+        return None
+
+    names = {}
+    for fid, (cls, body) in inner.items():
+        if cls == 1:
+            names[fid] = _field(body, 'm_Name', str, '')
+
+    lo = [None, None, None]
+    hi = [None, None, None]
+    for fid, (cls, body) in inner.items():
+        if cls != 33:                                   # MeshFilter
+            continue
+        owner = _ref(body, 'm_GameObject')
+        chain = _prefab_chain(inner, owner)
+        if chain is None:
+            continue
+        m = re.search(r'm_Mesh: \{fileID: (-?\d+), guid: ([0-9a-f]{32})', body)
+        if not m:
+            continue
+        box = PRIMITIVE_BOX.get(m.group(1))
+        if box is not None:
+            centre, half = box
+            mlo = [centre[k] - half[k] for k in range(3)]
+            mhi = [centre[k] + half[k] for k in range(3)]
+        else:
+            got = mesh_bounds(m.group(2), names.get(owner))
+            if got is None:
+                continue
+            mlo, mhi = got
+
+        origin, basis = chain
+        centre = [(mlo[k] + mhi[k]) / 2 for k in range(3)]
+        half = [(mhi[k] - mlo[k]) / 2 for k in range(3)]
+        wc = [origin[i] + _apply(basis, centre)[i] for i in range(3)]
+        ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
+        for k in range(3):
+            a, b = wc[k] - ext[k], wc[k] + ext[k]
+            lo[k] = a if lo[k] is None else min(lo[k], a)
+            hi[k] = b if hi[k] is None else max(hi[k], b)
+
+    if lo[0] is None:
+        return None
+    _PREFAB_BOUNDS[guid] = (lo, hi)
+    return _PREFAB_BOUNDS[guid]
+

@@ -333,6 +333,16 @@ def void_below(name, text, scene, problems, notes):
         if drawn is None or low < drawn:
             drawn = low
 
+    # The art dressed in as PREFAB INSTANCES, which the loop above cannot see: the
+    # scene lists an instance and no renderer, so walking renderers finds the arena
+    # somebody built by hand and none of what they filled it with. The mine's whole
+    # underground is instances, and asking only the renderers called it a void.
+    for pos, who in scene.prefab_art():
+        if who.startswith("GroundItem"):
+            continue                           # the loot pool, parked off-screen when empty
+        if drawn is None or pos[1] < drawn:
+            drawn = pos[1]
+
     # A cloud layer counts. It is drawn by PureVolumetricFog off a terrain's height
     # rather than by a renderer, so nothing above finds it, and it is the whole of the
     # Nordic fortress's answer to this question.

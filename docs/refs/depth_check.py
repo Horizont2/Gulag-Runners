@@ -85,7 +85,7 @@ def world(path, hatches):
     out["solidgate"] = baked["solidgate"]
     out["gate"] = baked["gate"]
     out["gatesshut"] = 0
-    return out, baked
+    return out, baked, scene
 
 
 def _takes_scene():
@@ -105,6 +105,18 @@ RAILS_AT_MOST = 0.30
 # How much the lane may still move after the feet have landed. The move itself belongs
 # in the air, where the eye reads it as leaning into the drop.
 SLIDE_AFTER = 0.15
+
+# How far a climbable box may sit from the nearest thing that draws. Touching is the
+# intent; a hand's breadth is the slack for a box drawn a little proud of its art.
+ART_GAP = 0.12
+
+# How near a ladder's head has to be to a storey's front edge to count as leaning on it.
+# Past this the two are not touching and the floor is free to come forward.
+LADDER_PINS = 0.25
+
+# What counts as a thing you climb, for the purpose of asking whether a climbable box
+# is standing on one: taller than this, and no wider than that.
+LADDER_TALL, LADDER_NARROW = 1.5, 1.2
 
 
 def storeys(baked):
@@ -327,7 +339,75 @@ def off_a_perch(w, baked, problems, notes):
         notes.append(f"  {tried} perch(es) stepped off")
 
 
-def stagger(floors, problems, notes):
+def on_the_art(scene, baked, problems, notes):
+    """Does the climbable box sit on a ladder anybody can see?
+
+    A marker and the thing it marks are two objects, and nothing holds them together.
+    Arena_Mine's two ladders were nudged 0.67 and 0.95 m towards the camera to follow
+    the storeys; the boxes standing beside them in the scene stayed where they were, and
+    the fighter went on climbing the air where the ladder used to be -- behind it now,
+    which is exactly what it looked like.
+
+    Those two live inside the ladder prefab since, so they cannot drift again. This is
+    for every other one: a climbable box has to overlap something that DRAWS, or it is a
+    ladder made of nothing.
+    """
+    # Ladder-SHAPED art, and not merely art. The first version of this asked only that
+    # the box overlap something that draws, and the two boxes that had been left behind
+    # still passed: they had drifted 0.67 m along a floor slab thirty metres wide and
+    # were still inside it. A thing you climb is tall and narrow, and that is the only
+    # thing worth comparing a climbable box against.
+    drawn = []
+    for go, d in scene.gos.items():
+        tr = scene.tr_of_go.get(go)
+        if tr is None:
+            continue
+        if scene.ancestor_has(go, geometry.PLAYER_GUID):
+            continue
+        # A renderer in the scene, or a prefab instance whose mesh is in its own file --
+        # the mine's ladders are the second kind, so asking only the first finds nothing.
+        if not scene.renders(go) and not scene.gos[go].get("guid"):
+            continue
+        origin, basis = scene.basis(tr)
+        centre, half = scene.local_box(go)
+        wc = [origin[i] + geometry._apply(basis, centre)[i] for i in range(3)]
+        ext = [sum(abs(basis[i][k]) * half[k] for k in range(3)) for i in range(3)]
+        lo = [wc[i] - ext[i] for i in range(3)]
+        hi = [wc[i] + ext[i] for i in range(3)]
+        tall = hi[1] - lo[1]
+        across = max(hi[0] - lo[0], hi[2] - lo[2])
+        if tall < LADDER_TALL or across > LADDER_NARROW:
+            continue
+        drawn.append((lo, hi, d["name"]))
+
+    for i, box in enumerate(baked["ladder"]):
+        x0, y0, x1, y1 = [F(v) for v in box]
+        z0, z1 = [F(v) for v in baked["ladderz"][i]]
+        lo, hi = [x0, y0, z0], [x1, y1, z1]
+        # How far the climbable box sticks OUT of the art's own bounds, not whether the
+        # two touch. A leaning ladder's bounds are a metre deep, so a box that has
+        # drifted two thirds of a metre still overlaps them -- it is simply no longer
+        # inside them, which is the thing that puts the fighter behind the rungs.
+        best, who = None, "nothing ladder-shaped"
+        for dlo, dhi, name in drawn:
+            out = max(max(dlo[k] - lo[k], hi[k] - dhi[k], 0.0) for k in range(3))
+            if best is None or out < best:
+                best, who = out, name
+        notes.append(f"  the ladder at x {x0:+.2f} is inside {who}"
+                     + (f", {best * 100:.0f} cm proud of it" if best is not None else ""))
+        if best is None or best > ART_GAP:
+            problems.append(
+                f"the climbable box at x {x0:+.2f}, y {y0:+.2f}..{y1:+.2f} is "
+                + (f"{best * 100:.0f} cm outside the nearest ladder-shaped thing "
+                   f"({who})." if best is not None
+                   else "nowhere near anything ladder-shaped.")
+                + f" A fighter will climb it and there will be no ladder under his "
+                f"hands -- which is what a marker left behind when its art moves looks "
+                f"like. Put the box inside the ladder's own prefab, where it cannot be "
+                f"left behind.")
+
+
+def stagger(floors, baked, problems, notes):
     """How far each storey stands from the fight, and from the one below it.
 
     The staircase principle says the storeys step back as they rise. It does not say how
@@ -358,6 +438,25 @@ def stagger(floors, problems, notes):
         notes.append(f"  y {below['top']:+.2f} -> y {above['top']:+.2f}: steps "
                      f"{step:+.2f} m back; it could come to z {best:+.2f} "
                      f"({above['zmin'] - best:+.2f} m of room in its front edge)")
+        # A ladder leaning on the storey's front lip PINS it. Move the floor forward
+        # and the ladder it serves is left behind it, poking up through the deck --
+        # which is why the Nordic fortress's top storey stands where it does, and it
+        # is a reason, not an oversight.
+        pinned = None
+        for i, box in enumerate(baked["ladder"]):
+            head_y = F(box[3])
+            if abs(head_y - above["top"]) > 0.4:
+                continue
+            lean = baked["ladderleanz"][i]
+            head_z = F(lean[1]) if F(lean[1]) > F(lean[0]) else F(lean[0])
+            if abs(head_z - above["zmin"]) <= LADDER_PINS:
+                pinned = head_z
+                break
+        if pinned is not None:
+            notes.append(f"    and it cannot: the ladder serving it leans on that lip at "
+                         f"z {pinned:+.2f}")
+            continue
+
         if step > STOREY_STEP and above["zmin"] > best + 0.05:
             problems.append(
                 f"the storey at y {above['top']:+.2f} stands {step:.2f} m behind the one "
@@ -394,7 +493,7 @@ def main(argv):
         return 1
 
     try:
-        w, baked = world(path, hatches)
+        w, baked, scene = world(path, hatches)
     except NotAnArena as why:
         print(f"  note: {scene_name} is dressed art, not an arena yet: {why}.")
         print("  note: run Tools > Gulag Runners > Setup > Make this scene playable, "
@@ -466,7 +565,8 @@ def main(argv):
                      "no gap in the upper floor, the only way down is the ladder.")
 
     climbs(w, baked, problems, notes)
-    stagger(floors, problems, notes)
+    on_the_art(scene, baked, problems, notes)
+    stagger(floors, baked, problems, notes)
     only_by_ladder(w, floors, problems, notes)
     off_a_perch(w, baked, problems, notes)
 
