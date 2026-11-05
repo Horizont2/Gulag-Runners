@@ -22,9 +22,18 @@ Two claims, and both of them were wrong on the pack this game ships:
       longest axis of the bounds", which refused to answer for the axe at all -- and a
       refusal left the hand twisted for whatever weapon it held last.
 
-So this measures the real art: the FBX a weapon prefab points at, through the prefab's own
-transforms, into the space the model hangs in the hand in. Then it runs the shipped rule
-(ModelShape.Measure, mirrored below) over it and asks what the player would see.
+So this measures the real art: the model file a weapon prefab points at -- FBX for the
+medieval pack, OBJ for the dungeon one -- through the prefab's own transforms, into the
+space the model hangs in the hand in. Then it runs the shipped rule (ModelShape.Measure,
+mirrored below) over it and asks what the player would see.
+
+Off the SCENES as well as the fighter prefabs, because the scenes are the version that
+runs: every arena overrides all eleven of its fighters' weapon roots, so the list in
+Player 1.prefab is a list the game never reads. Two things were hiding behind that. The
+sword and the axe are not the pack the prefab names -- all three arenas override them with
+the dungeon pack's models. And in the mine those two were authored at a THOUSAND times
+their size, which ItemModels divides out at load, so the game looked right while the scene
+held a 700-metre sword in a fighter's fist.
 
 Nothing here needs Unity, and that is the point: a weapon pack is a file, the rule is
 arithmetic, and the two of them can be put together from the outside.
@@ -48,7 +57,6 @@ ASSETS = os.path.join(ROOT, "Gulag runners", "Assets")
 PREFABS = os.path.join(ASSETS, "Prefabs")
 
 LOADOUT = "f45251f6651c01823ab78d6e297da412"       # PlayerLoadoutView
-SOCKET = "3f7c21d4a8b94e6f9c05d2173ae8b640"        # WeaponSocket
 
 # ------------------------------------------------------------------ the shipped rule
 # ModelShape's own two constants. Mirrored rather than imported because there is no C# here
@@ -128,10 +136,6 @@ def documents(text):
 
 # ------------------------------------------------------------------ transforms
 
-def quat(x, y, z, w):
-    return (x, y, z, w)
-
-
 def qmul(a, b):
     ax, ay, az, aw = a
     bx, by, bz, bw = b
@@ -158,6 +162,31 @@ def numbers(body, field, keys, default):
 
 
 # ------------------------------------------------------------------ the art
+
+def vertices(asset):
+    """Every vertex of a model file, in Unity's handedness.
+
+    Two formats, because the two packs this project draws weapons from ship in two: the
+    medieval pack as binary FBX and the dungeon pack as Wavefront OBJ. Unity flips Z on
+    import for both, which changes nothing measured here -- a reflection keeps angles and
+    lengths, and every length below is a share of another length -- but it is applied
+    anyway so that an axis named here is the axis somebody would type in the inspector.
+    """
+    if asset.lower().endswith(".obj"):
+        out = []
+        for line in read(asset).splitlines():
+            if not line.startswith("v "):
+                continue
+            bits = line.split()
+            if len(bits) >= 4:
+                out.append((float(bits[1]), float(bits[2]), -float(bits[3])))
+        return out
+
+    out = []
+    for verts, _tris in fbx_reader.geometry(asset):
+        out.extend((v[0], v[1], -v[2]) for v in verts)
+    return out
+
 
 def mesh_boxes(prefab_path):
     """Every mesh in a weapon prefab, as 8 corners in the prefab ROOT's own space.
@@ -199,9 +228,7 @@ def mesh_boxes(prefab_path):
             out.append((guid, None))
             continue
 
-        corners = []
-        for verts, _tris in fbx_reader.geometry(asset):
-            corners.extend((v[0], v[1], -v[2]) for v in verts)      # Unity flips Z
+        corners = vertices(asset)
         if not corners:
             out.append((guid, None))
             continue
@@ -293,8 +320,20 @@ def angle(a, b):
 # ------------------------------------------------------------------ the fighters
 
 def fighters():
-    """[(prefab name, [(item name, weapon prefab path, model root fileID)])]"""
+    """[(where, [(item name, weapon prefab path, authored scale)])], prefabs and scenes.
+
+    THE SCENES AS WELL, and that is not thoroughness -- it is the only version that runs.
+    Every arena overrides all eleven of its fighters' weapon roots, so the list in
+    Player 1.prefab is a list the game never reads. Checking the prefab alone measured a
+    hand nobody fights with, and it hid the thing that was actually in the mine: the same
+    eleven weapons, wired to the same prefabs, authored at a hundred and a thousand times
+    the size. ItemModels divides that out at load, so it is invisible in play and absurd
+    in the editor -- a 700-metre sword in a fighter's fist, which is a trap rather than a
+    bug, and the kind that gets "fixed" by somebody scaling something else to match.
+    """
     out = []
+
+    fighter_lists = {}
     for name in sorted(os.listdir(PREFABS)):
         if not name.endswith(".prefab"):
             continue
@@ -319,31 +358,92 @@ def fighters():
                                  listed.group(1)):
                 entries.append((int(m.group(1)), int(m.group(2))))
 
-        # Each root is a stripped GameObject belonging to a PrefabInstance; the instance
-        # says which prefab it is, and that prefab says which mesh.
-        sources = {}
-        for m in re.finditer(r"(?m)^--- !u!1001 &(-?\d+)\n(.*?)(?=^--- !u!|\Z)", text, re.S):
-            body = m.group(2)
+        wired = [(label(item), source_of(text, docs, root), 1.0)
+                 for item, root in entries]
+        out.append((name[:-7], wired))
+
+        # Kept by guid as well, because a scene's override list is positional: it replaces
+        # entry N's root and says nothing about which item entry N is.
+        meta = read(path + ".meta")
+        guid = re.search(r"guid: ([0-9a-f]{32})", meta)
+        if guid:
+            fighter_lists[guid.group(1)] = [item for item, _root in entries]
+
+    scenes = os.path.join(ASSETS, "Scenes")
+    for name in sorted(os.listdir(scenes)):
+        if not name.endswith(".unity"):
+            continue
+        text = read(os.path.join(scenes, name))
+        docs = documents(text)
+
+        for fid, (cls, body, _s) in sorted(docs.items()):
+            if cls != 1001:
+                continue
             src = re.search(r"m_SourcePrefab: \{fileID: 100100000, guid: ([0-9a-f]{32})",
                             body)
-            if src:
-                sources[int(m.group(1))] = src.group(1)
+            if src is None or src.group(1) not in fighter_lists:
+                continue
 
-        wired = []
-        for item, root in entries:
-            cls_body = docs.get(root)
-            owner = None
-            if cls_body:
-                m = re.search(r"m_PrefabInstance: \{fileID: (-?\d+)\}", cls_body[1])
-                if m:
-                    owner = int(m.group(1))
-            guid = sources.get(owner)
-            asset = GUIDS.get(guid) if guid else None
-            label = next((k for k, v in ITEMS.items() if v == item), str(item))
-            wired.append((label, asset, root))
+            order = fighter_lists[src.group(1)]
+            items = {int(i): int(v) for i, v in re.findall(
+                r"propertyPath: weapons\.Array\.data\[(\d+)\]\.item\n\s+value: (\d+)", body)}
+            roots = {int(i): int(v) for i, v in re.findall(
+                r"propertyPath: weapons\.Array\.data\[(\d+)\]\.root\n\s+value:\s*\n"
+                r"\s+objectReference: \{fileID: (-?\d+)\}", body)}
+            if not roots:
+                continue
 
-        out.append((name[:-7], wired))
+            wired = []
+            for i in sorted(roots):
+                item = items.get(i, order[i] if i < len(order) else -1)
+                wired.append((label(item), source_of(text, docs, roots[i]),
+                              scale_of(text, docs, roots[i])))
+            out.append((f"{name} {where_of(body) or 'fighter'}", wired))
+
     return out
+
+
+def label(item):
+    return next((k for k, v in ITEMS.items() if v == item), str(item))
+
+
+def where_of(body):
+    m = re.search(r"propertyPath: m_Name\n\s+value: (\S.*)", body)
+    return m.group(1).strip() if m else None
+
+
+def owner_of(docs, root):
+    """The PrefabInstance a stripped GameObject belongs to."""
+    cls_body = docs.get(root)
+    if not cls_body:
+        return None
+    m = re.search(r"m_PrefabInstance: \{fileID: (-?\d+)\}", cls_body[1])
+    return int(m.group(1)) if m else None
+
+
+def source_of(text, docs, root):
+    """Which weapon prefab the model under this root actually is."""
+    owner = owner_of(docs, root)
+    if owner is None:
+        return None
+    cls_body = docs.get(owner)
+    if not cls_body:
+        return None
+    src = re.search(r"m_SourcePrefab: \{fileID: 100100000, guid: ([0-9a-f]{32})",
+                    cls_body[1])
+    return GUIDS.get(src.group(1)) if src else None
+
+
+def scale_of(text, docs, root):
+    """What that model is authored at, before the fit touches it."""
+    owner = owner_of(docs, root)
+    if owner is None:
+        return 1.0
+    cls_body = docs.get(owner)
+    if not cls_body:
+        return 1.0
+    m = re.search(r"propertyPath: m_LocalScale\.x\n\s+value: ([-\d.eE+]+)", cls_body[1])
+    return float(m.group(1)) if m else 1.0
 
 
 def the_rule():
@@ -391,96 +491,150 @@ def main(argv):
             f"{broke}. Every number below assumes the blade in front of the hand is the "
             f"hitbox, and it no longer is.")
 
-    shape = {}
+    # Every model that is wired into anybody's hand, measured ONCE: the same eleven
+    # prefabs are wired in six hands, and eleven lines of numbers said six times is a
+    # report nobody reads to the end.
+    seen = {}
     for who, wired in found:
-        notes.append(f"{who}: {len(wired)} weapon(s) in the hand")
-        for item, asset, _root in wired:
+        for item, asset, _scale in wired:
             if asset is None:
                 problems.append(
                     f"{who}: the model wired for {item} is not a prefab instance this "
                     f"file can follow, so what the player holds cannot be measured.")
                 continue
+            seen.setdefault((item, asset), set()).add(who)
 
-            boxes = mesh_boxes(asset)
-            points = [p for _guid, corners in boxes if corners for p in corners]
-            if not points:
-                problems.append(
-                    f"{who}: {item} is wired to {os.path.basename(asset)}, which has no "
-                    f"mesh this can read. A weapon with no mesh is a weapon with no "
-                    f"length, and the fit leaves it at whatever size it shipped at.")
-                continue
+    notes.append(f"{len(seen)} model(s) in the fighters' hands, measured off their own "
+                 f"meshes and sized by the simulation's own blade length")
+    for (item, asset), _hands in sorted(seen.items()):
+        points = [p for _guid, corners in mesh_boxes(asset) if corners for p in corners]
+        if not points:
+            problems.append(
+                f"{item} is wired to {os.path.basename(asset)}, which has no mesh this "
+                f"can read. A weapon with no mesh is a weapon with no length, and the fit "
+                f"leaves it at whatever size it shipped at.")
+            continue
 
-            grip = measure(points)
-            blade = blade_metres(item)
-            shape.setdefault(item, (os.path.basename(asset), grip, blade, points))
+        grip = measure(points)
+        blade = blade_metres(item)
 
-            if grip is None:
-                problems.append(
-                    f"{who}: the automatic grip cannot read {item} "
-                    f"({os.path.basename(asset)}): it reaches no further along any axis "
-                    f"than it does across them, so which way it points is a coin toss. "
-                    f"Type a Blade Axis on its entry in the loadout's Weapons list.")
-                continue
+        if grip is None:
+            problems.append(
+                f"the automatic grip cannot read {item} ({os.path.basename(asset)}): it "
+                f"reaches no further along any axis than it does across them, so which way "
+                f"it points is a coin toss. Type a Blade Axis on its entry in the "
+                f"loadout's Weapons list.")
+            continue
 
-            # What the player ends up seeing, all of it as a share of the hitbox, which is
-            # the only length that matters: after the fit the blade in front of the hand IS
-            # the hitbox, so every other length is a ratio against grip["reach"].
-            far = max(math.sqrt(sum(c * c for c in p)) for p in points)
-            butt = grip["behind"] / grip["reach"]
-            tip = far / grip["reach"]
-            apart = angle(grip["blade"], principal(points))
-            was = grip["reach"] / max(grip["box"])          # the old fit, for the record
+        # What the player ends up seeing, all of it as a share of the hitbox, which is the
+        # only length that matters: after the fit the blade in front of the hand IS the
+        # hitbox, so every other length is a ratio against grip["reach"].
+        far = max(math.sqrt(sum(c * c for c in p)) for p in points)
+        butt = grip["behind"] / grip["reach"]
+        tip = far / grip["reach"]
+        apart = angle(grip["blade"], principal(points))
+        was = grip["reach"] / max(grip["box"])              # the old fit, for the record
 
-            fat = grip["across"] / max(grip["thick"], 1e-6)
-            face = f"flat {fat:.1f}x" if any(grip["flat"]) else f"round {fat:.1f}x"
+        fat = grip["across"] / max(grip["thick"], 1e-6)
+        face = f"flat {fat:.1f}x" if any(grip["flat"]) else f"round {fat:.1f}x"
 
-            if blade is not None:
-                notes.append(
-                    f"  {item:<12} blade {blade * 100:5.1f} cm out of the fist "
-                    f"(was {blade * was * 100:5.1f}, {was * 100:3.0f}% of it), butt "
-                    f"{butt * blade * 100:4.1f} cm behind it, steel out to "
-                    f"{tip * 100:3.0f}% of the tip, {apart:4.1f} deg off its own "
-                    f"principal axis, {face}")
+        if blade is not None:
+            pack = os.path.relpath(asset, ASSETS).split(os.sep)[0]
+            notes.append(
+                f"  {item + ' (' + pack.split()[0] + ')':<24} "
+                f"blade {blade * 100:5.1f} cm out of the fist "
+                f"(was {blade * was * 100:5.1f}, {was * 100:3.0f}% of it), butt "
+                f"{butt * blade * 100:4.1f} cm behind it, steel out to "
+                f"{tip * 100:3.0f}% of the tip, {apart:4.1f} deg off its own "
+                f"principal axis, {face}")
 
-            if apart > AXIS_APART:
-                problems.append(
-                    f"{who}: {item} is read as pointing {apart:.0f} degrees away from its "
-                    f"own principal axis. Two ways of measuring the same model disagree, "
-                    f"so the hand is being turned by a guess -- and a wrong one wrenches "
-                    f"the wrist and drags the whole arm after it. Type a Blade Axis on "
-                    f"its loadout entry.")
-            if butt > BUTT_AT_MOST:
-                problems.append(
-                    f"{who}: {item} is gripped with {butt * 100:.0f}% of its length behind "
-                    f"the hand. The fit sizes the blade in FRONT of the grip, so that is "
-                    f"{butt * (blade or 0) * 100:.0f} cm of haft out of the back of the "
-                    f"fist. The model is held somewhere near its middle.")
-            if tip < TIP_SHORT_OF:
-                problems.append(
-                    f"{who}: {item}'s steel stops at {tip * 100:.0f}% of the hitbox. The "
-                    f"player reads the distance off the picture and the picture is short, "
-                    f"which is the whole complaint: they step to just-out-of-range and get "
-                    f"hit.")
-            if tip > TIP_PAST:
-                problems.append(
-                    f"{who}: {item} is drawn {tip * 100:.0f}% as long as the segment that "
-                    f"hits, so there is steel on the screen that touches nobody.")
+        if apart > AXIS_APART:
+            problems.append(
+                f"{item} is read as pointing {apart:.0f} degrees away from its own "
+                f"principal axis. Two ways of measuring the same model disagree, so the "
+                f"hand is being turned by a guess -- and a wrong one wrenches the wrist "
+                f"and drags the whole arm after it. Type a Blade Axis on its loadout "
+                f"entry.")
+        if butt > BUTT_AT_MOST:
+            problems.append(
+                f"{item} is gripped with {butt * 100:.0f}% of its length behind the hand. "
+                f"The fit sizes the blade in FRONT of the grip, so that is "
+                f"{butt * (blade or 0) * 100:.0f} cm of haft out of the back of the fist. "
+                f"The model is held somewhere near its middle.")
+        if tip < TIP_SHORT_OF:
+            problems.append(
+                f"{item}'s steel stops at {tip * 100:.0f}% of the hitbox. The player reads "
+                f"the distance off the picture and the picture is short, which is the "
+                f"whole complaint: they step to just-out-of-range and get hit.")
+        if tip > TIP_PAST:
+            problems.append(
+                f"{item} is drawn {tip * 100:.0f}% as long as the segment that hits, so "
+                f"there is steel on the screen that touches nobody.")
 
-    # And the two fighters have to be the same fighter. Player 2 is a copy of Player 1, and
-    # a copy drifts: one sword wired to another pack's prefab is one player whose weapon
-    # sits differently, which is unanswerable from the inside.
+    # And every hand has to hold the same set, authored the same way. A scene's weapon list
+    # is a positional override of the prefab's, so a hand can quietly end up holding
+    # another pack's model, or the same model at a hundred times the size.
     wiring = {}
     for who, wired in found:
-        wiring[who] = {item: (os.path.basename(a) if a else None) for item, a, _r in wired}
-    names = sorted(wiring)
-    for i in range(len(names) - 1):
-        a, b = names[i], names[i + 1]
-        for item in sorted(set(wiring[a]) | set(wiring[b])):
-            if wiring[a].get(item) != wiring[b].get(item):
+        odd = [f"{i} x{s:g}" for i, _a, s in wired if abs(s - 1.0) > 0.001]
+        notes.append(f"{who}: {len(wired)} weapon(s) wired"
+                     + (f", AUTHORED OVERSIZE: {', '.join(odd)}" if odd else ", all at scale 1"))
+        for item, asset, scale in wired:
+            if abs(scale - 1.0) > 0.001:
+                problems.append(
+                    f"{who}: {item} is authored at {scale:g}x the size its own prefab says. "
+                    f"ItemModels measures what is drawn and divides that out, so the game "
+                    f"looks right and the scene does not: this is a "
+                    f"{scale:g}x weapon in a fighter's fist in the editor. Nothing can be "
+                    f"lined up by eye against it, and the next person to scale something "
+                    f"to match it will be matching a mistake.")
+        wiring[who] = {item: (os.path.relpath(a, ASSETS) if a else None)
+                       for item, a, _s in wired}
+
+    # Which hands have to agree with which. The two fighters in one arena, always: the same
+    # item has to be the same weapon on both sides of the fight. And arena to arena, because
+    # an item that is one model here and another there is a weapon that plays differently
+    # per map, which no player can learn.
+    #
+    # The FIGHTER PREFAB is the exception, and a note rather than a problem. A scene's weapon
+    # list is a positional override of the prefab's and every arena overrides all eleven, so
+    # the prefab's own list is a default nothing reads -- disagreeing with it is what an
+    # override is for. Worth saying out loud all the same: it is the list a new arena would
+    # start from.
+    arenas = [w for w in sorted(wiring) if ".unity" in w]
+    bare = [w for w in sorted(wiring) if ".unity" not in w]
+
+    for i, a in enumerate(arenas):
+        for b in arenas[i + 1:]:
+            same_arena = a.split(".unity")[0] == b.split(".unity")[0]
+            for item in sorted(set(wiring[a]) | set(wiring[b])):
+                if wiring[a].get(item) == wiring[b].get(item):
+                    continue
                 problems.append(
                     f"{a} holds {item} as {wiring[a].get(item)} and {b} holds it as "
-                    f"{wiring[b].get(item)}. The same item has to be the same model in "
-                    f"both hands, or the fight is not symmetrical.")
+                    f"{wiring[b].get(item)}. " + (
+                        "Two fighters in one arena, so one of them is fighting with "
+                        "another weapon than the other -- the fight is not symmetrical."
+                        if same_arena else
+                        "The same item has to be the same weapon in every arena, or it is "
+                        "a different weapon depending on the map."))
+
+    drift = {}
+    for arena in arenas:
+        prefab = next((p for p in bare if arena.endswith(p)), None)
+        if prefab is None:
+            continue
+        for item in sorted(wiring[prefab]):
+            theirs = wiring[arena].get(item)
+            if theirs is None or theirs == wiring[prefab][item]:
+                continue
+            drift.setdefault((item, wiring[prefab][item], theirs), set()).add(arena)
+
+    for (item, mine, theirs), where in sorted(drift.items()):
+        notes.append(f"{item}: the fighter prefabs carry {mine} and every arena overrides "
+                     f"it with {theirs} ({len(where)} hand(s)). An override is what a scene "
+                     f"list is for; the prefab's own entry is the default a new arena would "
+                     f"start from, and nothing uses it")
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)
