@@ -108,7 +108,24 @@ namespace GulagRunners.Net
         /// have. Against a bot there is nobody to wait for and this is true at once.
         /// </summary>
         public bool OpponentReady =>
-            _have && (_pairing.AgainstBot || !relayOpen || theyAreLoaded || GaveUpWaiting);
+            _have && (_pairing.AgainstBot || theyAreLoaded || GaveUpWaiting);
+
+        /// <summary>
+        /// Why there is no match, or empty while there still might be one.
+        ///
+        /// OpponentReady used to answer TRUE when the relay was not open — the term read
+        /// `|| !relayOpen`, meaning "nobody to wait for". That is true of a practice
+        /// opponent, which the line above already covers, and catastrophically false of a
+        /// relay that FAILED: a handshake that threw, a dashboard with Relay switched
+        /// off, two devices that both believed they were the host and so both allocated.
+        /// The gate opened instantly, the arena loaded, and the player was put alone in
+        /// it with the other fighter standing still — believing they were online, because
+        /// every screen up to that point had said so.
+        ///
+        /// A failure has to be a failure. The search screen reads this and says it, and
+        /// nothing goes through the gate on a pairing that did not happen.
+        /// </summary>
+        public string Broken { get; private set; } = "";
 
         /// <summary>
         /// We have been standing at the gate long enough that waiting is now the worse
@@ -122,8 +139,11 @@ namespace GulagRunners.Net
         /// arena instead of in the menu, and NetMatch no longer banks that wait. The
         /// cost of not going is the match.
         /// </summary>
+        /// And only ever with a relay OPEN. Going early is cheap when the other device is
+        /// at the far end of a link that works and one byte went missing; it is the whole
+        /// fault above when there is no link at all.
         public bool GaveUpWaiting =>
-            weAreLoaded && readyTimeout > 0f &&
+            weAreLoaded && relayOpen && readyTimeout > 0f &&
             Time.unscaledTime - _loadedAt > readyTimeout;
 
         void Awake()
@@ -201,7 +221,7 @@ namespace GulagRunners.Net
         {
             Drop();
 
-            if (search == null) { Say("no search screen"); return; }
+            if (search == null) { Fail("no search screen"); return; }
 
             _pairing = search.Opponent;
             _have = true;
@@ -214,7 +234,7 @@ namespace GulagRunners.Net
 
             if (UgsQueue.Current == null)
             {
-                Say("matched, but the session is gone");
+                Fail("MATCHED, BUT THE SESSION IS GONE");
                 return;
             }
 
@@ -235,10 +255,10 @@ namespace GulagRunners.Net
 
             if (stop.IsCancellationRequested) return;
 
-            if (!opened.Ok) { Say($"relay failed: {opened.Said}"); return; }
+            if (!opened.Ok) { Fail($"COULD NOT REACH THE OTHER PLAYER: {opened.Said}"); return; }
 
             _wire = new RelayTransport(opened.Relay, host);
-            if (!_wire.Open()) { Say($"relay: {_wire.Describe}"); _wire = null; return; }
+            if (!_wire.Open()) { Fail($"RELAY: {_wire.Describe}"); _wire = null; return; }
 
             // Listen before announcing: the other device may be loaded already, and a
             // "loaded" that arrives between opening the wire and subscribing to it is
@@ -284,6 +304,7 @@ namespace GulagRunners.Net
             if (_wire != null) { _wire.Received -= Heard; _wire.Close(); _wire = null; }
             if (_carried != null) { _carried.Close(); }
             Forget();
+            Broken = "";
             relayOpen = false;
             weAreLoaded = false;
             theyAreLoaded = false;
@@ -295,6 +316,21 @@ namespace GulagRunners.Net
         void Say(string said)
         {
             state = said;
+        }
+
+        /// <summary>
+        /// The pairing is not going to happen, and somebody has to be told.
+        ///
+        /// Logged as a warning as well as shown, because the shown line has one short
+        /// line of screen to live in and the reason is usually a dashboard setting.
+        /// </summary>
+        void Fail(string why)
+        {
+            Broken = why;
+            Say(why);
+            Debug.LogWarning($"{name}: {why}. Relay and Matchmaker both have to be "
+                             + "enabled on the Unity dashboard, and both devices have to "
+                             + "be signed in and on the same build.", this);
         }
     }
 }

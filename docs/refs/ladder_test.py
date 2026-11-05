@@ -308,6 +308,30 @@ both_zero = [(a, b) for a, b in [("Zz", "aa")]
 check("the fault this replaces is caught", both_zero,
       "a non-ordinal compare puts both players on fighter one and nobody on fighter two")
 
+# And the other way to ask it too early: before the other player is in the session at
+# all. The service hands back a session as soon as THIS device is in it, and the
+# opponent's join lands a moment later -- so the id can simply not be there yet.
+print("   and not before there is an opponent to compare against")
+check("an unknown opponent puts BOTH devices on fighter one",
+      m.local_player("aaa", "") == 0 and m.local_player("bbb", "") == 0,
+      "which is a match where both players drive fighter one, both allocate the relay, "
+      "and each ends up alone in an arena with the other fighter standing still")
+check("so a pairing made from one id is refused rather than guessed",
+      m.pairing("aaa", "", "session-1") is None
+      and m.pairing("", "bbb", "session-1") is None,
+      "None is 'wait, and then say so' -- never a seat")
+check("a player paired with themselves is refused as well",
+      m.pairing("aaa", "aaa", "session-1") is None,
+      "two ids that are one id cannot name two fighters")
+one = m.pairing("aaa", "bbb", "session-1")
+two = m.pairing("bbb", "aaa", "session-1")
+check("and once both ids are in, the two devices disagree about the seat and agree "
+      "about everything else",
+      one is not None and two is not None
+      and one["local_player"] != two["local_player"]
+      and one["seed"] == two["seed"],
+      f"{one} / {two}")
+
 print("   and the arena is dealt from the session id, not from a round trip")
 check("the same id gives the same number", m.match_seed("abc") == m.match_seed("abc"))
 check("different ids give different numbers",

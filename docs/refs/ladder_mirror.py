@@ -319,6 +319,32 @@ def local_player(mine, theirs, culture=None):
     return 0 if a <= b else 1
 
 
+def pairing(mine, theirs, session_id):
+    """UgsQueue.Took: a pairing, or None because there is not one yet.
+
+    THE GUARD, and it is the whole of the bug it closes. MatchmakeSessionAsync returns
+    when THIS device is in a session; the other player's join lands separately, a moment
+    later. So the session can hold one player, and whichever device the service answers
+    first usually sees exactly that.
+
+    local_player is then asked about an opponent it has never heard of, and being a pure
+    function it answers rather than refusing: 0. BOTH devices therefore drive fighter
+    one, both allocate the relay (RelayHandshake: "two allocators would make two relays
+    and meet in neither"), and each player ends up alone in an arena with a motionless
+    opponent -- each driving, as far as they can tell, the same fighter. Nothing logs an
+    error, because nothing failed; a question was asked a moment too early.
+
+    So the question is no longer asked early. None means wait, and after the timeout it
+    means tell the player, not guess.
+    """
+    if not mine or not theirs or mine == theirs:
+        return None
+    return dict(local_player=local_player(mine, theirs),
+                seed=match_seed(session_id),
+                against_bot=False,
+                join=session_id)
+
+
 def match_seed(session_id):
     """The number the arena is dealt from, folded out of the session id (FNV-1a)."""
     h = 2166136261

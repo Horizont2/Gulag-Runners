@@ -34,6 +34,7 @@ SCENES = os.path.join(ASSETS, "Scenes")
 PRESENT = os.path.join(ASSETS, "_Game", "Presentation")
 
 PLAYER_SCRIPT = "882fe3a922af38d6658c85cd54734955"      # PlayerController
+BRAIN_SCRIPT = "a96a27f0eefc27e7b188c1594a03a03d"       # FighterBrain
 
 # The touch controls, which are the one group with a hard rule rather than a comparison:
 # the HUD drives whoever is holding the phone, so SOME fighter in the scene has to be
@@ -205,7 +206,45 @@ def fighters(text, guids):
             field = re.sub(r"\.Array\.data\[\d+\]", "[]", field)
             wired[field] = wired.get(field, False) or mm.group(3) != "0"
         out.append((name.group(1).strip() if name else os.path.basename(src),
-                    wired, parts))
+                    wired, parts, int(m.group(1))))
+    return out
+
+
+def brains(text):
+    """{fighter's prefab instance: takeOver} for every FighterBrain in the scene.
+
+    The brain is added per arena rather than carried by the fighter prefab, and whether
+    it is DRIVING is a tick box on it that nothing in the game ever sets -- the only
+    writer in the project is the setup tool, which deliberately leaves it off so that
+    whoever runs it makes the choice. Nobody made it: all three arenas shipped with both
+    boxes clear, which means both fighters were waiting to be driven by something.
+
+    One of them is: the scene's own joysticks. The other one is waiting for input that
+    arrives over the network, and when the network is not there -- a practice match, a
+    pairing that failed -- it waits for ever, standing still, while the player circles it.
+    """
+    out = {}
+    docs = {}
+    for m in re.finditer(r"(?m)^--- !u!(\d+) &(-?\d+)( stripped)?\n(.*?)(?=^--- !u!|\Z)",
+                         text, re.S):
+        docs[int(m.group(2))] = m.group(4)
+
+    for fid, body in docs.items():
+        if BRAIN_SCRIPT not in body:
+            continue
+        self_ = re.search(r"\n  self: \{fileID: (-?\d+)\}", body)
+        took = re.search(r"\n  takeOver: (\d)", body)
+        on = re.search(r"\n  m_Enabled: (\d)", body)
+        if self_ is None:
+            continue
+        owner = docs.get(int(self_.group(1)), "")
+        inst = re.search(r"m_PrefabInstance: \{fileID: (-?\d+)\}", owner)
+        if inst is None:
+            continue
+        driving = took is not None and took.group(1) == "1" \
+            and (on is None or on.group(1) == "1")
+        key = int(inst.group(1))
+        out[key] = out.get(key, False) or driving
     return out
 
 
@@ -216,16 +255,17 @@ def main(argv):
     SCRIPTS = script_names()
     problems, notes = [], []
 
-    seen = {}
+    seen, text_of = {}, {}
     for name in wanted:
         text = open(os.path.join(SCENES, name), encoding="utf-8", errors="ignore").read()
+        text_of[name] = text
         seen[name] = fighters(text, guids)
         sized(text, guids, name, problems, notes)
 
     # What any arena wires is what every arena is expected to wire.
     expected = set()
     for rows in seen.values():
-        for _who, wired, _p in rows:
+        for _who, wired, *_ in rows:
             expected |= {f for f, on in wired.items() if on}
 
     for name, rows in seen.items():
@@ -234,12 +274,21 @@ def main(argv):
             problems.append(f"{name}: no fighters in it at all")
             continue
 
+        thinking = brains(text_of[name])
+        held, driven = [], []
+
         holders = 0
-        for who, wired, _p in rows:
+        for who, wired, _p, fid in rows:
             have = sorted(f for f, on in wired.items() if on)
-            notes.append(f"  {who}: {', '.join(have) if have else 'nothing wired'}")
+            bot = thinking.get(fid)
+            notes.append(f"  {who}: {', '.join(have) if have else 'nothing wired'}"
+                         + ("" if bot is None else
+                            f" (brain, {'driving' if bot else 'idle'})"))
+            if bot:
+                driven.append(who)
             if all(wired.get(c) for c in CONTROLS):
                 holders += 1
+                held.append(who)
             elif any(wired.get(c) for c in CONTROLS):
                 missing = [c for c in CONTROLS if not wired.get(c)]
                 problems.append(
@@ -260,12 +309,33 @@ def main(argv):
                 f"{name}: {holders} fighters have the HUD's controls wired, so one thumb "
                 f"drives both of them.")
 
+        # And somebody has to be FIGHTING the thumb. There is one set of joysticks in
+        # these scenes, so the second fighter is driven by the network or by its brain and
+        # by nothing else -- and with no network and no brain it is a statue.
+        if not driven:
+            problems.append(
+                f"{name}: nothing drives the second fighter. One fighter has the scene's "
+                f"joysticks and the other is waiting for input over the network, so with "
+                f"no opponent connected it stands still while the player walks around it. "
+                f"Tick Take Over on the FighterBrain of the fighter that is NOT holding "
+                f"the controls — NetMatch switches every brain off when a real opponent "
+                f"arrives, so this costs nothing online.")
+        elif len(driven) > 1:
+            problems.append(
+                f"{name}: {len(driven)} fighters are driven by their own brain "
+                f"({', '.join(driven)}), so the player has nothing to play.")
+        elif held and driven[0] in held:
+            problems.append(
+                f"{name}: {driven[0]} has both the scene's joysticks and a brain that is "
+                f"driving. PlayerInputRouter gives a taking-over source the whole fighter, "
+                f"so the thumb is ignored and the player is watching a bot play itself.")
+
         # The components each arena ADDS, compared the same way.
-        mine = set().union(*[p for _w, _x, p in rows]) if rows else set()
+        mine = set().union(*[p for _w, _x, p, *_ in rows]) if rows else set()
         for other, orows in seen.items():
             if other == name or not orows:
                 continue
-            theirs = set().union(*[p for _w, _x, p in orows])
+            theirs = set().union(*[p for _w, _x, p, *_ in orows])
             for part in sorted(theirs - mine):
                 problems.append(
                     f"{name}: no fighter here has a {part}, and every fighter in "
@@ -275,11 +345,11 @@ def main(argv):
 
         # And the comparison: what the other arenas wire and this one does not.
         here = set()
-        for _who, wired, _p in rows:
+        for _who, wired, *_ in rows:
             here |= {f for f, on in wired.items() if on}
         for field in sorted(expected - here):
             where = [n for n, r in seen.items()
-                     if n != name and any(w.get(field) for _x, w, _p in r)]
+                     if n != name and any(w.get(field) for _x, w, *_ in r)]
             if not where:
                 continue
             notes.append(f"  nothing in {name} sets {field}, which "

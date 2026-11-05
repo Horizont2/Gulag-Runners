@@ -50,6 +50,20 @@ namespace GulagRunners.Meta
                  "— is for before release.")]
         public bool signInAnonymously = true;
 
+        [Header("Being matched")]
+        [Tooltip("Seconds to wait for the other player to actually BE in the session " +
+                 "before giving up on the pairing.\n\n" +
+                 "Matchmaking returning is not the other player having arrived: the " +
+                 "service hands back a session as soon as this device is in it, and the " +
+                 "opponent's join lands separately, a moment later. Everything that makes " +
+                 "two devices one match is worked out from their two player ids, so " +
+                 "deciding any of it before the second id exists decides it WRONG — and " +
+                 "identically wrong on both phones, which is the one failure that cannot " +
+                 "be noticed from the inside.\n\n" +
+                 "Generous, because this is one poll every quarter second against a " +
+                 "service that has already said yes.")]
+        [Range(1f, 30f)] public float pairingTimeout = 10f;
+
         [Header("Debug")]
         public string state = "idle";
 
@@ -151,6 +165,21 @@ namespace GulagRunners.Meta
                 if (stop.IsCancellationRequested || session == null) return;
 
                 Current = session;
+
+                // AND NOT A MOMENT SOONER. See WaitForOpponent: the pairing is worked out
+                // from the two player ids, so it cannot be worked out while there is one.
+                if (!await WaitForOpponent(session, stop))
+                {
+                    if (stop.IsCancellationRequested) return;
+                    Set(QueueState.Failed, "THE OTHER PLAYER NEVER ARRIVED");
+                    Debug.LogWarning(
+                        $"{name}: matched into session {session.Id}, but after "
+                        + $"{pairingTimeout:0.#}s it still holds only this player. "
+                        + "Nothing that makes two devices one match can be decided from "
+                        + "one id, so the pairing is refused rather than guessed.", this);
+                    return;
+                }
+
                 Took(session);
             }
             catch (OperationCanceledException)
@@ -202,28 +231,100 @@ namespace GulagRunners.Meta
             try { await session.LeaveAsync(); } catch (Exception) { }
         }
 
-        /// <summary>Turns a joined session into the pairing the search screen wants.</summary>
-        void Took(ISession session)
+        /// <summary>
+        /// Waits until the session actually holds somebody else.
+        ///
+        /// THE BUG THIS EXISTS FOR, because it reads like a race and behaves like a
+        /// design flaw. MatchmakeSessionAsync returns when THIS device is in a session;
+        /// the opponent's join is a separate event that lands a moment later, and their
+        /// rating property later still. So the session handed back can hold one player,
+        /// and it usually does on whichever device the service answered first.
+        ///
+        /// Everything that makes two devices one match is then computed from the ids
+        /// they both hold -- which fighter each drives, who allocates the relay -- and
+        /// MatchAgreement.LocalPlayer, asked about an opponent it has never heard of,
+        /// answers 0. Both phones therefore drive fighter one, both allocate a relay,
+        /// and they meet in neither. What the two players see is a match that connected,
+        /// counted down, and put each of them alone in an arena with a motionless
+        /// opponent -- each of them driving, as far as they can tell, the same fighter.
+        /// Nothing logs an error, because nothing went wrong: a question was asked a
+        /// moment too early and got a plausible answer.
+        ///
+        /// Polled rather than driven off the session's PlayerJoined event, for the same
+        /// reason RelayHandshake polls for its join code: an event can fire before this
+        /// is listening, and a wait that misses its own notification waits for ever.
+        /// Asking cannot miss what has already happened.
+        /// </summary>
+        async Task<bool> WaitForOpponent(ISession session, CancellationToken stop)
         {
+            float waited = 0f;
+            while (true)
+            {
+                if (stop.IsCancellationRequested) return false;
+                if (!string.IsNullOrEmpty(Opponent(session, out _))) return true;
+                if (waited >= pairingTimeout) return false;
+
+                Set(QueueState.Looking, "PAIRING…");
+                await Task.Delay(250, stop);
+                waited += 0.25f;
+
+                try { await session.RefreshAsync(); } catch (Exception) { }
+            }
+        }
+
+        /// <summary>
+        /// The other player in the session: their id, and what they say their rating is.
+        ///
+        /// One reader for both the wait and the pairing, so the question "is the
+        /// opponent here" and the question "who is the opponent" cannot be answered by
+        /// two different pieces of code that disagree about what counts.
+        /// </summary>
+        string Opponent(ISession session, out double rating)
+        {
+            rating = 1500;
+            if (session == null) return "";
+
             string mine = session.CurrentPlayer != null ? session.CurrentPlayer.Id : "";
-            string theirs = "";
-            double theirRating = 1500;
 
             IReadOnlyList<IReadOnlyPlayer> players = session.Players;
             for (int i = 0; players != null && i < players.Count; i++)
             {
                 IReadOnlyPlayer p = players[i];
-                if (p == null || p.Id == mine) continue;
-                theirs = p.Id;
+                if (p == null || string.IsNullOrEmpty(p.Id) || p.Id == mine) continue;
 
                 if (p.Properties != null &&
                     p.Properties.TryGetValue(ratingAttribute, out PlayerProperty said) &&
+                    said != null &&
                     double.TryParse(said.Value,
                                     System.Globalization.NumberStyles.Float,
                                     System.Globalization.CultureInfo.InvariantCulture,
                                     out double got))
-                    theirRating = got;
-                break;
+                    rating = got;
+
+                return p.Id;
+            }
+            return "";
+        }
+
+        /// <summary>Turns a joined session into the pairing the search screen wants.</summary>
+        void Took(ISession session)
+        {
+            string mine = session.CurrentPlayer != null ? session.CurrentPlayer.Id : "";
+            string theirs = Opponent(session, out double theirRating);
+
+            // Two ids that are not two ids. MatchAgreement is a pure function and answers
+            // 0 for this rather than throwing, which is right for a pure function and
+            // wrong here: 0 on both devices is the both-drive-fighter-one match that has
+            // no symptom. Refused where there is somebody to tell.
+            if (string.IsNullOrEmpty(mine) || string.IsNullOrEmpty(theirs) || mine == theirs)
+            {
+                Set(QueueState.Failed, "THE SERVICE PAIRED NOBODY");
+                Debug.LogWarning(
+                    $"{name}: session {session.Id} names this player as \"{mine}\" and the "
+                    + $"opponent as \"{theirs}\". Which fighter each device drives is worked "
+                    + "out from those two, so a pair that is not a pair would put both "
+                    + "devices on fighter one.", this);
+                return;
             }
 
             _found = new MatchFound

@@ -37,9 +37,10 @@ def check(name, cond, detail=""):
 class Side:
     """One phone's half of the gate, as OnlineMatch runs it."""
 
-    def __init__(self, loads_at, keep_announcing=True):
+    def __init__(self, loads_at, keep_announcing=True, relay_open=True):
         self.loads_at = loads_at
         self.keep = keep_announcing
+        self.relay_open = relay_open
         self.loaded = False
         self.heard = False
         self.loaded_at = None
@@ -49,7 +50,18 @@ class Side:
     def ready(self, now):
         if self.heard:
             return True
-        return (self.loaded and TIMEOUT > 0
+        # GaveUpWaiting, and the `relay_open` is the fix rather than the detail.
+        #
+        # OpponentReady used to read `|| !relayOpen`, meaning "nobody to wait for" --
+        # which is true of a practice opponent and catastrophically false of a relay
+        # that FAILED. The gate opened instantly, the arena loaded, and the player was
+        # put alone in it with the other fighter standing still, having been told
+        # "opponent found" four screens earlier. Two players doing that at once, each in
+        # their own arena, is the bug report about both of them driving one character.
+        #
+        # Going early is cheap when the link works and one datagram went missing. With
+        # no link at all it is the whole fault, so it is no longer allowed.
+        return (self.loaded and self.relay_open and TIMEOUT > 0
                 and now - self.loaded_at > TIMEOUT)
 
     def update(self, now, link):
@@ -135,6 +147,35 @@ check("one side alone still goes in, rather than hanging for ever",
 check("and it waited the timeout first, not none of it",
       a.went_at is not None and a.went_at - 1.0 >= TIMEOUT - 0.1,
       f"{a.went_at - 1.0:.2f} s against a {TIMEOUT} s timeout" if a.went_at else "")
+
+print("\nThe relay never opened at all, which is a different thing entirely")
+# There is no other side to be waited for here, and no amount of waiting will produce
+# one: the handshake threw, or Relay is off on the dashboard, or both devices thought
+# they were the host and so both allocated. Going in anyway is what put a player alone
+# in an arena believing they were online.
+alone = Side(1.0, relay_open=False)
+nowhere = Link(alone, Side(1e9), drop=0)
+now = 0.0
+while now < 30.0:
+    alone.update(now, nowhere)
+    now += TICK
+check("a side with no relay never goes through the gate",
+      alone.went_at is None,
+      "it has to be told the match failed, not handed an arena with nobody in it")
+check("and the timeout does not rescue it, because there is nothing to rescue",
+      not alone.ready(30.0),
+      "30 s is five timeouts")
+# The same side with the relay up is the case above, and it must still go in: the fix
+# must not have turned a lost datagram into a dead match.
+working = Side(1.0, relay_open=True)
+link = Link(working, Side(1e9), drop=0)
+now = 0.0
+while now < 30.0:
+    working.update(now, link)
+    now += TICK
+check("while a working relay whose other end is slow still goes in",
+      working.went_at is not None,
+      f"after {working.went_at - 1.0:.1f} s" if working.went_at else "hung")
 
 print("\nALL PASS" if ok else "\nSOME FAILED")
 sys.exit(0 if ok else 1)

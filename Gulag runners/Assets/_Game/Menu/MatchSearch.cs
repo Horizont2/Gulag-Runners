@@ -323,6 +323,8 @@ namespace GulagRunners.Game
             // loading, and is what let one phone start the match alone.
             if (_gate is OnlineMatch online) online.WeHaveLoaded();
 
+            if (Failed()) return;
+
             Enter(OpponentReady ? SearchPhase.Starting : SearchPhase.Waiting);
             if (phase == SearchPhase.Starting) Done();
         }
@@ -339,9 +341,35 @@ namespace GulagRunners.Game
         /// So it names who is being waited for, and counts. The count is the real
         /// timeout, not decoration: when it runs out the match starts anyway.
         /// </summary>
+        /// <summary>
+        /// The pairing has fallen over, so this screen stops rather than hands over.
+        ///
+        /// Handing over anyway is what it did, and it is the worst of the three things
+        /// it could do. The gate answered "ready" whenever there was no relay, which
+        /// covered both "there is nobody to wait for" and "the connection failed" -- so
+        /// a failed match loaded the arena, said nothing, and left the player alone in
+        /// it driving fighter one while fighter two stood still. Two players doing that
+        /// at once, each in their own arena, is a bug report about one character being
+        /// shared, and the real fault is four screens earlier.
+        ///
+        /// Stopping here is honest and costs nothing: the arena is loaded but held, the
+        /// cross is still on screen, and pressing it rewinds the load.
+        /// </summary>
+        bool Failed()
+        {
+            string broken = _gate is OnlineMatch online ? online.Broken : "";
+            if (string.IsNullOrEmpty(broken)) return false;
+
+            Fill(1f);
+            Say(broken.ToUpperInvariant());
+            return true;
+        }
+
         void Waiting()
         {
             Fill(1f);
+
+            if (Failed()) return;
 
             if (OpponentReady)
             {
