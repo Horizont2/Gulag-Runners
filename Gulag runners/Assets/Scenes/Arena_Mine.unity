@@ -245,6 +245,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (8)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1369,6 +1373,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (7)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1522,6 +1530,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3198,6 +3210,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3376,6 +3392,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (6)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4620,6 +4640,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (9)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5409,6 +5433,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -136978,6 +137006,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -142907,6 +142939,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -143432,6 +143468,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PP_Lantern_02_Yellow_Light_Iron (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 7413659883411584670, guid: 9380f34c10f5fe34e863c769353585c0, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: a7d3c91e58f24b6097ce3815d2a4f0b6, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
