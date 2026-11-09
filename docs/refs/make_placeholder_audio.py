@@ -272,6 +272,124 @@ def rung(length=0.16, out=False):
         yield (knock * 0.5 + grit) * 0.45
 
 
+# ---------------------------------------------------------------- the rooms themselves
+#
+# Nothing in this game loops. Every sound above is an event, which means the arenas are
+# silent between footsteps -- and a silent room does not read as quiet, it reads as a
+# game with the sound off. docs/01 builds the scavenge phase on listening, and listening
+# needs something to listen THROUGH.
+#
+# These are beds, not events: eight seconds each, played on a loop by one AudioSource per
+# arena. Eight is long enough not to be heard repeating and short enough to be a file
+# somebody will actually replace.
+#
+# SEAMLESS IS ARITHMETIC, not luck. A loop that clicks at the wrap is worse than no loop,
+# so the tonal parts use frequencies that complete a WHOLE number of cycles in the
+# length, and the noise is cross-faded with its own head. Both are checked by
+# audio_check, because a click is exactly the kind of thing nobody hears until it is
+# shipped.
+
+
+def seamless(samples, length, fade=0.5):
+    """Cross-fades the tail of a noise bed over its own head, so the wrap is continuous."""
+    buf = list(samples)
+    n = len(buf)
+    k = int(RATE * min(fade, length / 3.0))
+    for i in range(k):
+        a = i / k                       # 0 at the start of the fade, 1 at the end
+        head = buf[i]
+        buf[n - k + i] = buf[n - k + i] * (1.0 - a) + head * a
+    return buf[:n - 0]
+
+
+def cycles(f, length):
+    """The nearest frequency to f that completes whole cycles in length."""
+    return max(1, round(f * length)) / length
+
+
+def room_mine(length=8.0):
+    """Underground: moving air, the weight of rock over it, and water finding its way down."""
+    n = int(RATE * length)
+    out = [0.0] * n
+    # Air, as noise through a very low one-pole, which is what a long tunnel does to it.
+    low = 0.0
+    for i in range(n):
+        low += 0.012 * (noise() - low)
+        out[i] += low * 3.2
+    # Two low tones at whole-cycle frequencies: the room's own note, never quite steady.
+    for f, a in ((cycles(47.0, length), 0.1), (cycles(71.0, length), 0.06)):
+        for i in range(n):
+            t = i / RATE
+            out[i] += math.sin(2 * math.pi * f * t) * a * (
+                0.75 + 0.25 * math.sin(2 * math.pi * cycles(0.37, length) * t))
+    # Drips. On the beat of nothing, which is the point: at whole-second-ish offsets the
+    # ear would hear a rhythm and a rhythm is a machine, not a cave.
+    for at, pitch in ((1.37, 980.0), (3.11, 1240.0), (4.02, 860.0), (6.73, 1130.0)):
+        start = int(RATE * at)
+        tail = int(RATE * 0.22)
+        for i in range(tail):
+            if start + i >= n:
+                break
+            t = i / RATE
+            out[start + i] += (math.sin(2 * math.pi * pitch * t) * 0.5
+                               + math.sin(2 * math.pi * pitch * 1.98 * t) * 0.15) \
+                * env(t, 0.22, 0.0008, 1, 24.0) * 0.5
+    return seamless(out, length)
+
+
+def room_forest(length=8.0):
+    """Outdoors and wet: wind through leaves, with the hiss of rain already falling on them."""
+    n = int(RATE * length)
+    out = [0.0] * n
+    band = 0.0
+    prev = 0.0
+    for i in range(n):
+        t = i / RATE
+        # Band-limited hiss: a low-pass of a high-pass, which is as close to leaves as two
+        # poles get.
+        x = noise()
+        band += 0.08 * (x - band)
+        high = x - prev
+        prev = x
+        swell = 0.55 + 0.45 * math.sin(2 * math.pi * cycles(0.21, length) * t) \
+            * math.sin(2 * math.pi * cycles(0.067, length) * t)
+        out[i] = (band * 1.5 + high * 0.22) * swell * 0.8
+    # One branch complaining, somewhere off to the side.
+    start = int(RATE * 5.2)
+    for i in range(int(RATE * 0.9)):
+        if start + i >= n:
+            break
+        t = i / RATE
+        out[start + i] += math.sin(2 * math.pi * (120.0 + 40.0 * t) * t) * 0.12 * \
+            env(t, 0.9, 0.08, 1, 1.6) * (0.5 + 0.5 * math.sin(2 * math.pi * 7.0 * t))
+    return seamless(out, length)
+
+
+def room_fortress(length=8.0):
+    """High, cold and open: wind with nothing to break it, and rope against a pole."""
+    n = int(RATE * length)
+    out = [0.0] * n
+    band = 0.0
+    for i in range(n):
+        t = i / RATE
+        x = noise()
+        band += 0.045 * (x - band)
+        # Thinner than the forest and with bigger swells: wind round a wall, not through
+        # leaves.
+        swell = 0.4 + 0.6 * (0.5 + 0.5 * math.sin(2 * math.pi * cycles(0.13, length) * t))
+        out[i] = band * 2.2 * swell * 0.75
+        out[i] += math.sin(2 * math.pi * cycles(310.0, length) * t) * 0.012 * swell
+    for at in (2.4, 6.1):
+        start = int(RATE * at)
+        for i in range(int(RATE * 0.3)):
+            if start + i >= n:
+                break
+            t = i / RATE
+            out[start + i] += (noise() * 0.5 + math.sin(2 * math.pi * 210.0 * t) * 0.4) * \
+                env(t, 0.3, 0.002, 1, 12.0) * 0.22
+    return seamless(out, length)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     print(f"placeholder audio -> {os.path.relpath(OUT)}")
@@ -309,6 +427,11 @@ def main():
     wav("Dodge", effort(0.24))
     wav("Ladder_Grab", rung())
     wav("Ladder_Out", rung(0.22, out=True))
+
+    # And the rooms, which loop. One per arena, so the three do not sound like one place.
+    wav("Room_Mine", room_mine())
+    wav("Room_Forest", room_forest())
+    wav("Room_Fortress", room_fortress())
 
 
 if __name__ == "__main__":
