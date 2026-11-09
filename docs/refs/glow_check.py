@@ -34,15 +34,29 @@ by somebody who cannot see the other.
 """
 import io, os, re, sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import arena_demo_geometry as geometry   # noqa: E402
+
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 ASSETS = os.path.join(ROOT, "Gulag runners", "Assets")
 GAME = os.path.join(ASSETS, "_Game")
 
-# The scenes a match is played in. The menu has its own look and its own profile.
-# A name that is not there any more is not a fault -- SetupScene was deleted once it had
-# served its purpose -- but a list with NOTHING left in it is, because then this check
-# passes while checking nothing.
-GAMEPLAY = ("Arena_Forest.unity", "SetupScene.unity")
+# The scenes a match is played in, ASKED FOR rather than listed.
+#
+# It was a list, and the list went stale the way a hand-written list does: it named
+# Arena_Forest and SetupScene, and SetupScene was deleted the moment it had served its
+# purpose. So this check reported "0 problems across 1 gameplay scene" for months while
+# two of the three arenas were never looked at -- and the one line of output that said so
+# read like a note about a tidied-up scene rather than a check that had stopped checking.
+#
+# That the other two were fine was luck: all three happen to share one profile. Luck is
+# not what a check is for.
+MENU = ("Menu.unity",)
+
+
+def gameplay():
+    """Every arena in the map pool, plus any other arena scene in the project."""
+    return geometry.arena_scenes()
 
 VOLUME_SCRIPT = "172515602e62fb746b5d573b38a5fe58"
 
@@ -61,6 +75,53 @@ def profiles():
             m = re.search(r"^guid: ([0-9a-f]{32})", read(os.path.join(root, f)), re.M)
             if m:
                 out[m.group(1)] = os.path.join(root, f[:-5])
+    return out
+
+
+def volumes(src, found):
+    """Every enabled Volume in a scene, as (priority, profile path, profile name).
+
+    PLURAL, and in priority order, because URP blends them: the effective value of an
+    override is the one set by the highest-priority volume that sets it at all. That is
+    how an arena can share one base profile for the things that must not drift -- the
+    tonemapper and the bloom this whole file is about -- and still have a grade of its
+    own on top. Reading only the first volume in the file would report the base's look
+    for a scene that has graded over it, or the grade's for a scene whose base does the
+    work; which of those you got would depend on document order.
+    """
+    out = []
+    for m in re.finditer(r"(?m)^--- !u!114 &(-?\d+)\n(.*?)(?=^--- !u!|\Z)", src, re.S):
+        body = m.group(2)
+        if f"guid: {VOLUME_SCRIPT}" not in body:
+            continue
+        if re.search(r"^  m_Enabled: 0", body, re.M):
+            continue
+        guid = re.search(r"sharedProfile: \{fileID: 11400000, guid: ([0-9a-f]{32})", body)
+        pri = re.search(r"^  priority: (-?[\d.]+)", body, re.M)
+        out.append((float(pri.group(1)) if pri else 0.0,
+                    found.get(guid.group(1)) if guid else None,
+                    guid.group(1) if guid else None))
+    out.sort(key=lambda r: r[0])
+    return out
+
+
+def effective(stack, name):
+    """One override, as the blended stack actually leaves it.
+
+    Walked from the lowest priority up, so a higher volume's value wins and a field it
+    does not touch keeps the one below it -- which is what URP does.
+    """
+    out = None
+    for _pri, path, _guid in stack:
+        if path is None:
+            continue
+        got = override(read(path), name)
+        if got is None:
+            continue
+        if out is None:
+            out = dict(got)
+        else:
+            out.update(got)
     return out
 
 
@@ -86,7 +147,7 @@ def main():
 
     looked_at = 0
 
-    for scene in GAMEPLAY:
+    for scene in tuple(gameplay()) + MENU:
         path = os.path.join(ASSETS, "Scenes", scene)
         if not os.path.exists(path):
             notes.append(f"{scene}: not in the project any more, so it was skipped")
@@ -94,25 +155,40 @@ def main():
         looked_at += 1
         src = read(path)
 
-        if f"guid: {VOLUME_SCRIPT}" not in src:
+        stack = volumes(src, found)
+        if not stack:
             problems.append(f"{scene}: no Volume at all, so it renders with URP's fallback "
                             f"profile and nothing in this project decides its look")
             continue
 
-        m = re.search(r"sharedProfile: \{fileID: 11400000, guid: ([0-9a-f]{32})", src)
-        if not m:
-            problems.append(f"{scene}: its Volume has no profile")
-            continue
+        for pri, asset, guid in stack:
+            if guid is None:
+                problems.append(f"{scene}: a Volume at priority {pri:g} has no profile")
+            elif asset is None:
+                problems.append(f"{scene}: its volume profile {guid} is not in the project")
 
-        asset = found.get(m.group(1))
-        if asset is None:
-            problems.append(f"{scene}: its volume profile {m.group(1)} is not in the project")
-            continue
+        # TWO VOLUMES AT ONE PRIORITY IS A COIN TOSS. URP blends by priority and leaves
+        # the order of equals to whatever registered first, so a field both of them set
+        # is decided by load order -- which is not a thing anybody can see, author or
+        # reason about. The menu shipped exactly this: its own profile asks for Neutral
+        # tonemapping and a leftover from the project template asks for ACES, both
+        # global, both at priority 0.
+        at = {}
+        for pri, asset, _guid in stack:
+            at.setdefault(pri, []).append(os.path.basename(asset) if asset else "no profile")
+        for pri, who in sorted(at.items()):
+            if len(who) > 1:
+                problems.append(
+                    f"{scene}: {len(who)} enabled Volumes at the same priority "
+                    f"({pri:g}): {', '.join(who)}. URP leaves the order of equal "
+                    f"priorities to whichever registered first, so every field they both "
+                    f"set is decided by load order. Give one of them a higher priority, "
+                    f"or switch it off.")
 
-        name = os.path.basename(asset)
-        psrc = read(asset)
+        name = " + ".join(os.path.basename(a) for _p, a, _g in stack if a) or "no profile"
+        notes.append(f"{scene}: {len(stack)} volume(s) -> {name}")
 
-        bloom = override(psrc, "Bloom")
+        bloom = effective(stack, "Bloom")
         if bloom is None:
             problems.append(f"{scene} -> {name}: no Bloom override, so an emissive item is "
                             f"only a bright item and the rarity never haloes")
@@ -125,7 +201,7 @@ def main():
             else:
                 thresholds.append((name, bloom.get("threshold", 0)))
 
-        tone = override(psrc, "Tonemapping")
+        tone = effective(stack, "Tonemapping")
         if tone is None or not tone["active"]:
             problems.append(f"{scene} -> {name}: no tonemapping, so every colour above 1 "
                             f"clips channel by channel and a bright violet comes out white")
