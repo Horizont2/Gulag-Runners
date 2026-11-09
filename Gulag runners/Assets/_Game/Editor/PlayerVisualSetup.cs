@@ -15,7 +15,7 @@ namespace GulagRunners.GameEditor
     public static class PlayerVisualSetup
     {
         const string DefaultPrefabPath =
-            "Assets/PolyOne/Free Stickman/Prefabs/Free Pack - Stick Man.prefab";
+            "Assets/ThirdParty/PolyOne/Free Stickman/Prefabs/Free Pack - Stick Man.prefab";
         const string VisualChildName = "Visual";
 
         [MenuItem("Tools/Gulag Runners/Setup/Attach character model to all players", false, 10)]

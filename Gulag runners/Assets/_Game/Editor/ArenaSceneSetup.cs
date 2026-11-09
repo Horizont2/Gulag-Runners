@@ -47,7 +47,10 @@ namespace GulagRunners.GameEditor
     /// </summary>
     public static class ArenaSceneSetup
     {
-        const string Reference = "Assets/Scenes/Arena_Demo.unity";
+        // The arena a new one is copied from. Arena_Demo, which this named, was deleted
+        // once it had served its purpose -- so the tool has been pointing at nothing, and
+        // saying nothing about it, ever since. The forest is the finished one now.
+        const string Reference = "Assets/Scenes/Arena_Forest.unity";
 
         /// <summary>
         /// One per thing a match cannot start without. The root carrying it in the

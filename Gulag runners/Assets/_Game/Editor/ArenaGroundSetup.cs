@@ -49,7 +49,7 @@ namespace GulagRunners.GameEditor
     {
         const string ShaderName = "Gulag Runners/Arena Ground";
         const string MaterialFolder = "Assets/_Game/Materials";
-        const string Pack = "Assets/Game Buffs/Free Stylized Textures/Textures";
+        const string Pack = "Assets/ThirdParty/Game Buffs/Free Stylized Textures/Textures";
 
         const string GroundMaterial = MaterialFolder + "/GR_ArenaGround.mat";
         const string RockMaterial = MaterialFolder + "/GR_ArenaRock.mat";
@@ -397,7 +397,8 @@ namespace GulagRunners.GameEditor
                 Debug.LogError(
                     $"Arena ground: {path} is missing.\n" +
                     "That is the Free Stylized Textures pack. It is on this branch under " +
-                    "Assets/Game Buffs -- if the folder is there but Unity cannot see it, " +
+                    "Assets/ThirdParty/Game Buffs -- if the folder is there but Unity cannot "
+                    + "see it, " +
                     "the import has not finished; let it, then run this again.");
                 return null;
             }
@@ -447,7 +448,7 @@ namespace GulagRunners.GameEditor
         /// Unity's own grey is the obvious one. The second is not, and missing it cost the
         /// most important surface in the game on the first run of this tool: on the art
         /// branch the main floor -- the 30.16 x 4.41 m slab the whole fight happens on --
-        /// is not on Unity's grey at all. It carries Assets/Materials/Ground.mat, a
+        /// is not on Unity's grey at all. It carries Assets/_Game/Materials/Ground.mat, a
         /// half-finished first go at this exact job, with the albedo wired into its
         /// _BumpMap. Checking only for Unity's default walks straight past the floor and
         /// textures the eight smaller blocks around it, which looks like the tool worked.
@@ -458,7 +459,7 @@ namespace GulagRunners.GameEditor
         /// </summary>
         static readonly string[] Placeholders =
         {
-            "Assets/Materials/Ground.mat",
+            "Assets/_Game/Materials/Ground.mat",
         };
 
         static bool IsPlaceholder(Material m)

@@ -35,7 +35,7 @@ namespace GulagRunners.GameEditor
         const float DesignW = 1920f;
         const float DesignH = 864f;
         const string RootName = "Search UI";
-        const string DrawnFolder = "Assets/UI/Search/generated";
+        const string DrawnFolder = "Assets/_Game/UI/Search/generated";
 
         DefaultAsset _folder;
         Font _font;
@@ -226,11 +226,11 @@ namespace GulagRunners.GameEditor
             {
                 if (_found.ContainsKey(a.Key)) continue;
 
-                if (!AssetDatabase.IsValidFolder("Assets/UI")) AssetDatabase.CreateFolder("Assets", "UI");
-                if (!AssetDatabase.IsValidFolder("Assets/UI/Search"))
-                    AssetDatabase.CreateFolder("Assets/UI", "Search");
+                if (!AssetDatabase.IsValidFolder("Assets/_Game/UI")) AssetDatabase.CreateFolder("Assets/_Game", "UI");
+                if (!AssetDatabase.IsValidFolder("Assets/_Game/UI/Search"))
+                    AssetDatabase.CreateFolder("Assets/_Game/UI", "Search");
                 if (!AssetDatabase.IsValidFolder(DrawnFolder))
-                    AssetDatabase.CreateFolder("Assets/UI/Search", "generated");
+                    AssetDatabase.CreateFolder("Assets/_Game/UI/Search", "generated");
 
                 string file = a.Key.Substring(a.Key.LastIndexOf('/') + 1);
                 string path = $"{DrawnFolder}/{file}.png";

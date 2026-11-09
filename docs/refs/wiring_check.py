@@ -293,12 +293,64 @@ def name_of(body, fid, src):
     return nm.group(1).strip() if nm else f"go {m.group(1)}"
 
 
+def paths_that_exist():
+    """Every "Assets/..." written into our own C#, and whether it is still there.
+
+    A path in a string is a reference Unity cannot follow and nothing can rename. Every
+    other link in this project is a guid, which survives a file being moved; these do not,
+    and they fail in the worst way -- an editor tool that silently finds nothing, reports
+    "0 wired" and leaves the scene alone.
+
+    Tidying Assets into ThirdParty/ and _Game/ broke eleven of them at once, which is what
+    this rule is for. It ignores a path that is plainly being BUILT rather than read (one
+    that ends in a separator, or is a folder the tool creates), and it reads a trailing
+    folder as a folder.
+    """
+    out = []
+    for folder in OURS:
+        for where, _dirs, files in os.walk(folder):
+            if os.sep + "obj" in where or os.sep + "bin" in where:
+                continue
+            for f in files:
+                if not f.endswith(".cs"):
+                    continue
+                src = io.open(os.path.join(where, f), encoding="utf-8", errors="replace").read()
+                for m in re.finditer(r'"(Assets/[^"\n]*)"', src):
+                    path = m.group(1)
+                    if path in ("Assets/", "Assets") or path.endswith("/"):
+                        continue
+                    if "--" in path or " " == path[-1]:
+                        continue              # prose in a log line, not a path
+                    full = os.path.join(ASSETS, "..", path)
+                    if os.path.exists(full):
+                        continue
+                    # a folder a tool CREATES is allowed not to exist yet -- written
+                    # either whole, or as CreateFolder(parent, leaf), which is the way
+                    # Unity's own API takes it
+                    parent, _, leaf = path.rpartition("/")
+                    if re.search(r'CreateFolder\([^)]*"%s"' % re.escape(path), src):
+                        continue
+                    if leaf and re.search(r'CreateFolder\(\s*"%s"\s*,\s*"%s"\s*\)'
+                                          % (re.escape(parent), re.escape(leaf)), src):
+                        continue
+                    line = src[:m.start()].count("\n") + 1
+                    out.append((os.path.relpath(os.path.join(where, f), ASSETS), line, path))
+    return out
+
+
 def main():
     global ENUMS
     ENUMS = enums()
     known = scripts()
     by_guid_meta = {}
     problems, notes = [], []
+
+    gone = paths_that_exist()
+    notes.append(f"{len(gone)} path(s) written into our C# point at nothing")
+    for where, line, path in gone:
+        problems.append(f"{where}:{line} reads \"{path}\", which is not in the project. "
+                        f"A path in a string is the one kind of reference a move does not "
+                        f"carry, and a tool that cannot find its asset says nothing.")
     checked = 0
 
     files = []

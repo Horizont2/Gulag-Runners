@@ -34,7 +34,7 @@ namespace GulagRunners.GameEditor
     public static class ArmourWiring
     {
         const string CharacterPath =
-            "Assets/URP GanzSe Free Modular Character Pack/Prefabs/Modular Character/" +
+            "Assets/ThirdParty/URP GanzSe Free Modular Character Pack/Prefabs/Modular Character/" +
             "GanzSe Free Modular Character Update 1_1.prefab";
 
         const string HolderName = "Armour";

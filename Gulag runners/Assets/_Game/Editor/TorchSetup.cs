@@ -42,7 +42,7 @@ namespace GulagRunners.GameEditor
     {
         const string HolderName = "Torch Fire";
         const string FlamePath =
-            "Assets/Polyart/PolyartStudio/SharedResources/Effects/PF_FireSmall.prefab";
+            "Assets/ThirdParty/Polyart/PolyartStudio/SharedResources/Effects/PF_FireSmall.prefab";
         const string MaterialPath = "Assets/_Game/Art/Materials/Torch_Fire.mat";
 
         // The stand-in lamp from before the torches could light themselves. It sat in mid
