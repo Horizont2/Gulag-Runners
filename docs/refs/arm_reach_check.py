@@ -49,10 +49,21 @@ ASSETS = os.path.join(ROOT, "Gulag runners", "Assets")
 
 # How much of the arm's full length the goal may ask for. Not 1.0: an arm held dead
 # straight at every angle is a mannequin, and leaves nothing for the small disagreements
-# between a bind pose and a playing one. Unity's own Arm Stretch on this rig is 0.05, so
-# anything past 1.05 cannot be reached at all, by anything.
+# between a bind pose and a playing one.
 COMFORTABLE = 0.95
-IMPOSSIBLE = 1.05
+
+
+def impossible(meta_text):
+    """What the arm cannot reach however hard the solver tries: 1 + the rig's Arm Stretch.
+
+    This was the constant 1.05, Unity's default, with a comment saying so -- and the value
+    is a field on the avatar, which makes raising it the one way to close a goal that is
+    out of reach WITHOUT shortening the arm. Shortening the arm is the fight (this file's
+    own header: 7.3 cm moved the mace from 10.1 to 29.7 seconds to kill), so the two are
+    not interchangeable and the check must not hide the cheaper one behind a constant.
+    """
+    m = re.search(r"\n\s+armStretch: ([-\d.]+)", meta_text or "")
+    return 1.0 + (float(m.group(1)) if m else 0.05)
 
 
 def read(path):
@@ -286,6 +297,7 @@ def main():
             print(f"  note - {len(found)} humanoid rigs in the project; measuring "
                   f"{os.path.basename(list(found)[0])} for every fighter")
         rig = measure(found[list(found)[0]])
+        rig_meta = read(list(found)[0] + ".meta")
 
         shoulder_y = rig["shoulder_y"] * scale
         depth = rig["shoulder_depth"] * scale
@@ -326,10 +338,15 @@ def main():
         # look, weighed against the reach that closing it costs. The check measures it
         # and says what would fit; it does not get to spend 7 cm of everybody's reach.
         wrong = 0
-        if worst > reach * IMPOSSIBLE:
+        limit = impossible(rig_meta)
+        if worst > reach * limit:
             print(f"      note    - {worst / reach:.0%} of the arm's length cannot be "
-                  f"reached at all: Arm Stretch tops out at 5%. The hand is left short "
-                  f"and the spine is pulled out after the goal.")
+                  f"reached at all: this rig's Arm Stretch tops out at {limit - 1:.0%}. "
+                  f"The hand is left short, the spine is pulled out after the goal, and "
+                  f"the hand's ROTATION goal loses to its position goal -- which is a "
+                  f"weapon sitting crooked in the fist, worst on the longest ones.")
+        elif worst > reach * limit - 0.0001:
+            pass
         elif worst > reach * COMFORTABLE:
             print(f"      note    - {worst / reach:.0%} of the arm's length leaves the "
                   f"elbow locked straight and nothing in hand but stretch.")

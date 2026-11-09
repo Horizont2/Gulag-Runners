@@ -184,14 +184,25 @@ namespace GulagRunners.Game
             // — while the weapon in the same hand pulsed, from the same function.
             if (_armourRenderer != null)
             {
-                Color worn = ItemModels.RarityGlow(tierColours, _armour, Time.time, glow,
+                // Time 0, like PlayerArmourView does and for the same reason: RarityPulse
+                // is a sine and sin(0) is 0, so the tier shows at its steady brightness and
+                // nothing breathes.
+                Color worn = ItemModels.RarityGlow(tierColours, _armour, 0f, glow,
                                                    out float lit);
                 ItemModels.Tint(_armourRenderer, ref _armourBlock, worn, lit);
             }
 
             if (_weaponRenderer == null) return;
 
-            Color colour = ItemModels.RarityGlow(tierColours, _weapon, Time.time, glow,
+            // AND THE WEAPON DOES NOT BREATHE EITHER.
+            //
+            // The pulse is the FLOOR's: docs/03 gives it one job, which is to answer "is
+            // that worth crossing the room for" from the other side of the arena, and a
+            // legendary is deliberately the only thing moving. In the hand that question
+            // has been answered -- the thing is yours, it is six inches from the camera,
+            // and a weapon that keeps throbbing while you fight with it reads as a bug
+            // rather than as rarity. The colour stays; only the movement goes.
+            Color colour = ItemModels.RarityGlow(tierColours, _weapon, 0f, glow,
                                                  out float emission);
             int left = inv.WeaponDurability;
 

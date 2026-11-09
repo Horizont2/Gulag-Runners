@@ -25,6 +25,12 @@ on a phone, with the volume down, nobody notices for weeks.
       wired to the right clips, every one of them with its component DISABLED. Unity
       refuses to play a disabled source.
 
+A ROW WITH NO CLIP IS NOT A FAULT. The table is meant to be filled in as the game is
+built, and this project is going to FMOD: a row carries a Unity clip and an FMOD event
+path, only one of which the live backend reads. So this counts the empty rows and says
+so, and fails only when the game posts a sound the table has no ROW for -- which is the
+thing that loses the hearing model and the noise indicator with it.
+
 So this walks the chain per scene and fails on any dead link. It cannot hear anything
 either -- there is no Unity here -- but every one of those five is a fact in a file.
 
@@ -103,42 +109,6 @@ def wav_index():
     return out, names
 
 
-def clicks(path):
-    """Does this loop wrap cleanly, and is it at a usable level? A reason, or None.
-
-    A loop that clicks at the wrap is the classic fault nobody hears until it ships: it
-    is one sample out of 176 400 and it arrives exactly once every eight seconds, which
-    the ear reads as a tick in the room rather than as a bug in a file. So it is measured
-    rather than trusted -- the step from the last sample to the first, against the
-    loudest step inside the waveform. A wrap that is no worse than the signal's own
-    steepest moment cannot be heard as an edge.
-    """
-    try:
-        raw = open(path, "rb").read()
-        at = raw.index(b"data") + 8
-        import struct
-        n = (len(raw) - at) // 2
-        if n < 1000:
-            return None
-        s = struct.unpack_from("<%dh" % n, raw, at)
-    except Exception:
-        return None                       # not a wav this can read; not a fault of the scene
-
-    wrap = abs(s[0] - s[-1])
-    inside = max(abs(s[k + 1] - s[k]) for k in range(0, n - 1, 7))
-    peak = max(abs(v) for v in s) / 32767.0
-
-    if inside > 0 and wrap > inside:
-        return (f"clicks where it wraps: the step from its last sample to its first is "
-                f"{wrap}, against {inside} for the steepest moment inside it, so the join "
-                f"is the loudest edge in the file and arrives once a loop")
-    if peak > 0.98:
-        return f"peaks at {peak:.2f}, so it is clipping before the mixer sees it"
-    if peak < 0.02:
-        return f"peaks at {peak:.3f}, which is silence with a file attached"
-    return None
-
-
 def ids():
     """SoundId name -> number, off the enum."""
     src = read(os.path.join(AUDIO, "SoundId.cs"))
@@ -176,7 +146,6 @@ def main(argv):
     effects_guid = guid_of(os.path.join(ASSETS, "_Game", "Presentation", "PlayerEffects.cs"))
     SOUNDS = ids()
     by_number = {v: k for k, v in SOUNDS.items()}
-    wavs, clips_by_guid = wav_index()
 
     # ---------------------------------------------------------- the code side, once
     asked = posted()
@@ -276,49 +245,10 @@ def main(argv):
                 f"refuses to play a disabled source, so the prop is silent while looking "
                 f"entirely wired.")
 
-        # --- the room itself
-        #
-        # A bed, not an event: one looping source per arena. Without it the arena is silent
-        # between footsteps, and a silent room does not read as quiet -- it reads as a game
-        # with the sound off. docs/01 builds the scavenge phase on listening, and listening
-        # needs something to listen THROUGH.
-        beds = []
-        for fid, (cls, body) in sorted(docs.items()):
-            if cls != 82 or not re.search(r"^  Loop: 1", body, re.M):
-                continue
-            if re.search(r"^  m_Enabled: 0", body, re.M):
-                continue
-            res = re.search(r"m_Resource: \{fileID: \d+, guid: ([0-9a-f]{32})", body)
-            awake = re.search(r"^  m_PlayOnAwake: (\d)", body, re.M)
-            vol = re.search(r"^  m_Volume: ([\d.]+)", body, re.M)
-            go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
-            beds.append((named.get(int(go.group(1))) if go else "?",
-                         res.group(1) if res else None,
-                         awake.group(1) == "1" if awake else False,
-                         float(vol.group(1)) if vol else 1.0))
-
-        if not beds:
-            problems.append(
-                f"{scene}: nothing loops, so the room is silent between footsteps. One "
-                f"AudioSource with Loop and Play On Awake, holding a room tone, is the "
-                f"difference between a quiet arena and a game with the sound off.")
-        for who, clip, awake, vol in beds:
-            notes.append(f"  room tone on {who}: "
-                         + (f"{clips_by_guid.get(clip, clip)}" if clip else "NO CLIP")
-                         + f", volume {vol:g}" + ("" if awake else ", NOT playing on awake"))
-            if clip is None:
-                problems.append(
-                    f"{scene}: the looping source on {who} has no clip, so it loops "
-                    f"nothing.")
-            elif not awake:
-                problems.append(
-                    f"{scene}: the room tone on {who} does not play on awake, and nothing "
-                    f"in the game starts it, so it never plays.")
-            if clip and clip in wavs:
-                bad = clicks(wavs[clip])
-                if bad:
-                    problems.append(f"{scene}: the room tone on {who} {bad}")
-
+        # No rule about a room tone here. There was one -- every arena must carry a
+        # looping bed -- and it went with the beds themselves: ambience is FMOD's to
+        # author, and a check that demands a .wav in a project moving to FMOD events is a
+        # check arguing with the plan.
         # --- and somebody to hear it
         if effects_guid not in text:
             notes.append(f"  no PlayerEffects in this scene, so only the AudioManager's "

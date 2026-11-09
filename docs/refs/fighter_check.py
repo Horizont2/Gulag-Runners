@@ -313,13 +313,15 @@ def main(argv):
         # these scenes, so the second fighter is driven by the network or by its brain and
         # by nothing else -- and with no network and no brain it is a statue.
         if not driven:
-            problems.append(
-                f"{name}: nothing drives the second fighter. One fighter has the scene's "
-                f"joysticks and the other is waiting for input over the network, so with "
-                f"no opponent connected it stands still while the player walks around it. "
-                f"Tick Take Over on the FighterBrain of the fighter that is NOT holding "
-                f"the controls — NetMatch switches every brain off when a real opponent "
-                f"arrives, so this costs nothing online.")
+            # A NOTE and not a problem, which is a correction. This failed the scene on the
+            # grounds that the second fighter stands still with nobody connected -- true,
+            # and not a defect: whether a practice bot drives it is a DESIGN decision, and
+            # the answer here is no. These arenas are for two people, and an opponent that
+            # plays itself while you wait for your friend is worse than one that waits.
+            # The setup tool says the same: it adds the brain switched off, on purpose,
+            # because the tick box is the feature.
+            notes.append(f"  nothing drives the second fighter here; it waits for the "
+                         f"other player rather than for a bot")
         elif len(driven) > 1:
             problems.append(
                 f"{name}: {len(driven)} fighters are driven by their own brain "
