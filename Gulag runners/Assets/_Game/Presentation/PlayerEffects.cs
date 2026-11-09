@@ -173,6 +173,18 @@ namespace GulagRunners.Game
         public ActionEffect mantle = new ActionEffect
             { sound = SoundId.LadderOut, level = NoiseLevel.Quiet };
 
+        [Header("Weight")]
+        [Tooltip("At or above this many frames in its attack, a weapon swings HEAVY and uses " +
+                 "the sound below instead of the one on the Swing row.\n\n" +
+                 "Off the item's own attack frames, which is the number the fight is already " +
+                 "balanced on: the dagger takes 9 and the warhammer 34, so one line splits " +
+                 "the table into the six you flick and the six you commit to. The table has " +
+                 "had a heavy row since it was written and nothing ever chose it, so every " +
+                 "weapon in the game whooshed like a dagger.")]
+        [Range(8, 40)] public int heavyFrames = 20;
+
+        public SoundId heavySwing = SoundId.AttackSwingHeavy;
+
         [Header("Noise")]
         [Tooltip("How often the chest-prying noise repeats while the work lasts, in seconds.\n\n" +
                  "A held particle system lasts by itself; a sound does not, and somebody " +
@@ -256,7 +268,13 @@ namespace GulagRunners.Game
             // uses -- so the sound fires exactly when the blade became dangerous, rather
             // than when a state machine said so.
             bool swinging = s.SwingShare > 0;
-            if (swinging && !_swinging) Fire(swing, "swing");
+            if (swinging && !_swinging)
+            {
+                bool heavy = heavySwing != SoundId.None &&
+                             ItemTable.Get(s.Inventory.Weapon).AttackFrames >= heavyFrames;
+                Fire(swing, heavy ? "heavy swing" : "swing",
+                     heavy ? heavySwing : SoundId.None);
+            }
             _swinging = swinging;
 
             // The trail runs for as long as the blade is live, which is now a real
@@ -326,24 +344,32 @@ namespace GulagRunners.Game
         /// and whose indicator lights up. A fighter's own position is both where the sound is
         /// and where it happened, which is what Post wants.
         /// </summary>
-        void Fire(ActionEffect effect, string what)
+        void Fire(ActionEffect effect, string what, SoundId instead = SoundId.None)
         {
             effect.Play();
-            Noise(effect);
+            Noise(effect, instead);
 
             if (logEvents)
                 Debug.Log($"{name}: {what}" +
                           (effect.particles == null ? "  (no effect wired)" : ""), this);
         }
 
-        /// <summary>The noise half of an event, with no particles touched.</summary>
-        void Noise(ActionEffect effect)
+        /// <summary>
+        /// The noise half of an event, with no particles touched.
+        ///
+        /// `instead` is for the one event whose sound is not a property of the event but of
+        /// what is being held: a swing. Passed rather than written into the row, because
+        /// the row is a serialized field and borrowing it for a frame would dirty the
+        /// component and show the wrong value to anyone looking at it.
+        /// </summary>
+        void Noise(ActionEffect effect, SoundId instead = SoundId.None)
         {
-            if (effect.sound == SoundId.None) return;
+            SoundId sound = instead != SoundId.None ? instead : effect.sound;
+            if (sound == SoundId.None) return;
             if (AudioManager.Instance == null || player == null) return;
 
             Vector2 at = player.FeetPosition;
-            AudioManager.Instance.Post(effect.sound, at, effect.level, at);
+            AudioManager.Instance.Post(sound, at, effect.level, at);
         }
     }
 }

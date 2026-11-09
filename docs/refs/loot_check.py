@@ -55,6 +55,106 @@ def ground_item_models():
     return items, bool(fallback and fallback.group(1) != "0")
 
 
+def worn_parts_land_on_the_floor(problems, notes):
+    """Is a body part borrowed as a prop brought back to the drop point?
+
+    The nine armour models are parts of the modular character -- the same meshes
+    PlayerArmourView switches on when the item is worn -- and a character's parts are
+    authored WHERE THEY SIT ON HIM: the helmets around y 1.7, the chests around 1.2, the
+    belts around 0.9. Used as a prop, each one therefore floats about a metre above the
+    thing it belongs to.
+
+    ItemModels.Fit scales a model and never recentres it, deliberately: a weapon's origin
+    is its grip and moving that would be wrong. So the offset has to be authored, on a
+    child beneath the root -- beneath, because Fit multiplies the ROOT's scale and a
+    position on the root itself is in the parent's space and would not scale with it.
+
+    Which makes "the offset is zero" a silent fault with no symptom in any file: the item
+    is the right size, the right mesh, the right material, and a metre in the air. Hence
+    a rule, and hence this length of explanation for one comparison.
+    """
+    path = os.path.join(ASSETS, "Prefabs", "GroundItem.prefab")
+    if not os.path.exists(path):
+        return
+    text = open(path, encoding="utf-8", errors="ignore").read()
+
+    docs = {}
+    for m in re.finditer(r"(?m)^--- !u!(\d+) &(-?\d+)( stripped)?\n(.*?)(?=^--- !u!|\Z)",
+                         text, re.S):
+        docs[int(m.group(2))] = (int(m.group(1)), m.group(4))
+
+    # Which meshes come from a rig: an FBX that any SkinnedMeshRenderer in the project
+    # reads. Asked rather than listed, so a second character pack is covered too.
+    skinned = set()
+    for where, _dirs, files in os.walk(os.path.join(ASSETS)):
+        for f in files:
+            if not f.endswith((".prefab", ".unity")):
+                continue
+            body = open(os.path.join(where, f), encoding="utf-8", errors="ignore").read()
+            for m in re.finditer(r"(?m)^--- !u!137 &-?\d+\n(.*?)(?=^--- !u!|\Z)", body, re.S):
+                g = re.search(r"m_Mesh: \{fileID: -?\d+, guid: ([0-9a-f]{32})", m.group(1))
+                if g:
+                    skinned.add(g.group(1))
+
+    names = {f: (re.search(r"m_Name: (.*)", b).group(1).strip()
+                 if re.search(r"m_Name: (.*)", b) else None)
+             for f, (c, b) in docs.items() if c == 1}
+
+    def transform_of(go):
+        for f, (c, b) in docs.items():
+            if c == 4 and f"m_GameObject: {{fileID: {go}}}" in b:
+                return f
+        return None
+
+    def walk(go, offset, root_name, depth=0):
+        """Every mesh under this object, with how far it sits from the root."""
+        if depth > 4:
+            return
+        tr = transform_of(go)
+        if tr is None:
+            return
+        body = docs[tr][1]
+        pos = re.search(r"m_LocalPosition: \{x: ([-\d.e+]+), y: ([-\d.e+]+), z: ([-\d.e+]+)\}",
+                        body)
+        here = offset + (float(pos.group(2)) if pos else 0.0)
+
+        comps = [int(x) for x in re.findall(r"- component: \{fileID: (-?\d+)\}",
+                                            docs[go][1])]
+        for c in comps:
+            if docs.get(c, (0, ""))[0] != 33:
+                continue
+            g = re.search(r"m_Mesh: \{fileID: -?\d+, guid: ([0-9a-f]{32})", docs[c][1])
+            if g and g.group(1) in skinned and abs(here) < 0.3:
+                problems.append(
+                    f"GroundItem.prefab: {root_name} is drawn with a mesh from a rigged "
+                    f"character and sits {here:+.2f} m from the item's own origin. Those "
+                    f"parts are authored where they sit on a body -- a helmet around 1.7 m "
+                    f"up -- so without an offset beneath the root it floats about a metre "
+                    f"over the drop. Fit scales a model and never recentres it.")
+
+        kids = re.search(r"m_Children:(.*?)m_Father", body, re.S)
+        for k in re.findall(r"- \{fileID: (-?\d+)\}", kids.group(1) if kids else ""):
+            kt = docs.get(int(k))
+            if kt is None or kt[0] != 4:
+                continue
+            kgo = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", kt[1])
+            if kgo:
+                walk(int(kgo.group(1)), here, root_name, depth + 1)
+
+    block = re.search(r"  models:\n((?:  - item: .*\n    root: .*\n)*)", text)
+    rows = re.findall(r"- item: (\d+)\n    root: \{fileID: (-?\d+)\}",
+                      block.group(1)) if block else []
+    borrowed = 0
+    for _item, root in rows:
+        r = int(root)
+        if r == 0 or docs.get(r, (0, ""))[0] != 1:
+            continue
+        before = len(problems)
+        walk(r, 0.0, names.get(r) or str(r))
+        borrowed += 1 if len(problems) == before else 0
+    notes.append(f"{len(rows)} model row(s) on the ground item, offsets checked")
+
+
 def rolls(problems, notes):
     """Will the chests ever pay out anything different?
 
@@ -178,10 +278,14 @@ def every_item_drawn(drawable, problems, notes):
     other end of it, and nine identical cubes say only "something".
 
     So the rule is per ITEM and not per mesh: anything the drop table can roll needs its
-    own entry, even if that entry is a box of its own shape. The eleven weapons have
-    real prefabs -- the same ones the fighters hold -- and body armour, helmets and
-    belts have no mesh anywhere in the project, so they get a slab, a small deep box and
-    a strap. Greybox that says what KIND it is.
+    own entry, even if that entry is a box of its own shape.
+
+    All of them now have a real one. The eleven weapons use the same prefabs the
+    fighters hold. The nine suits, helmets and belts were a cube each, shaped by scale,
+    on the stated grounds that no mesh for them existed anywhere in the project -- which
+    was wrong: they are the parts of the modular character that PlayerArmourView
+    switches on when you WEAR them, so the thing on the floor is now the thing you will
+    be wearing. Only the bandage is still a box, having no part on the character.
     """
     table = os.path.join(ASSETS, "_Game", "Sim", "Items", "ItemTable.cs")
     ids = os.path.join(ASSETS, "_Game", "Sim", "Items", "ItemId.cs")
@@ -227,6 +331,7 @@ def main(argv):
                   else " and has NO stand-in"))
 
     every_item_drawn(drawable, problems, notes)
+    worn_parts_land_on_the_floor(problems, notes)
 
     for name in wanted:
         path = os.path.join(SCENES, name)

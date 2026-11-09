@@ -108,6 +108,43 @@ def class_body(src, after):
     return src[start:]
 
 
+def without_nested_types(body):
+    """A class body with the bodies of its nested types cut out.
+
+    class_body already scopes to the component and says why: a nested class's fields are
+    not slots on the component. It scopes to the OUTER braces though, so a type declared
+    INSIDE those braces is still in the text -- and MatchOutcomeView declares a private
+    struct holding what each camera was framing, whose fields are called Camera, Player and
+    Target. Read as the component's own, they are three inspector slots that do not exist,
+    and the three arenas were duly reported as missing them.
+
+    Unity serializes a nested type's fields only through a FIELD of that type, which this
+    sees on its own; the type's declaration is never a slot.
+    """
+    out, i = [], 0
+    for m in re.finditer(r"(?m)^\s*(?:\[[^\]]*\]\s*)*"
+                         r"(?:public|private|internal|protected)?\s*(?:readonly\s+)?"
+                         r"(?:static\s+)?(?:sealed\s+|abstract\s+|partial\s+)*"
+                         r"(?:class|struct|interface|enum)\s+\w+[^{;]*\{", body):
+        start = m.end() - 1
+        if start < i:
+            continue
+        out.append(body[i:m.start()])
+        depth = 0
+        for k in range(start, len(body)):
+            if body[k] == "{":
+                depth += 1
+            elif body[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    i = k + 1
+                    break
+        else:
+            i = len(body)
+    out.append(body[i:])
+    return "".join(out)
+
+
 def fields_of(src, whole):
     """The public serialized fields of a script, with their type and whether they are optional.
 
@@ -115,6 +152,7 @@ def fields_of(src, whole):
     the right one here because what matters is the NAME Unity serializes, which is exactly what
     the declaration says.
     """
+    src = without_nested_types(src)
     found = {}
     for m in re.finditer(
             r'(?:\[[^\]]*\]\s*)*public\s+(?!static|const|event|override|readonly)'
