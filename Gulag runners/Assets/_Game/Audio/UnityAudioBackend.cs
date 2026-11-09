@@ -32,19 +32,47 @@ namespace GulagRunners.Game
 
         int _next;
 
-        public bool Ready => voices != null && voices.Length > 0;
+        /// <summary>
+        /// Is there a voice to speak with? A VOICE, not an array.
+        ///
+        /// This read `voices.Length > 0`, and that one word is why the whole game was silent
+        /// in all three arenas with nothing in the log to say so. Every arena's array had six
+        /// SLOTS and six nulls in them -- the shape somebody leaves behind after setting the
+        /// size and before dragging the sources in. Length was 6, so Ready said yes, so
+        /// AudioManager handed its finished volume over; NextFreeVoice then found no non-null
+        /// voice, fell through to voices[_next], which was null, and Play returned at its own
+        /// null check. Silence, no warning, no exception, and a sound table full of clips
+        /// nobody could hear.
+        /// </summary>
+        public bool Ready => Voice() != null;
+
+        AudioSource Voice()
+        {
+            if (voices == null) return null;
+            for (int i = 0; i < voices.Length; i++)
+                if (voices[i] != null) return voices[i];
+            return null;
+        }
 
         void Reset() => voices = GetComponentsInChildren<AudioSource>();
 
         void Awake()
         {
             if (manager == null) manager = GetComponentInParent<AudioManager>();
-            if (voices == null || voices.Length == 0) voices = GetComponentsInChildren<AudioSource>();
 
-            if (voices == null || voices.Length == 0)
+            // On "no voice", not on "no array". An array of empty slots is the common way
+            // for this to be wrong, and it used to be the one case the fallback skipped.
+            if (Voice() == null) voices = GetComponentsInChildren<AudioSource>();
+
+            if (Voice() == null)
             {
-                Debug.LogWarning($"{name}: no AudioSources, so the game will be silent. Add a few " +
-                                 "as children of this object and list them above.", this);
+                Debug.LogWarning(
+                    $"{name}: no AudioSources, so the game will be silent"
+                    + (voices != null && voices.Length > 0
+                        ? $" -- there are {voices.Length} voice slots and every one of them is "
+                          + "empty, which looks set up and is not"
+                        : "")
+                    + ". Add a few as children of this object and list them above.", this);
                 return;
             }
 

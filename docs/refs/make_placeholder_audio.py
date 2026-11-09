@@ -181,6 +181,97 @@ def take(length=0.18, up=True):
         yield (math.sin(phase) * 0.6 + noise() * 0.18) * env(t, length, 0.002, 1, 2.4) * 0.5
 
 
+# ---------------------------------------------------------------- the fight
+#
+# The whole of combat was missing from this file, and from the sound table with it, which
+# is how a fight could be had in silence while somebody walking across the room was
+# announced. docs/02 asks that a parry and a blocked hit be told apart across the arena;
+# that is a demand on these as much as on the particles, so the pair below are deliberately
+# different objects rather than two volumes of the same one.
+
+
+def whoosh(length=0.3, heavy=False):
+    """A blade through air: band-limited noise swept down, loudest in the middle of the arc."""
+    n = int(RATE * length)
+    low = 0.0
+    for i in range(n):
+        t = i / RATE
+        k = t / length
+        # A one-pole low-pass whose corner falls as the swing passes: the Doppler of a thing
+        # going by, without pretending to model one.
+        a = 0.55 - 0.3 * k if not heavy else 0.4 - 0.25 * k
+        low += a * (noise() - low)
+        shape = math.sin(math.pi * min(1.0, k)) ** (1.4 if heavy else 2.0)
+        yield low * shape * (0.85 if heavy else 0.6)
+
+
+def hit(length=0.34, armoured=False):
+    """Landing on somebody. Flesh is a low thump with grit; armour rings over the top."""
+    n = int(RATE * length)
+    phase = 0.0
+    for i in range(n):
+        t = i / RATE
+        phase += 2 * math.pi * (155.0 - 85.0 * min(1.0, t / 0.1)) / RATE
+        body = math.sin(phase) * env(t, length, 0.001, 1, 5.0)
+        grit = noise() * env(t, length, 0.0008, 1, 30.0) * 0.6
+        ring = 0.0
+        if armoured:
+            for f, a in ((1420.0, 0.5), (2180.0, 0.3), (3310.0, 0.18)):
+                ring += math.sin(2 * math.pi * f * t) * a * env(t, length, 0.0005, 1, 9.0)
+        yield (body * 0.8 + grit + ring * 0.5) * 0.7
+
+
+def ring(length=0.55, bright=1.0):
+    """Steel caught on steel. The parry is this one, longer and higher than a block."""
+    n = int(RATE * length)
+    partials = [(2240.0 * bright, 1.0), (3360.0 * bright, 0.55),
+                (5020.0 * bright, 0.3), (6730.0 * bright, 0.16)]
+    for i in range(n):
+        t = i / RATE
+        v = noise() * env(t, length, 0.0005, 1, 45.0) * 0.5
+        for f, a in partials:
+            v += math.sin(2 * math.pi * f * t) * a * env(t, length, 0.0004, 1, 3.2) * 0.17
+        yield v * 0.75
+
+
+def effort(length=0.26, deep=False):
+    """A body doing something: the breath and the cloth, with no voice in it."""
+    n = int(RATE * length)
+    low = 0.0
+    for i in range(n):
+        t = i / RATE
+        low += (0.22 if deep else 0.45) * (noise() - low)
+        yield low * env(t, length, 0.01, 1, 2.6) * (0.55 if deep else 0.4)
+
+
+def drop_body(length=0.9):
+    """Going down for good: the fall, and then nothing moving."""
+    n = int(RATE * length)
+    phase = 0.0
+    for i in range(n):
+        t = i / RATE
+        phase += 2 * math.pi * (120.0 - 72.0 * min(1.0, t / 0.18)) / RATE
+        thump = math.sin(phase) * env(t, length, 0.002, 1, 2.4)
+        cloth = noise() * env(t, length, 0.005, 1, 5.0) * 0.35
+        second = 0.0
+        if t > 0.26:                       # the weight settling after the first impact
+            k = t - 0.26
+            second = math.sin(2 * math.pi * 88.0 * k) * max(0.0, (1 - k / 0.3) ** 3) * 0.45
+        yield (thump * 0.8 + cloth + second) * 0.7
+
+
+def rung(length=0.16, out=False):
+    """A hand or a boot on a ladder. Out is the last one, with the ground under it."""
+    n = int(RATE * length)
+    phase = 0.0
+    for i in range(n):
+        t = i / RATE
+        phase += 2 * math.pi * (310.0 if not out else 210.0) / RATE
+        knock = math.sin(phase) * env(t, length, 0.0008, 1, 14.0)
+        grit = noise() * env(t, length, 0.0006, 1, 34.0) * 0.35
+        yield (knock * 0.5 + grit) * 0.45
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     print(f"placeholder audio -> {os.path.relpath(OUT)}")
@@ -203,6 +294,21 @@ def main():
     wav("Chest_Open", chest_open())
     wav("Item_Pickup", take())
     wav("Item_Drop", take(0.22, up=False))
+
+    # The fight. Two weights of swing and two of impact, because the table has rows for
+    # both and a heavy weapon that sounds like a dagger is a lie the player can hear.
+    wav("Swing_Light", whoosh())
+    wav("Swing_Heavy", whoosh(0.38, heavy=True))
+    wav("Hit_Flesh", hit())
+    wav("Hit_Armour", hit(0.4, armoured=True))
+    wav("Block_Impact", ring(0.34, bright=0.8))
+    wav("Parry", ring(0.62, bright=1.15))
+    wav("Stagger", effort(0.34, deep=True))
+    wav("Death", drop_body())
+    wav("Jump", effort(0.2))
+    wav("Dodge", effort(0.24))
+    wav("Ladder_Grab", rung())
+    wav("Ladder_Out", rung(0.22, out=True))
 
 
 if __name__ == "__main__":
