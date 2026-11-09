@@ -173,6 +173,40 @@ def check(path, guids):
             bad.append("has a MatchState but nothing listening to its Ended event, so "
                        "winning the match plays no differently from pausing it")
 
+        # And an outcome that plays. Two of its numbers fail SILENTLY, which is the only
+        # reason they are worth a rule of their own:
+        #
+        #   AN ANIMATION CURVE WITH NO KEYS EVALUATES TO ZERO, for every input, for ever.
+        #       So a Push Ease that was never authored is not a linear push or a missing
+        #       ease -- it is no push at all, and nothing says so. Unity writes an empty
+        #       curve for any AnimationCurve field that reaches a scene without one, which
+        #       is every field added to a component after the scene was saved.
+        #   AND A TIGHTEN OF 1 IS NO TIGHTEN. It is the identity, so the shot holds where
+        #       it was. Legitimate if somebody wants the freeze and the slow motion alone,
+        #       but then the push seconds and the curve beside it are furniture, and this
+        #       says which of the two was meant.
+        if outcome_g and outcome_g in src:
+            for cls, fid, _stripped, body in docs:
+                if cls != "114" or f"guid: {outcome_g}" not in body:
+                    continue
+                keys = re.search(r"\n  pushEase:\n(.*?)(?=\n  \w+:)", body, re.S)
+                how_many = len(re.findall(r"- serializedVersion: \d+\n\s+time:", keys.group(1))) \
+                    if keys else 0
+                tighten = re.search(r"\n  pushTighten: ([\d.]+)", body)
+                close = float(tighten.group(1)) if tighten else 1.0
+
+                if close > 1.0 and how_many < 2:
+                    bad.append(
+                        f"the MatchOutcomeView at {fid} asks for a {close:g}x tighter shot "
+                        f"on a Push Ease with {how_many} key(s). An empty curve evaluates "
+                        f"to zero for every input, so the camera never moves and nothing "
+                        f"reports it")
+                if close <= 1.0 and how_many >= 2:
+                    bad.append(
+                        f"the MatchOutcomeView at {fid} has a Push Ease curve and a Push "
+                        f"Tighten of {close:g}, which is the identity -- the curve is "
+                        f"furniture and the shot holds where it was")
+
         bad += no_camera(docs, src)
 
     for b in bad:

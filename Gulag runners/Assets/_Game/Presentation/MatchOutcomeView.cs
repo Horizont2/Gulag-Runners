@@ -22,8 +22,22 @@ namespace GulagRunners.Game
     ///                 so both devices still run the SAME ticks in the same order and the
     ///                 rollback layer never notices (docs/06). Nothing here may touch the
     ///                 tick count, and nothing here does.
-    ///   the camera    pushes in on the winner. Not a cut — a cut in a game with one
+    ///   the camera    tightens on the winner. Not a cut — a cut in a game with one
     ///                 camera reads as a bug.
+    ///
+    ///                 THROUGH THE CAMERA'S OWN FRAMING, and that is not a detail. This
+    ///                 used to write cam.position from the coroutine, reasoning — as the
+    ///                 body below still correctly does — that a coroutine resumes after
+    ///                 every Update and therefore wins. It does not win here:
+    ///                 SideViewCamera owns the transform and sets it in LATE Update,
+    ///                 which runs after coroutines, so every pushed metre was overwritten
+    ///                 before it was drawn. The push was invisible and always had been.
+    ///
+    ///                 So it asks for a tighter shot instead — more of the screen filled
+    ///                 by a body — and points the camera at the winner, both of which are
+    ///                 the camera's own public business. One per screen, because these
+    ///                 arenas carry a camera per fighter: on one phone both halves tighten
+    ///                 on the winner, and on two phones each device tightens its own.
     ///   the bodies    the winner plays a state you name; the loser goes down.
     ///
     /// GOING DOWN IS DONE HERE AND NOT IN THE ANIMATOR ON PURPOSE. GR_Player has no death
@@ -42,8 +56,12 @@ namespace GulagRunners.Game
         [Tooltip("The match. Found in the scene when empty.")]
         public MatchState match;
 
-        [Tooltip("The camera that pushes in. The main camera when empty.")]
-        public Camera view;
+        [Tooltip("The cameras that tighten on the winner. Empty takes every enabled one " +
+                 "in the scene, which is what an arena with a camera per fighter wants.\n\n" +
+                 "SideViewCamera rather than Camera, because the shot is asked for through " +
+                 "its framing: it owns its own transform and would overwrite anything " +
+                 "written here.")]
+        public SideViewCamera[] cameras = System.Array.Empty<SideViewCamera>();
 
         [Header("The beat")]
         [Tooltip("Seconds everything holds still on the finishing blow, at real time. " +
@@ -57,10 +75,12 @@ namespace GulagRunners.Game
         [Range(0f, 4f)] public float slowSeconds = 1.1f;
 
         [Header("The camera")]
-        [Tooltip("Metres the camera moves towards the winner. 0 leaves it where it is.")]
-        [Range(0f, 6f)] public float pushIn = 1.6f;
+        [Tooltip("How much tighter the shot gets, as a multiplier on how much of the " +
+                 "screen a body fills. 1 leaves the framing alone; 1.35 is about a third " +
+                 "closer, which reads as a push without losing the arena behind him.")]
+        [Range(1f, 2.5f)] public float pushTighten = 1.35f;
 
-        [Tooltip("Seconds the push takes. It runs on unscaled time, so the slow motion " +
+        [Tooltip("Seconds the tightening takes. It runs on unscaled time, so the slow motion " +
                  "does not also slow the camera down to a crawl.")]
         [Range(0.1f, 4f)] public float pushSeconds = 1.3f;
 
@@ -110,7 +130,8 @@ namespace GulagRunners.Game
         void OnEnable()
         {
             if (match == null) match = FindFirstObjectByType<MatchState>();
-            if (view == null) view = Camera.main;
+            if (cameras == null || cameras.Length == 0)
+                cameras = FindObjectsByType<SideViewCamera>(FindObjectsSortMode.None);
 
             if (match != null)
             {
@@ -171,9 +192,12 @@ namespace GulagRunners.Game
             }
 
             state = "slow";
-            Transform cam = view != null ? view.transform : null;
-            Vector3 camFrom = cam != null ? cam.position : Vector3.zero;
-            Vector3 toward = Toward(cam, won);
+
+            // Every screen that is actually drawing. On one phone that is both halves of
+            // a split screen; on two it is the one camera NetMatch left enabled, which is
+            // this device's own -- so each player gets the shot of their own view rather
+            // than one of them getting somebody else's.
+            Aim(won);
 
             Transform body = lost != null && lost.visualRoot != null ? lost.visualRoot : null;
             if (body != null && layTheLoserDown)
@@ -196,10 +220,10 @@ namespace GulagRunners.Game
                 }
                 else Time.timeScale = _scaleWas;
 
-                if (cam != null && pushIn > 0f && pushSeconds > 0f)
+                if (pushTighten > 1f && pushSeconds > 0f)
                 {
                     float k = pushEase.Evaluate(Mathf.Clamp01(t / pushSeconds));
-                    cam.position = camFrom + toward * (pushIn * k);
+                    Tighten(Mathf.Lerp(1f, pushTighten, k));
                 }
 
                 // Written from the coroutine, which resumes AFTER every Update has run --
@@ -238,15 +262,67 @@ namespace GulagRunners.Game
             _running = null;
         }
 
-        /// <summary>Which way the camera travels: towards the winner, flattened.</summary>
-        Vector3 Toward(Transform cam, PlayerController won)
-        {
-            if (cam == null) return Vector3.zero;
-            if (won == null) return cam.forward;
+        // What each camera was framing before the sequence took it over, so it can be
+        // handed back exactly. Held per camera and not as one value, because the two in a
+        // split-screen arena are framing two different fighters.
+        readonly System.Collections.Generic.List<Framing> _framings =
+            new System.Collections.Generic.List<Framing>();
 
-            Vector3 at = won.transform.position - cam.position;
-            at.y = 0f;
-            return at.sqrMagnitude > 0.0001f ? at.normalized : cam.forward;
+        struct Framing
+        {
+            public SideViewCamera Camera;
+            public PlayerController Player;
+            public Transform Target;
+            public float BodyFraction;
+            public float WorldHeight;
+        }
+
+        /// <summary>Points every drawing camera at the winner, remembering what it had.</summary>
+        void Aim(PlayerController won)
+        {
+            _framings.Clear();
+            if (cameras == null) return;
+
+            foreach (SideViewCamera cam in cameras)
+            {
+                if (cam == null || !cam.isActiveAndEnabled) continue;
+
+                Camera drawn = cam.GetComponent<Camera>();
+                if (drawn != null && !drawn.enabled) continue;   // the other player's, off
+
+                _framings.Add(new Framing
+                {
+                    Camera = cam,
+                    Player = cam.player,
+                    Target = cam.target,
+                    BodyFraction = cam.bodyScreenFraction,
+                    WorldHeight = cam.visibleWorldHeight,
+                });
+
+                if (won == null) continue;
+                cam.player = won;
+                cam.target = won.transform;
+            }
+        }
+
+        /// <summary>
+        /// Asks for a tighter shot, by the share of the screen a body fills.
+        ///
+        /// Which is the knob that works. SideViewCamera computes its distance from
+        /// EffectiveViewHeight every LateUpdate -- FramingBodyHeight / bodyScreenFraction
+        /// when it is framing automatically, visibleWorldHeight when it is not -- so the
+        /// way in is to change what it reads, not where it ended up.
+        /// </summary>
+        void Tighten(float by)
+        {
+            foreach (Framing was in _framings)
+            {
+                if (was.Camera == null) continue;
+                if (was.Camera.manualFraming)
+                    was.Camera.visibleWorldHeight = was.WorldHeight / Mathf.Max(0.01f, by);
+                else
+                    was.Camera.bodyScreenFraction = was.BodyFraction * by;
+            }
         }
 
         /// <summary>Which way a body falls: away from whoever hit it last.</summary>
@@ -302,6 +378,19 @@ namespace GulagRunners.Game
                 _fallen.localPosition = _stoodPosition;
                 _fallen = null;
             }
+
+            // And the cameras back to what they were framing. Exactly what they were: a
+            // camera handed back a DEFAULT instead of its own value is a camera that
+            // quietly reframes every round until nobody can tell what it was tuned to.
+            foreach (Framing was in _framings)
+            {
+                if (was.Camera == null) continue;
+                was.Camera.player = was.Player;
+                was.Camera.target = was.Target;
+                was.Camera.bodyScreenFraction = was.BodyFraction;
+                was.Camera.visibleWorldHeight = was.WorldHeight;
+            }
+            _framings.Clear();
         }
     }
 }
