@@ -19,7 +19,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SSPD=M(2400), SMINF=10, SMAXF=30, LREGRAB=12,
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
-         BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
+         BODYZ=M(600), DEPTHSPD=M(4000), AIRDEPTH=M(3000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
          LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=32, RISEMARGIN=M(120), ALLOW_DODGE=True, MANTLE_RISE=M(450), LADDER_JUMP=False,
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
@@ -343,13 +343,25 @@ def update_depth(s, w):
         # keep the slice you left until your feet touched and then slide you forward on
         # the spot, which is what "he drops to the floor below and stays in the
         # background" means: the move happened after the landing instead of during the
-        # fall. Only on the way down -- being dragged backwards while jumping UP at a
-        # ledge would put the shoulders through its front face.
-        if s.vy > 0:
-            return
+        # fall.
+        #
+        # On the way UP as well, once the fighter is over the thing. The guard here was
+        # `if s.vy > 0: return`, against being dragged backwards while jumping at a
+        # ledge -- and landing_lane already skips every box whose top is above the feet,
+        # so the guard only ever delayed the lean onto something ALREADY cleared. That is
+        # the forest's cages, which are parkour and stand on their own slices: leaning
+        # only on the way down left most of that distance to be walked off AFTER landing,
+        # as a slide into the back of the cage. And since a box is only solid to a body
+        # whose slice overlaps it, a cage whose roof is near the top of the arc was passed
+        # straight through -- the body drifting towards the camera INSIDE it.
         want = landing_lane(s, w)
         if want is None:
             return
+        # And faster off the ground: the gentle speed is for walking between slices, and
+        # in the air the move has to finish before the feet touch or the rest of it
+        # happens on the floor.
+        s.depth = move_towards(s.depth, want, mul(mul(C["DEPTHSPD"], C["AIRDEPTH"]), DT))
+        return
     else:
         want = lane_ahead(s, w)
         if want is None:

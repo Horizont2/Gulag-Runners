@@ -111,6 +111,15 @@ namespace GulagRunners.Sim
         public Fix DepthSnapSpeed;
 
         /// <summary>
+        /// What DepthSnapSpeed is multiplied by while the feet are off the ground.
+        ///
+        /// One number and not two speeds, so the ground speed stays the thing anybody
+        /// tunes and the air is always a multiple of it: they are the same move, and a
+        /// pair that can drift apart is a pair that will.
+        /// </summary>
+        public Fix AirDepthSnap;
+
+        /// <summary>
         /// How far ahead to look for the next thing worth standing on, in metres. A body walks
         /// onto the slice of whatever it is about to climb: that is what lets one floor hold a
         /// ramp at one depth and a crate staircase at another, and a fighter use both.
@@ -304,6 +313,7 @@ namespace GulagRunners.Sim
             c.BodyWidth   = Fix.FromMilli(300);
             c.BodyDepth   = Fix.FromMilli(600);
             c.DepthSnapSpeed = Fix.FromMilli(4000);
+            c.AirDepthSnap = Fix.FromMilli(3000);
             c.LaneLookahead  = Fix.FromMilli(1200);
             c.LaneReach      = Fix.FromMilli(2000);
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure

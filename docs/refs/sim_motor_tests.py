@@ -202,4 +202,61 @@ f0 = s.facing
 for _ in range(21): step(s, DOD, W)
 ok &= check("dodge keeps the current facing", s.facing == f0, f"facing={s.facing}")
 
+print("\n12. jumping onto a cage that stands on its own slice")
+# Arena_Forest's cages are parkour, on purpose, and not one of them is on the floor's
+# lane: the hanging pair sits 1.66 m behind it, the standing ones about 1.2 m in front.
+# Two things therefore have to happen in the AIR.
+#
+# The lean has to be spent before the feet touch, or the rest of it is a slide across the
+# cage floor once you are standing on it -- which is what "jump on a cage and it slowly
+# sucks you inside" was.
+#
+# And the body has to be on the cage's slice by the time it arrives, because a box is only
+# solid to a body whose slice OVERLAPS it. Arriving with the slice you took off from is
+# arriving INSIDE the cage: the roof is not there to be landed on.
+HOME_WAS = C["HOME"]
+C["HOME"] = X(-3.16)                                   # the forest's fight plane
+FLOOR_Z, CAGE_Z = (X(-2.63), X(1.78)), (X(-3.90), X(-3.20))
+FLOOR_LANE, CAGE_LANE = F(T.lane_on(FLOOR_Z, X(-2.33))), F(T.lane_on(CAGE_Z, X(-2.33)))
+
+
+def cage_world(roof):
+    """A floor 4.4 m deep and a cage prop standing in front of it, as the forest has."""
+    return {"solid": [(X(-10.0), X(-1.0), X(10.0), X(0.0)),
+                      (X(2.0), X(0.0), X(2.68), X(roof))],
+            "solidz": [FLOOR_Z, CAGE_Z], "oneway": [], "onewayz": [],
+            "ladder": [], "ladderz": [], "ladderlean": [], "ladderleanz": []}
+
+
+def jump_onto_cage(roof):
+    """Run at the cage and jump it. Returns the state at touchdown and how many ticks
+    were spent standing where the cage is while the cage was not solid."""
+    w = cage_world(roof)
+    st = S(0.75, 0.0)
+    st.mode = "ground"
+    st.depth = X(FLOOR_LANE)
+    inside = 0
+    for t in range(120):
+        step(st, R | (JMP if 6 <= t <= 20 else 0), w)
+        x, y, z = F(st.x), F(st.y), F(st.depth)
+        if (1.85 < x < 2.83 and 0.0 < y < roof
+                and not (z + 0.3 > F(CAGE_Z[0]) and z - 0.3 < F(CAGE_Z[1]))):
+            inside += 1
+        if t > 25 and st.mode == "ground":
+            break
+    return st, inside
+
+
+ok &= check("the cage stands on a slice of its own", abs(CAGE_LANE - FLOOR_LANE) > 1.0,
+            f"floor {FLOOR_LANE:+.2f}, cage {CAGE_LANE:+.2f}")
+for roof in (0.6, 0.9, 1.2, 1.4):
+    st, inside = jump_onto_cage(roof)
+    left = abs(F(st.depth) - CAGE_LANE)
+    ok &= check(f"a {roof:.2f} m cage is landed ON, never passed through",
+                abs(F(st.y) - roof) < 0.05 and inside == 0,
+                f"y={F(st.y):+.2f} slice={F(st.depth):+.2f}, {inside} tick(s) inside it")
+    ok &= check(f"and the lean onto it is spent in the air", left < 0.15,
+                f"{left:.2f} m of it left to walk off on the cage")
+C["HOME"] = HOME_WAS
+
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

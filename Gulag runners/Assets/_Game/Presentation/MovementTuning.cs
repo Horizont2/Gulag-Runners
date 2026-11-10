@@ -119,6 +119,15 @@ namespace GulagRunners.Game
                  "teleport sideways whenever a ramp starts at another depth.")]
         public float depthSnapSpeed = 4f;
 
+        [Tooltip("How much faster that is while the feet are off the ground.\n\n" +
+                 "The speed above is tuned for walking from one slice to another, where " +
+                 "gentle is right. A JUMP to a prop at another depth has to finish its " +
+                 "move before the landing, or the rest of it happens as a slide across " +
+                 "the floor you just landed on — which is what being slowly pulled into " +
+                 "the forest's hanging cages was. In the air the body is already " +
+                 "travelling, so the same move reads as leaning into the jump.")]
+        [Range(1f, 6f)] public float airDepthSnap = 3f;
+
         [Tooltip("How far ahead to look for the next thing worth standing on, in metres. The " +
                  "body walks onto the slice of whatever it is about to climb, which is what " +
                  "lets one floor hold a ramp at one depth and a crate stair at another.")]
@@ -199,6 +208,7 @@ namespace GulagRunners.Game
             c.CrouchHeight = M(Mathf.Min(crouchHeight, bodyHeight * 0.75f));
             c.BodyDepth = M(bodyDepth);
             c.DepthSnapSpeed = M(depthSnapSpeed);
+            c.AirDepthSnap = Fix.FromMilli((int)(airDepthSnap * 1000));
             c.LaneLookahead = M(laneLookahead);
             c.LaneReach = M(laneReach);
             c.LadderStandOff = M(ladderStandOff);

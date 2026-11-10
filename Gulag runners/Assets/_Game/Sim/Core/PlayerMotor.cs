@@ -152,13 +152,45 @@ namespace GulagRunners.Sim
                 // the whole move happened after the landing, as a slide, instead of
                 // during the fall where the eye reads it as leaning into the drop.
                 //
-                // Only on the way DOWN. Coming down is a move towards the camera and the
-                // storey below is already underneath you; jumping UP at a ledge and being
-                // dragged backwards before you are over it would put your shoulders
-                // through its front face.
-                if (s.Velocity.Y > Fix.Zero ||
-                    !TryLandingLane(ref s, world, in cfg, out want))
-                    return;
+                // ON THE WAY UP TOO, once you are over the thing. This used to be the
+                // way down only, guarding against being "dragged backwards before you are
+                // over a ledge" -- and that guard was doing the job twice, because
+                // TryLandingLane already skips every box whose top is above the feet. The
+                // velocity test only delayed the lean on a surface the fighter had
+                // ALREADY cleared.
+                //
+                // Which is the whole of the forest's cages. They are parkour, on purpose,
+                // and each one stands on its own slice -- the hanging pair 1.66 m behind
+                // the floor's lane, the standing ones about 1.2 m in front of it. Leaning
+                // only on the way down left most of that distance to be travelled AFTER
+                // the feet landed, as a slide across the cage floor, and a slide you did
+                // not ask for towards the back of a cage is being slowly sucked into it.
+                //
+                // Worse than a slide, in fact: a box is only solid to a body whose slice
+                // OVERLAPS it (SolidAt), so arriving with the slice you took off from is
+                // arriving INSIDE the cage. Jump at one whose roof is near the top of the
+                // arc and the old rule had you pass straight through it, drift towards the
+                // camera for a fifth of a second while inside it, and end up on the floor.
+                // Starting the lean at the lip spends the move in the air instead, where
+                // the eye reads it as leaning into the jump, and the roof is solid by the
+                // time the feet reach it.
+                if (!TryLandingLane(ref s, world, in cfg, out want)) return;
+
+                // And faster while the feet are off the ground. The gentle 4 m/s is tuned
+                // for walking from one slice to another; in the air the body is already
+                // travelling, so the same move reads as part of the arc rather than as
+                // something tugging at it -- and it finishes before the landing, which is
+                // the point.
+                //
+                // A config that never set the multiplier moves at the ground speed, which
+                // is what every version before this one did. Nothing in the project builds
+                // a MoveConfig by hand -- they all start from Default -- and the inspector
+                // cannot type a zero, so this is only here to keep the one that does from
+                // freezing the lean altogether.
+                Fix faster = cfg.AirDepthSnap > Fix.Zero ? cfg.AirDepthSnap : Fix.One;
+                s.Depth = Fix.MoveTowards(s.Depth, want,
+                                          cfg.DepthSnapSpeed * faster * Dt);
+                return;
             }
             else if (!TryLaneAhead(ref s, world, in cfg, out want) &&
                      !TryFloorLane(ref s, world, in cfg, out want))
