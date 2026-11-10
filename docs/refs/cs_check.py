@@ -240,6 +240,149 @@ def unassigned_struct_fields(path, src, fields):
     return out
 
 
+
+# ------------------------------------------------------------------ the fifth mistake
+#
+# A CALL TO SOMETHING THE FILE NO LONGER HAS. This one shipped the day it was written: a
+# block of a tool was cut out -- the folder-scanning half of MenuBuilder -- and it took
+# three methods with it that the other half still called. Unity answered with six CS0103s
+# and, because the editor assembly then does not build, kept running the PREVIOUS
+# compile: the tool on the menu was the old one, the change looked like it had not
+# happened, and the real message was five screens up in the console.
+#
+# Which is the worst shape a mistake can have here -- it looks like the edit did nothing.
+# So it is checked: every call with no receiver has to be a method THIS FILE defines, or
+# something inherited from the handful of Unity base classes the project derives from.
+#
+# Per file, and not per project, on purpose. A bare call in C# resolves inside its own type
+# and its bases -- a static on another class arrives as `Other.Thing()`, with a receiver the
+# pattern below skips -- so the file is the right scope, and the project is the wrong one:
+# the three builder windows each have their own `Import`, `Size` and `MeasureScale`, so
+# asking "does ANY file define this name" would have answered yes for exactly the three
+# methods that had just been deleted from MenuBuilder, and said ok. That is the whole bug,
+# missed by the check written for it.
+#
+# What makes the narrow scope safe is one fact about this project, worth re-checking before
+# widening it: no type here derives from another type here (every base is MonoBehaviour,
+# EditorWindow, Editor, ScriptableObject or an interface), there is no `using static`, and
+# there are no partial types. So nothing can legally call a bare method that lives in
+# another file.
+
+# Called bare and inherited rather than written here. Only the ones this project's own
+# types really use; anything else is a name to add deliberately after reading why.
+INHERITED = {
+    # MonoBehaviour / Object
+    "GetComponent", "GetComponentInChildren", "GetComponentInParent",
+    "GetComponentsInChildren", "GetComponentsInParent", "GetComponents",
+    "TryGetComponent", "Instantiate", "Destroy", "DestroyImmediate", "FindObjectsByType",
+    "FindFirstObjectByType", "FindAnyObjectByType", "StartCoroutine", "StopCoroutine",
+    "StopAllCoroutines", "Invoke", "CancelInvoke", "InvokeRepeating", "print",
+    "DontDestroyOnLoad", "SendMessage", "BroadcastMessage", "CompareTag",
+    # EditorWindow / Editor / ScriptableObject
+    "GetWindow", "Close", "Repaint", "ShowUtility", "ShowModalUtility", "CreateInstance",
+    "DrawDefaultInspector", "serializedObject", "ApplyModifiedProperties", "Update",
+    "OnInspectorGUI", "SetDirty", "EditorGUILayout", "Focus",
+    # C# itself
+    "nameof", "typeof", "sizeof", "default", "checked", "unchecked", "base", "this",
+    "value", "stackalloc", "with", "when", "and", "or", "not",
+    # System.Object's own statics, called bare from anywhere
+    "ReferenceEquals", "Equals", "GetHashCode", "ToString",
+}
+
+CONTROL = {"if", "else", "for", "foreach", "while", "switch", "case", "do", "using",
+           "lock", "return", "throw", "catch", "fixed", "yield", "select", "where",
+           "from", "in", "is", "as", "new", "get", "set", "add", "remove", "init"}
+
+# A declaration's return type may be a generic with spaces in it -- Dictionary<string,
+# Sprite> -- so the type is matched as "a word, optionally followed by a bracketed lump",
+# not as one token of word characters. Missing that read six real methods as undefined.
+DEFINE = re.compile(
+    r"(?m)^[ \t]*(?:(?:public|private|protected|internal|static|readonly|sealed|override|"
+    r"virtual|async|partial|new|extern|unsafe|abstract|implicit|explicit|operator)\s+)*"
+    r"[\w\.\?]+(?:<[^()=;]*>)?(?:\[\s*\])?\s+(\w+)\s*(?:<[^>()]*>)?\s*\(")
+
+# And a delegate in a variable is called like a method: Action paint = ...; paint();
+DELEGATE = re.compile(
+    r"\b(?:Action|Func|Predicate|Comparison|Converter|EventHandler|UnityAction)"
+    r"(?:<[^()=;]*>)?\s+(\w+)\s*[=;,)]")
+LAMBDA_VAR = re.compile(r"\bvar\s+(\w+)\s*=\s*[^;]*=>")
+
+CALL = re.compile(r"(?<![\w\.])(\w+)\s*(?:<[^<>()]*>)?\s*\(")
+
+
+def without_attributes(src):
+    """Attribute blocks out: [Tooltip("...")] is not a call, and this project is full of
+    them -- the tooltips are the documentation."""
+    out, i, n = [], 0, len(src)
+    while i < n:
+        # a line whose first non-space character opens an attribute
+        start = src.find("[", i)
+        if start < 0:
+            out.append(src[i:])
+            break
+
+        head = src.rfind("\n", 0, start) + 1
+        if src[head:start].strip() != "":
+            out.append(src[i:start + 1])
+            i = start + 1
+            continue
+
+        depth, j = 0, start
+        while j < n:
+            if src[j] == "[":
+                depth += 1
+            elif src[j] == "]":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+
+        out.append(src[i:start])
+        # keep the newlines so reported line numbers stay right
+        out.append("\n" * src.count("\n", start, j))
+        i = j + 1
+
+    return "".join(out)
+
+
+def defined_names(src):
+    """Every method this file declares, including local functions and constructors."""
+    out = {m.group(1) for m in DEFINE.finditer(src)}
+    out |= {m.group(1) for m in DELEGATE.finditer(src)}
+    out |= {m.group(1) for m in LAMBDA_VAR.finditer(src)}
+    # constructors and type names: `class Foo` / `struct Foo` / `Foo(` inside it
+    out |= {m.group(1) for m in re.finditer(r"(?:class|struct|interface|enum)\s+(\w+)", src)}
+    return out
+
+
+def missing_calls(path, src):
+    """Calls with no receiver that this file does not define."""
+    here = defined_names(src)
+    out, said = [], set()
+
+    for m in CALL.finditer(src):
+        name = m.group(1)
+        if name in said or name in CONTROL or name in INHERITED or name in here:
+            continue
+
+        # `new Thing(...)` is a constructor, not a call to something this project owes a
+        # definition for -- every BCL and Unity type arrives that way.
+        before = src[:m.start()].rstrip()
+        if before.endswith("new"):
+            continue
+        # A receiver, including one left at the end of the line above.
+        if before.endswith((".", "?", "?.")):
+            continue
+        said.add(name)
+        line = src.count("\n", 0, m.start()) + 1
+        out.append(f"{path}({line}): calls {name}(), and this file does not define "
+                   f"it. A method deleted with the block around it leaves exactly this: "
+                   f"the file no longer compiles, Unity keeps the PREVIOUS build of the "
+                   f"editor assembly, and the tool on the menu is the old one -- which "
+                   f"reads as \"my change did nothing\".")
+    return out
+
+
 def main():
     sources = {}
     for root, _, names in os.walk(ROOT):
@@ -250,12 +393,14 @@ def main():
             sources[path] = io.open(os.path.join(root, f), encoding="utf-8").read()
 
     fields = struct_fields(sources)
+
     problems, files = [], len(sources)
     for path, src in sorted(sources.items()):
         problems += unclosed_strings(path, src)
         problems += brackets(path, src)
         problems += duplicate_locals(path, strip(src))
         problems += unassigned_struct_fields(path, strip(src), fields)
+        problems += missing_calls(path, without_attributes(strip(src)))
 
     for p in problems:
         print("  " + p)

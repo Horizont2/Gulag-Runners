@@ -177,6 +177,73 @@ namespace GulagRunners.GameEditor
             _scale = MeasureScale();
         }
 
+        /// <summary>The last word of a key: "menu/bar/fill" is "fill".</summary>
+        static string Tail(string key) => key.Substring(key.LastIndexOf('/') + 1);
+
+        /// <summary>
+        /// At what multiple of the design this folder came out, as the value the MOST
+        /// assets agree on. Not the mean: one frame Figma cropped tight to its stroke drags
+        /// a mean off, and surviving exactly that is what this exists for.
+        /// </summary>
+        float MeasureScale()
+        {
+            Dictionary<float, int> votes = new Dictionary<float, int>();
+            foreach (Asset a in Needed)
+            {
+                if (a.W <= 0f || !_found.TryGetValue(a.Key, out string path)) continue;
+                Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (tex == null) continue;
+
+                float v = Mathf.Round(tex.width / a.W * 4f) / 4f;
+                if (v <= 0f) continue;
+                votes.TryGetValue(v, out int n);
+                votes[v] = n + 1;
+            }
+
+            float best = 1f;
+            int bestVotes = 0;
+            foreach (KeyValuePair<float, int> kv in votes)
+                if (kv.Value > bestVotes) { bestVotes = kv.Value; best = kv.Key; }
+            return best;
+        }
+
+        Sprite Import(Asset asset)
+        {
+            if (!_found.TryGetValue(asset.Key, out string path)) return null;
+
+            TextureImporter imp = (TextureImporter)AssetImporter.GetAtPath(path);
+            if (imp == null) return null;
+
+            imp.textureType = TextureImporterType.Sprite;
+            imp.spriteImportMode = SpriteImportMode.Single;
+            // Never rounded to a power of two. A 1600x448 button stretched to 2048x512 is
+            // not the art that was drawn, and it is the same setting that made the scale
+            // unmeasurable above.
+            imp.npotScale = TextureImporterNPOTScale.None;
+            imp.mipmapEnabled = false;
+            imp.filterMode = FilterMode.Bilinear;
+            imp.alphaIsTransparency = true;
+            imp.sRGBTexture = true;
+            imp.maxTextureSize = 2048;
+            imp.textureCompression = TextureImporterCompression.Uncompressed;
+            imp.wrapMode = TextureWrapMode.Clamp;
+
+            // A nine-slice border is quoted in TEXTURE pixels and uGUI divides it by
+            // spritePPU / canvasReferencePPU before drawing. Left at the default 100
+            // against the canvas's own 100 that divisor is 1, so a 5 px corner exported at
+            // 4x draws as a 20 UNIT corner. That is what made the HUD look heavy for
+            // several passes before anybody found it.
+            imp.spritePixelsPerUnit = 100f * Mathf.Max(0.01f, _scale);
+            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * _scale;
+
+            imp.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
+        /// <summary>The size a sprite actually is, in design units, or the design size.</summary>
+        Vector2 Size(string key, float w, float h) =>
+            _size.TryGetValue(key, out Vector2 v) ? v : new Vector2(w, h);
+
         // ---------------------------------------------------------------- the build
 
         void Build()
