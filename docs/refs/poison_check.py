@@ -128,10 +128,54 @@ def pools(text, docs, pool_guid):
             # No body wired: the component measures its own object instead.
             box = next((f for f, (c, b) in docs.items()
                         if c == 4 and f"m_GameObject: {{fileID: {owner}}}" in b), None)
-        surface = re.search(r"\n  surface: \{fileID: (-?\d+)\}", body)
+
+        def slot(name):
+            m = re.search(r"\n  " + name + r": \{fileID: (-?\d+)\}", body)
+            return int(m.group(1)) if m else 0
+
+        hide = re.search(r"\n  hideBoxesInPlay: (\d)", body)
         out.append(dict(component=fid, owner=owner, body=box,
-                        surface=surface and int(surface.group(1)) or 0))
+                        surface=slot("surface"), mist=slot("mist"), source=slot("source"),
+                        hidden=hide is None or hide.group(1) == "1"))
     return out
+
+
+def emitters_under(docs, transform):
+    """How many particle systems hang off this transform, prefab instances included.
+
+    A prefab instance writes no components into the scene at all -- only a stripped shell
+    pointing at the asset -- so counting class 198 in the scene file finds nothing and the
+    smoke reads as missing. This follows the shell into the prefab, which is where the
+    pack's effect actually lives.
+    """
+    found, stack = 0, [transform]
+    while stack:
+        t = stack.pop()
+        if t not in docs:
+            continue
+        body = docs[t][1]
+
+        src = re.search(r"m_CorrespondingSourceObject: \{fileID: -?\d+, "
+                        r"guid: ([0-9a-f]{32}), type: \d\}", body)
+        if src:
+            asset = geometry._asset_of(src.group(1))
+            if asset and os.path.exists(asset):
+                found += len(re.findall(r"(?m)^--- !u!198 &", read(asset)))
+            continue
+
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        if go:
+            comps = re.search(r"  m_Component:\n((?:  - component: \{fileID: -?\d+\}\n)*)",
+                              docs.get(int(go.group(1)), (0, ""))[1])
+            if comps and comps.group(1):
+                for c in re.findall(r"fileID: (-?\d+)", comps.group(1)):
+                    if docs.get(int(c), (0,))[0] == 198:
+                        found += 1
+
+        kids = re.search(r"  m_Children:(?: \[\]|\n((?:  - \{fileID: -?\d+\}\n)*))", body)
+        if kids and kids.group(1):
+            stack += [int(v) for v in re.findall(r"fileID: (-?\d+)", kids.group(1))]
+    return found
 
 
 def colliders_under(docs, transform):
@@ -297,9 +341,28 @@ def main(argv):
                 f"scene brings a BoxCollider with it, and a solid pool is one the fighters "
                 f"STAND on -- which looks exactly like the poison working.")
 
-        if not p["surface"]:
-            notes.append(f"  no surface slab wired, so the waterline is the top of a block "
-                         f"of green -- which is the hardest part of it to judge")
+        # --- and can anybody SEE it
+        #
+        # The boxes are a measurement and are switched off the moment the game starts, so
+        # the smoke is the whole picture. Nothing wired means poison that kills from an
+        # empty-looking floor -- the only failure here that is worse than a boxy one.
+        band = emitters_under(docs, p["mist"]) if p["mist"] else 0
+        below = emitters_under(docs, p["source"]) if p["source"] else 0
+
+        if p["hidden"] and band + below == 0:
+            problems.append(
+                f"{scene}: the boxes are hidden in play and no smoke is wired (Mist, Source), "
+                f"so the poison is INVISIBLE: health drains on a floor that looks dry. Wire "
+                f"the smoke, or switch Hide Boxes In Play off and live with a green slab.")
+        elif band + below == 0:
+            notes.append(f"  no smoke wired; the pool is drawn as the box itself, which is a "
+                         f"measurement rather than a picture")
+        else:
+            notes.append(f"  smoke: {band} emitter(s) riding the waterline, {below} under "
+                         f"the floor")
+            if band == 0:
+                notes.append(f"  nothing at the waterline, so the surface -- the one height "
+                             f"a player has to read -- is only implied by the smoke below it")
 
     for n in notes:
         print(("  " + n) if n.startswith(" ") else ("  note: " + n))

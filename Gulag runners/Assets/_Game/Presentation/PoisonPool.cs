@@ -55,10 +55,33 @@ namespace GulagRunners.Game
                  "only part of it a player has to judge.")]
         public Transform surface;
 
-        [Tooltip("Optional. Moved with the surface, so bubbles and mist rise off the real " +
-                 "waterline rather than off the floor. Not played or stopped from here — " +
-                 "whatever is dropped in keeps its own authored settings.")]
+        [Tooltip("The smoke at the surface: moved with the waterline, so it always rolls off " +
+                 "the real level rather than off the floor.\n\n" +
+                 "This is what the poison LOOKS like. The boxes above are a measurement — " +
+                 "hidden the moment the game starts — and a slab of flat green is not a " +
+                 "thing anybody wants to look at for eighty seconds; a fog bank creeping up " +
+                 "the arena is. Switched on with the flood and off again while the pool is " +
+                 "empty, so the first minute has no green in it at all.\n\n" +
+                 "Not played or stopped from here: whatever is dropped in keeps its own " +
+                 "authored emission, lifetime and colour.")]
         public Transform mist;
+
+        [Tooltip("The smoke BELOW: left exactly where it is authored, at the bottom of the " +
+                 "pool, under the arena.\n\n" +
+                 "The surface band alone reads as a line that moves. What makes it read as a " +
+                 "place filling up is smoke welling out from underneath the floor and rising " +
+                 "through it — the source of the thing rather than its edge. Switched on and " +
+                 "off with the flood, never moved.")]
+        public Transform source;
+
+        [Tooltip("Hide the boxes when the game starts, leaving only the smoke.\n\n" +
+                 "The box IS the authoring: it is what you drag to say where the poison stops, " +
+                 "and the only thing in the scene that can be measured. It is also a flat green " +
+                 "slab, which is not what a rising poison looks like — so it is visible while " +
+                 "you build the arena and switched off the moment anybody plays it. Turn this " +
+                 "off to see the measured volume in play, which is how you check that the smoke " +
+                 "and the damage agree about where the surface is.")]
+        public bool hideBoxesInPlay = true;
 
         [Tooltip("Draw the pool at full flood in the scene view, and the floors it drowns.")]
         public bool drawGizmo = true;
@@ -82,8 +105,23 @@ namespace GulagRunners.Game
         {
             get
             {
-                Renderer art = body != null ? body.GetComponent<Renderer>() : null;
-                if (art != null) return art.bounds;
+                // The MESH rather than the renderer, so a hidden box still says where the
+                // pool is. Renderer.bounds on a switched-off renderer is not something to
+                // rely on, and this one is switched off in every build: the box is the
+                // measurement, the smoke is the picture.
+                if (body != null)
+                {
+                    MeshFilter mesh = body.GetComponent<MeshFilter>();
+                    if (mesh != null && mesh.sharedMesh != null)
+                    {
+                        Bounds local = mesh.sharedMesh.bounds;
+                        return new Bounds(body.TransformPoint(local.center),
+                                          Scaled(local.size, body.lossyScale));
+                    }
+
+                    Renderer art = body.GetComponent<Renderer>();
+                    if (art != null && art.enabled) return art.bounds;
+                }
 
                 Collider c = GetComponent<Collider>();
                 if (c != null) return c.bounds;
@@ -92,9 +130,15 @@ namespace GulagRunners.Game
                 if (r != null) return r.bounds;
 
                 Transform t = body != null ? body : transform;
-                return new Bounds(t.position, t.lossyScale);
+                return new Bounds(t.position, Abs(t.lossyScale));
             }
         }
+
+        static Vector3 Scaled(Vector3 size, Vector3 scale) => new Vector3(
+            Mathf.Abs(size.x * scale.x), Mathf.Abs(size.y * scale.y), Mathf.Abs(size.z * scale.z));
+
+        static Vector3 Abs(Vector3 v) =>
+            new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
 
         /// <summary>This pool as the simulation holds it. Called by the baker, once.</summary>
         public Aabb ToBox()
@@ -116,7 +160,36 @@ namespace GulagRunners.Game
         Vector3 _surfaceScale;
         bool _measured;
 
-        void Awake() => Measure();
+        void Awake()
+        {
+            // Measured FIRST, and then hidden. The box is the only thing in the scene that
+            // says how high the poison comes, so it is read before anything about it changes.
+            Measure();
+
+            if (hideBoxesInPlay)
+            {
+                Hide(body);
+                Hide(surface);
+            }
+
+            // And nothing green until the flood starts. Switched off here rather than left
+            // to the first LateUpdate, so a particle system does not get one frame of
+            // emission in at the top of the match.
+            Show(mist, false);
+            Show(source, false);
+        }
+
+        static void Hide(Transform art)
+        {
+            if (art == null) return;
+            foreach (Renderer r in art.GetComponentsInChildren<Renderer>(true))
+                r.enabled = false;
+        }
+
+        static void Show(Transform art, bool on)
+        {
+            if (art != null && art.gameObject.activeSelf != on) art.gameObject.SetActive(on);
+        }
 
         /// <summary>
         /// Remembers the full pool before anything shrinks it.
@@ -175,6 +248,13 @@ namespace GulagRunners.Game
                 surface.position = at;
             }
 
+            // The smoke is the poison, as far as anybody looking at it is concerned: the
+            // band rides the waterline, the source stays under the arena, and neither exists
+            // until the pool starts filling. Switched by the LEVEL rather than by the phase,
+            // so there is nothing to keep in step with the clock.
+            Show(mist, p > 0f);
+            Show(source, p > 0f);
+
             if (mist != null)
             {
                 Vector3 at = mist.position;
@@ -210,17 +290,22 @@ namespace GulagRunners.Game
 
             Bounds b = Application.isPlaying && _measured ? _flooded : Flooded;
 
-            // The pool at full flood, and the waterline across it. Green, because that is
-            // what it is; the line is brighter than the box for the same reason the art has
-            // a separate lid — the top is the only part of this a player has to judge.
-            Gizmos.color = new Color(0.35f, 0.95f, 0.3f, 0.25f);
+            // The pool at full flood. Green, because that is what it is -- and in a build
+            // this gizmo is the ONLY place the volume is drawn, since the boxes are hidden
+            // and the smoke has no edges.
+            Gizmos.color = new Color(0.35f, 0.95f, 0.3f, 0.2f);
             Gizmos.DrawCube(b.center, b.size);
 
             Gizmos.color = new Color(0.6f, 1f, 0.35f, 1f);
             Gizmos.DrawWireCube(b.center, b.size);
 
+            // And the waterline the preview asks for, which is the number worth judging:
+            // everything under it is lost ground, so this line is the arena saying which
+            // platforms the fight finishes on.
+            float p = Mathf.Clamp01(Application.isPlaying ? Rise() : preview);
             Vector3 lid = b.center;
-            lid.y = b.max.y;
+            lid.y = b.min.y + b.size.y * p;
+            Gizmos.color = new Color(0.75f, 1f, 0.4f, 1f);
             Gizmos.DrawWireCube(lid, new Vector3(b.size.x, 0f, b.size.z));
         }
     }
