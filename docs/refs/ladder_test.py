@@ -292,39 +292,46 @@ print("\nwhat a matched pair works out without sending a packet")
 # first fighter, nor what number the arena is dealt from, and in a deterministic
 # simulation both are load-bearing.
 
-pairs = [("aaa", "bbb"), ("Zz", "aa"), ("9", "A"), ("player-01", "player-02"),
-         ("f47ac10b", "f47ac10c"), ("\u0430\u0431\u0432", "abc")]
-sides = [(m.local_player(a, b), m.local_player(b, a)) for a, b in pairs]
-check("the two devices never pick the same fighter",
-      all(x != y for x, y in sides), str(sides))
-check("and between them they cover both",
-      all(sorted((x, y)) == [0, 1] for x, y in sides), str(sides))
+# The seat is the session's HOST, which is the one answer the service also enforces:
+# only the host may leave the relay's join code in a session property.
+check("the host drives fighter one and the guest fighter two",
+      (m.local_player(True), m.local_player(False)) == (0, 1),
+      f"host {m.local_player(True)}, guest {m.local_player(False)}")
+check("so the two devices never pick the same fighter",
+      m.local_player(True) != m.local_player(False),
+      "one session, one host -- there is nothing for them to disagree about")
 
-# The fault: a culture-sensitive comparison. Czech sorts "ch" after "h"; Turkish
-# dotless i; here it is enough to model ANY ordering that differs from ordinal.
-swapped = lambda s: s.lower()
-both_zero = [(a, b) for a, b in [("Zz", "aa")]
-             if m.local_player(a, b, culture=swapped) == m.local_player(b, a)]
-check("the fault this replaces is caught", both_zero,
-      "a non-ordinal compare puts both players on fighter one and nobody on fighter two")
+# THE FAULT THIS REPLACES, and it is worth keeping in front of us. The seat used to be
+# the lower of the two player ids, and both devices did agree on that. It was simply
+# about the wrong thing: the id comparison nominates the host of the RELAY, and the
+# session already has a host, who is the only player allowed to write the join code.
+# On any pairing where the service's host held the higher id the two disagreed --
+# "only the host can do this" on one device, a twenty-second wait for a code on the
+# other -- and neither message mentions the session.
+def by_ids(mine, theirs):
+    return 0 if mine <= theirs else 1
+
+disagreed = [(a, b, host) for a, b in (("aaa", "bbb"), ("zzz", "aaa"))
+             for host in (True, False)
+             if by_ids(a, b) != m.local_player(host)]
+check("the old rule and the service disagree on half of all pairings",
+      len(disagreed) == 2,
+      "which is the coin flip behind 'connection lost' on one phone and "
+      "'only the host can do this' on the other")
 
 # And the other way to ask it too early: before the other player is in the session at
 # all. The service hands back a session as soon as THIS device is in it, and the
 # opponent's join lands a moment later -- so the id can simply not be there yet.
-print("   and not before there is an opponent to compare against")
-check("an unknown opponent puts BOTH devices on fighter one",
-      m.local_player("aaa", "") == 0 and m.local_player("bbb", "") == 0,
-      "which is a match where both players drive fighter one, both allocate the relay, "
-      "and each ends up alone in an arena with the other fighter standing still")
-check("so a pairing made from one id is refused rather than guessed",
+print("   and not before there is an opponent at all")
+check("a pairing made from one id is refused rather than guessed",
       m.pairing("aaa", "", "session-1") is None
       and m.pairing("", "bbb", "session-1") is None,
       "None is 'wait, and then say so' -- never a seat")
 check("a player paired with themselves is refused as well",
       m.pairing("aaa", "aaa", "session-1") is None,
       "two ids that are one id cannot name two fighters")
-one = m.pairing("aaa", "bbb", "session-1")
-two = m.pairing("bbb", "aaa", "session-1")
+one = m.pairing("aaa", "bbb", "session-1", am_host=True)
+two = m.pairing("bbb", "aaa", "session-1", am_host=False)
 check("and once both ids are in, the two devices disagree about the seat and agree "
       "about everything else",
       one is not None and two is not None

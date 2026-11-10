@@ -303,23 +303,23 @@ def search(queue, played, rating=1500.0, step=1 / 60.0, limit=120.0):
 # Mirrors Assets/_Game/Meta/MatchAgreement.cs.
 
 
-def local_player(mine, theirs, culture=None):
-    """Which fighter this device drives, from the two player ids alone.
+def local_player(am_host):
+    """Which fighter this device drives: the session's HOST drives fighter one.
 
-    `culture` models the fault: a comparison that is not ORDINAL can order the same
-    pair differently on two devices with different system languages, and then both
-    players drive fighter one while nobody drives fighter two.
+    It used to be worked out from the two player ids (ordinal compare, lower id first),
+    and both devices did reach the same answer that way. The answer was simply about the
+    wrong thing. The relay's join code is left in a session property and ONLY THE
+    SESSION'S HOST MAY WRITE ONE -- so the device the id comparison nominated was refused
+    outright on half of all pairings ("only the host can do this") while the real host
+    waited out the handshake and reported that nobody had opened a relay.
+
+    The service has already decided which end is the host, both devices can read it, and
+    it cannot disagree with itself. One fact, and the same one the transport binds on.
     """
-    if not mine:
-        return 0 if not theirs else 1
-    if not theirs:
-        return 0
-    key = culture or (lambda s: s)
-    a, b = key(mine), key(theirs)
-    return 0 if a <= b else 1
+    return 0 if am_host else 1
 
 
-def pairing(mine, theirs, session_id):
+def pairing(mine, theirs, session_id, am_host=True):
     """UgsQueue.Took: a pairing, or None because there is not one yet.
 
     THE GUARD, and it is the whole of the bug it closes. MatchmakeSessionAsync returns
@@ -327,19 +327,19 @@ def pairing(mine, theirs, session_id):
     later. So the session can hold one player, and whichever device the service answers
     first usually sees exactly that.
 
-    local_player is then asked about an opponent it has never heard of, and being a pure
-    function it answers rather than refusing: 0. BOTH devices therefore drive fighter
-    one, both allocate the relay (RelayHandshake: "two allocators would make two relays
-    and meet in neither"), and each player ends up alone in an arena with a motionless
-    opponent -- each driving, as far as they can tell, the same fighter. Nothing logs an
-    error, because nothing failed; a question was asked a moment too early.
+    Everything else about the pairing is then decided about a player nobody has heard of:
+    the opponent's name, their rating, and whether there is a match at all. Nothing logs
+    an error, because nothing failed; a question was asked a moment too early.
 
     So the question is no longer asked early. None means wait, and after the timeout it
     means tell the player, not guess.
+
+    The SEAT is no longer among the things worked out here -- it is the session's host --
+    but the guard stays exactly as it was: a pairing with one id in it is not a pairing.
     """
     if not mine or not theirs or mine == theirs:
         return None
-    return dict(local_player=local_player(mine, theirs),
+    return dict(local_player=local_player(am_host),
                 seed=match_seed(session_id),
                 against_bot=False,
                 join=session_id)

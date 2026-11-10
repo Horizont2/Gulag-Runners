@@ -177,5 +177,123 @@ check("while a working relay whose other end is slow still goes in",
       working.went_at is not None,
       f"after {working.went_at - 1.0:.1f} s" if working.went_at else "hung")
 
+# ------------------------------------------------------------------ the relay handshake
+#
+# A gate both sides reach is no use if neither can open a relay, and that was the next
+# fault down. The join code is left in a SESSION PROPERTY, and the service allows exactly
+# one player to write one: the session's host. Who allocates was decided somewhere else
+# entirely -- by comparing the two player ids -- and the two answers agree only by luck.
+#
+# Mirrors RelayHandshake.Open, both ends, which is the only way a two-sided protocol can
+# be tested at all.
+
+PATIENCE = 20.0          # RelayHandshake.Patience: how long a joiner waits for the code
+POLL = 0.5
+
+
+class Session:
+    """The meeting place. One host, and only the host may leave a code in it."""
+
+    def __init__(s, host):
+        s.host = host
+        s.code = None
+        s.refused = 0
+
+    def write(s, who):
+        if who != s.host:
+            s.refused += 1
+            raise PermissionError("only the host can do this")
+        s.code = f"code-{who}"
+
+
+class Device:
+    """One phone opening the relay, as RelayHandshake.Open does it: three attempts,
+    alternating ends, because believing one side of this over the other is how two
+    devices wait for each other until both give up."""
+
+    ATTEMPTS = 3
+
+    def __init__(s, me, believes_host, self_correcting=True):
+        s.me = me
+        s.believes = believes_host
+        s.correcting = self_correcting
+        s.role = None            # the role it ended up taking
+        s.ok = False
+        s.at = None
+        s.waited = 0.0
+        s.attempt = 0
+        s._as_host = believes_host
+
+    def step(s, session, now):
+        if s.ok or s.at is not None:
+            return
+        if s._as_host:
+            try:
+                session.write(s.me)
+                s.ok, s.role, s.at = True, True, now
+            except PermissionError:
+                s._next(now)
+            return
+
+        if session.code is not None:
+            s.ok, s.role, s.at = True, False, now
+            return
+
+        s.waited += POLL
+        if s.waited >= PATIENCE:
+            s._next(now)
+
+    def _next(s, now):
+        s.attempt += 1
+        if not s.correcting or s.attempt >= s.ATTEMPTS:
+            s.at = now                      # gave up
+            return
+        s._as_host = not s._as_host
+        s.waited = 0.0
+
+
+def run(session, a, b, limit=60.0):
+    now = 0.0
+    while now < limit and not (a.ok and b.ok) and not (a.at and b.at):
+        a.step(session, now)
+        b.step(session, now)
+        now += POLL
+    return now
+
+
+print("\nthe relay handshake: who is allowed to leave the join code")
+
+# The service made device 1 the host. The session is asked, so device 1 allocates.
+s = Session(host=1)
+a, b = Device(0, believes_host=False), Device(1, believes_host=True)
+took = run(s, a, b)
+check("asking the session, both ends open the relay", a.ok and b.ok,
+      f"in {took:.1f} s, refused {s.refused} time(s)")
+check("and they take opposite ends of it", a.role != b.role,
+      f"device 0 host={a.role}, device 1 host={b.role}")
+check("which is also which fighter each drives: the host is fighter one",
+      (0 if b.role else 1) == 0 and (0 if a.role else 1) == 1)
+
+# THE BUG. The old rule nominated the LOWER ID, and the service's host was the higher.
+s = Session(host=1)
+a = Device(0, believes_host=True, self_correcting=False)    # id comparison says "me"
+b = Device(1, believes_host=False, self_correcting=False)   # so the real host waits
+took = run(s, a, b)
+check("the old rule deadlocks when the service chose the other host",
+      not a.ok and not b.ok,
+      f"refused {s.refused} time(s) and {took:.0f} s of waiting -- which is "
+      f"'only the host can do this' on one phone and a lost connection on the other")
+
+# And the session itself being wrong about both ends cannot deadlock either.
+s = Session(host=1)
+a, b = Device(0, believes_host=False), Device(1, believes_host=False)
+took = run(s, a, b)
+check("a session that calls both ends the guest still opens, after the patience",
+      a.ok and b.ok, f"in {took:.1f} s")
+check("and the end that took the host role is the one the service allows",
+      b.role is True and a.role is False,
+      f"device 0 host={a.role} (it was refused, waited, and read the code the real "
+      f"host had finally left), device 1 host={b.role}")
+
 print("\nALL PASS" if ok else "\nSOME FAILED")
 sys.exit(0 if ok else 1)

@@ -44,12 +44,24 @@ namespace GulagRunners.Net
         static MatchFound _carriedPairing;
         static bool _carriedHave;
 
+        /// <summary>
+        /// Which end of the relay this device took, as the handshake actually took it.
+        ///
+        /// Carried separately from the pairing because it is the SESSION's answer and not
+        /// the matchmaker's: the pairing says who was matched, the session says which of
+        /// them is the host, and only the host may leave a join code. The arena needs the
+        /// second one — it decides the transport's end and, through LanLink, which fighter
+        /// this device drives.
+        /// </summary>
+        static bool _carriedHost;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void Forget()
         {
             _carried = null;
             _carriedPairing = default;
             _carriedHave = false;
+            _carriedHost = false;
         }
 
         [Header("Wiring")]
@@ -245,17 +257,24 @@ namespace GulagRunners.Net
 
         async System.Threading.Tasks.Task Open(CancellationToken stop)
         {
-            // Whoever drives fighter one allocates. Both devices reached that from the
-            // player ids alone, so exactly one allocates and exactly one waits -- two
-            // allocators would make two relays and meet in neither.
-            bool host = _pairing.LocalPlayer == 0;
-
+            // THE SESSION'S HOST ALLOCATES, and the handshake asks the session rather than
+            // being told: only the host may leave a join code in a session property, so any
+            // other answer is a coin flip between "only the host can do this" on one device
+            // and a twenty-second wait for a code on the other. RelayHandshake.Open has the
+            // whole account of it.
             RelayHandshake.Opened opened =
-                await RelayHandshake.Open(UgsQueue.Current, host, stop);
+                await RelayHandshake.Open(UgsQueue.Current, stop);
 
             if (stop.IsCancellationRequested) return;
 
             if (!opened.Ok) { Fail($"COULD NOT REACH THE OTHER PLAYER: {opened.Said}"); return; }
+
+            // And the role it actually took is the one everything downstream follows: the
+            // transport's end, the fighter this device drives, the camera, the health bars
+            // and which side the ladder scores. One fact rather than two that can disagree.
+            bool host = opened.Host;
+            localPlayer = host ? 0 : 1;
+            _pairing.LocalPlayer = localPlayer;
 
             _wire = new RelayTransport(opened.Relay, host);
             if (!_wire.Open()) { Fail($"RELAY: {_wire.Describe}"); _wire = null; return; }
@@ -268,6 +287,7 @@ namespace GulagRunners.Net
             relayOpen = true;
             _carried = _wire;
             _carriedPairing = _pairing;
+            _carriedHost = host;
             _carriedHave = true;
 
             Say(opened.Said);
@@ -282,9 +302,14 @@ namespace GulagRunners.Net
                                     out int player)
         {
             wire = _carried;
-            host = _carriedPairing.LocalPlayer == 0;
+
+            // The role the handshake TOOK, not one re-derived from the pairing. They say
+            // the same thing now -- Open writes the pairing's side from the session's host
+            // -- and keeping one of them authoritative is what stops the next edit from
+            // reintroducing two answers to one question.
+            host = _carriedHost;
             seed = _carriedPairing.Seed;
-            player = _carriedPairing.LocalPlayer;
+            player = _carriedHost ? 0 : 1;
             return _carriedHave && _carried != null;
         }
 

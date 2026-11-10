@@ -135,6 +135,12 @@ namespace GulagRunners.Game
             _up = true;
             if (_winner < 0 && match != null) _winner = match.SeriesWinner;
 
+            // Which side this device is, from the match rather than from the inspector:
+            // the headline says WON or LOST, and saying the wrong one of those is the
+            // worst thing this screen can do. MatchState.LocalFighter is the one place
+            // that answers it.
+            if (match != null) localPlayer = match.LocalFighter;
+
             int mine = match != null ? match.Wins(localPlayer) : 0;
             int theirs = match != null ? match.Wins(1 - localPlayer) : 0;
 

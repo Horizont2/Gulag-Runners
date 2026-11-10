@@ -9329,6 +9329,7 @@ MonoBehaviour:
   queueName: ranked-1v1
   ratingAttribute: rating
   signInAnonymously: 1
+  pairingTimeout: 20
   state: idle
 --- !u!1 &825751903
 GameObject:

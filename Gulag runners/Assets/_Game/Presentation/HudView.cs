@@ -210,6 +210,18 @@ namespace GulagRunners.Game
                  "is drawn, which bar is blue, and whose stamina is hidden.")]
         [Range(0, 1)] public int localPlayer;
 
+        [Tooltip("Take the side from the match rather than from the number above.\n\n" +
+                 "On: whichever fighter this device is actually playing owns the blue bar, " +
+                 "every frame -- the one the wire named, or, with nobody on the wire, the " +
+                 "one nobody's brain is driving. Off: the number above is used as typed, " +
+                 "which is what a screenshot or a shop mock-up wants.\n\n" +
+                 "It is on by default because the number above was the bug: it is set once, " +
+                 "by the net layer, and a device whose link is adopted a frame late or " +
+                 "re-adopted after a drop keeps the scene's answer -- which is always " +
+                 "\"player one\". The player then watches the OTHER fighter's health bar " +
+                 "drain, and the only way to describe that is \"the bars are wrong\".")]
+        public bool followTheDevice = true;
+
         [Tooltip("Hide the opponent's stamina charges. Their health is public -- a fight " +
                  "where neither side can see the damage is not a fight -- but what they " +
                  "have left to spend is not.\n\n" +
@@ -396,6 +408,13 @@ namespace GulagRunners.Game
         {
             if (!Application.isPlaying && !paintInEditMode) return;
             if (matchState == null) matchState = MatchState.Instance;
+
+            // Whose bar is whose, from the match rather than from the inspector. One line
+            // and it is the fix for a whole class of complaint: the side is a fact about
+            // the device, it can change mid-match when a bot takes a dropped player's
+            // fighter, and nothing about painting a bar should outlive it.
+            if (followTheDevice && matchState != null && Application.isPlaying)
+                localPlayer = matchState.LocalFighter;
 
             PaintBar(bar1, player1, localPlayer == 0);
             PaintBar(bar2, player2, localPlayer == 1);

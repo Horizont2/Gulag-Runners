@@ -540,6 +540,12 @@ namespace GulagRunners.Net
                 view.player = mine;
                 view.target = mine.transform;
             }
+            // On the match itself first, because that is where everything else now reads
+            // it from -- the three fields below are the same answer kept three more times,
+            // and they are set as well only so a HUD with Follow The Device switched off
+            // still shows the right side.
+            if (match != null) match.SetLocalFighter(player);
+
             if (hud != null) hud.localPlayer = player;
             if (result != null)
             {

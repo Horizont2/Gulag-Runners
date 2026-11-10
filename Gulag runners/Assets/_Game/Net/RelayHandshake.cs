@@ -52,32 +52,117 @@ namespace GulagRunners.Net
             public bool Ok;
             public RelayServerData Relay;
             public string Said;
+
+            /// <summary>
+            /// Which end of the relay this device took: true if it allocated.
+            ///
+            /// Returned rather than passed in, because the answer is the SESSION's and not
+            /// the caller's — see <see cref="Open"/>. Everything downstream hangs off it:
+            /// the transport binds as host or connects to one, LanLink turns it into which
+            /// fighter this device drives, and NetMatch points the camera, the health bars
+            /// and the ladder at that fighter. One fact, read once, used by all of them.
+            /// </summary>
+            public bool Host;
         }
 
         /// <summary>
         /// Makes or joins the relay for this session.
         ///
-        /// <paramref name="host"/> must be the end MatchAgreement made fighter one.
-        /// Not a coin toss and not whoever asked first: both devices reach that answer
-        /// from the player ids alone, so exactly one of them allocates and exactly one
-        /// waits. Two allocators would make two relays and meet in neither.
+        /// WHO ALLOCATES IS THE SESSION'S HOST, and this used to be decided from the two
+        /// player ids instead (MatchAgreement.LocalPlayer: the lower id drives fighter one
+        /// and therefore allocates). Both devices did reach the same answer from the ids,
+        /// which is what the argument was for -- and the answer had nothing to do with the
+        /// one fact that matters here: the join code is left in a session property, and
+        /// ONLY THE SESSION'S HOST MAY WRITE ONE. Unity's SDK refuses the rest, in those
+        /// words.
+        ///
+        /// So on about half of all pairings -- whenever the service's host was the higher
+        /// id -- the device that believed it was hosting called AsHost on a session it did
+        /// not own and was refused ("only the host can do this"), while the real host sat
+        /// in WaitForCode for twenty seconds waiting for a code nobody was allowed to
+        /// leave, and then said the other player never opened a relay. Two different
+        /// messages, one cause, and neither of them mentions the session.
+        ///
+        /// Asking the session removes the disagreement rather than making the two answers
+        /// agree: there is exactly one host, both devices can see which one it is, and the
+        /// service enforces it. The role taken comes back in <see cref="Opened.Host"/> so
+        /// that the transport and the fighter index are the same fact and cannot drift.
         /// </summary>
-        public static async Task<Opened> Open(ISession session, bool host,
-                                              CancellationToken stop)
+        public static async Task<Opened> Open(ISession session, CancellationToken stop)
         {
+            bool host = session != null && session.IsHost;
+
             try
             {
-                return host ? await Allocate(session, stop) : await Join(session, stop);
+                // THE OTHER END, AND THEN BACK AGAIN. Three attempts, alternating, because
+                // believing one side of this over the other is how two devices wait for
+                // each other until both give up -- which is the whole bug this file is
+                // about. It cannot make two relays: the service allows exactly one player
+                // to write the join code, so a second allocator is refused rather than
+                // accommodated.
+                //
+                // The third attempt is the one that is easy to miss. If the session called
+                // BOTH ends the guest, both wait out the patience and both then try to
+                // allocate; the real host succeeds, the other is refused -- and by then the
+                // code it was waiting for is finally there, so it has to be allowed to go
+                // back and read it.
+                bool asHost = host;
+                Opened last = new Opened { Ok = false, Said = "nothing attempted" };
+                string first = null;
+
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    last = await Try(session, asHost, stop);
+                    if (last.Ok)
+                    {
+                        if (attempt > 0)
+                            Debug.LogWarning(
+                                $"relay: the session called this device the " +
+                                $"{(host ? "host" : "guest")} and that did not work " +
+                                $"({first}); opened it as the {(asHost ? "host" : "guest")} " +
+                                $"on attempt {attempt + 1}.");
+                        last.Host = asHost;
+                        return last;
+                    }
+
+                    if (stop.IsCancellationRequested) break;
+                    first ??= last.Said;
+                    asHost = !asHost;
+                }
+
+                last.Said = first == last.Said ? last.Said : $"{first}; then: {last.Said}";
+                last.Host = host;
+                return last;
             }
             catch (OperationCanceledException)
             {
-                return new Opened { Ok = false, Said = "cancelled" };
+                return new Opened { Ok = false, Said = "cancelled", Host = host };
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"relay handshake failed -- {e.Message}\n" +
                                  "Relay has to be enabled on the dashboard, and the " +
                                  "device has to be signed in.");
+                return new Opened { Ok = false, Said = e.Message, Host = host };
+            }
+        }
+
+        /// <summary>
+        /// One end of the handshake, with its failure returned rather than thrown, so the
+        /// caller can try the other end without unwinding.
+        /// </summary>
+        static async Task<Opened> Try(ISession session, bool asHost, CancellationToken stop)
+        {
+            try
+            {
+                return asHost ? await Allocate(session, stop) : await Join(session, stop);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
                 return new Opened { Ok = false, Said = e.Message };
             }
         }

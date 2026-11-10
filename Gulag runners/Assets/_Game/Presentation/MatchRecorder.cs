@@ -103,6 +103,12 @@ namespace GulagRunners.Game
                 return;
             }
 
+            // From the match, not from the inspector. A rating written against the wrong
+            // fighter is the one mistake here that cannot be noticed and cannot be undone:
+            // the player loses and climbs, or wins and drops, and the save is already on
+            // disk by the time anybody wonders.
+            if (match != null) localPlayer = match.LocalFighter;
+
             bool won = winner == localPlayer;
             var opponent = new Rating
             {

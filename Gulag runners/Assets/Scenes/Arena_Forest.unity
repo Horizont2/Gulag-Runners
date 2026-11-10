@@ -117824,6 +117824,7 @@ MonoBehaviour:
   player2: {fileID: 1900000130}
   matchState: {fileID: 1900000400}
   localPlayer: 0
+  followTheDevice: 1
   hideOpponentStamina: 1
   palette:
     self: {r: 0.28, g: 0.6, b: 1, a: 1}

@@ -166,6 +166,53 @@ namespace GulagRunners.Game
         /// <summary>Where the match has got to. Read it; only the tick moves it.</summary>
         public MatchSimState Match => _match;
 
+        /// <summary>
+        /// Which fighter THIS device is playing. The one place that answers it.
+        ///
+        /// It was answered in three places before, as a number typed into the inspector on
+        /// the HUD, on the results screen and on the recorder, and written to all three by
+        /// NetMatch once the wire said who this device was. Three copies of one fact, set
+        /// once, is a fact that goes stale: a device whose link is adopted a frame late, or
+        /// re-adopted after a drop, keeps the scene's answer -- and the scene's answer is
+        /// always "player one". What that looks like is the health bar, the camera and the
+        /// ladder all belonging to the other fighter, which is a bug nobody can describe
+        /// except as "the bars are wrong".
+        ///
+        /// So it lives here, beside the fighters it indexes, and everything that needs it
+        /// reads it every frame. Set by <see cref="SetLocalFighter"/> when a wire knows
+        /// better; until then it is the fighter nobody's brain is driving, which is the
+        /// human on a phone playing alone, whichever end of the arena they start at.
+        /// </summary>
+        public int LocalFighter { get; private set; }
+
+        /// <summary>
+        /// The wire has said which fighter this device drives. Clamped, because an index
+        /// from outside is an index that can be wrong, and a HUD painted from a bad one is
+        /// harder to explain than a HUD painted from the fallback.
+        /// </summary>
+        public void SetLocalFighter(int index)
+        {
+            int many = fighters.Count > 0 ? fighters.Count : 1;
+            LocalFighter = Mathf.Clamp(index, 0, many - 1);
+        }
+
+        /// <summary>
+        /// The fighter this device's own thumbs are on: the first one a brain is not
+        /// driving. The same question NetMatch asks to find the local controls, so the
+        /// answer cannot differ from the one the input takes.
+        /// </summary>
+        int HumanFighter()
+        {
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                PlayerController f = fighters[i];
+                if (f == null) continue;
+                FighterBrain brain = f.GetComponentInChildren<FighterBrain>(true);
+                if (brain == null || !brain.TakingOver) return i;
+            }
+            return 0;
+        }
+
         MatchSimState _match = MatchSimState.Fresh();
 
         /// <summary>A phase began this tick. Raised once, not every frame.</summary>
@@ -367,6 +414,11 @@ namespace GulagRunners.Game
             // number that works in play mode and not in a fresh round, or the other way
             // about, and neither reads as a missing line.
             ApplyTuning();
+
+            // Whose thumbs are on which fighter, re-taken rather than remembered: a round
+            // dealt after a bot substituted for a dropped player is a round where the
+            // answer has changed. A wire that knows better overwrites it on the next tick.
+            LocalFighter = HumanFighter();
 
             if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
             SimWorld world = worldBaker != null ? worldBaker.World : null;

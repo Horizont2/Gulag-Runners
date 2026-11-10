@@ -61,8 +61,13 @@ namespace GulagRunners.Meta
                  "identically wrong on both phones, which is the one failure that cannot " +
                  "be noticed from the inside.\n\n" +
                  "Generous, because this is one poll every quarter second against a " +
-                 "service that has already said yes.")]
-        [Range(1f, 30f)] public float pairingTimeout = 10f;
+                 "service that has already said yes -- and because giving up early is " +
+                 "the expensive mistake. The other player is then matched with somebody " +
+                 "who has walked away, which to them is a match that never starts: the " +
+                 "report behind this number was one phone pressing PLAY and the other " +
+                 "opening the build a minute later, which is exactly the pairing where " +
+                 "the second join lands last.")]
+        [Range(1f, 30f)] public float pairingTimeout = 20f;
 
         [Header("Debug")]
         public string state = "idle";
@@ -329,9 +334,20 @@ namespace GulagRunners.Meta
 
             _found = new MatchFound
             {
-                // Worked out, not asked for: both devices reach the same answer from
-                // the ids they both hold. MatchAgreement says why it is ordinal.
-                LocalPlayer = MatchAgreement.LocalPlayer(mine, theirs),
+                // WHICH FIGHTER THIS DEVICE DRIVES IS THE SESSION'S HOST, and it used to be
+                // worked out from the two player ids instead (MatchAgreement.LocalPlayer:
+                // the lower one drives fighter one). Both devices did reach the same answer
+                // that way -- and the answer was unrelated to the one the SERVICE enforces.
+                // Only the session's host may write the relay's join code into a session
+                // property, so on any pairing where the host was the higher id the device
+                // that believed it was hosting was refused ("only the host can do this")
+                // while the real host waited out the handshake and reported that nobody had
+                // opened a relay.
+                //
+                // The service has already decided, both ends can read it, and it cannot
+                // disagree with itself. RelayHandshake.Open then confirms the role it
+                // actually took, which is what the arena follows.
+                LocalPlayer = session.IsHost ? 0 : 1,
                 Seed = MatchAgreement.Seed(session.Id),
                 OpponentName = Name(theirs),
                 OpponentRating = theirRating,
