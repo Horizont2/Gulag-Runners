@@ -85,6 +85,7 @@ def world(path, hatches):
     out["solidgate"] = baked["solidgate"]
     out["gate"] = baked["gate"]
     out["gatesshut"] = 0
+    out["_scene"] = path
     return out, baked, scene
 
 
@@ -269,6 +270,84 @@ def only_by_ladder(w, floors, problems, notes):
                     break
             x += 1.0
     notes.append(f"  {tried} jump(s) tried from along the storeys; none reached the one above")
+
+
+def knocked_off_a_ladder(w, baked, problems, notes):
+    """Hit a man half way up every ladder, and see where he comes down.
+
+    THE REPORT: "while one player is on a ladder and the other hits him, the player can be
+    thrown off the map". Measured here, on Arena_Forest, it was 22 metres sideways in a
+    single tick and then a fall with nothing under it.
+
+    A ladder in this project passes THROUGH the floor it serves -- no hatch is cut in the
+    slab, the hole is in depth -- so a climber half way up is standing inside twenty-nine
+    metres of floor, legally, because the ladder's own shaft is exempt from collision while
+    the rungs are held. A hit takes the ladder away mid-slab, the exemption goes with it,
+    and the body is inside a box it is not moving into. MoveX's wall pass answered that with
+    the box's FAR face, which for the arena floor is the end of the arena.
+
+    So it is measured on the real motor in the real arena: mount, climb, apply exactly what
+    CombatMotor.Hit applies to a climber, and run until the body lands or leaves. A ladder
+    nobody can be knocked off safely is a ladder nobody should climb.
+    """
+    PUSH, HEAVY = X(2.8), X(4.8)          # CombatConfig Knockback / HeavyKnockback
+    floor = min(F(b[1]) for b in baked["solid"]) if baked["solid"] else -10.0
+    tried = 0
+
+    for i, box in enumerate(baked["ladder"]):
+        x0, y0, x1, y1 = [F(v) for v in box]
+        for share in (0.15, 0.4, 0.7, 0.95):
+            for side in (-1, 1):
+                for push in (PUSH, HEAVY):
+                    st = S((x0 + x1) / 2, y0 + (y1 - y0) * share)
+                    st.depth = X(-2.0)
+                    m.try_mount(st, 1, w)
+                    for _ in range(12):
+                        step(st, m.UP, w)
+                    if st.mode not in ("ladder", "mount"):
+                        continue          # climbed out or stepped off: not a climber to hit
+
+                    tried += 1
+                    from_y, from_z = F(st.y), F(st.depth)
+
+                    # CombatMotor.Hit, the part of it that moves a climber
+                    st.vx = push * side
+                    st.stun = 20
+                    st.mode = "air"
+                    st.ladder = -1
+                    st.script_t = st.script_frames = 0
+
+                    jump = 0.0
+                    landed = False
+                    for _ in range(600):
+                        was = F(st.x)
+                        step(st, 0, w)
+                        jump = max(jump, abs(F(st.x) - was))
+                        if st.mode == "ground" and abs(st.vy) < X(0.05):
+                            landed = True
+                            break
+                        if F(st.y) < floor - 12.0:
+                            break
+
+                    if not landed:
+                        problems.append(
+                            f"{os.path.basename(w['_scene'])}: knocked off the ladder at "
+                            f"x {(x0 + x1) / 2:+.2f}, {share * 100:.0f}% up (y {from_y:+.2f}, "
+                            f"z {from_z:+.2f}), pushed "
+                            f"{'left' if side < 0 else 'right'}, the body never lands -- it "
+                            f"ends at x {F(st.x):+.2f} y {F(st.y):+.2f}, outside the arena. A "
+                            f"climber is inside the floor he is climbing through, legally; "
+                            f"take the ladder away and whatever resolves that overlap decides "
+                            f"where he goes.")
+                    elif jump > 0.2:
+                        problems.append(
+                            f"{os.path.basename(w['_scene'])}: knocked off the ladder at "
+                            f"x {(x0 + x1) / 2:+.2f}, {share * 100:.0f}% up, one tick moved "
+                            f"the body {jump * 100:.0f} cm -- a tick of running is 5. That is "
+                            f"a teleport out of a box he was already inside, not a push.")
+
+    if tried:
+        notes.append(f"  {tried} hit(s) on a climber; every one of them lands")
 
 
 def off_a_perch(w, baked, problems, notes):
@@ -569,6 +648,7 @@ def main(argv):
     stagger(floors, baked, problems, notes)
     only_by_ladder(w, floors, problems, notes)
     off_a_perch(w, baked, problems, notes)
+    knocked_off_a_ladder(w, baked, problems, notes)
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)

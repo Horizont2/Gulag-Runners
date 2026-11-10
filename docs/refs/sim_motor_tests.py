@@ -350,4 +350,71 @@ for roof in (0.6, 0.9, 1.2, 1.4):
                 f"{left:.2f} m of it left to walk off on the cage")
 C["HOME"] = HOME_WAS
 
+print("\n13. knocked off a ladder half way through the floor it climbs")
+# THE REPORT: "while one player is on a ladder and the other hits him, the player can be
+# thrown off the map". Not an exaggeration -- measured on Arena_Forest it was 22 metres in
+# one tick, and then a fall with no floor under it.
+#
+# Nothing in the arena is wrong. A ladder here passes THROUGH the floor it serves: there is
+# no hatch cut in the slab, the hole is in depth, and climbing works because the ladder's
+# own shaft is exempt from collision while the rungs are held. So a climber half way up is
+# standing inside 29 metres of floor, legally.
+#
+# Take the ladder away mid-slab -- which is exactly what a hit does -- and the exemption
+# goes with it. The body is then inside a box it is not moving into, and the wall pass of
+# MoveX answered that with "the wall you are walking into is at its far face": 16 metres to
+# the left, past the end of every floor below. Hence the flight, hence the fall.
+#
+# The fix is the guard MoveY has always had, in the other axis. With it, the man falls down
+# the shaft he was climbing, which is what being knocked off a ladder should do.
+SLAB = {"solid": [(X(-16.0), X(-0.12), X(12.0), X(0.12)),      # the floor, 28 m of it
+                  (X(-13.0), X(-1.94), X(8.0), X(-1.70))],     # the storey below
+        "solidz": [(X(-2.63), X(1.78)), (X(-4.14), X(-2.46))],
+        "oneway": [], "onewayz": [],
+        "ladder": [], "ladderz": [], "ladderlean": [], "ladderleanz": []}
+
+st = S(-10.1, -0.61)                      # mid-slab, as a climber is
+st.mode = "air"
+st.depth = X(-2.80)                       # the stand-off in front of the rungs
+st.vx = X(2.8)                            # CombatConfig.KnockbackSpeed
+st.stun = 20
+flew = 0.0
+for t in range(240):
+    was = F(st.x)
+    step(st, 0, SLAB)
+    flew = max(flew, abs(F(st.x) - was))
+    if st.mode == "ground":
+        break
+
+ok &= check("one tick cannot move the body further than one tick of running",
+            flew < 0.2, f"worst single tick {flew * 100:.0f} cm")
+ok &= check("and he comes down the shaft onto the storey below",
+            st.mode == "ground" and abs(F(st.y) + 1.70) < 0.1 and abs(F(st.x) + 10.1) < 2.0,
+            f"ended x {F(st.x):+.2f} y {F(st.y):+.2f} z {F(st.depth):+.2f} ({st.mode})")
+
+# And the guard must not stop a wall being a wall. A body walking INTO one from outside it
+# is the case the wall pass exists for, and it still has to stop: the guard only declines to
+# answer for a body that was already overlapping the box before the step.
+WALL = {"solid": [(X(-10.0), X(-1.0), X(10.0), X(0.0)),       # floor
+                  (X(0.0), X(0.0), X(1.0), X(3.0))],          # a wall standing on it
+        "solidz": [(X(-2.63), X(1.78)), (X(-2.63), X(1.78))],
+        "oneway": [], "onewayz": [],
+        "ladder": [], "ladderz": [], "ladderlean": [], "ladderleanz": []}
+
+st = S(-3.0, 0.0)
+st.mode = "ground"
+st.depth = X(-2.33)
+for t in range(180):
+    step(st, R, WALL)
+ok &= check("a body walking into a wall is still stopped by its near face",
+            -0.2 < F(st.x) < -0.1, f"stopped at x {F(st.x):+.3f} (the wall starts at 0.00)")
+
+st = S(4.0, 0.0)
+st.mode = "ground"
+st.depth = X(-2.33)
+for t in range(180):
+    step(st, L, WALL)
+ok &= check("and from the other side too",
+            1.1 < F(st.x) < 1.2, f"stopped at x {F(st.x):+.3f} (the wall ends at 1.00)")
+
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

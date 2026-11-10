@@ -1520,7 +1520,34 @@ namespace GulagRunners.Sim
                                      targetX + half, s.Position.Y + height);
                 if (!body.Overlaps(in solid)) continue;
 
-                targetX = dx > Fix.Zero ? solid.MinX - half - Skin : solid.MaxX + half + Skin;
+                // Only a surface the body is moving INTO is a wall. Without this guard a
+                // body that ALREADY overlaps a box is snapped to its far face, and the far
+                // face of the arena floor is the end of the arena: this is how a fighter
+                // knocked off a ladder left the level. He climbs through the floor slab --
+                // the shaft is exempt while he is holding the rungs, which is what makes a
+                // ladder through solid ground work at all -- and the hit takes the ladder
+                // away mid-slab. Nothing else changed: the body is standing inside 29 m of
+                // floor, pushed right, so this line read "the right-hand wall of that floor
+                // is at x -16.69" and put him there, 22 m away, past every floor below, and
+                // he fell out of the world.
+                //
+                // MoveY has had the same guard for a while, against the same thing in the
+                // other axis: "a player spawned with their head inside the floor above gets
+                // snapped to the far side of it and teleports a whole storey".
+                //
+                // With it, being knocked off a ladder drops the man down the shaft he was
+                // climbing, which is what being knocked off a ladder should do.
+                if (dx > Fix.Zero)
+                {
+                    if (s.Position.X + half > solid.MinX + Skin) continue;
+                    targetX = solid.MinX - half - Skin;
+                }
+                else
+                {
+                    if (s.Position.X - half < solid.MaxX - Skin) continue;
+                    targetX = solid.MaxX + half + Skin;
+                }
+
                 s.Velocity.X = Fix.Zero;
             }
 

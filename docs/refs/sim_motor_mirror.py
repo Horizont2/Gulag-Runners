@@ -198,7 +198,17 @@ def move_x(s, dx, w):
         if not solid_at(w, i, s.depth, halfz): continue
         b = (tx - half, s.y, tx + half, s.y + h)
         if not overlaps(b, sol): continue
-        tx = sol[0] - half - SKIN if dx > 0 else sol[2] + half + SKIN
+        # Only a surface the body moves INTO is a wall. A body that already overlaps a box
+        # would otherwise be snapped to its FAR face, and the far face of the arena floor is
+        # the end of the arena -- which is how a fighter knocked off a ladder left the level:
+        # he climbs through the floor slab (the shaft is exempt while he holds the rungs) and
+        # the hit takes the ladder away mid-slab. move_y has had this guard all along.
+        if dx > 0:
+            if s.x + half > sol[0] + SKIN: continue
+            tx = sol[0] - half - SKIN
+        else:
+            if s.x - half < sol[2] - SKIN: continue
+            tx = sol[2] + half + SKIN
         s.vx = 0
 
     for i in range(len(w.get("walls", ()))):
