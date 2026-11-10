@@ -189,12 +189,30 @@ namespace GulagRunners.Game
         /// The wire has said which fighter this device drives. Clamped, because an index
         /// from outside is an index that can be wrong, and a HUD painted from a bad one is
         /// harder to explain than a HUD painted from the fallback.
+        ///
+        /// And REMEMBERED, which is the whole of "the bars belong to the wrong fighter" and
+        /// "the armour the other player picked up is the armour on my interface". NetMatch
+        /// says this at the top of a match and deals the round on the NEXT LINE:
+        ///
+        ///     BeMe(link.LocalPlayer);        // -> SetLocalFighter(1) on the guest
+        ///     match.StartFresh(seed);        // -> Deal(0) -> LocalFighter = HumanFighter()
+        ///
+        /// ...and HumanFighter answers "the first fighter no brain is driving", which on a
+        /// networked device is fighter ZERO on both phones -- the brains were switched off
+        /// three lines earlier, precisely because neither fighter is a bot any more. So the
+        /// guest's HUD read the host's fighter for the whole match: his health in the bar
+        /// that is tinted as his own, his gear in the equipment column, and nothing in the
+        /// scene wired wrongly to find.
         /// </summary>
         public void SetLocalFighter(int index)
         {
             int many = fighters.Count > 0 ? fighters.Count : 1;
             LocalFighter = Mathf.Clamp(index, 0, many - 1);
+            _wiredLocal = true;
         }
+
+        /// <summary>A wire has told us which side this device is; stop guessing.</summary>
+        bool _wiredLocal;
 
         /// <summary>
         /// The fighter this device's own thumbs are on: the first one a brain is not
@@ -417,8 +435,14 @@ namespace GulagRunners.Game
 
             // Whose thumbs are on which fighter, re-taken rather than remembered: a round
             // dealt after a bot substituted for a dropped player is a round where the
-            // answer has changed. A wire that knows better overwrites it on the next tick.
-            LocalFighter = HumanFighter();
+            // answer has changed.
+            //
+            // Unless a wire has already said, in which case it is not a guess to re-take.
+            // This line used to run unconditionally, and NetMatch deals the opening round
+            // on the line AFTER it tells us the side -- so every networked guest threw the
+            // answer away immediately and read the host's fighter instead. See
+            // SetLocalFighter.
+            if (!_wiredLocal) LocalFighter = HumanFighter();
 
             // And the chest watchdog is re-armed per round, so a stall in the second round
             // is reported as loudly as one in the first.
