@@ -38,7 +38,8 @@ namespace GulagRunners.GameEditor
         // folder. UiSpriteSet says why; the short version is that a folder scan is a
         // guessing game that works once and goes quietly wrong afterwards.
         UiSpriteSet _set;
-        DefaultAsset _folder;        // optional, and only ever fills rows that are empty
+        Object _folder;              // optional, and only ever fills rows that are empty
+        bool _folderOpen;
         Vector2 _scroll;
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
 
@@ -132,42 +133,11 @@ namespace GulagRunners.GameEditor
 
         void OnGUI()
         {
-            _set = UiSpriteRows.Field(_set, "HUD Sprites");
-
-            if (_set == null)
-            {
-                EditorGUILayout.HelpBox(
-                    "Make a sprite list (or drop an existing one in) and the rows appear " +
-                    "below: one per piece of the HUD, with the design size beside it. " +
-                    "Drag the assets in and press Build.", MessageType.Info);
-                return;
-            }
-
             List<string> keys = Keys();
-            List<Vector2> sizes = Sizes();
-            UiSpriteRows.Rows(_set, keys, sizes, ref _scroll);
+            _set = UiSpriteRows.Field(_set, "HUD Sprites", keys);
+            if (_set == null) return;
 
-            EditorGUILayout.Space();
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                _folder = (DefaultAsset)EditorGUILayout.ObjectField(
-                    new GUIContent("Fill empties from",
-                                   "Optional. A folder to guess the EMPTY rows from, by " +
-                                   "name. It never touches a row you have dragged into, " +
-                                   "and a bad guess leaves the row empty rather than " +
-                                   "swapping a sprite behind your back."),
-                    _folder, typeof(DefaultAsset), false);
-
-                using (new EditorGUI.DisabledScope(_folder == null))
-                    if (GUILayout.Button("Fill", GUILayout.Width(60)))
-                    {
-                        int filled = UiSpriteRows.FillEmptyFromFolder(_set, _folder, keys);
-                        Debug.Log(filled == 0
-                                      ? "Nothing in that folder answered to an empty row."
-                                      : $"Filled {filled} empty row(s) from the folder. " +
-                                        "Check them: a guess is a guess.", _set);
-                    }
-            }
+            UiSpriteRows.Rows(_set, keys, Sizes(), ref _scroll);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Size on screen", EditorStyles.boldLabel);
@@ -213,6 +183,9 @@ namespace GulagRunners.GameEditor
 
             if (GUILayout.Button("Build the HUD in this scene", GUILayout.Height(32)))
                 Build();
+
+            EditorGUILayout.Space();
+            UiSpriteRows.FolderFill(_set, keys, ref _folderOpen, ref _folder);
             EditorGUILayout.LabelField(
                 "Replaces any \"HUD\" object this tool built before. Everything it makes " +
                 "is an ordinary GameObject afterwards.", EditorStyles.wordWrappedMiniLabel);

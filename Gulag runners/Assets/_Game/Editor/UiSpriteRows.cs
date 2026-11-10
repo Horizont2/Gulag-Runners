@@ -25,38 +25,132 @@ namespace GulagRunners.GameEditor
         /// Offering to create it matters more than it looks: the first thing anybody does
         /// with a tool that needs an asset they have never heard of is close the tool.
         /// </summary>
-        public static UiSpriteSet Field(UiSpriteSet set, string suggestedName)
+        public static UiSpriteSet Field(UiSpriteSet set, string suggestedName,
+                                        IList<string> keys = null)
         {
+            // FOUND, NOT ASKED FOR. A window that opens on an empty object field for an
+            // asset type nobody has ever made is a window with nothing to do: the one
+            // report this change exists for was "it still wants a folder", from somebody
+            // looking at exactly that -- one field they could not fill and no way in.
+            if (set == null) set = Existing(suggestedName);
+
             EditorGUILayout.LabelField("Sprites", EditorStyles.boldLabel);
+
+            if (set == null)
+            {
+                EditorGUILayout.LabelField(
+                    "This screen is built from a list of named rows -- one per piece -- " +
+                    "that you drag the assets into. There is no list in the project yet.",
+                    EditorStyles.wordWrappedMiniLabel);
+
+                if (GUILayout.Button($"Make the list ({suggestedName})", GUILayout.Height(30)))
+                    set = Create(suggestedName, keys);
+
+                EditorGUILayout.Space();
+                set = (UiSpriteSet)EditorGUILayout.ObjectField(
+                    new GUIContent("or use this one", "An existing list, if you keep more " +
+                                                      "than one."),
+                    set, typeof(UiSpriteSet), false);
+                return set;
+            }
+
             EditorGUILayout.LabelField(
                 "One row per piece below. Drag the asset into the row and press Build — " +
                 "no folder to scan and no filenames to get right.",
                 EditorStyles.wordWrappedMiniLabel);
 
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                set = (UiSpriteSet)EditorGUILayout.ObjectField(
-                    "Sprite set", set, typeof(UiSpriteSet), false);
+            set = (UiSpriteSet)EditorGUILayout.ObjectField(
+                "Sprite list", set, typeof(UiSpriteSet), false);
 
-                using (new EditorGUI.DisabledScope(set != null))
-                    if (GUILayout.Button("New…", GUILayout.Width(60))) set = Create(suggestedName);
-            }
+            // And the rows this screen needs, there before the first click. Sync writes
+            // only when something actually changed, so this is free per repaint.
+            if (set != null && keys != null && set.Missing(keys) > 0) set.Sync(keys);
 
             return set;
         }
 
-        static UiSpriteSet Create(string suggestedName)
+        /// <summary>
+        /// A list already in the project: the one named after this screen if there is one,
+        /// otherwise any of them -- several builders are meant to be able to share one.
+        /// </summary>
+        static UiSpriteSet Existing(string suggestedName)
         {
-            string path = EditorUtility.SaveFilePanelInProject(
-                "Where to keep the sprite list", suggestedName, "asset",
-                "This file remembers which asset goes in which row. Keep it in the " +
-                "project and commit it: it is the wiring, and it is wired once.");
-            if (string.IsNullOrEmpty(path)) return null;
+            string[] guids = AssetDatabase.FindAssets("t:UiSpriteSet");
+            UiSpriteSet any = null;
 
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                UiSpriteSet found = AssetDatabase.LoadAssetAtPath<UiSpriteSet>(path);
+                if (found == null) continue;
+                if (found.name == suggestedName) return found;
+                any = any ?? found;
+            }
+
+            return any;
+        }
+
+        /// <summary>
+        /// Makes the list where the rest of the interface lives, with this screen's rows
+        /// already in it. No file dialog: the question "where should this go" has one
+        /// right answer and asking it is the step people give up on.
+        /// </summary>
+        static UiSpriteSet Create(string suggestedName, IList<string> keys)
+        {
+            const string home = "Assets/_Game/UI";
+            if (!AssetDatabase.IsValidFolder(home))
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/_Game"))
+                    AssetDatabase.CreateFolder("Assets", "_Game");
+                AssetDatabase.CreateFolder("Assets/_Game", "UI");
+            }
+
+            string path = AssetDatabase.GenerateUniqueAssetPath($"{home}/{suggestedName}.asset");
             UiSpriteSet made = ScriptableObject.CreateInstance<UiSpriteSet>();
+            if (keys != null) made.Sync(keys);
             AssetDatabase.CreateAsset(made, path);
             AssetDatabase.SaveAssets();
+
+            Debug.Log($"Made {path}. It is the wiring for this screen -- keep it in the " +
+                      "project and commit it, and it only has to be filled in once.", made);
             return made;
+        }
+
+        /// <summary>
+        /// The folder, folded away. It is a convenience for the first import of a fresh
+        /// export and nothing else, and it sat in the middle of the window looking like
+        /// the thing the tool wanted -- which is how "it still asks for a folder" happens
+        /// to somebody who has read none of the tooltips.
+        /// </summary>
+        public static void FolderFill(UiSpriteSet set, IList<string> keys,
+                                      ref bool open, ref Object folder)
+        {
+            if (set == null) return;
+
+            open = EditorGUILayout.Foldout(
+                open, "Optional: guess the empty rows from a folder", true);
+            if (!open) return;
+
+            EditorGUILayout.LabelField(
+                "For the first import of a fresh export, when twenty-eight drags are a " +
+                "chore. It fills only EMPTY rows, by name, and never touches one you have " +
+                "dragged into — a bad guess leaves the row empty rather than swapping a " +
+                "sprite behind your back.", EditorStyles.wordWrappedMiniLabel);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                folder = EditorGUILayout.ObjectField("Folder", folder, typeof(DefaultAsset),
+                                                     false);
+                using (new EditorGUI.DisabledScope(folder == null))
+                    if (GUILayout.Button("Fill", GUILayout.Width(60)))
+                    {
+                        int filled = FillEmptyFromFolder(set, folder, keys);
+                        Debug.Log(filled == 0
+                                      ? "Nothing in that folder answered to an empty row."
+                                      : $"Filled {filled} empty row(s). Check them: a guess " +
+                                        "is a guess.", set);
+                    }
+            }
         }
 
         /// <summary>

@@ -37,7 +37,8 @@ namespace GulagRunners.GameEditor
         const string RootName = "Search UI";
         const string DrawnFolder = "Assets/_Game/UI/Search/generated";
 
-        DefaultAsset _folder;
+        Object _folder;
+        bool _folderOpen;
         Font _font;
         float _scale = 4f;
         float _textScale = 1f;
@@ -90,30 +91,17 @@ namespace GulagRunners.GameEditor
 
         void OnGUI()
         {
-            _set = UiSpriteRows.Field(_set, "Search Sprites");
+            List<string> keys = Keys();
+            _set = UiSpriteRows.Field(_set, "Search Sprites", keys);
             EditorGUILayout.LabelField(
                 "All five pieces are DRAWN if their row is empty, so this screen builds " +
                 "with nothing dragged in at all. A row that has something wins.",
                 EditorStyles.wordWrappedMiniLabel);
 
-            List<string> keys = Keys();
             if (_set != null)
             {
                 UiSpriteRows.Rows(_set, keys, Sizes(), ref _scroll, 150f);
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    _folder = (DefaultAsset)EditorGUILayout.ObjectField(
-                        new GUIContent("Fill empties from",
-                                       "Optional. Guesses the EMPTY rows from a folder."),
-                        _folder, typeof(DefaultAsset), false);
-
-                    using (new EditorGUI.DisabledScope(_folder == null))
-                        if (GUILayout.Button("Fill", GUILayout.Width(60)))
-                            Debug.Log($"Filled " +
-                                      $"{UiSpriteRows.FillEmptyFromFolder(_set, _folder, keys)}" +
-                                      " empty row(s).", _set);
-                }
+                UiSpriteRows.FolderFill(_set, keys, ref _folderOpen, ref _folder);
             }
 
             EditorGUILayout.Space();

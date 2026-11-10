@@ -41,7 +41,8 @@ namespace GulagRunners.GameEditor
         const float DesignH = 864f;
         const string RootName = "Menu UI";
 
-        DefaultAsset _folder;
+        Object _folder;
+        bool _folderOpen;
         // The sprites, dragged into named rows. See UiSpriteSet: a folder scan matches
         // filenames, which works on the export it was written against and quietly goes
         // wrong on every one after it.
@@ -105,39 +106,11 @@ namespace GulagRunners.GameEditor
 
         void OnGUI()
         {
-            _set = UiSpriteRows.Field(_set, "Menu Sprites");
-
-            if (_set == null)
-            {
-                EditorGUILayout.HelpBox(
-                    "Make a sprite list (or drop an existing one in) and the rows appear " +
-                    "below: one per piece of the menu, with the design size beside it. " +
-                    "One list can hold the whole interface -- the keys are prefixed by " +
-                    "screen, so the HUD's rows and these do not collide.", MessageType.Info);
-                return;
-            }
-
             List<string> keys = Keys();
+            _set = UiSpriteRows.Field(_set, "Menu Sprites", keys);
+            if (_set == null) return;
+
             UiSpriteRows.Rows(_set, keys, Sizes(), ref _scroll, 240f);
-
-            EditorGUILayout.Space();
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                _folder = (DefaultAsset)EditorGUILayout.ObjectField(
-                    new GUIContent("Fill empties from",
-                                   "Optional. Guesses the EMPTY rows from a folder, by " +
-                                   "name, and never touches one you have dragged into."),
-                    _folder, typeof(DefaultAsset), false);
-
-                using (new EditorGUI.DisabledScope(_folder == null))
-                    if (GUILayout.Button("Fill", GUILayout.Width(60)))
-                    {
-                        int filled = UiSpriteRows.FillEmptyFromFolder(_set, _folder, keys);
-                        Debug.Log(filled == 0
-                                      ? "Nothing in that folder answered to an empty row."
-                                      : $"Filled {filled} empty row(s). Check them.", _set);
-                    }
-            }
 
             EditorGUILayout.Space();
             _font = (Font)EditorGUILayout.ObjectField(
@@ -170,6 +143,9 @@ namespace GulagRunners.GameEditor
                 have == keys.Count ? MessageType.Info : MessageType.Warning);
 
             if (GUILayout.Button("Build the menu screen", GUILayout.Height(32))) Build();
+
+            EditorGUILayout.Space();
+            UiSpriteRows.FolderFill(_set, keys, ref _folderOpen, ref _folder);
         }
 
         static List<string> Keys()

@@ -88,6 +88,23 @@ namespace GulagRunners.GameEditor
         /// bottom: a sprite dragged in before a key was renamed is still a sprite somebody
         /// chose, and deleting it silently is how a tool loses an afternoon's work.
         /// </summary>
+        /// <summary>
+        /// How many of these keys have no row yet. Asked every frame by the builder
+        /// windows, so it allocates nothing and writes nothing.
+        /// </summary>
+        public int Missing(IList<string> keys)
+        {
+            int n = 0;
+            for (int i = 0; i < keys.Count; i++)
+            {
+                bool found = false;
+                for (int j = 0; j < slots.Count && !found; j++)
+                    if (slots[j] != null && slots[j].key == keys[i]) found = true;
+                if (!found) n++;
+            }
+            return n;
+        }
+
         public int Sync(IList<string> keys)
         {
             List<Slot> ordered = new List<Slot>(keys.Count);
@@ -107,6 +124,14 @@ namespace GulagRunners.GameEditor
                 if (slots[j] != null && !ordered.Contains(slots[j]) &&
                     !string.IsNullOrEmpty(slots[j].key))
                     ordered.Add(slots[j]);
+
+            // Written only when it actually changed, because a builder window asks for
+            // this every repaint and an asset marked dirty sixty times a second is an
+            // asset Unity saves sixty times a second.
+            bool same = ordered.Count == slots.Count;
+            for (int i = 0; same && i < ordered.Count; i++)
+                same = ReferenceEquals(ordered[i], slots[i]);
+            if (same) return 0;
 
             slots = ordered;
             EditorUtility.SetDirty(this);
