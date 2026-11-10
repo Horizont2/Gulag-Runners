@@ -127,17 +127,30 @@ def open_and_take(s, chests, player=0):
     return a + b, taken
 
 
-print("1. the table of docs/03 is the table the code produces")
-rows = [("crate, with a club", CRATE, CLUB, 0.6),
-        ("locker, with a club", LOCKER, CLUB, 2.5),
-        ("safe, forced bare-handed", SAFE, NONE, 6.0)]
+print("1. the time to open a chest is the time the code produces")
+# One price for all three kinds (ChestConfig.Default, and every arena's tuning): the kind
+# decides the loot tier, not the price of getting at it. What a weapon changes is the
+# speed, and that is the trade the scavenge phase is built on.
+rows = [("crate, with a club", CRATE, CLUB, 1.25),
+        ("locker, with a club", LOCKER, CLUB, 1.25),
+        ("safe, forced bare-handed", SAFE, NONE, 2.5)]
 for label, kind, weapon, want in rows:
     got = frames_to_open(kind, weapon) / 60
-    check(label, abs(got - want) < 0.05, f"{got:.2f} s, docs/03 says {want} s")
+    check(label, abs(got - want) < 0.05, f"{got:.2f} s, the config says {want} s")
 check("bare hands are the slow way in",
       frames_to_open(CRATE, NONE) > frames_to_open(CRATE, CLUB),
       f"crate {frames_to_open(CRATE, NONE)/60:.1f} s bare vs "
       f"{frames_to_open(CRATE, CLUB)/60:.1f} s with a club")
+
+# AND EVERY WEAPON CAN ACTUALLY OPEN ONE, which is the shape of the fault behind "the
+# animation plays and the chest never opens": the gain is the weapon's pry speed in
+# thousandths, clamped to at least 1, so a pry speed of zero does not stall -- it takes
+# 150,000 ticks, which is forty-one minutes of holding the button.
+slow = [(ITEMS[w]["name"], frames_to_open(CRATE, w) / 60)
+        for w in ITEMS if ITEMS[w]["kind"] == 1]
+check("no weapon in the table takes more than five seconds on a chest",
+      all(s <= 5.0 for _n, s in slow),
+      ", ".join(f"{n} {s:.1f}s" for n, s in sorted(slow, key=lambda r: -r[1])[:4]))
 
 print("\n2. walking up to a chest and opening it, on the real arena")
 chests = build()
@@ -157,8 +170,8 @@ check("and the club is in hand", s.inv.weapon == CLUB and s.inv.durability == 14
 print("\n3. the weapon is also the crowbar (docs/03)")
 s2 = spawn(-2.5, 0.9, CLUB)
 took, item = hold_open(s2, chests, 0)
-check("the club opens the locker in half the time", abs(took / 60 - 2.5) < 0.1,
-      f"{took/60:.2f} s")
+check("the club opens the locker in half the time", abs(took / 60 - 1.25) < 0.1,
+      f"{took/60:.2f} s against 2.50 s bare-handed")
 check("and it cost two of its fourteen uses", s2.inv.durability == 12,
       f"durability {s2.inv.durability}")
 collect(s2, chests)
@@ -166,7 +179,7 @@ check("the chainmail goes on by itself: the armour slot was free", s2.inv.armour
 
 spear = spawn(-2.0, floor_h + 0.9, SPEAR)
 safes = 0
-for _ in range(4):
+for _ in range(8):
     c = [Chest(SAFE, BANDAGE, (X(-2.45), X(floor_h), X(-1.55), X(floor_h + 0.9)))]
     spear.opening = -1
     if spear.inv.weapon == NONE:
@@ -174,8 +187,11 @@ for _ in range(4):
     hold_open(spear, c, 0)
     if c[0].opened:
         safes += 1
-check("a spear forces three safes and then breaks", safes == 3 and spear.inv.weapon == NONE,
-      f"{safes} safes at 3 of 9 durability = {3/9*100:.0f}% each, docs/03 says ~35%")
+# Five, not three: the wear is two per chest for every kind now (ChestConfig.Default),
+# where docs/03 charged three for a safe. What has to stay true is that the crowbar IS the
+# weapon -- open enough and you are fighting with your hands.
+check("a spear forces five safes and then breaks", safes == 5 and spear.inv.weapon == NONE,
+      f"{safes} safes at 2 of 9 durability = {2/9*100:.0f}% each")
 check("and you are back to bare hands", spear.inv.bare)
 
 print("\n4. noise is the price (docs/01: sound is the only way to be found)")
@@ -189,16 +205,24 @@ s2.stepn = 0
 tick(s2, ACTION, chests, 0)
 check("forcing a locker bare-handed is Medium", bare_noise == 2, f"level {bare_noise}")
 check("prying it with a weapon is Loud", s2.noise == 3, f"level {s2.noise}")
+# AND THE SAME FOR A CRATE, which docs/03 made the quiet way in and the config no longer
+# does: every kind costs Medium by hand and Loud with a weapon. The trade is still a trade
+# -- the lever that halves the time doubles the chance of being heard -- it is just not a
+# property of the chest any more.
 chests = build()
 s3 = spawn(-5.5, 0.9, CLUB)
 s3.stepn = 0
 tick(s3, ACTION, chests, 0)
-check("a crate stays Quiet either way", s3.noise == 1, f"level {s3.noise}")
+check("a crate costs the same noise as anything else", s3.noise == 3, f"level {s3.noise}")
+s4 = spawn(-5.5, 0.9)
+s4.stepn = 0
+tick(s4, ACTION, chests, 0)
+check("and bare hands are the quiet way into all of them", s4.noise == 2, f"level {s4.noise}")
 
 print("\n5. letting go drains, it does not reset")
 chests = build()
 s = spawn(-2.5, 0.9)
-for _ in range(120):                                  # two seconds of a five-second locker
+for _ in range(120):                                  # two seconds of a 2.5 s locker
     tick(s, ACTION, chests, 0)
 held = chests[1].progress
 check("progress built up", held > 0, f"{held/1000:.0f} of {CHEST_CFG[LOCKER]['bare']} frames")

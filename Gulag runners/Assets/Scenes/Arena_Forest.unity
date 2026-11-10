@@ -128677,9 +128677,9 @@ MonoBehaviour:
     windupSpeed: 0.48
     activeSpeed: 0.18
     recoverySpeed: 0.4
-    knockbackSpeed: 3.2
-    heavyKnockbackSpeed: 6
-    knockbackLift: 1.6
+    knockbackSpeed: 2.8
+    heavyKnockbackSpeed: 4.8
+    knockbackLift: 2.2
     chip: 0.3
     blockStaminaCost: 1
     heavyBlockStaminaCost: 2

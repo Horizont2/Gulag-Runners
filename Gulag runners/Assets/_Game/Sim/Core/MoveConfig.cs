@@ -107,6 +107,22 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix BodyDepth;
 
+        /// <summary>
+        /// What is left of a blow's push after one tick, in thousandths.
+        ///
+        /// A hit hands the body a velocity and this is how it spends it: 930 keeps 93% of
+        /// it every tick, which is an exponential tail -- fast at first, then easing out
+        /// to nothing. The alternative, and what this replaced, was a flat drag of a sixth
+        /// of the ground deceleration: a CONSTANT slowing, which arrives at zero with the
+        /// same speed it had the tick before and stops dead. Snapped to full speed on one
+        /// tick and stopped dead at the end of it, a knockback has a jolt at both ends,
+        /// and that is most of "the push is too sharp to play against".
+        ///
+        /// Applied in the air as well. A finisher lifts the victim off the ground, and
+        /// without a decay up there the push is spent entirely by the landing.
+        /// </summary>
+        public int PushDecayPermille;
+
         /// <summary>How fast a body slides between slices, in m/s. 0 snaps.</summary>
         public Fix DepthSnapSpeed;
 
@@ -312,6 +328,7 @@ namespace GulagRunners.Sim
             c.CrouchHeight = Fix.FromMilli(682);
             c.BodyWidth   = Fix.FromMilli(300);
             c.BodyDepth   = Fix.FromMilli(600);
+            c.PushDecayPermille = 930;
             c.DepthSnapSpeed = Fix.FromMilli(4000);
             c.AirDepthSnap = Fix.FromMilli(3000);
             c.LaneLookahead  = Fix.FromMilli(1200);

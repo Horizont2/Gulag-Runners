@@ -335,9 +335,20 @@ namespace GulagRunners.Sim
             c.RecoilFrames = 10;
             c.AttackFramesPermille = 1450;   // 0.28 s to read the commonest wind-up
 
-            c.KnockbackSpeed = Fix.FromMilli(3200);
-            c.HeavyKnockbackSpeed = Fix.FromMilli(6000);
-            c.KnockbackLift = Fix.FromMilli(1600);
+            // LOWER THAN THEY WERE, and spent rather than braked (MoveConfig.PushDecay).
+            // A heavy blow used to put 6 m/s into the body and a flat drag took it away at a
+            // constant rate: 1.86 m of travel, which is a launch across half a room, and a
+            // dead stop at the end of it. Measured on the mirror, 4.8 m/s against the decay
+            // is 0.91 m -- still past the edge of a blade's reach, so a string still has to
+            // step back in, with none of the sharpness. The light blow goes 0.45 m -> 0.35 m
+            // for the same reason.
+            c.KnockbackSpeed = Fix.FromMilli(2800);
+            c.HeavyKnockbackSpeed = Fix.FromMilli(4800);
+
+            // And the finisher lifts enough to SEE. At 1.6 m/s it was 4 cm and 0.11 s of
+            // air, which is the "three centimetres nobody can see" the old comment
+            // complained about one number up; 2.2 is 8 cm and a sixth of a second.
+            c.KnockbackLift = Fix.FromMilli(2200);
 
             c.MaxArmourPermille = 500;     // the full legendary kit is 450; this never fires
             c.MaxStunResistPermille = 400; // a great helm is 380 of it

@@ -119,6 +119,19 @@ namespace GulagRunners.Game
                  "teleport sideways whenever a ramp starts at another depth.")]
         public float depthSnapSpeed = 4f;
 
+        [Header("Being hit")]
+        [Tooltip("What is left of a blow's push after one tick.\n\n" +
+                 "0.93 keeps 93% of it every tick: the body is moved hard at first and " +
+                 "eases out to nothing. Lower it and a hit barely moves anybody; raise it " +
+                 "towards 1 and the push carries for the whole stun.\n\n" +
+                 "What this replaced was a flat drag — a constant slowing, which arrives at " +
+                 "zero still travelling and stops dead. Snapped to full speed on one tick " +
+                 "and stopped dead at the end, a knockback jolts at both ends, and that is " +
+                 "most of what makes being hit unpleasant to play against rather than " +
+                 "heavy. Hit stop already holds the body still while the eye reads the " +
+                 "blow, so the only sharp number left is the one the blow itself set.")]
+        [Range(0.6f, 0.99f)] public float pushDecay = 0.93f;
+
         [Tooltip("How much faster that is while the feet are off the ground.\n\n" +
                  "The speed above is tuned for walking from one slice to another, where " +
                  "gentle is right. A JUMP to a prop at another depth has to finish its " +
@@ -207,6 +220,7 @@ namespace GulagRunners.Game
             c.BodyHeight = M(bodyHeight);
             c.CrouchHeight = M(Mathf.Min(crouchHeight, bodyHeight * 0.75f));
             c.BodyDepth = M(bodyDepth);
+            c.PushDecayPermille = Mathf.Clamp(Mathf.RoundToInt(pushDecay * 1000f), 1, 1000);
             c.DepthSnapSpeed = M(depthSnapSpeed);
             c.AirDepthSnap = Fix.FromMilli((int)(airDepthSnap * 1000));
             c.LaneLookahead = M(laneLookahead);

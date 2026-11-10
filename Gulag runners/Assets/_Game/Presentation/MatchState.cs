@@ -420,6 +420,15 @@ namespace GulagRunners.Game
             // answer has changed. A wire that knows better overwrites it on the next tick.
             LocalFighter = HumanFighter();
 
+            // And the chest watchdog is re-armed per round, so a stall in the second round
+            // is reported as loudly as one in the first.
+            for (int i = 0; i < _pryingAt.Length; i++)
+            {
+                _pryingAt[i] = -1;
+                _pryingFor[i] = 0;
+                _warnedStall[i] = false;
+            }
+
             if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
             SimWorld world = worldBaker != null ? worldBaker.World : null;
 
@@ -452,7 +461,75 @@ namespace GulagRunners.Game
             LootMotor.StepGround(GroundItems, world, Drops);
             ResolveHits();
             BitePoison(world);
+            WatchChests(world);
         }
+
+        /// <summary>
+        /// Says so when a fighter has been prying at one chest for longer than that chest
+        /// can possibly take.
+        ///
+        /// A SEARCH ANIMATION THAT NEVER ENDS is the one loot fault that looks like nothing:
+        /// the fighter works, the chest does not open, and every number involved is a
+        /// plausible number somewhere else in the project. The progress is in thousandths of
+        /// a bare-handed frame and the gain is the weapon's pry speed in the same units, so
+        /// a pry speed that arrives as 0.001 instead of 1.0 -- one bad conversion, one data
+        /// file written by hand -- clamps the gain to 1 and makes a 2.5 s chest take
+        /// forty-one minutes. Nothing errors. Nothing logs. The player holds the button.
+        ///
+        /// So the one thing that cannot be read off a running game is printed once: what
+        /// the chest needs, what this weapon adds, and where the progress actually is.
+        /// Which of those three is wrong says which layer to go and look at.
+        /// </summary>
+        void WatchChests(SimWorld world)
+        {
+            if (world == null || ChestStates == null || ChestStates.Length == 0) return;
+
+            int watched = fighters.Count < _pryingAt.Length ? fighters.Count : _pryingAt.Length;
+            for (int i = 0; i < watched; i++)
+            {
+                PlayerController f = fighters[i];
+                if (f == null) continue;
+
+                int chest = f.State.OpeningChest;
+                if (chest < 0 || chest >= world.Chests.Length)
+                {
+                    _pryingAt[i] = -1;
+                    _pryingFor[i] = 0;
+                    continue;
+                }
+
+                if (_pryingAt[i] != chest) { _pryingAt[i] = chest; _pryingFor[i] = 0; }
+                _pryingFor[i]++;
+
+                // Three times what it should take, plus a second: slack for a hand coming
+                // off the button, a drop and a re-claim, and a chest shared with the other
+                // fighter -- none of which should ever add up to this much.
+                int should = LootMotor.FramesToOpen(world.Chests[chest].Kind,
+                                                    f.State.Inventory.Weapon, Config);
+                if (_pryingFor[i] <= should * 3 + 60 || _warnedStall[i]) continue;
+
+                _warnedStall[i] = true;
+                int gain = ItemTable.WeaponOrFists(f.State.Inventory.Weapon).PrySpeed.ToMilli();
+                Debug.LogError(
+                    $"{name}: player {i + 1} has been prying at chest {chest} " +
+                    $"({world.Chests[chest].Kind}) for {_pryingFor[i] / 60f:0.0} s and it has " +
+                    $"not opened. It should take {should / 60f:0.0} s.\n" +
+                    $"  progress {ChestStates[chest].Progress} of " +
+                    $"{Config.For(world.Chests[chest].Kind).BareFrames * 1000} needed, " +
+                    $"+{gain} a tick from {f.State.Inventory.Weapon} (pry speed " +
+                    $"{gain / 1000f:0.###}), claimed by player " +
+                    $"{ChestStates[chest].Opener + 1}.\n" +
+                    "  A gain of 1 means the weapon's pry speed arrived as a thousandth of " +
+                    "what it should be: check that item's data file. A progress that is not " +
+                    "climbing means something else is draining it. A claim held by the OTHER " +
+                    "player means the two fighters are sharing an index they should not.",
+                    this);
+            }
+        }
+
+        readonly int[] _pryingAt = { -1, -1 };
+        readonly int[] _pryingFor = new int[2];
+        readonly bool[] _warnedStall = new bool[2];
 
         /// <summary>
         /// The poison takes its bite, once for the whole match.

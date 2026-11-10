@@ -124,10 +124,16 @@ def pry_milli(weapon):
 
 # ---------------------------------------------------------------- chests (docs/03)
 CRATE, LOCKER, SAFE = 0, 1, 2
+# ONE PRICE FOR ALL THREE KINDS, which is what ChestConfig.Default actually holds and
+# what every arena's ChestTuning is set to: 150 frames by hand, so 2.5 s bare and 1.25 s
+# with a club. docs/03 priced them apart -- 1.2 s for a crate, 6 s for a safe -- and this
+# table still said so long after the code stopped: the kind decides the LOOT TIER now, and
+# the pricing comes back when the kinds are placed deliberately rather than scattered
+# (ChestTuning says why). A mirror that holds yesterday's numbers tests yesterday's game.
 CHEST_CFG = {
-    CRATE:  dict(bare=72,  bare_noise=1, tool_noise=1, wear=1, name="crate"),
-    LOCKER: dict(bare=300, bare_noise=2, tool_noise=3, wear=2, name="locker"),
-    SAFE:   dict(bare=360, bare_noise=3, tool_noise=3, wear=3, name="safe"),
+    CRATE:  dict(bare=150, bare_noise=2, tool_noise=3, wear=2, name="crate"),
+    LOCKER: dict(bare=150, bare_noise=2, tool_noise=3, wear=2, name="locker"),
+    SAFE:   dict(bare=150, bare_noise=2, tool_noise=3, wear=2, name="safe"),
 }
 # Chance of each tier per chest kind, in percent. Rows sum to 100.
 TIER_ODDS = {

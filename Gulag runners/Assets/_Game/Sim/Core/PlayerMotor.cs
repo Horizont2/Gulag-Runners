@@ -495,13 +495,25 @@ namespace GulagRunners.Sim
             if (s.SpeedPermille > 0)
                 targetSpeed = new Fix((int)(((long)targetSpeed.Raw * s.SpeedPermille) / 1000));
 
-            // Knocked back: the body keeps what the blow gave it. Running the normal ground
-            // deceleration over a hit would wipe the knockback in a tenth of a second, and a hit
-            // that does not move anybody is a hit nobody can read.
+            // Knocked back: the body keeps what the blow gave it, and SPENDS it rather than
+            // being braked. Running the normal ground deceleration over a hit would wipe the
+            // knockback in a tenth of a second, and a hit that does not move anybody is a hit
+            // nobody can read -- but the flat drag that replaced it has the other fault: a
+            // constant slowing arrives at zero still travelling and stops dead.
+            //
+            // So the push decays by a share of itself each tick. It is fast at first, eases
+            // out to nothing, and never jolts at either end: the only sudden number in the
+            // whole exchange is the one the blow itself set, and hit stop is already holding
+            // the body still while the eye reads that.
             if (s.HitstunTimer > 0 || s.StaggerTimer > 0 || s.RecoilTimer > 0)
             {
-                Fix drag = cfg.GroundDecel / 6;
-                s.Velocity.X = Fix.MoveTowards(s.Velocity.X, Fix.Zero, drag * Dt);
+                int keep = cfg.PushDecayPermille > 0 ? cfg.PushDecayPermille : 930;
+                int raw = (int)(((long)s.Velocity.X.Raw * keep) / 1000);
+
+                // And a floor, or the tail runs for a second and a half of creep: below a
+                // centimetre a second there is nothing left to read, and a body that is
+                // still moving is a body the next blow lands on differently.
+                s.Velocity.X = raw > -650 && raw < 650 ? Fix.Zero : new Fix(raw);
             }
             else
             {

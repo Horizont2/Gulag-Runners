@@ -277,14 +277,14 @@ namespace GulagRunners.Game
         [Range(0f, 1f)] public float activeSpeed = 0.18f;
         [Range(0f, 1f)] public float recoverySpeed = 0.4f;
 
-        public float knockbackSpeed = 3.2f;
-        public float heavyKnockbackSpeed = 6f;
+        public float knockbackSpeed = 2.8f;
+        public float heavyKnockbackSpeed = 4.8f;
 
         [Tooltip("Upward part of a knockback, and ONLY on the heavy finisher.\n\n" +
                  "On every hit it lifted them three centimetres — nothing you can see — " +
                  "while taking them off the ground for 21 frames, which slid them out of " +
                  "reach before any follow-up could land.")]
-        public float knockbackLift = 1.6f;
+        public float knockbackLift = 2.2f;
 
         [Header("Guard")]
         [Tooltip("Damage that still gets through a block.")]

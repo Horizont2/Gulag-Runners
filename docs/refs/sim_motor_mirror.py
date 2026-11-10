@@ -19,6 +19,7 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SSPD=M(2400), SMINF=10, SMAXF=30, LREGRAB=12,
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
+         PUSHKEEP=930,
          BODYZ=M(600), DEPTHSPD=M(4000), AIRDEPTH=M(3000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
          LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=32, RISEMARGIN=M(120), ALLOW_DODGE=True, MANTLE_RISE=M(450), LADDER_JUMP=False,
          CORNER=M(250), FALLTHRU=18, HOME=0,
@@ -532,7 +533,12 @@ def step_flat(s, inp, w):
     if s.speed_permille > 0:
         tgt = (tgt * s.speed_permille) // 1000
     if s.stun > 0 or s.stagger > 0 or getattr(s, "recoil_t", 0) > 0:
-        s.vx = move_towards(s.vx, 0, mul(C["GDEC"] // 6, DT))
+        # The push is SPENT, not braked: a share of itself goes every tick, so it is fast at
+        # first and eases out to nothing. A flat drag -- which is what this was, a sixth of
+        # the ground deceleration -- arrives at zero still travelling and stops dead, and a
+        # knockback with a jolt at both ends is most of "the push is too sharp to play".
+        raw = (s.vx * C["PUSHKEEP"]) // 1000
+        s.vx = 0 if -650 < raw < 650 else raw
     else:
         acc = (C["GACC"] if g else C["AACC"]) if wx else (C["GDEC"] if g else C["ADEC"])
         s.vx = move_towards(s.vx, tgt, mul(acc, DT))
