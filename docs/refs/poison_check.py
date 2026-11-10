@@ -134,9 +134,12 @@ def pools(text, docs, pool_guid):
             return int(m.group(1)) if m else 0
 
         hide = re.search(r"\n  hideBoxesInPlay: (\d)", body)
+        line = re.search(r"\n  showWaterline: (\d)", body)
         out.append(dict(component=fid, owner=owner, body=box,
                         surface=slot("surface"), mist=slot("mist"), source=slot("source"),
-                        hidden=hide is None or hide.group(1) == "1"))
+                        glow=slot("glow"),
+                        hidden=hide is None or hide.group(1) == "1",
+                        waterline=line is None or line.group(1) == "1"))
     return out
 
 
@@ -250,6 +253,28 @@ MAX_ON_SCREEN = 0.4
 # And a minimum above zero is a particle that cannot be far away: it is held at this share
 # of the screen whatever the distance.
 MIN_ON_SCREEN = 0.02
+
+
+def lights_under(docs, transform):
+    """How many lights hang off this transform. Class 108, counted through children."""
+    found, stack = 0, [transform]
+    while stack:
+        tr = stack.pop()
+        if tr not in docs:
+            continue
+        body = docs[tr][1]
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        if go:
+            comps = re.search(r"  m_Component:\n((?:  - component: \{fileID: -?\d+\}\n)*)",
+                              docs.get(int(go.group(1)), (0, ""))[1])
+            if comps and comps.group(1):
+                for c in re.findall(r"fileID: (-?\d+)", comps.group(1)):
+                    if docs.get(int(c), (0,))[0] == 108:
+                        found += 1
+        kids = re.search(r"  m_Children:(?: \[\]|\n((?:  - \{fileID: -?\d+\}\n)*))", body)
+        if kids and kids.group(1):
+            stack += [int(v) for v in re.findall(r"fileID: (-?\d+)", kids.group(1))]
+    return found
 
 
 def floors(baked, min_width):
@@ -406,7 +431,21 @@ def main(argv):
             notes.append(f"  no smoke wired; the pool is drawn as the box itself, which is a "
                          f"measurement rather than a picture")
         else:
-            notes.append(f"  smoke: {band} emitter(s) in the pool itself, {below} under the floor")
+            lit = lights_under(docs, p["glow"]) if p["glow"] else 0
+            notes.append(f"  smoke: {band} emitter(s) in the pool itself, {below} under "
+                         f"the floor; {lit} light(s) on the waterline; the line itself is "
+                         f"{'drawn' if p['waterline'] else 'OFF'}")
+
+            # Neither of these is a failure -- a flood of smoke alone is a legitimate
+            # look -- but both are the difference between poison you see coming and
+            # poison you notice when the health starts dropping, so they are said.
+            if lit == 0:
+                notes.append(f"  no light on the waterline: smoke is transparent, and a "
+                             f"transparent thing in a dark arena is a suggestion. Green on "
+                             f"the floor is what makes a flood read from across the room")
+            if not p["waterline"]:
+                notes.append(f"  and the waterline is switched off, so the one height a "
+                             f"player has to read has no edge at all")
 
             # The clamps, which are the one thing about this smoke that can look right on
             # the machine it was built on and wrong on the next one.

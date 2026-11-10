@@ -84,7 +84,7 @@ namespace GulagRunners.Game
                  "off with the flood, never moved.")]
         public Transform source;
 
-        [Tooltip("Hide the boxes when the game starts, leaving only the smoke.\n\n" +
+        [Tooltip("Hide the BODY of the pool when the game starts, leaving the smoke.\n\n" +
                  "The box IS the authoring: it is what you drag to say where the poison stops, " +
                  "and the only thing in the scene that can be measured. It is also a flat green " +
                  "slab, which is not what a rising poison looks like — so it is visible while " +
@@ -92,6 +92,26 @@ namespace GulagRunners.Game
                  "off to see the measured volume in play, which is how you check that the smoke " +
                  "and the damage agree about where the surface is.")]
         public bool hideBoxesInPlay = true;
+
+        [Tooltip("Keep the thin waterline visible in play. ON, and worth being on.\n\n" +
+                 "It is the only height in the arena a player has to READ -- everything under " +
+                 "it is lost ground -- and smoke has no edge. A hand's breadth of bright " +
+                 "green across the arena answers \"how high is it now\" in one glance, and " +
+                 "the arenas' bloom makes it glow for free.\n\n" +
+                 "It is also not the slab anybody complained about: 6 cm against the body's " +
+                 "two and a half metres. Switch it off for a softer look and the smoke has " +
+                 "to carry the reading on its own.")]
+        public bool showWaterline = true;
+
+        [Tooltip("Optional. Lights, kept on the waterline.\n\n" +
+                 "The one thing that makes a flood read from across the arena rather than " +
+                 "being noticed when the health starts going: green on the floor, on the " +
+                 "props and on the fighters' shins. Smoke is transparent and a transparent " +
+                 "thing in a dark arena is a suggestion; a lit floor is a fact.\n\n" +
+                 "Moved with the surface and switched on and off with the flood, exactly " +
+                 "like the smoke. Whatever is dropped in keeps its own colour, range and " +
+                 "intensity -- this only carries it.")]
+        public Transform glow;
 
         [Tooltip("Draw the pool at full flood in the scene view, and the floors it drowns.")]
         public bool drawGizmo = true;
@@ -180,14 +200,16 @@ namespace GulagRunners.Game
             if (hideBoxesInPlay)
             {
                 Hide(body);
-                Hide(surface);
+                if (!showWaterline) Hide(surface);
             }
 
             // And nothing green until the flood starts. Switched off here rather than left
             // to the first LateUpdate, so a particle system does not get one frame of
-            // emission in at the top of the match.
+            // emission in at the top of the match -- and a light does not sit lit on the
+            // floor of an arena nobody has flooded yet.
             Show(mist, false);
             Show(source, false);
+            Show(glow, false);
         }
 
         static void Hide(Transform art)
@@ -266,11 +288,22 @@ namespace GulagRunners.Game
             // phase, so there is nothing to keep in step with the clock.
             Show(mist, p > 0f);
             Show(source, p > 0f);
+            Show(glow, p > 0f);
 
             // The fog is scaled to the flooded volume, exactly as the body box is: bottom
             // on the floor of the pool, top at the waterline. The emitter is then a flat
             // slab at the start and a filled room at the end, which is what makes the green
             // come UP rather than simply appear.
+            // On the line, where the eye already is. A light sunk in the middle of the
+            // volume lights the inside of its own smoke; on the surface it lights the
+            // floor, the props and whatever is standing in it.
+            if (glow != null)
+            {
+                Vector3 at = glow.position;
+                at.y = top;
+                glow.position = at;
+            }
+
             if (mist != null)
             {
                 Vector3 fog = _mistScale;
