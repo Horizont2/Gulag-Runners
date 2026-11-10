@@ -105,6 +105,14 @@ namespace GulagRunners.Game
                  "left takes it; level pegging is a draw.")]
         public float suddenDeathSeconds = 10f;
 
+        [Header("The poison (docs/33)")]
+        [Tooltip("The green coming up out of the floor across the closing phase, which is " +
+                 "what the last minute does instead of narrowing the arena.\n\n" +
+                 "The pool itself is authored in the arena, as a box with a PoisonPool on " +
+                 "it: that box is where the poison stops. An arena without one never floods, " +
+                 "whatever is set here.")]
+        public PoisonTuning poison = new PoisonTuning();
+
         [Header("Series")]
         [Tooltip("Rounds a fighter has to take to win the MATCH. Two is best of three.\n\n" +
                  "A round is one deal of the arena; the match is the series of them, and " +
@@ -148,6 +156,12 @@ namespace GulagRunners.Game
         /// </summary>
         public ArmConfig Arm { get; private set; } = ArmConfig.Default();
         public MatchConfig MatchRules { get; private set; }
+
+        /// <summary>
+        /// The rising poison: how fast and how hard. WHERE it is belongs to the arena and is
+        /// authored as a box (<see cref="PoisonPool"/>); an arena without one never floods.
+        /// </summary>
+        public PoisonConfig Poison { get; private set; } = PoisonConfig.Default();
 
         /// <summary>Where the match has got to. Read it; only the tick moves it.</summary>
         public MatchSimState Match => _match;
@@ -348,11 +362,11 @@ namespace GulagRunners.Game
 
         void Deal(int round)
         {
-            Config = chests.ToConfig();
-            Drops = drops.ToConfig();
-            Combat = combat.ToConfig();
-            Arm = combat.ToArmConfig();
-            MatchRules = BuildRules();
+            // Through the one method that reads the inspector, rather than a second copy of
+            // the same five lines: a tuning class added to one of them and not the other is a
+            // number that works in play mode and not in a fresh round, or the other way
+            // about, and neither reads as a missing line.
+            ApplyTuning();
 
             if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
             SimWorld world = worldBaker != null ? worldBaker.World : null;
@@ -385,6 +399,41 @@ namespace GulagRunners.Game
 
             LootMotor.StepGround(GroundItems, world, Drops);
             ResolveHits();
+            BitePoison(world);
+        }
+
+        /// <summary>
+        /// The poison takes its bite, once for the whole match.
+        ///
+        /// Here rather than at the front of the tick, next to the clock that raised the level,
+        /// for two reasons that both come down to timing. Where a body ENDED the tick is where
+        /// it is standing, so a fighter who climbed out this tick is out. And the outputs a
+        /// view reads — the damage, the death — are cleared at the front of each fighter's own
+        /// tick, so damage dealt before that is damage nothing ever hears about: no number
+        /// over the head, no death cry, a corpse that simply appears.
+        ///
+        /// Which makes it the hit resolution's neighbour exactly: both decide damage once for
+        /// the whole match, from the state as the tick leaves it.
+        /// </summary>
+        void BitePoison(SimWorld world)
+        {
+            if (world == null || !world.HasPoison || fighters.Count < 2) return;
+
+            PoisonConfig venom = Poison;
+            MatchConfig rules = MatchRules;
+            if (!PoisonMotor.Bites(_match.Frame, in rules, in venom)) return;
+            if (_match.Finished) return;
+
+            if (_scratch.Length != fighters.Count) _scratch = new PlayerSimState[fighters.Count];
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                if (fighters[i] == null) return;
+                _scratch[i] = fighters[i].State;
+            }
+
+            PoisonMotor.Bite(_scratch, world, in venom, fighters[0].Config);
+
+            for (int i = 0; i < fighters.Count; i++) fighters[i].OverwriteState(in _scratch[i]);
         }
 
         /// <summary>
@@ -487,6 +536,13 @@ namespace GulagRunners.Game
                 // the same reason the gate mask is: it is a pure function of the frame, so
                 // the two devices cannot disagree and a rollback needs nothing but the frame.
                 world.WallProgress = _match.ClosingProgress(rules);
+
+                // And how full the pool is. Nothing in the motor collides with it -- poison
+                // is a level, not a box -- but it is written at the same moment and for the
+                // same reason: the number the surface is DRAWN at and the number that decides
+                // who is drowning have to be one number, taken once a tick.
+                PoisonConfig venom = Poison;
+                world.PoisonRise = PoisonMotor.RiseAt(_match.Frame, in rules, in venom);
             }
 
             if (_match.GatesJustShut != 0)
@@ -583,6 +639,7 @@ namespace GulagRunners.Game
             Drops = drops.ToConfig();
             Combat = combat.ToConfig();
             Arm = combat.ToArmConfig();
+            Poison = poison.ToConfig();
             MatchRules = BuildRules();
         }
 

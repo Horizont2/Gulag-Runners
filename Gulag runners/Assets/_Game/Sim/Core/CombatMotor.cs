@@ -368,7 +368,20 @@ namespace GulagRunners.Sim
             }
         }
 
-        static void Wound(ref PlayerSimState victim, int damage)
+        /// <summary>
+        /// Health falls, and if it runs out the fighter is dead. The ONE place either of
+        /// those happens.
+        ///
+        /// Public because the arena can kill as well as a weapon can: the rising poison of
+        /// <see cref="PoisonMotor"/> wounds through here rather than writing Health itself,
+        /// so there is still exactly one place that declares a death and sets the flags a
+        /// match ends on. A second one would be a fighter whose health reached zero and who
+        /// nobody noticed was dead.
+        ///
+        /// It does NOT touch WasHit or DamageTaken: those say a blow landed, and whether
+        /// one did is the caller's business, not this method's.
+        /// </summary>
+        public static void Wound(ref PlayerSimState victim, int damage)
         {
             victim.Health -= (short)damage;
             if (victim.Health > 0) return;

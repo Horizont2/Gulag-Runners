@@ -233,6 +233,52 @@ namespace GulagRunners.Sim
         public bool WallReaches(int i, Fix depth, Fix halfDepth) =>
             Walls[i].Span.Reaches(depth, halfDepth);
 
+        // ------------------------------------------------------------------ the poison
+        //
+        // The other way to take an arena away: from BELOW. Where a shutter is collision that
+        // appears, the poison is no collision at all -- a level, and a cost for being under
+        // it. So it needs no boxes, no gate bits and no shove; three numbers say everything
+        // about it, and two of them are baked with the arena.
+
+        /// <summary>
+        /// The pool at full flood, as the arena was authored: where the surface starts
+        /// (MinY), where it stops (MaxY), and how wide the flooded ground is.
+        ///
+        /// An empty box is an arena with no poison in it, which is every arena until one is
+        /// authored with a pool — the same way an arena with no gates never closes.
+        /// </summary>
+        public Aabb Poison;
+
+        /// <summary>How deep the pool reaches. A walkway behind it stays dry.</summary>
+        public Span PoisonZ = Span.Everywhere;
+
+        /// <summary>
+        /// How full the pool is, 0 to 1. Written from the clock before anything moves, like
+        /// <see cref="GatesShut"/> and <see cref="WallProgress"/>, and a pure function of the
+        /// frame for the same reason: two devices cannot disagree about it and a rollback
+        /// needs nothing but the frame to put the water back.
+        /// </summary>
+        public Fix PoisonRise;
+
+        /// <summary>Is there a pool in this arena at all.</summary>
+        public bool HasPoison => Poison.MaxY > Poison.MinY;
+
+        /// <summary>Where the surface stands this tick.</summary>
+        public Fix PoisonY => Poison.MinY + (Poison.MaxY - Poison.MinY) * PoisonRise;
+
+        /// <summary>
+        /// Is this body in the poison: under the surface, inside the flooded ground, and on a
+        /// slice the pool reaches.
+        ///
+        /// The feet, not the chest. The surface is a line a body is either above or below, and
+        /// a rule measured at the waist is a rule that has to explain itself to somebody
+        /// standing in it up to the knees.
+        /// </summary>
+        public bool InPoison(FixVec2 feet, Fix depth, Fix halfDepth) =>
+            HasPoison && feet.Y < PoisonY &&
+            feet.X > Poison.MinX && feet.X < Poison.MaxX &&
+            PoisonZ.Reaches(depth, halfDepth);
+
         /// <summary>
         /// Which gate each solid belongs to, parallel to Solids. -1 — and any solid past the
         /// end of this array — is a wall that was always there.

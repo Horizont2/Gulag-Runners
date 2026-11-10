@@ -22,7 +22,11 @@ NAMES = {CAGES: "cages", SCAVENGE: "scavenge", SIREN: "siren", HUNT: "hunt",
 # death has to end, and the result has to hand over to the next round. The set adds to 2:30,
 # which is where docs/01 bounds a match.
 DEFAULT = dict(cage=180, scavenge=1320, siren=90, hunt=2010, closing=4800,
-               sudden=600, restart=300, shutter=3600)
+               sudden=600, restart=300, shutter=3600,
+               # The poison: 80 s to fill the pool, two health every half second to anybody
+               # under the surface. The rise is the closing phase's own length, so the level
+               # tops out exactly as sudden death begins -- the beat the last shutter fell on.
+               poison_rise=4800, poison_every=30, poison_bite=2, poison_on=True)
 
 MAX_GATES = 32
 
@@ -120,6 +124,78 @@ def shove(fighters, gates, just_shut, half_width=0.2, height=0.91):
             f["chest"] = -1
             f["stagger"] = max(f.get("stagger", 0), 24)
             f["shoved"] = f.get("shoved", 0) + 1
+
+
+# ------------------------------------------------------------------- the poison (docs/33)
+#
+# The other way to take an arena away: from BELOW. Two pure functions of the frame number and
+# one loop over the fighters, with no poison state anywhere -- the frame already answers where
+# the surface is, so two devices cannot disagree about it and a rollback needs nothing but the
+# frame to put the water back.
+
+
+class Pool:
+    """The poison at full flood, as the arena authored it: a box whose TOP is where the
+    surface stops. Everything under that line is lost ground by the end of the phase."""
+
+    def __init__(s, min_x, min_y, max_x, max_y, span=(-1e9, 1e9)):
+        s.min_x, s.min_y, s.max_x, s.max_y = min_x, min_y, max_x, max_y
+        s.span = span
+
+    def surface(s, rise):
+        return s.min_y + (s.max_y - s.min_y) * rise
+
+    def holds(s, x, y, rise, depth=0.0, half=0.3):
+        """Is a body with its feet here in the poison: under the surface, inside the flooded
+        ground, and on a slice the pool reaches. The FEET -- ankle deep is in it."""
+        return (y < s.surface(rise) and s.min_x < x < s.max_x
+                and depth + half > s.span[0] and depth - half < s.span[1])
+
+
+def poison_rise_at(frame, cfg):
+    """How full the pool is, 0 to 1. Nothing until the closing phase, then even across the
+    rise, then full for the rest of the match -- it does not drain away under a result."""
+    if not cfg.get("poison_on", True):
+        return 0.0
+
+    frm = phase_start(CLOSING, cfg)
+    window = cfg["poison_rise"] or cfg["closing"]
+    if window <= 0:
+        return 1.0 if frame >= frm else 0.0
+
+    done = frame - frm
+    if done <= 0:
+        return 0.0
+    if done >= window:
+        return 1.0
+    return (done * 1000 // window) / 1000.0        # thousandths, as the fixed point does
+
+
+def poison_bites(frame, cfg):
+    """Is this the tick the poison takes its bite. Counted from the start of the rise, so a
+    phase length changed ahead of it cannot shift the bite onto a different tick of the flood
+    -- and the first bite is a whole interval after the poison appears, never on its first."""
+    if not cfg.get("poison_on", True) or cfg["poison_bite"] <= 0 or cfg["poison_every"] <= 0:
+        return False
+    done = frame - phase_start(CLOSING, cfg)
+    return done > 0 and done % cfg["poison_every"] == 0
+
+
+def poison_bite(fighters, pool, rise, cfg):
+    """Bites everyone standing in it, once. Never a shove and never a crush: a tide is not in
+    anybody's way, it only makes being under it expensive."""
+    if pool is None or not cfg.get("poison_on", True) or cfg["poison_bite"] <= 0:
+        return
+    for f in fighters:
+        if f.get("dead"):
+            continue
+        if not pool.holds(f["x"], f["y"], rise, f.get("depth", 0.0), f.get("half_depth", 0.3)):
+            continue
+        f["health"] = f.get("health", 100) - cfg["poison_bite"]
+        f["bitten"] = f.get("bitten", 0) + 1
+        if f["health"] <= 0:
+            f["health"] = 0
+            f["dead"] = True
 
 
 class Match:

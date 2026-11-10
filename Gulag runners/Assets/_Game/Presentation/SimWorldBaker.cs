@@ -173,6 +173,15 @@ namespace GulagRunners.Game
 
         /// <summary>Every object belonging to a closing wall, so the static pass skips them.</summary>
         readonly HashSet<int> _wallOwners = new HashSet<int>();
+
+        /// <summary>
+        /// The same for the poison pool, and it matters more: a pool is a box of art, and the
+        /// box somebody drags in to make one is a Unity cube, which arrives with a BoxCollider
+        /// on it. Baked, that collider is a solid block filling the bottom of the arena — the
+        /// fighters stand on the poison, which is the single worst way this could fail,
+        /// because it looks like the pool working.
+        /// </summary>
+        readonly HashSet<int> _poolOwners = new HashSet<int>();
         readonly List<Rect> _gizmoGate = new List<Rect>();
 
         void Awake()
@@ -249,6 +258,41 @@ namespace GulagRunners.Game
                 }
             }
 
+            // The poison, on the same terms and for a stronger reason: it is not collision at
+            // all. A pool is a level and a cost for being under it, so every object belonging
+            // to one is claimed here and never looked at again by the collision passes.
+            //
+            // One pool per arena. Two would be two surfaces, and the simulation holds ONE
+            // level — so a second one is said out loud rather than quietly ignored, which is
+            // how you end up wondering why half the poison does not hurt.
+            Aabb poison = default;
+            Span poisonZ = Span.Everywhere;
+            int pools = 0;
+            _poolOwners.Clear();
+            foreach (GameObject root in RootObjects())
+            {
+                foreach (PoisonPool p in root.GetComponentsInChildren<PoisonPool>(true))
+                {
+                    if (p == null || !p.enabled || !p.gameObject.activeInHierarchy) continue;
+
+                    p.Measure();
+                    pools++;
+                    if (pools == 1)
+                    {
+                        poison = p.ToBox();
+                        poisonZ = p.ToSpan();
+                    }
+                    foreach (Transform t in p.GetComponentsInChildren<Transform>(true))
+                        _poolOwners.Add(t.gameObject.GetInstanceID());
+                }
+            }
+
+            if (pools > 1)
+                Debug.LogWarning(
+                    $"{name}: {pools} PoisonPool(s) in this arena and the simulation holds one " +
+                    "level. The first one found is the poison; the rest are art that will " +
+                    "rise with it and bite nobody. Make one pool big enough instead.", this);
+
             int roots = 0, slopes = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0, markedOffPlane = 0,
                 chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
@@ -282,6 +326,7 @@ namespace GulagRunners.Game
                     // collider pass, on its layer, as a solid wall.
                     handled.Add(c.gameObject.GetInstanceID());
                     if (_wallOwners.Contains(c.gameObject.GetInstanceID())) continue;
+                    if (_poolOwners.Contains(c.gameObject.GetInstanceID())) continue;
 
                     // enabled && activeInHierarchy, NOT isActiveAndEnabled. The two are not
                     // the same here: isActiveAndEnabled is false for a component Unity has
@@ -359,8 +404,9 @@ namespace GulagRunners.Game
                     { skippedAlreadyMarked++; continue; }
 
                     // A closing wall is held separately: it moves, so it cannot be one of
-                    // the immutable boxes.
+                    // the immutable boxes. The poison is not collision at all.
                     if (_wallOwners.Contains(col.gameObject.GetInstanceID())) continue;
+                    if (_poolOwners.Contains(col.gameObject.GetInstanceID())) continue;
 
                     // Never bake a player's own body: it would become a wall it stands inside.
                     if (col.GetComponentInParent<PlayerController>() != null)
@@ -490,6 +536,8 @@ namespace GulagRunners.Game
             {
                 Gates = gateDefs,
                 Walls = walls.ToArray(),
+                Poison = poison,
+                PoisonZ = poisonZ,
                 SolidGate = gateOf.ToArray(),
                 Solids = solids.ToArray(),
                 OneWay = oneWay.ToArray(),
@@ -515,6 +563,9 @@ namespace GulagRunners.Game
                 $"({hatches} cut by ladders), " +
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
                 $"{World.Gates.Length} gate ({gated} box(es)), " +
+                (World.HasPoison
+                    ? $"poison from y {World.Poison.MinY} to y {World.Poison.MaxY}, "
+                    : "no poison, ") +
                 $"{slopes} slope(s) cut into steps, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
 

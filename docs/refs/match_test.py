@@ -2,7 +2,8 @@
 import match_mirror as M
 from match_mirror import Match, step, phase_at, total_frames, DEFAULT, NAMES, CAGES, SCAVENGE, \
     SIREN, HUNT, CLOSING, SUDDEN, OVER, Gate, gate_shuts_at, gates_shut_at, shove, \
-    CLOSING_GATE, SUDDEN_GATE, MINUS_X, PLUS_X, MINUS_Y, PLUS_Y, phase_start
+    CLOSING_GATE, SUDDEN_GATE, MINUS_X, PLUS_X, MINUS_Y, PLUS_Y, phase_start, \
+    Pool, poison_rise_at, poison_bites, poison_bite
 import loot_mirror as L
 
 ok = True
@@ -327,5 +328,81 @@ for i in range(total_frames(cfg)):
         drift.append(i)
 check("and two arenas shut on the same ticks, having never spoken", not drift,
       f"disagreed on {len(drift)} tick(s); final mask {a.gates_shut:b}")
+
+print("\nThe poison comes up instead of the arena coming in (docs/33)")
+# Arena_Forest's own pool: from the pit floor at y -1.70 up to y 2.00, which is above the
+# ground floor and the stairs and below the cages and the walkways. So the flood takes the
+# looting ground away and leaves the parkour, which is the whole point of it.
+pool = Pool(-18.0, -1.70, 13.0, 2.00, span=(-6.0, 2.5))
+FLOOR, CAGE_ROOF = 0.12, 2.96
+
+rise = [poison_rise_at(f, cfg) for f in range(total_frames(cfg) + 600)]
+closing_at = phase_start(CLOSING, cfg)
+sudden_at = phase_start(SUDDEN, cfg)
+
+check("the pool is empty for the whole first minute",
+      max(rise[:closing_at + 1]) == 0.0, f"up to {clock(closing_at / 60)}")
+check("it fills across the closing phase and never drains",
+      rise == sorted(rise) and rise[-1] == 1.0,
+      f"{rise[closing_at + 1]:.3f} at the first tick of it, 1.000 by the end")
+check("and it tops out exactly as sudden death begins",
+      rise[sudden_at] == 1.0 and rise[sudden_at - 1] < 1.0,
+      f"{clock(sudden_at / 60)}, the beat the last shutter fell on")
+
+# "Not super fast" is a number: the forest's 3.70 m of pool over 80 s. Measured over a
+# SECOND rather than a tick, because the level is kept in thousandths of the pool and so
+# arrives in steps -- 3.7 mm of it here, about twelve times a second, which is a stair nobody
+# can see and a speed everybody can judge.
+climb = [pool.surface(r) for r in rise]
+fastest = max(climb[f + 60] - climb[f] for f in range(closing_at, sudden_at - 60))
+step_mm = max(climb[f + 1] - climb[f] for f in range(closing_at, sudden_at - 1)) * 1000
+check("it rises slowly enough to walk away from", fastest < 0.20,
+      f"{fastest * 100:.1f} cm/s at its fastest, "
+      f"{pool.max_y - pool.min_y:.2f} m over {(sudden_at - closing_at) / 60:.0f} s")
+check("and it arrives in steps too small to see", step_mm < 10.0,
+      f"{step_mm:.1f} mm per step, one thousandth of the pool")
+
+drowned = next(f for f in range(len(rise)) if pool.surface(rise[f]) > FLOOR)
+check("the ground floor goes under part way through the phase",
+      sudden_at > drowned > closing_at,
+      f"y {FLOOR:.2f} is wet at {clock(drowned / 60)}")
+check("and the cages the parkour is for never do",
+      pool.surface(1.0) < CAGE_ROOF,
+      f"the surface stops at y {pool.surface(1.0):.2f}, the roofs are at y {CAGE_ROOF:.2f}")
+
+print("\nAnd it bites whoever stays down there")
+first = [f for f in range(closing_at, closing_at + 400) if poison_bites(f, cfg)]
+check("the first bite is a whole interval after the poison appears, not on its first tick",
+      first[0] == closing_at + cfg["poison_every"],
+      f"{(first[0] - closing_at) / 60:.2f} s in, then every "
+      f"{cfg['poison_every'] / 60:.2f} s")
+
+low = dict(x=0.0, y=FLOOR, depth=-2.33, health=100)
+high = dict(x=-7.05, y=CAGE_ROOF, depth=-0.67, health=100)
+died_at = None
+for f in range(closing_at, total_frames(cfg)):
+    if not poison_bites(f, cfg):
+        continue
+    poison_bite([low, high], pool, poison_rise_at(f, cfg), cfg)
+    if low.get("dead") and died_at is None:
+        died_at = f
+
+check("a fighter who stands on the flooded floor drowns in it", low.get("dead"),
+      f"dead {(died_at - drowned) / 60:.1f} s after his feet went under, "
+      f"{low['bitten']} bite(s) of {cfg['poison_bite']}")
+check("and not instantly: it is a tide, not a trap", (died_at - drowned) / 60 > 15.0,
+      f"{(died_at - drowned) / 60:.1f} s of standing in it")
+check("a fighter on the cage roof is never bitten at all", "bitten" not in high,
+      f"{high['health']}/100 left")
+
+print("\nThe poison is a pure function of the frame, like the shutters")
+check("two devices compute the same level, having never spoken",
+      all(poison_rise_at(f, cfg) == poison_rise_at(f, dict(cfg)) for f in
+          range(0, total_frames(cfg), 7)))
+off = dict(cfg, poison_on=False)
+check("switched off, nothing rises and nothing bites",
+      max(poison_rise_at(f, off) for f in range(total_frames(off))) == 0.0 and
+      not any(poison_bites(f, off) for f in range(total_frames(off))),
+      "an arena can be played flooded or dry without moving the pool")
 
 print("\n" + ("ALL PASS" if ok else "SOME FAILED"))
