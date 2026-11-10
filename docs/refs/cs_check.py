@@ -20,6 +20,16 @@ a hand edit actually makes, and both are findable from the text:
     unclosed quote simply pairs with the next quote two lines down and the braces still
     balance. A line-aware scanner is the only way to see it.
 
+  * a call to something the file no longer defines. CS0103 — see the long note further down;
+    it cost an afternoon because Unity answers a broken editor assembly by keeping the
+    PREVIOUS one, so the tool on the menu is the old one and the change looks like it did
+    nothing.
+  * the same type declared in two files. CS0101, and the one a MERGE makes: a generated
+    `InputSystem_Actions.cs` sat in Assets/ while the .inputactions it came from had wrapper
+    generation switched back on, so Unity wrote a second copy of the same class beside the
+    asset. One class, two files, and every member in it reported twice — which is what
+    "висипало багато помилок" after a merge looks like.
+
 Neither is a type check: this cannot tell you a method does not exist. It tells you the edit
 is at least well-formed, which is the part a careful patch can get wrong without noticing.
 """
@@ -28,8 +38,19 @@ import os
 import re
 import sys
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
-                    "Gulag runners", "Assets", "_Game")
+ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
+                      "Gulag runners", "Assets")
+ROOT = ASSETS
+
+# Code that arrived as somebody else's zip: it compiled before it got here, and a rule
+# written against this project's habits has no business failing a vendor's file. _Leftovers
+# is the template project Unity made, kept only for reference.
+#
+# Everything else under Assets IS checked -- not just _Game. A merge brings code in beside
+# it (Core/NomadUI did), and the half of the project a check does not walk is the half that
+# arrives broken.
+SKIP = {"ThirdParty", "_Leftovers", "Plugins", "StreamingAssets", "TextMesh Pro",
+        "Samples", "Resources.meta"}
 
 DECL = re.compile(r'^\s*(?:(?:readonly|const)\s+)?'
                   r'(?:(?:in|ref|out)\s+)?'
@@ -350,8 +371,11 @@ def defined_names(src):
     out = {m.group(1) for m in DEFINE.finditer(src)}
     out |= {m.group(1) for m in DELEGATE.finditer(src)}
     out |= {m.group(1) for m in LAMBDA_VAR.finditer(src)}
-    # constructors and type names: `class Foo` / `struct Foo` / `Foo(` inside it
-    out |= {m.group(1) for m in re.finditer(r"(?:class|struct|interface|enum)\s+(\w+)", src)}
+    # constructors and type names: `class Foo` / `struct Foo` / `Foo(` inside it. The
+    # `@` is optional because generated code writes `class @InputSystem_Actions` --
+    # escaping a name that needs no escaping -- and its own constructor then reads as
+    # a call to something nothing defines.
+    out |= {m.group(1) for m in re.finditer(r"\b(?:class|struct|interface|enum)\s+@?(\w+)", src)}
     return out
 
 
@@ -383,18 +407,166 @@ def missing_calls(path, src):
     return out
 
 
+# ------------------------------------------------------------------ the sixth mistake
+#
+# THE SAME TYPE DECLARED TWICE. This is the mistake a merge makes rather than an edit, and
+# it reported itself as two hundred errors: a generated `InputSystem_Actions.cs` committed
+# in Assets/, and the .inputactions it was generated FROM with "generate C# class" switched
+# back on, so Unity wrote its own copy next to the asset. Two files, one class, every member
+# in it duplicated -- and no single error message says "the merge did this".
+#
+# A partial class spread over several files is legal and normal -- CFXR is written that way
+# -- so a second declaration alone proves nothing. What proves it is the MEMBERS: two halves
+# of one partial type that both define `Dispose` are not two halves, they are two copies.
+# And the class that started this is partial, so "non-partial only" would have missed it.
+
+TYPE_DECL = re.compile(
+    r"(?m)^[ \t]*(?:\[[^\]]*\]\s*)*"
+    r"((?:(?:public|private|protected|internal|static|sealed|abstract|partial|new|"
+    r"readonly|unsafe|ref)\s+)*)"
+    r"(class|struct|interface|enum|record)\s+@?(\w+)")
+
+NAMESPACE = re.compile(r"(?m)^\s*namespace\s+([\w\.]+)")
+
+
+def body_of(src, at):
+    """The text between the braces of the declaration starting at `at`."""
+    start = src.find("{", at)
+    if start < 0:
+        return ""
+    depth = 0
+    for i in range(start, len(src)):
+        if src[i] == "{":
+            depth += 1
+        elif src[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[start + 1:i]
+    return src[start + 1:]
+
+
+def members_of(body):
+    """The methods declared DIRECTLY in a type body.
+
+    Depth matters: run the pattern over a whole class and it reads every `if (` and every
+    local function inside every method as a member of the class. Both of CFXR's halves have
+    an `if` in them, which is not a redeclaration of anything.
+    """
+    flat, depth = [], 0
+    for line in body.split("\n"):
+        if depth == 0:
+            flat.append(line)
+        depth += line.count("{") - line.count("}")
+        if depth < 0:
+            depth = 0
+    return {m.group(1) for m in DEFINE.finditer("\n".join(flat))} - CONTROL - INHERITED
+
+
+def declared_types(src):
+    """The TOP-LEVEL types a file declares: name -> (line, partial?, member names).
+
+    Top level only, by brace depth. A nested type is deliberately left out: the three
+    builder windows each hold their own `Asset` struct, which is three legal types with one
+    name, and a rule that cannot tell nesting apart fails the project for its own habits.
+    A nested collision can only happen if the outer types collide too, and that is the line
+    worth printing anyway.
+    """
+    ns = NAMESPACE.search(src)
+    prefix = (ns.group(1) + ".") if ns else ""
+    floor = 1 if ns else 0        # the depth a top-level type sits at
+
+    out = {}
+    for m in TYPE_DECL.finditer(src):
+        head = src[:m.start()]
+        if head.count("{") - head.count("}") != floor:
+            continue
+        name = prefix + m.group(3)
+        if name in out:
+            continue
+        body = body_of(src, m.end())
+        members = members_of(body)
+        out[name] = (src.count("\n", 0, m.start()) + 1, "partial" in m.group(1), members)
+    return out
+
+
+def assembly_of(path, asmdef_dirs):
+    """Which compilation a file lands in.
+
+    Two types of one name are only an error inside one assembly, and this project has
+    several: every folder with an .asmdef is its own, and Unity splits the rest into the
+    runtime assembly and the Editor one by whether the path has an Editor folder in it.
+    """
+    best = ""
+    for d in asmdef_dirs:
+        if path.startswith(d) and len(d) > len(best):
+            best = d
+    if best:
+        return best
+    parts = path.replace("\\", "/").split("/")
+    return "Assembly-CSharp-Editor" if "Editor" in parts else "Assembly-CSharp"
+
+
+def duplicate_types(sources, asmdef_dirs):
+    """One type, two files, one assembly -- and, for partials, the same members twice."""
+    where = {}
+    for path, src in sorted(sources.items()):
+        asm = assembly_of(path, asmdef_dirs)
+        for name, (line, is_partial, members) in \
+                declared_types(without_attributes(strip(src))).items():
+            where.setdefault((asm, name), []).append((path, line, is_partial, members))
+
+    out = []
+    for (asm, name), places in sorted(where.items()):
+        if len(places) < 2:
+            continue
+
+        said = ", ".join(f"{p}({n})" for p, n, _pa, _me in places)
+
+        if any(not is_partial for _p, _n, is_partial, _me in places):
+            out.append(f"{name} is declared in {len(places)} files of the same assembly "
+                       f"({asm}) and is not partial -- {said}. CS0101, and C# then reports "
+                       f"it once per MEMBER as well, which is how a two-file mistake "
+                       f"arrives as a screen of errors.")
+            continue
+
+        # Every declaration is partial, which is legal -- unless the halves overlap.
+        shared = set.intersection(*[me for _p, _n, _pa, me in places])
+        if len(shared) >= 2:
+            few = ", ".join(sorted(shared)[:4])
+            out.append(f"{name} is partial across {len(places)} files of the same assembly "
+                       f"({asm}) and {len(shared)} member(s) are defined in more than one "
+                       f"of them ({few}...) -- {said}. Two halves of a partial type do not "
+                       f"both define the same method: this is one file copied, usually "
+                       f"generated code committed next to the asset that generates it.")
+    return out
+
+
 def main():
-    sources = {}
-    for root, _, names in os.walk(ROOT):
+    # Two sets, on purpose. `sources` is the code this project is answerable for, and the
+    # per-file rules speak only about it. `every` is EVERY .cs under Assets, vendor code
+    # included, because a duplicate type does not care who wrote the other copy: the one
+    # that started this rule was generated into _Leftovers, a folder the per-file rules
+    # skip, and a check that skipped it too would have found nothing.
+    sources, every, asmdefs = {}, {}, []
+    base = os.path.join(ASSETS, "..", "..")
+
+    for root, dirs, names in os.walk(ASSETS):
+        rel_root = os.path.relpath(root, base)
         for f in sorted(names):
+            if f.endswith(".asmdef"):
+                asmdefs.append(rel_root + os.sep)
             if not f.endswith(".cs"):
                 continue
-            path = os.path.relpath(os.path.join(root, f), os.path.join(ROOT, "..", "..", ".."))
-            sources[path] = io.open(os.path.join(root, f), encoding="utf-8").read()
+            path = os.path.relpath(os.path.join(root, f), base)
+            text = io.open(os.path.join(root, f), encoding="utf-8",
+                           errors="replace").read()
+            every[path] = text
+            if not (set(path.replace("\\", "/").split("/")) & SKIP):
+                sources[path] = text
 
     fields = struct_fields(sources)
 
-    problems, files = [], len(sources)
+    problems, files = duplicate_types(every, asmdefs), len(sources)
     for path, src in sorted(sources.items()):
         problems += unclosed_strings(path, src)
         problems += brackets(path, src)
