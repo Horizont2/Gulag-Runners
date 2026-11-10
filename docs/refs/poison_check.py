@@ -48,6 +48,10 @@ POOL_CS = os.path.join(ASSETS, "_Game", "Presentation", "PoisonPool.cs")
 # This is the bar for what the flood takes away -- drowning a crate is not drowning a storey.
 FIGHT_WIDTH = 2.0
 
+# How deep the waterline may reach before it stops being a line. Half a metre either side
+# of the fight plane is a bar at the fighters' feet; six metres is the floor of a room.
+LINE_DEPTH = 1.5
+
 # And a bar for somewhere to STAND, which is a different question and a much lower one. The
 # body is 0.30 m wide, so two body widths is a ledge two people can be on; the hanging cages
 # of Arena_Forest are 0.68 m across and are deliberately the last ground left. A check that
@@ -404,6 +408,37 @@ def main(argv):
                     f"{scene}: the pool covers {share * 100:.0f}% of the ground it floods "
                     f"(x {x0:.1f}..{x1:.1f} against x {want_lo:.1f}..{want_hi:.1f}). The rest "
                     f"is dry floor beside the flood: a corner to wait the last minute out in.")
+
+        # --- is the waterline a LINE, or a lid
+        #
+        # IT WAS A LID, and this is the report the rule exists for: "the poison rises not
+        # as smoke but as some kind of green platform". Not the body box, which is hidden
+        # in play -- the thin bright bar added to make the surface readable, authored at
+        # the pool's whole footprint: 32 m by 6.8 m, six centimetres thick. Six centimetres
+        # is a line seen edge-on, and nobody sees it edge-on. The camera sits four metres
+        # in front of the fight plane and looks slightly down, so most of that bar is
+        # between the camera and the fighters, and a horizontal plane seen from above its
+        # own edge is a FLOOR. Rising, lit, and bright green: a platform.
+        #
+        # So the bar has to be a bar. Its width is the arena's -- that is the point of it --
+        # and its depth has to stay around the fight plane, where the fighters are and where
+        # the eye already is.
+        if p["surface"] and p["waterline"]:
+            spos, sscale, _tilt = placed(docs, p["surface"])
+            deep = abs(sscale[2])
+            if deep > LINE_DEPTH:
+                problems.append(
+                    f"{scene}: the waterline is {deep:.1f} m deep (x {abs(sscale[0]):.1f} m "
+                    f"wide, {abs(sscale[1]) * 100:.0f} cm thick). That is a LID, not a line: "
+                    f"the camera looks slightly down from in front of the fight plane, so a "
+                    f"horizontal plane that reaches toward it reads as a floor -- a green "
+                    f"platform that rises, which is the one thing the smoke is there to be "
+                    f"instead of. Keep it under {LINE_DEPTH:.1f} m, across the fight plane.")
+            elif abs(spos[2]) > deep / 2 + FIGHT_WIDTH / 2:
+                problems.append(
+                    f"{scene}: the waterline sits at z {spos[2]:+.1f} and is {deep:.1f} m "
+                    f"deep, so it misses the fight plane at z 0 entirely -- a bright line "
+                    f"somewhere behind or in front of the only depth anybody is standing at.")
 
         # --- and the cube's own collider
         solid = colliders_under(docs, p["body"]) + colliders_under(docs, p["owner"])
