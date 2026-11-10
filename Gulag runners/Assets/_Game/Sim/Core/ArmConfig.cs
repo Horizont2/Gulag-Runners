@@ -351,9 +351,9 @@ namespace GulagRunners.Sim
             // that is swung is the blade that is seen. Its own defaults are in metres
             // against a 0.91 m fighter: a 0.246 m haft, a 0.28 m floor, a 1.30 m ceiling.
             c.HaftPermille = 270;
-            c.ReachToBladePermille = 730;
+            c.ReachToBladePermille = 420;
             c.MinBladePermille = 310;
-            c.MaxBladePermille = 1430;
+            c.MaxBladePermille = 950;
 
             c.BodyRadiusPermille = 180;    // a bit wider than the collision box
             c.BladeRadiusPermille = 60;

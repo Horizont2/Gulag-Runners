@@ -39,7 +39,7 @@ CFG = dict(
     deadzone=220, aim_band=180, settle_arc=360, min_swing=250, carry_drop=700,
     aim_relative=0, aim_floor_pm=500, aim_tilt_pm=1000,
     full_sweep_pm=400, recovery_pm=450,
-    haft_pm=270, reach_to_blade_pm=730, min_blade_pm=310, max_blade_pm=1430,
+    haft_pm=270, reach_to_blade_pm=420, min_blade_pm=310, max_blade_pm=950,
     body_radius_pm=180, blade_radius_pm=60,
     hit_lock=18, clash_deflect=700, clash_lock=10,
 )
