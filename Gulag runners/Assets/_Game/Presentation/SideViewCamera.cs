@@ -226,6 +226,7 @@ namespace GulagRunners.Game
         Vector2 _focus;
         Vector2 _focusVelocity;
         float _anchorY;
+        float _vSmooth;              // the follow time actually in use, eased towards the wanted one
         float _lookAhead;
         float _lookAheadVelocity;
         float _zoom = 1f;
@@ -474,11 +475,21 @@ namespace GulagRunners.Game
             float wantX = SoftTarget(_focus.x, aim.x, dead.x);
             float wantY = SoftTarget(_focus.y, aim.y, dead.y);
 
-            float vSmooth = verticalSmoothTime;
-            if (_fastFall) vSmooth = fallSmoothTime;
+            float wantSmooth = verticalSmoothTime;
+            if (_fastFall) wantSmooth = fallSmoothTime;
             else if (player != null && (player.State.Mode == Sim.MoveMode.Climbing ||
                                         player.State.Mode == Sim.MoveMode.Mounting))
-                vSmooth = climbSmoothTime;
+                wantSmooth = climbSmoothTime;
+
+            // Eased, not switched. How hard the camera pulls is as visible as where it
+            // pulls to: 0.22 to 0.07 between two frames triples the follow speed on the
+            // spot, and the frame it happened on was the frame after the apex of a jump.
+            // A sixth of a second to change its mind is invisible on its own and takes the
+            // corner off every mode change in here.
+            if (_vSmooth <= 0f) _vSmooth = wantSmooth;
+            float span = Mathf.Max(0.01f, Mathf.Abs(verticalSmoothTime - fallSmoothTime));
+            _vSmooth = Mathf.MoveTowards(_vSmooth, wantSmooth, span / 0.16f * dt);
+            float vSmooth = _vSmooth;
 
             _focus.x = Mathf.SmoothDamp(_focus.x, wantX, ref _focusVelocity.x,
                                         horizontalSmoothTime, Mathf.Infinity, dt);
@@ -536,7 +547,7 @@ namespace GulagRunners.Game
                                           ref _lookAheadVelocity,
                                           lookAheadSmoothTime, Mathf.Infinity, dt);
 
-            float y = AnchoredY(a.y);
+            float y = AnchoredY(a.y, dt);
             return new Vector2(a.x + _lookAhead, y + AimHeight);
         }
 
@@ -545,7 +556,7 @@ namespace GulagRunners.Game
         /// the view does not bob through every jump, and only gives way when the player gets far
         /// enough from it to risk leaving the screen.
         /// </summary>
-        float AnchoredY(float targetY)
+        float AnchoredY(float targetY, float dt)
         {
             if (player == null || !anchorToGround) return targetY;
 
@@ -568,27 +579,56 @@ namespace GulagRunners.Game
                 default:
                 {
                     float vy = player.State.Velocity.Y.Raw / (float)Sim.Fix.RawOne;
+                    float rise = airRiseSlackFraction * EffectiveViewHeight;
+                    float fall = airFallSlackFraction * EffectiveViewHeight;
 
                     // A committed fall is tracked directly, and led slightly below, so the
                     // ground arrives in frame before the player does.
-                    if (vy < -fallFollowSpeed)
+                    //
+                    // FAST IS NOT FALLING, and that distinction is the sharp movement at the
+                    // top of every jump. An ordinary jump rises 2.05 m; the slack above the
+                    // anchor is 1.8, so the anchor has barely given way at the apex -- and
+                    // 0.14 s later the body is doing 3 m/s downwards while still 1.6 m ABOVE
+                    // the anchor. On speed alone that read as a committed fall: the anchor
+                    // jumped 1.6 m UP in one frame, the smoothing time dropped from 0.22 to
+                    // 0.07 in the same frame, and the camera lurched upwards at the one
+                    // moment the player is watching the arc. So the slack has to be spent as
+                    // well: a fall is a body that is both falling fast AND below the window
+                    // the jump was allowed to use.
+                    if (vy < -fallFollowSpeed && targetY < _anchorY - fall)
                     {
                         float range = Mathf.Max(0.1f, player.tuning.maxFallSpeed - fallFollowSpeed);
                         float lead = Mathf.Clamp01((-vy - fallFollowSpeed) / range) *
                                      fallLookAheadFraction * EffectiveViewHeight;
-                        _anchorY = targetY - lead;
                         _fastFall = true;
-                        return _anchorY;
+                        return Anchor(targetY - lead, vy, dt);
                     }
 
                     _fastFall = false;
-                    float rise = airRiseSlackFraction * EffectiveViewHeight;
-                    float fall = airFallSlackFraction * EffectiveViewHeight;
-                    if (targetY > _anchorY + rise) _anchorY = targetY - rise;
-                    else if (targetY < _anchorY - fall) _anchorY = targetY + fall;
+                    if (targetY > _anchorY + rise) return Anchor(targetY - rise, vy, dt);
+                    if (targetY < _anchorY - fall) return Anchor(targetY + fall, vy, dt);
                     return _anchorY;
                 }
             }
+        }
+
+        /// <summary>
+        /// Moves the anchor towards where it wants to be, at no more than the speed the body
+        /// itself is travelling.
+        ///
+        /// The anchor used to be assigned, which is a teleport, and a teleport under a
+        /// smoothing time is a lurch -- the camera chasing a metre and a half that the thing
+        /// it is following never moved. Bounded by the body's own speed it cannot overtake
+        /// it, so every change of mode in here costs at most what the fall is already
+        /// costing. In the slack cases the bound is not even reached: the window moves with
+        /// the body, at exactly the body's speed.
+        /// </summary>
+        float Anchor(float want, float vy, float dt)
+        {
+            float speed = Mathf.Abs(vy);
+            if (speed < 0.01f) return _anchorY;
+            _anchorY = Mathf.MoveTowards(_anchorY, want, speed * dt);
+            return _anchorY;
         }
 
         /// <summary>Half the visible world size at the gameplay plane, for the current zoom.</summary>
