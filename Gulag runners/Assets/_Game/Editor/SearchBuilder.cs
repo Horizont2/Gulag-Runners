@@ -41,7 +41,9 @@ namespace GulagRunners.GameEditor
         Font _font;
         float _scale = 4f;
         float _textScale = 1f;
-        bool _scanned;
+        // Dragged in, not scanned for: see UiSpriteSet.
+        UiSpriteSet _set;
+        Vector2 _scroll;
 
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
         readonly Dictionary<string, Vector2> _size = new Dictionary<string, Vector2>();
@@ -88,23 +90,31 @@ namespace GulagRunners.GameEditor
 
         void OnGUI()
         {
-            EditorGUILayout.LabelField("Sprites", EditorStyles.boldLabel);
+            _set = UiSpriteRows.Field(_set, "Search Sprites");
             EditorGUILayout.LabelField(
-                "Optional. All five pieces are drawn if they are not here, so this screen " +
-                "builds with nothing exported at all. A folder wins where it has a file.",
+                "All five pieces are DRAWN if their row is empty, so this screen builds " +
+                "with nothing dragged in at all. A row that has something wins.",
                 EditorStyles.wordWrappedMiniLabel);
 
-            EditorGUI.BeginChangeCheck();
-            _folder = (DefaultAsset)EditorGUILayout.ObjectField(
-                "Folder", _folder, typeof(DefaultAsset), false);
-            if (EditorGUI.EndChangeCheck()) _scanned = false;
+            List<string> keys = Keys();
+            if (_set != null)
+            {
+                UiSpriteRows.Rows(_set, keys, Sizes(), ref _scroll, 150f);
 
-            if (GUILayout.Button("Scan", GUILayout.Height(22))) Scan();
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    _folder = (DefaultAsset)EditorGUILayout.ObjectField(
+                        new GUIContent("Fill empties from",
+                                       "Optional. Guesses the EMPTY rows from a folder."),
+                        _folder, typeof(DefaultAsset), false);
 
-            if (_scanned)
-                EditorGUILayout.HelpBox(
-                    $"{_found.Count} of {Needed.Length} found in the folder at " +
-                    $"{_scale:0.##}x. The rest will be drawn.", MessageType.Info);
+                    using (new EditorGUI.DisabledScope(_folder == null))
+                        if (GUILayout.Button("Fill", GUILayout.Width(60)))
+                            Debug.Log($"Filled " +
+                                      $"{UiSpriteRows.FillEmptyFromFolder(_set, _folder, keys)}" +
+                                      " empty row(s).", _set);
+                }
+            }
 
             EditorGUILayout.Space();
             _font = (Font)EditorGUILayout.ObjectField(
@@ -128,77 +138,36 @@ namespace GulagRunners.GameEditor
 
         // ---------------------------------------------------------------- the sprites
 
-        void Scan()
+        static List<string> Keys()
         {
-            _found.Clear();
-            _scanned = true;
-
-            string root = _folder != null ? AssetDatabase.GetAssetPath(_folder) : null;
-            if (string.IsNullOrEmpty(root)) { _scale = 4f; return; }
-
-            string[] files = AssetDatabase.FindAssets("t:Texture2D", new[] { root })
-                                          .Select(AssetDatabase.GUIDToAssetPath)
-                                          .Distinct().OrderBy(p => p).ToArray();
-
-            // Path first, for every key, and only then bare filenames -- in two passes,
-            // because TWO of the five are called close.png. One loop matching either way
-            // bound icon/close.png to the button key on the filename and left the icon to
-            // be drawn, with the export sitting right there in the folder.
-            foreach (string path in files)
-            {
-                string relative = Relative(path, root);
-                foreach (Asset a in Needed)
-                {
-                    string bare = a.Key.StartsWith("search/") ? a.Key.Substring(7) : a.Key;
-                    if (relative == a.Key || relative == bare) { _found[a.Key] = path; break; }
-                }
-            }
-
-            foreach (Asset a in Needed)
-            {
-                if (_found.ContainsKey(a.Key)) continue;
-                string tail = a.Key.Substring(a.Key.LastIndexOf('/') + 1);
-
-                // Only when that name is unambiguous: among the files still spare, exactly
-                // one carries it. Two spare close.png and neither is guessed at.
-                string[] hits = files
-                    .Where(p => !_found.ContainsValue(p) &&
-                                Path.GetFileNameWithoutExtension(p).ToLowerInvariant() == tail)
-                    .ToArray();
-                if (hits.Length == 1) _found[a.Key] = hits[0];
-            }
-
-            Prepare();
-            _scale = MeasureScale();
+            List<string> keys = new List<string>(Needed.Length);
+            foreach (Asset a in Needed) keys.Add(a.Key);
+            return keys;
         }
 
-        static string Relative(string path, string root)
+        static List<Vector2> Sizes()
         {
-            string p = path.Replace('\\', '/');
-            string r = root.Replace('\\', '/').TrimEnd('/') + "/";
-            if (p.StartsWith(r)) p = p.Substring(r.Length);
-            int dot = p.LastIndexOf('.');
-            return (dot > 0 ? p.Substring(0, dot) : p).ToLowerInvariant();
+            List<Vector2> sizes = new List<Vector2>(Needed.Length);
+            foreach (Asset a in Needed) sizes.Add(new Vector2(a.W, a.H));
+            return sizes;
         }
 
         /// <summary>
-        /// Sprites BEFORE anything is measured. A fresh PNG imports as a plain texture
-        /// whose npotScale is ToNearest, so a 96 px icon reports 128 and the measured
-        /// scale comes out of a power of two rather than the file. That one cost a whole
-        /// menu built a quarter too small.
+        /// The paths behind the dragged sprites. Whatever is not here this tool draws, which
+        /// is why an empty list still builds a screen.
         /// </summary>
-        void Prepare()
+        void Gather()
         {
-            foreach (string path in _found.Values)
-            {
-                TextureImporter imp = (TextureImporter)AssetImporter.GetAtPath(path);
-                if (imp == null) continue;
-                if (imp.textureType == TextureImporterType.Sprite &&
-                    imp.npotScale == TextureImporterNPOTScale.None) continue;
-                imp.textureType = TextureImporterType.Sprite;
-                imp.npotScale = TextureImporterNPOTScale.None;
-                imp.SaveAndReimport();
-            }
+            _found.Clear();
+            if (_set != null)
+                foreach (Asset a in Needed)
+                {
+                    Sprite s = _set.Get(a.Key);
+                    if (s == null) continue;
+                    string path = AssetDatabase.GetAssetPath(s);
+                    if (!string.IsNullOrEmpty(path)) _found[a.Key] = path;
+                }
+            _scale = MeasureScale();
         }
 
         float MeasureScale()
@@ -244,6 +213,14 @@ namespace GulagRunners.GameEditor
                 Object.DestroyImmediate(tex);
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
                 _found[a.Key] = path;
+
+                // Into the row as well, so the window shows what was drawn and the artist
+                // can see which pieces are placeholders waiting to be replaced.
+                if (_set != null)
+                {
+                    Sprite drawn = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                    if (drawn != null) _set.Put(a.Key, drawn);
+                }
                 drew.Add(file);
             }
         }
@@ -372,7 +349,7 @@ namespace GulagRunners.GameEditor
 
         void Build()
         {
-            if (!_scanned) Scan();
+            Gather();
 
             List<string> drew = new List<string>();
             DrawMissing(drew);

@@ -42,14 +42,17 @@ namespace GulagRunners.GameEditor
         const string RootName = "Menu UI";
 
         DefaultAsset _folder;
-        bool _scanned;
+        // The sprites, dragged into named rows. See UiSpriteSet: a folder scan matches
+        // filenames, which works on the export it was written against and quietly goes
+        // wrong on every one after it.
+        UiSpriteSet _set;
+        Vector2 _scroll;
         float _scale = 1f;
         float _readoutScale = 1f;
         float _buttonScale = 1f;
         Font _font;
 
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
-        readonly List<string> _unmatched = new List<string>();
         readonly Dictionary<string, Vector2> _size = new Dictionary<string, Vector2>();
 
         [MenuItem("Tools/Gulag Runners/Build the menu screen")]
@@ -102,37 +105,38 @@ namespace GulagRunners.GameEditor
 
         void OnGUI()
         {
-            EditorGUILayout.LabelField("Exported sprites", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField(
-                "The folder Figma exported, anywhere under Assets. Every node on the " +
-                "\"Export — Menu assets\" sheet is named after its key, so the files " +
-                "arrive saying what they are.", EditorStyles.wordWrappedMiniLabel);
+            _set = UiSpriteRows.Field(_set, "Menu Sprites");
 
-            EditorGUI.BeginChangeCheck();
-            _folder = (DefaultAsset)EditorGUILayout.ObjectField(
-                "Folder", _folder, typeof(DefaultAsset), false);
-            if (EditorGUI.EndChangeCheck()) _scanned = false;
-
-            using (new EditorGUI.DisabledScope(_folder == null))
-                if (GUILayout.Button("Scan the folder", GUILayout.Height(24))) Scan();
-
-            if (_scanned)
+            if (_set == null)
             {
-                EditorGUILayout.Space();
                 EditorGUILayout.HelpBox(
-                    _found.Count == Needed.Length
-                        ? $"All {Needed.Length} sprites found, exported at {_scale:0.##}x."
-                        : $"{_found.Count} of {Needed.Length} found at {_scale:0.##}x. The " +
-                          "rest are listed below; the screen still builds without them and " +
-                          "leaves those pieces blank.",
-                    _found.Count == Needed.Length ? MessageType.Info : MessageType.Warning);
+                    "Make a sprite list (or drop an existing one in) and the rows appear " +
+                    "below: one per piece of the menu, with the design size beside it. " +
+                    "One list can hold the whole interface -- the keys are prefixed by " +
+                    "screen, so the HUD's rows and these do not collide.", MessageType.Info);
+                return;
+            }
 
-                foreach (Asset a in Needed)
-                    if (!_found.ContainsKey(a.Key))
-                        EditorGUILayout.LabelField("   missing", a.Key);
+            List<string> keys = Keys();
+            UiSpriteRows.Rows(_set, keys, Sizes(), ref _scroll, 240f);
 
-                foreach (string path in _unmatched)
-                    EditorGUILayout.LabelField("   unused", Path.GetFileName(path));
+            EditorGUILayout.Space();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                _folder = (DefaultAsset)EditorGUILayout.ObjectField(
+                    new GUIContent("Fill empties from",
+                                   "Optional. Guesses the EMPTY rows from a folder, by " +
+                                   "name, and never touches one you have dragged into."),
+                    _folder, typeof(DefaultAsset), false);
+
+                using (new EditorGUI.DisabledScope(_folder == null))
+                    if (GUILayout.Button("Fill", GUILayout.Width(60)))
+                    {
+                        int filled = UiSpriteRows.FillEmptyFromFolder(_set, _folder, keys);
+                        Debug.Log(filled == 0
+                                      ? "Nothing in that folder answered to an empty row."
+                                      : $"Filled {filled} empty row(s). Check them.", _set);
+                    }
             }
 
             EditorGUILayout.Space();
@@ -157,179 +161,51 @@ namespace GulagRunners.GameEditor
                 _buttonScale, 0.5f, 1.4f);
 
             EditorGUILayout.Space();
-            using (new EditorGUI.DisabledScope(!_scanned))
-                if (GUILayout.Button("Build the menu screen", GUILayout.Height(32))) Build();
+            int have = _set.Filled(keys);
+            EditorGUILayout.HelpBox(
+                have == keys.Count
+                    ? $"All {keys.Count} pieces are in."
+                    : $"{have} of {keys.Count} filled in. The screen still builds and leaves " +
+                      "the rest blank.",
+                have == keys.Count ? MessageType.Info : MessageType.Warning);
+
+            if (GUILayout.Button("Build the menu screen", GUILayout.Height(32))) Build();
         }
 
-        // ---------------------------------------------------------------- the scan
+        static List<string> Keys()
+        {
+            List<string> keys = new List<string>(Needed.Length);
+            foreach (Asset a in Needed) keys.Add(a.Key);
+            return keys;
+        }
 
-        void Scan()
+        static List<Vector2> Sizes()
+        {
+            List<Vector2> sizes = new List<Vector2>(Needed.Length);
+            foreach (Asset a in Needed) sizes.Add(new Vector2(a.W, a.H));
+            return sizes;
+        }
+
+        /// <summary>The paths behind the dragged sprites: what the import and the build read.</summary>
+        void Gather()
         {
             _found.Clear();
-            _unmatched.Clear();
-            _scanned = true;
-
-            string root = AssetDatabase.GetAssetPath(_folder);
-            if (string.IsNullOrEmpty(root)) return;
-
-            string[] files = AssetDatabase.FindAssets("t:Texture2D", new[] { root })
-                                          .Select(AssetDatabase.GUIDToAssetPath)
-                                          .Distinct().OrderBy(p => p).ToArray();
-
-            // A bare filename is only safe when nothing else in the set ends the same way.
-            // Nothing does here, but the guard stays: the day somebody adds menu/icon/gold
-            // beside menu/rank/gold, this is what stops one quietly claiming the other.
-            HashSet<string> ambiguous = new HashSet<string>(
-                Needed.Select(a => Tail(a.Key)).GroupBy(t => t)
-                      .Where(g => g.Count() > 1).Select(g => g.Key));
-
-            Dictionary<string, int> bestScale = new Dictionary<string, int>();
-
-            foreach (string path in files)
-            {
-                string relative = Relative(path, root);
-                string name = Normalise(Path.GetFileNameWithoutExtension(path), out int at);
-
-                string key = null;
-                foreach (Asset a in Needed)
-                {
-                    string withoutPrefix = a.Key.StartsWith("menu/") ? a.Key.Substring(5) : a.Key;
-                    bool byPath = relative == a.Key || relative == withoutPrefix;
-                    bool byName = name == Tail(a.Key) && !ambiguous.Contains(Tail(a.Key));
-                    if (byPath || byName) { key = a.Key; break; }
-                }
-
-                if (key == null) { _unmatched.Add(path); continue; }
-
-                // Two copies of the same piece at different scales: keep the larger.
-                if (!bestScale.TryGetValue(key, out int had) || at > had)
-                {
-                    bestScale[key] = at;
-                    _found[key] = path;
-                }
-            }
-
-            Prepare();
-            _scale = MeasureScale();
-        }
-
-        /// <summary>
-        /// Make every found file a Sprite BEFORE anything is measured off it.
-        ///
-        /// Unity imports a new PNG as a plain TEXTURE, and a plain texture has npotScale
-        /// set to ToNearest -- so a 96x96 icon is reported as 128x128 and a 1600x448
-        /// button as 2048x512. Measuring the export scale off tex.width then measures the
-        /// power of two Unity rounded it to rather than the file: eleven 96 px icons all
-        /// read 128/24 = 5.33 and voted the whole sheet to 5.25x, which put a 26 unit
-        /// corner on the name plate at 34 and stretched the art on its way in.
-        ///
-        /// Sprites are never NPOT-scaled, so one pass of this and tex.width is the file
-        /// again. It is also the import these assets want in the end, so nothing is wasted.
-        /// </summary>
-        void Prepare()
-        {
-            foreach (string path in _found.Values)
-            {
-                TextureImporter imp = (TextureImporter)AssetImporter.GetAtPath(path);
-                if (imp == null) continue;
-                if (imp.textureType == TextureImporterType.Sprite &&
-                    imp.npotScale == TextureImporterNPOTScale.None) continue;
-
-                imp.textureType = TextureImporterType.Sprite;
-                imp.npotScale = TextureImporterNPOTScale.None;
-                imp.SaveAndReimport();
-            }
-        }
-
-        static string Tail(string key) => key.Substring(key.LastIndexOf('/') + 1);
-
-        static string Relative(string path, string root)
-        {
-            string p = path.Replace('\\', '/');
-            string r = root.Replace('\\', '/').TrimEnd('/') + "/";
-            if (p.StartsWith(r)) p = p.Substring(r.Length);
-            int dot = p.LastIndexOf('.');
-            if (dot > 0) p = p.Substring(0, dot);
-            return Normalise(p, out _);
-        }
-
-        static string Normalise(string name, out int scale)
-        {
-            scale = 1;
-            string s = name.ToLowerInvariant().Replace('_', '-').Replace(' ', '-');
-            foreach (int k in new[] { 8, 4, 3, 2 })
-                if (s.EndsWith($"@{k}x")) { scale = k; s = s.Substring(0, s.Length - 3); break; }
-            return s.TrimEnd('-');
-        }
-
-        /// <summary>
-        /// At what multiple of the design this folder came out, as the value the MOST
-        /// assets agree on. Not the mean: one frame Figma cropped tight to its stroke drags
-        /// a mean off, and surviving exactly that is what this exists for.
-        /// </summary>
-        float MeasureScale()
-        {
-            Dictionary<float, int> votes = new Dictionary<float, int>();
+            if (_set == null) return;
             foreach (Asset a in Needed)
             {
-                if (a.W <= 0f || !_found.TryGetValue(a.Key, out string path)) continue;
-                Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-                if (tex == null) continue;
-
-                float v = Mathf.Round(tex.width / a.W * 4f) / 4f;
-                if (v <= 0f) continue;
-                votes.TryGetValue(v, out int n);
-                votes[v] = n + 1;
+                Sprite s = _set.Get(a.Key);
+                if (s == null) continue;
+                string path = AssetDatabase.GetAssetPath(s);
+                if (!string.IsNullOrEmpty(path)) _found[a.Key] = path;
             }
-
-            float best = 1f;
-            int bestVotes = 0;
-            foreach (KeyValuePair<float, int> kv in votes)
-                if (kv.Value > bestVotes) { bestVotes = kv.Value; best = kv.Key; }
-            return best;
+            _scale = MeasureScale();
         }
-
-        Sprite Import(Asset asset)
-        {
-            if (!_found.TryGetValue(asset.Key, out string path)) return null;
-
-            TextureImporter imp = (TextureImporter)AssetImporter.GetAtPath(path);
-            if (imp == null) return null;
-
-            imp.textureType = TextureImporterType.Sprite;
-            imp.spriteImportMode = SpriteImportMode.Single;
-            // Never rounded to a power of two. A 1600x448 button stretched to 2048x512 is
-            // not the art that was drawn, and it is the same setting that made the scale
-            // unmeasurable above.
-            imp.npotScale = TextureImporterNPOTScale.None;
-            imp.mipmapEnabled = false;
-            imp.filterMode = FilterMode.Bilinear;
-            imp.alphaIsTransparency = true;
-            imp.sRGBTexture = true;
-            imp.maxTextureSize = 2048;
-            imp.textureCompression = TextureImporterCompression.Uncompressed;
-            imp.wrapMode = TextureWrapMode.Clamp;
-
-            // A nine-slice border is quoted in TEXTURE pixels and uGUI divides it by
-            // spritePPU / canvasReferencePPU before drawing. Left at the default 100
-            // against the canvas's own 100 that divisor is 1, so a 5 px corner exported at
-            // 4x draws as a 20 UNIT corner. That is what made the HUD look heavy for
-            // several passes before anybody found it.
-            imp.spritePixelsPerUnit = 100f * Mathf.Max(0.01f, _scale);
-            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * _scale;
-
-            imp.SaveAndReimport();
-            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
-        }
-
-        /// <summary>The size a sprite actually is, in design units, or the design size.</summary>
-        Vector2 Size(string key, float w, float h) =>
-            _size.TryGetValue(key, out Vector2 v) ? v : new Vector2(w, h);
 
         // ---------------------------------------------------------------- the build
 
         void Build()
         {
+            Gather();
             _size.Clear();
             Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
             List<string> odd = new List<string>();

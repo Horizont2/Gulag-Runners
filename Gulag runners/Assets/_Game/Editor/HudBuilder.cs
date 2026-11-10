@@ -34,11 +34,13 @@ namespace GulagRunners.GameEditor
         const float DesignH = 864f;
         const string RootName = "HUD";
 
-        DefaultAsset _folder;
+        // The sprites, dragged into named rows rather than matched to filenames in a
+        // folder. UiSpriteSet says why; the short version is that a folder scan is a
+        // guessing game that works once and goes quietly wrong afterwards.
+        UiSpriteSet _set;
+        DefaultAsset _folder;        // optional, and only ever fills rows that are empty
         Vector2 _scroll;
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
-        readonly List<string> _unmatched = new List<string>();
-        bool _scanned;
 
         // What multiple of the design this export came out at, and the size each sprite
         // therefore IS. Both are measured per build rather than typed in; see MeasureScale.
@@ -130,18 +132,42 @@ namespace GulagRunners.GameEditor
 
         void OnGUI()
         {
-            EditorGUILayout.LabelField("Exported sprites", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField(
-                "The folder Figma exported. Put it anywhere under Assets first — Unity " +
-                "cannot import from outside the project.", EditorStyles.wordWrappedMiniLabel);
+            _set = UiSpriteRows.Field(_set, "HUD Sprites");
 
-            EditorGUI.BeginChangeCheck();
-            _folder = (DefaultAsset)EditorGUILayout.ObjectField(
-                "Folder", _folder, typeof(DefaultAsset), false);
-            if (EditorGUI.EndChangeCheck()) _scanned = false;
+            if (_set == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Make a sprite list (or drop an existing one in) and the rows appear " +
+                    "below: one per piece of the HUD, with the design size beside it. " +
+                    "Drag the assets in and press Build.", MessageType.Info);
+                return;
+            }
 
-            using (new EditorGUI.DisabledScope(_folder == null))
-                if (GUILayout.Button("Scan the folder", GUILayout.Height(24))) Scan();
+            List<string> keys = Keys();
+            List<Vector2> sizes = Sizes();
+            UiSpriteRows.Rows(_set, keys, sizes, ref _scroll);
+
+            EditorGUILayout.Space();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                _folder = (DefaultAsset)EditorGUILayout.ObjectField(
+                    new GUIContent("Fill empties from",
+                                   "Optional. A folder to guess the EMPTY rows from, by " +
+                                   "name. It never touches a row you have dragged into, " +
+                                   "and a bad guess leaves the row empty rather than " +
+                                   "swapping a sprite behind your back."),
+                    _folder, typeof(DefaultAsset), false);
+
+                using (new EditorGUI.DisabledScope(_folder == null))
+                    if (GUILayout.Button("Fill", GUILayout.Width(60)))
+                    {
+                        int filled = UiSpriteRows.FillEmptyFromFolder(_set, _folder, keys);
+                        Debug.Log(filled == 0
+                                      ? "Nothing in that folder answered to an empty row."
+                                      : $"Filled {filled} empty row(s) from the folder. " +
+                                        "Check them: a guess is a guess.", _set);
+                    }
+            }
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Size on screen", EditorStyles.boldLabel);
@@ -175,206 +201,56 @@ namespace GulagRunners.GameEditor
                                "for a screenshot."),
                 _controlScale, 0.4f, 1.25f);
 
-            if (_scanned)
-            {
-                int have = _found.Count;
-                EditorGUILayout.Space();
-                EditorGUILayout.HelpBox(
-                    have == Needed.Length
-                        ? $"All {Needed.Length} sprites found."
-                        : $"{have} of {Needed.Length} found. The missing ones are listed below; " +
-                          "the HUD still builds without them and leaves those objects empty.",
-                    have == Needed.Length ? MessageType.Info : MessageType.Warning);
+            EditorGUILayout.Space();
+            int have = _set.Filled(keys);
+            EditorGUILayout.HelpBox(
+                have == keys.Count
+                    ? $"All {keys.Count} pieces are in. Four of them this tool draws itself " +
+                      "if you leave them empty."
+                    : $"{have} of {keys.Count} filled in. The HUD still builds: an empty row " +
+                      "is an object with no sprite on it, not a failure.",
+                have == keys.Count ? MessageType.Info : MessageType.Warning);
 
-                _scroll = EditorGUILayout.BeginScrollView(_scroll, GUILayout.Height(220));
-                foreach (Asset a in Needed)
-                {
-                    bool ok = _found.ContainsKey(a.Key);
-                    EditorGUILayout.LabelField(
-                        (ok ? "✓  " : "—  ") + a.Key,
-                        ok ? Path.GetFileName(_found[a.Key]) : "missing",
-                        ok ? EditorStyles.miniLabel : EditorStyles.boldLabel);
-                }
-                if (_unmatched.Count > 0)
-                {
-                    EditorGUILayout.Space();
-                    EditorGUILayout.LabelField("Files the HUD has no place for:",
-                                               EditorStyles.miniBoldLabel);
-                    foreach (string f in _unmatched)
-                        EditorGUILayout.LabelField("   " + Path.GetFileName(f),
-                                                   EditorStyles.miniLabel);
-                }
-                EditorGUILayout.EndScrollView();
-
-                EditorGUILayout.Space();
-                if (GUILayout.Button("Build the HUD in this scene", GUILayout.Height(32)))
-                    Build();
-                EditorGUILayout.LabelField(
-                    "Replaces any \"HUD\" object this tool built before. Everything it makes " +
-                    "is an ordinary GameObject afterwards.", EditorStyles.wordWrappedMiniLabel);
-            }
+            if (GUILayout.Button("Build the HUD in this scene", GUILayout.Height(32)))
+                Build();
+            EditorGUILayout.LabelField(
+                "Replaces any \"HUD\" object this tool built before. Everything it makes " +
+                "is an ordinary GameObject afterwards.", EditorStyles.wordWrappedMiniLabel);
         }
 
-        // ---------------------------------------------------------------- matching
+        /// <summary>The keys this screen is made of, in the order the rows are drawn.</summary>
+        static List<string> Keys()
+        {
+            List<string> keys = new List<string>(Needed.Length);
+            foreach (Asset a in Needed) keys.Add(a.Key);
+            return keys;
+        }
+
+        /// <summary>The design size of each, shown beside its row.</summary>
+        static List<Vector2> Sizes()
+        {
+            List<Vector2> sizes = new List<Vector2>(Needed.Length);
+            foreach (Asset a in Needed) sizes.Add(new Vector2(a.W, a.H));
+            return sizes;
+        }
 
         /// <summary>
-        /// Matches files to the assets the HUD needs.
-        ///
-        /// By NAME rather than by path, because an export can come out one folder deeper or
-        /// one shallower than it went in, and because @2x and @4x are the same sprite at
-        /// two sizes. The largest wins: a nine-sliced 3 px line survives being scaled down
-        /// and does not survive being scaled up.
+        /// The paths behind the dragged sprites, which is all the rest of the tool ever
+        /// wanted: the import settings are written through the path and the sprite is
+        /// loaded back from it.
         /// </summary>
-        void Scan()
+        void Gather()
         {
             _found.Clear();
-            _unmatched.Clear();
-            _scanned = true;
+            if (_set == null) return;
 
-            string root = AssetDatabase.GetAssetPath(_folder);
-            if (string.IsNullOrEmpty(root)) return;
-
-            string[] files = AssetDatabase.FindAssets("t:Texture2D", new[] { root })
-                                          .Select(AssetDatabase.GUIDToAssetPath)
-                                          .Distinct().OrderBy(p => p).ToArray();
-
-            // A bare tail is only safe when nothing else in the set ends the same way, and
-            // two things here do: hud/slot/frame and hud/bar/frame. Matching on the tail
-            // alone let bar/frame.png claim the slot square and then be overwritten by the
-            // real one, so the bar came out with no frame at all and nothing said why.
-            HashSet<string> ambiguous = new HashSet<string>(
-                Needed.Select(a => a.Key.Substring(a.Key.LastIndexOf('/') + 1))
-                      .GroupBy(t => t).Where(g => g.Count() > 1).Select(g => g.Key));
-
-            Dictionary<string, int> bestScale = new Dictionary<string, int>();
-            List<string> unnamed = new List<string>();
-
-            // ---- first pass: the files that say what they are
-            foreach (string path in files)
-            {
-                string name = Normalise(Path.GetFileNameWithoutExtension(path), out int scale);
-                string relative = Relative(path, root);
-
-                string key = null;
-                foreach (Asset a in Needed)
-                {
-                    string tail = a.Key.Substring(a.Key.LastIndexOf('/') + 1);
-                    string withoutPrefix = a.Key.StartsWith("hud/") ? a.Key.Substring(4) : a.Key;
-                    bool byPath = relative == withoutPrefix || relative == a.Key;
-                    bool byName = name == tail && !ambiguous.Contains(tail);
-                    if (byPath || byName) { key = a.Key; break; }
-                }
-
-                if (key == null) { unnamed.Add(path); continue; }
-                if (!bestScale.TryGetValue(key, out int had) || scale > had)
-                {
-                    bestScale[key] = scale;
-                    _found[key] = path;
-                }
-            }
-
-            // ---- second pass: the files Figma named after the vector inside them
-            foreach (string path in unnamed)
-            {
-                Asset? hit = ByShape(path, Relative(path, root));
-                if (hit == null) { _unmatched.Add(path); continue; }
-                _found[hit.Value.Key] = path;
-            }
-
-            Prepare();
-        }
-
-        /// <summary>
-        /// Make every found file a Sprite BEFORE anything is measured off it.
-        ///
-        /// Unity imports a new PNG as a plain TEXTURE, and a plain texture has npotScale
-        /// set to ToNearest -- so a 96x96 icon is reported as 128x128 and a 1600x448
-        /// button as 2048x512. Measuring the export scale off tex.width then measures the
-        /// power of two Unity rounded it to rather than the file: eleven 96 px icons all
-        /// read 128/24 = 5.33 and voted the whole sheet to 5.25x, which put a 26 unit
-        /// corner on the name plate at 34 and stretched the art on its way in.
-        ///
-        /// Sprites are never NPOT-scaled, so one pass of this and tex.width is the file
-        /// again. It is also the import these assets want in the end, so nothing is wasted.
-        /// </summary>
-        void Prepare()
-        {
-            foreach (string path in _found.Values)
-            {
-                TextureImporter imp = (TextureImporter)AssetImporter.GetAtPath(path);
-                if (imp == null) continue;
-                if (imp.textureType == TextureImporterType.Sprite &&
-                    imp.npotScale == TextureImporterNPOTScale.None) continue;
-
-                imp.textureType = TextureImporterType.Sprite;
-                imp.npotScale = TextureImporterNPOTScale.None;
-                imp.SaveAndReimport();
-            }
-        }
-
-
-        static string Relative(string path, string root) =>
-            Normalise(Path.ChangeExtension(path.Substring(root.Length).TrimStart('/'), null),
-                      out _);
-
-        /// <summary>
-        /// A misnamed file worked out from the folder it sits in and the shape it has.
-        ///
-        /// Only consulted once the names have had their turn. An exported node can be
-        /// trimmed to its own ink rather than to the frame it was drawn in — the sound arc
-        /// comes out 444x213 where the frame is 210x62 — so proportions alone are not
-        /// enough. They settle it when they are close; when they are not, and the folder
-        /// has exactly one asset still spoken for by nobody, that is the answer by
-        /// elimination. Anything still ambiguous is left alone and reported.
-        /// </summary>
-        Asset? ByShape(string path, string relative)
-        {
-            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            if (tex == null || tex.height == 0) return null;
-
-            string folder = relative.Contains("/")
-                ? relative.Substring(0, relative.LastIndexOf('/')) : "";
-
-            List<Asset> open = new List<Asset>();
             foreach (Asset a in Needed)
             {
-                if (_found.ContainsKey(a.Key) || a.H <= 0) continue;
-                // The three drawn below are never guessed at. The halo exported as a hard
-                // 64 px square — Figma gave the rectangle inside the frame and left the
-                // blur behind — and a hard square is the right SHAPE and the wrong asset,
-                // so shape matching would take it and quietly replace a soft glow with a
-                // block. A correctly NAMED export still wins; only the guess is refused.
-                if (Generated.Contains(a.Key)) continue;
-                string group = a.Key.StartsWith("hud/") ? a.Key.Substring(4) : a.Key;
-                group = group.Contains("/") ? group.Substring(0, group.LastIndexOf('/')) : "";
-                if (group == folder) open.Add(a);
+                Sprite s = _set.Get(a.Key);
+                if (s == null) continue;
+                string path = AssetDatabase.GetAssetPath(s);
+                if (!string.IsNullOrEmpty(path)) _found[a.Key] = path;
             }
-            if (open.Count == 0) return null;
-
-            float ratio = tex.width / (float)tex.height;
-            Asset? best = null;
-            float bestError = 0.06f;
-            foreach (Asset a in open)
-            {
-                float want = a.W / a.H;
-                float error = Mathf.Abs(ratio - want) / want;
-                if (error >= bestError) continue;
-                bestError = error;
-                best = a;
-            }
-            if (best != null) return best;
-
-            return open.Count == 1 ? open[0] : (Asset?)null;
-        }
-
-        /// <summary>Lower-cased, hyphenated, with any @2x/@4x taken off and reported.</summary>
-        static string Normalise(string name, out int scale)
-        {
-            scale = 1;
-            string s = name.ToLowerInvariant().Replace('_', '-').Replace(' ', '-');
-            foreach (int k in new[] { 8, 4, 3, 2 })
-                if (s.EndsWith($"@{k}x")) { scale = k; s = s.Substring(0, s.Length - 3); break; }
-            return s.TrimEnd('-');
         }
 
         // ---------------------------------------------------------------- import
@@ -396,7 +272,10 @@ namespace GulagRunners.GameEditor
 
             imp.textureType = TextureImporterType.Sprite;
             imp.spriteImportMode = SpriteImportMode.Single;
-            // Never rounded to a power of two -- see Prepare.
+            // Never rounded to a power of two: a sprite is never NPOT-scaled, and a
+            // texture that is would be measured as the power of two Unity rounded it
+            // to rather than as the file -- which votes the whole sheet to the wrong
+            // export scale and stretches the art on its way in.
             imp.npotScale = TextureImporterNPOTScale.None;
             imp.mipmapEnabled = false;
             imp.filterMode = FilterMode.Bilinear;
@@ -457,6 +336,14 @@ namespace GulagRunners.GameEditor
                 if (!_buildMannequin && key.StartsWith("hud/leaders")) continue;
                 if (!_buildSoundCue && key == "hud/sound/arc") continue;
 
+                // Unless somebody has dragged real art into that row. These four are
+                // drawn because a Figma export cannot carry them -- a soft glow, a thin
+                // arc -- and the moment there IS a file for one, the file wins. Anything
+                // else is a tool overwriting the artist.
+                Sprite already = _set != null ? _set.Get(key) : null;
+                if (already != null &&
+                    !AssetDatabase.GetAssetPath(already).Contains("/generated/")) continue;
+
                 Asset asset = Needed.First(a => a.Key == key);
                 string dir = $"{root}/generated";
                 if (!AssetDatabase.IsValidFolder(dir))
@@ -477,6 +364,14 @@ namespace GulagRunners.GameEditor
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
                 _found[key] = path;
                 made.Add(file);
+
+                // Into the row as well, so the window shows what was drawn and the next
+                // build uses the same file rather than drawing it again blind.
+                if (_set != null)
+                {
+                    Sprite drawn = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                    if (drawn != null) _set.Put(key, drawn);
+                }
             }
         }
 
@@ -606,12 +501,22 @@ namespace GulagRunners.GameEditor
         void Build()
         {
             List<string> generated = new List<string>();
-            string sourceFolder = AssetDatabase.GetAssetPath(_folder);
 
-            // Measured BEFORE anything is drawn, so the two sprites this tool draws itself
-            // come out at the same multiple as the ones Figma sent.
+            // The rows, as paths: everything below this line works the way it always did.
+            Gather();
+
+            // Measured BEFORE anything is drawn, so the pieces this tool draws itself come
+            // out at the same multiple as the ones that were dragged in.
             _scale = MeasureScale();
-            if (!string.IsNullOrEmpty(sourceFolder)) GenerateMissing(sourceFolder, generated);
+
+            // Beside the list itself, because that is the one folder this tool knows about
+            // now. The generated sprites are put back INTO the rows, so they appear in the
+            // window next to the dragged ones rather than being invisible magic.
+            string home = _set != null
+                ? System.IO.Path.GetDirectoryName(AssetDatabase.GetAssetPath(_set))
+                                 ?.Replace('\\', '/')
+                : null;
+            if (!string.IsNullOrEmpty(home)) GenerateMissing(home, generated);
 
             _size.Clear();
             Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
