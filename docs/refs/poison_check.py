@@ -204,6 +204,54 @@ def colliders_under(docs, transform):
     return found
 
 
+def screen_clamps(docs, transform):
+    """Every particle renderer's min/max particle size under this transform.
+
+    These two are fractions of the SCREEN, not metres, and that is the whole reason this
+    rule exists. A min of 0.2 means no particle may be drawn smaller than a fifth of the
+    screen's height however far away it is, and a max of 1.2 means one may cover the lot --
+    so the same build looks like soft fog on one machine and like a screen-filling green
+    texture on another, because the two have different resolutions and the camera frames by
+    height. It cannot be seen in the inspector without knowing what the numbers mean, and it
+    cannot be reproduced on the machine that looks right.
+
+    Polyart's fog ships with 0.2 and 1.2, which is correct for a prop you walk past and
+    wrong for a volume that fills an arena.
+    """
+    out, stack = [], [transform]
+    while stack:
+        t = stack.pop()
+        if t not in docs:
+            continue
+        body = docs[t][1]
+
+        src = re.search(r"m_CorrespondingSourceObject: \{fileID: -?\d+, "
+                        r"guid: ([0-9a-f]{32}), type: \d\}", body)
+        if src:
+            asset = geometry._asset_of(src.group(1))
+            if asset and os.path.exists(asset):
+                text = read(asset)
+                name = os.path.basename(asset)
+                for m in re.finditer(r"  m_MinParticleSize: ([\d.]+)\n"
+                                     r"  m_MaxParticleSize: ([\d.]+)", text):
+                    out.append((name, float(m.group(1)), float(m.group(2))))
+            continue
+
+        kids = re.search(r"  m_Children:(?: \[\]|\n((?:  - \{fileID: -?\d+\}\n)*))", body)
+        if kids and kids.group(1):
+            stack += [int(v) for v in re.findall(r"fileID: (-?\d+)", kids.group(1))]
+    return out
+
+
+# What a particle may cover, as a share of the screen. Above this the look depends on the
+# machine's resolution rather than on the arena.
+MAX_ON_SCREEN = 0.4
+
+# And a minimum above zero is a particle that cannot be far away: it is held at this share
+# of the screen whatever the distance.
+MIN_ON_SCREEN = 0.02
+
+
 def floors(baked, min_width):
     """Every surface at least this wide: its top, and the ground it covers."""
     out = []
@@ -358,11 +406,30 @@ def main(argv):
             notes.append(f"  no smoke wired; the pool is drawn as the box itself, which is a "
                          f"measurement rather than a picture")
         else:
-            notes.append(f"  smoke: {band} emitter(s) riding the waterline, {below} under "
-                         f"the floor")
+            notes.append(f"  smoke: {band} emitter(s) in the pool itself, {below} under the floor")
+
+            # The clamps, which are the one thing about this smoke that can look right on
+            # the machine it was built on and wrong on the next one.
+            for where in (p["mist"], p["source"]):
+                if not where:
+                    continue
+                for asset, lo, hi in screen_clamps(docs, where):
+                    if hi > MAX_ON_SCREEN:
+                        problems.append(
+                            f"{scene}: {asset} lets one particle cover {hi * 100:.0f}% of the "
+                            f"SCREEN (Max Particle Size {hi}). That is a fraction of the "
+                            f"viewport, not metres, so the poison is soft fog on one "
+                            f"resolution and a screen-filling texture on another. Keep it "
+                            f"under {MAX_ON_SCREEN}.")
+                    if lo > MIN_ON_SCREEN:
+                        problems.append(
+                            f"{scene}: {asset} forces every particle to at least "
+                            f"{lo * 100:.0f}% of the screen (Min Particle Size {lo}), so the "
+                            f"smoke cannot be far away and the far end of the arena is drawn "
+                            f"in the same giant cards as the near end. Zero it.")
             if band == 0:
-                notes.append(f"  nothing at the waterline, so the surface -- the one height "
-                             f"a player has to read -- is only implied by the smoke below it")
+                notes.append(f"  nothing in the pool, so the surface -- the one height a "
+                             f"player has to read -- is only implied by the smoke below it")
 
     for n in notes:
         print(("  " + n) if n.startswith(" ") else ("  note: " + n))

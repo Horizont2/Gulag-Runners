@@ -75,8 +75,8 @@ ParticleSystemRenderer:
   m_SortingOrder: 0
   m_RenderMode: 0
   m_SortMode: 0
-  m_MinParticleSize: 0.2
-  m_MaxParticleSize: 1.2
+  m_MinParticleSize: 0
+  m_MaxParticleSize: 0.15
   m_CameraVelocityScale: 0
   m_VelocityScale: 0
   m_LengthScale: 2
@@ -181,8 +181,8 @@ ParticleSystem:
     startLifetime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 8
-      minScalar: 6
+      scalar: 5
+      minScalar: 3.5
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -350,8 +350,8 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 5
-      minScalar: 3
+      scalar: 2.4
+      minScalar: 1.2
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -509,8 +509,8 @@ ParticleSystem:
     startRotationX:
       serializedVersion: 2
       minMaxState: 0
-      scalar: -0.03
-      minScalar: -0.03
+      scalar: -0.004
+      minScalar: -0.004
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -562,8 +562,8 @@ ParticleSystem:
     startRotationY:
       serializedVersion: 2
       minMaxState: 0
-      scalar: -0.03
-      minScalar: -0.03
+      scalar: -0.004
+      minScalar: -0.004
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -615,8 +615,8 @@ ParticleSystem:
     startRotation:
       serializedVersion: 2
       minMaxState: 0
-      scalar: -0.03
-      minScalar: -0.03
+      scalar: -0.004
+      minScalar: -0.004
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -672,8 +672,8 @@ ParticleSystem:
     gravityModifier:
       serializedVersion: 2
       minMaxState: 0
-      scalar: -0.03
-      minScalar: -0.03
+      scalar: -0.004
+      minScalar: -0.004
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -733,7 +733,7 @@ ParticleSystem:
     donutRadius: 0.2
     m_Position: {x: 0, y: 0, z: 0}
     m_Rotation: {x: -90, y: 0, z: 0}
-    m_Scale: {x: 10, y: 2, z: 3}
+    m_Scale: {x: 10, y: 1, z: 3}
     placementMode: 0
     m_MeshMaterialIndex: 0
     m_MeshNormalOffset: 0
@@ -931,8 +931,8 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 12
-      minScalar: 12
+      scalar: 18
+      minScalar: 18
       maxCurve:
         serializedVersion: 2
         m_Curve:

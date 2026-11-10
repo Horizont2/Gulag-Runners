@@ -55,8 +55,18 @@ namespace GulagRunners.Game
                  "only part of it a player has to judge.")]
         public Transform surface;
 
-        [Tooltip("The smoke at the surface: moved with the waterline, so it always rolls off " +
-                 "the real level rather than off the floor.\n\n" +
+        [Tooltip("The smoke IN the poison: scaled and placed to fill exactly the part of the " +
+                 "pool that has flooded, so its top edge is the waterline and its bottom is " +
+                 "the floor of the pool.\n\n" +
+                 "Filled rather than floated, and that is the whole difference between a tide " +
+                 "and a fog machine. Parked at the surface instead, the band emits across the " +
+                 "whole arena from the first tick -- the poison then appears everywhere at " +
+                 "once and only the line moves, which is not what rising means. Scaled with " +
+                 "the flood, the emitter at the start is a flat slab on the lowest ground: " +
+                 "the green comes up out of the floor, because that is where it is.\n\n" +
+                 "The particle system has to scale its SHAPE and not its particles for this " +
+                 "to work (Scaling Mode: Shape, which GR_PoisonFog is authored with); " +
+                 "anything else grows the smoke itself as the pool fills.\n\n" +
                  "This is what the poison LOOKS like. The boxes above are a measurement — " +
                  "hidden the moment the game starts — and a slab of flat green is not a " +
                  "thing anybody wants to look at for eighty seconds; a fog bank creeping up " +
@@ -158,6 +168,7 @@ namespace GulagRunners.Game
         Bounds _flooded;
         Vector3 _scale;
         Vector3 _surfaceScale;
+        Vector3 _mistScale;
         bool _measured;
 
         void Awake()
@@ -204,6 +215,7 @@ namespace GulagRunners.Game
             _flooded = Flooded;
             _scale = (body != null ? body : transform).localScale;
             _surfaceScale = surface != null ? surface.localScale : Vector3.one;
+            _mistScale = mist != null ? mist.localScale : Vector3.one;
             _measured = true;
         }
 
@@ -249,16 +261,24 @@ namespace GulagRunners.Game
             }
 
             // The smoke is the poison, as far as anybody looking at it is concerned: the
-            // band rides the waterline, the source stays under the arena, and neither exists
-            // until the pool starts filling. Switched by the LEVEL rather than by the phase,
-            // so there is nothing to keep in step with the clock.
+            // fog fills what has flooded, the source stays under the arena, and neither
+            // exists until the pool starts filling. Switched by the LEVEL rather than by the
+            // phase, so there is nothing to keep in step with the clock.
             Show(mist, p > 0f);
             Show(source, p > 0f);
 
+            // The fog is scaled to the flooded volume, exactly as the body box is: bottom
+            // on the floor of the pool, top at the waterline. The emitter is then a flat
+            // slab at the start and a filled room at the end, which is what makes the green
+            // come UP rather than simply appear.
             if (mist != null)
             {
+                Vector3 fog = _mistScale;
+                fog.y = _mistScale.y * p;
+                mist.localScale = fog;
+
                 Vector3 at = mist.position;
-                at.y = top;
+                at.y = _flooded.min.y + _flooded.extents.y * p;
                 mist.position = at;
             }
         }
