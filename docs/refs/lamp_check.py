@@ -115,6 +115,46 @@ def correlation(a, b):
     return sum((a[i] - ma) * (b[i] - mb) for i in range(n)) / math.sqrt(va * vb)
 
 
+# Horizontal distance within which a prop counts as the thing a lamp is standing ON, and
+# how far above it the lamp's own feet may be. A hung lamp has its floor over a metre down.
+ON_TOP_OF = 0.08
+STANDS_WITHIN = 1.00
+
+
+def stood_on(scene, pos):
+    """What this lamp is standing on, if anything.
+
+    A LAMP THAT STANDS ON A CRATE HAS NOTHING TO SWING FROM, and the sway is a material --
+    so it rocked on the spot like a weeble, which is the report this exists for. Which
+    lamps those are is not a judgement to be typed into a list: a lamp stood on something
+    has that thing directly beneath it, within a couple of centimetres horizontally.
+    """
+    x, y, z = pos
+    best = None
+    for other, who in scene.prefab_art():
+        if "Lantern" in who:
+            continue
+        if math.hypot(other[0] - x, other[2] - z) > ON_TOP_OF:
+            continue
+        if not 0.0 < y - other[1] <= STANDS_WITHIN:
+            continue
+        if best is None or y - other[1] < best[0]:
+            best = (y - other[1], who)
+    return best
+
+
+def sways(scene, name, guid):
+    """Is this lamp instance actually wearing the swaying material?"""
+    for fid, (cls, body) in sorted(scene.docs.items()):
+        if cls != 1001:
+            continue
+        who = re.search(r"propertyPath: m_Name\n\s+value: ([^\n]*)", body)
+        if who is None or who.group(1).strip() != name:
+            continue
+        return guid in body
+    return False
+
+
 def main(argv):
     name, body = material(SHADER)
     problems, notes = [], []
@@ -150,12 +190,32 @@ def main(argv):
             continue
         scene = geometry.Scene(path)
 
-        lamps = []
+        lamps, still = [], []
         for pos, who in scene.prefab_art():
             if "Lantern" not in who:
                 continue
-            lamps.append((pos, who))
+            (lamps if sways(scene, who, guid) else still).append((pos, who))
+
+        # A lamp stood on a crate must not be wearing the sway.
+        for pos, who in lamps:
+            on = stood_on(scene, pos)
+            if on is None:
+                continue
+            problems.append(
+                f"{scene_name}: {who} stands on {on[1]}, {on[0] * 100:.0f} cm up, and is "
+                f"wearing {name}. The sway rotates it about a hook 52 cm above its own "
+                f"feet, which a lamp standing on a crate does not have: it rocks on the "
+                f"spot. Give it GR_LanternStill -- the same shader and colour with the "
+                f"swing zeroed -- and leave the sway to the ones that hang.")
+
+        for pos, who in still:
+            on = stood_on(scene, pos)
+            if on is None:
+                notes.append(f"  {who} hangs and does NOT sway, which is a choice rather "
+                             f"than a fault -- but the fire inside it still flickers")
+
         if not lamps:
+            notes.append(f"{scene_name}: no lamp in this scene sways")
             continue
 
         # A lamp's own scale, so the hook is where it really is and the swing is measured
