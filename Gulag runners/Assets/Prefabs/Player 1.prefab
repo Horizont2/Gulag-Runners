@@ -233,7 +233,7 @@ MonoBehaviour:
     hardLandSpeed: 8
   planeZ: -1.4
   depthFromScene: 1
-  depthSmoothTime: 0.12
+  depthSmoothTime: 0
   visualYOffset: 0
   stepSmoothTime: 0.07
   stepSmoothMax: 0.4

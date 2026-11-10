@@ -70,11 +70,20 @@ namespace GulagRunners.Game
                  "the depth you are actually on.")]
         public bool depthFromScene = true;
 
-        [Tooltip("Follow a ladder's own depth while climbing it.\n\n" +
-                 "A ladder modelled in front of the platform it serves is climbed in front of " +
-                 "it too; staying on the plane would draw the body inside the floor it is " +
-                 "climbing past. 0 snaps.")]
-        public float depthSmoothTime = 0.12f;
+        [Tooltip("Smoothing on the DRAWN depth. Leave it at zero.\n\n" +
+                 "This is the last of the days when depth was a presentation flourish, and " +
+                 "it is the whole of \"you jump on a cage and it slowly sucks you inside\". " +
+                 "The simulation moves the body onto the cage's slice IN THE AIR, in about " +
+                 "a tenth of a second, so the lean is spent before the feet land -- and then " +
+                 "this smoothed the DRAWING of it over another fifth of a second, which lands " +
+                 "first and does the rest of the move afterwards, as a slide across the cage " +
+                 "floor. 1.66 m of it on the forest's hanging cages.\n\n" +
+                 "There is nothing here that wants smoothing: the simulation already bounds " +
+                 "how fast depth may change (Depth Snap Speed, and Air Depth Snap in the air), " +
+                 "and the frames between ticks are interpolated like x and y. Anything above " +
+                 "zero is the drawn body disagreeing with the body that collides, which is " +
+                 "the one thing a 2.5D level cannot afford.")]
+        public float depthSmoothTime = 0f;
 
         [Tooltip("Distance from this object's origin down to the feet, because the simulation " +
                  "tracks the feet. For the scaled capsule this is 0.9, half the body height.")]

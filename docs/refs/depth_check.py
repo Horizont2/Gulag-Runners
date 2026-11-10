@@ -30,6 +30,7 @@ ready to have it switched on: without a hatch there is no way to drop between st
 all, and this check has nothing to measure.
 """
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -270,6 +271,43 @@ def only_by_ladder(w, floors, problems, notes):
                     break
             x += 1.0
     notes.append(f"  {tried} jump(s) tried from along the storeys; none reached the one above")
+
+
+PREFABS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Prefabs")
+
+
+def drawn_depth(problems, notes):
+    """The DRAWN depth may not lag the simulated one.
+
+    This is the other half of "you jump on a cage and it slowly sucks you inside", and the
+    half that survived the first fix. The simulation moves the body onto the cage's slice in
+    the AIR now, in about a tenth of a second, so the lean is spent before the feet land --
+    and then PlayerController smooth-damped the DRAWING of it over another fifth of a
+    second. The drawn body therefore lands first and does most of the move afterwards, as a
+    slide across the cage floor: 1.66 m of it on the forest's hanging cages, at walking
+    speed, with nobody touching the stick. Which is being sucked into a cage.
+
+    Nothing about depth wants smoothing. The simulation bounds how fast it may change, and
+    the frames between ticks are interpolated like x and y, so a smoothing time is purely
+    the drawn body disagreeing with the body that collides.
+
+    Checked on the prefabs rather than in the scenes because that is where it lives, and
+    because it reached a build at 0.12 twice.
+    """
+    for name in ("Player 1.prefab", "Player 2.prefab"):
+        path = os.path.join(PREFABS, name)
+        if not os.path.exists(path):
+            continue
+        text = open(path, encoding="utf-8", errors="ignore").read()
+        for m in re.finditer(r"^  depthSmoothTime: ([-\d.eE+]+)", text, re.M):
+            if float(m.group(1)) > 0.001:
+                problems.append(
+                    f"{name}: depthSmoothTime is {m.group(1)}. The simulation finishes the "
+                    f"lean onto a prop in the air; smoothing the DRAWN depth lands first and "
+                    f"does the rest as a slide across the thing you landed on, which is "
+                    f"exactly the \"jumping on a cage slowly sucks you inside\" report. "
+                    f"Zero it -- depth is bounded in the simulation and interpolated between "
+                    f"ticks already.")
 
 
 def knocked_off_a_ladder(w, baked, problems, notes):
@@ -649,6 +687,7 @@ def main(argv):
     only_by_ladder(w, floors, problems, notes)
     off_a_perch(w, baked, problems, notes)
     knocked_off_a_ladder(w, baked, problems, notes)
+    drawn_depth(problems, notes)
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)
