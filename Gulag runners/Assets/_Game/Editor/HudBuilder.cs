@@ -349,10 +349,6 @@ namespace GulagRunners.GameEditor
         }
 
         /// <summary>
-        /// A soft square halo as a distance field, which is what a blur of a rounded
-        /// rectangle is anyway — and sharper, because it is computed rather than sampled.
-        /// </summary>
-        /// <summary>
         /// The off-screen cue: a thin arc, fading out at both ends.
         ///
         /// A circular segment whose chord is the full width and whose sagitta is the
@@ -395,6 +391,10 @@ namespace GulagRunners.GameEditor
             return tex;
         }
 
+        /// <summary>
+        /// A soft square halo as a distance field, which is what a blur of a rounded
+        /// rectangle is anyway — and sharper, because it is computed rather than sampled.
+        /// </summary>
         static Texture2D DrawGlow(int w, int h, int scale)
         {
             int W = w * scale, H = h * scale;

@@ -177,13 +177,55 @@ namespace GulagRunners.GameEditor
             _scale = MeasureScale();
         }
 
-        /// <summary>The last word of a key: "menu/bar/fill" is "fill".</summary>
-        static string Tail(string key) => key.Substring(key.LastIndexOf('/') + 1);
+        // ---------------------------------------------------------------- import
 
         /// <summary>
-        /// At what multiple of the design this folder came out, as the value the MOST
-        /// assets agree on. Not the mean: one frame Figma cropped tight to its stroke drags
-        /// a mean off, and surviving exactly that is what this exists for.
+        /// The import settings from HudBuilder, applied for you.
+        ///
+        /// Mip maps and compression are both off on purpose so thin lines stay crisp,
+        /// and pixels-per-unit is set from the measured export scale so nine-slice
+        /// borders draw at their designed size.
+        /// </summary>
+        Sprite Import(Asset asset)
+        {
+            if (!_found.TryGetValue(asset.Key, out string path)) return null;
+
+            TextureImporter imp = (TextureImporter)AssetImporter.GetAtPath(path);
+            if (imp == null) return null;
+
+            imp.textureType = TextureImporterType.Sprite;
+            imp.spriteImportMode = SpriteImportMode.Single;
+            // Never rounded to a power of two. A 1600x448 button stretched to 2048x512
+            // is not the art that was drawn, and it is the same setting that makes the
+            // export scale below unmeasurable.
+            imp.npotScale = TextureImporterNPOTScale.None;
+            imp.mipmapEnabled = false;
+            imp.filterMode = FilterMode.Bilinear;
+            imp.alphaIsTransparency = true;
+            imp.sRGBTexture = true;
+            imp.maxTextureSize = 2048;
+            imp.textureCompression = TextureImporterCompression.Uncompressed;
+            imp.wrapMode = TextureWrapMode.Clamp;
+
+            // A nine-slice border is quoted in TEXTURE pixels and uGUI divides it by
+            // spritePPU / canvasReferencePPU before drawing. Left at the default 100
+            // against the canvas's own 100 that divisor is 1, so a 5 px corner exported
+            // at 4x draws as a 20 UNIT corner -- which is what made the HUD look heavy
+            // for several passes before anybody found it.
+            imp.spritePixelsPerUnit = 100f * Mathf.Max(0.01f, _scale);
+
+            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * _scale;
+
+            imp.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
+        /// <summary>
+        /// At what multiple of the design this folder was exported.
+        ///
+        /// One number for the whole export, taken as the one the most assets AGREE on
+        /// rather than averaged: one frame Figma cropped tight to its stroke drags a mean
+        /// off, and surviving exactly that is what this exists for.
         /// </summary>
         float MeasureScale()
         {
@@ -194,7 +236,7 @@ namespace GulagRunners.GameEditor
                 Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
                 if (tex == null) continue;
 
-                float v = Mathf.Round(tex.width / a.W * 4f) / 4f;
+                float v = Mathf.Round(tex.width / a.W * 4f) / 4f;   // to the nearest quarter
                 if (v <= 0f) continue;
                 votes.TryGetValue(v, out int n);
                 votes[v] = n + 1;
@@ -207,42 +249,13 @@ namespace GulagRunners.GameEditor
             return best;
         }
 
-        Sprite Import(Asset asset)
-        {
-            if (!_found.TryGetValue(asset.Key, out string path)) return null;
-
-            TextureImporter imp = (TextureImporter)AssetImporter.GetAtPath(path);
-            if (imp == null) return null;
-
-            imp.textureType = TextureImporterType.Sprite;
-            imp.spriteImportMode = SpriteImportMode.Single;
-            // Never rounded to a power of two. A 1600x448 button stretched to 2048x512 is
-            // not the art that was drawn, and it is the same setting that made the scale
-            // unmeasurable above.
-            imp.npotScale = TextureImporterNPOTScale.None;
-            imp.mipmapEnabled = false;
-            imp.filterMode = FilterMode.Bilinear;
-            imp.alphaIsTransparency = true;
-            imp.sRGBTexture = true;
-            imp.maxTextureSize = 2048;
-            imp.textureCompression = TextureImporterCompression.Uncompressed;
-            imp.wrapMode = TextureWrapMode.Clamp;
-
-            // A nine-slice border is quoted in TEXTURE pixels and uGUI divides it by
-            // spritePPU / canvasReferencePPU before drawing. Left at the default 100
-            // against the canvas's own 100 that divisor is 1, so a 5 px corner exported at
-            // 4x draws as a 20 UNIT corner. That is what made the HUD look heavy for
-            // several passes before anybody found it.
-            imp.spritePixelsPerUnit = 100f * Mathf.Max(0.01f, _scale);
-            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * _scale;
-
-            imp.SaveAndReimport();
-            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
-        }
-
         /// <summary>The size a sprite actually is, in design units, or the design size.</summary>
         Vector2 Size(string key, float w, float h) =>
             _size.TryGetValue(key, out Vector2 v) ? v : new Vector2(w, h);
+
+        /// <summary>The short leaf name of an asset key (e.g. "menu/icon/coin" -> "coin").</summary>
+        static string Tail(string key) =>
+            string.IsNullOrEmpty(key) ? string.Empty : key.Substring(key.LastIndexOf('/') + 1);
 
         // ---------------------------------------------------------------- the build
 
@@ -696,6 +709,7 @@ namespace GulagRunners.GameEditor
 
             if (key != null && sprites.TryGetValue(key, out Sprite s)) image.sprite = s;
             image.type = sliced ? Image.Type.Sliced : Image.Type.Simple;
+            image.preserveAspect = false;
             image.raycastTarget = false;
             return image;
         }
