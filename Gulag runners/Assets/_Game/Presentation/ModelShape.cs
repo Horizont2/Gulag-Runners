@@ -119,6 +119,25 @@ namespace GulagRunners.Game
         public static bool Measure(GameObject root, out Grip grip)
         {
             grip = default;
+
+            // THE TIP IS A VERTEX, when the mesh will say where its vertices are.
+            //
+            // Everything below this is the box rule, and the box is why two weapons sat
+            // crooked in the hand. A box has six faces and the rule can only answer with
+            // one of them, so a model authored a few degrees off its own axis is gripped
+            // along the axis and hangs at that angle for the rest of the match: the pack's
+            // axe is 11 degrees off and its scythe 19. Worse, the reach is then measured
+            // along the axis rather than along the weapon, which is shorter by the cosine
+            // -- so the fit scales the model UP to compensate and the steel overshoots the
+            // hitbox it is supposed to BE. Measured on the pack: 125% of it on the axe.
+            //
+            // A vertex cloud has no such problem. The furthest point from the grip is the
+            // tip, wherever it is, and the line from the grip to it is what the simulation
+            // swings -- so pointing that line along the arm puts the drawn steel exactly
+            // where the blade is. The haft may then hang at whatever angle the model was
+            // authored with, which is what a real weapon does.
+            if (Tip(root, out grip)) return true;
+
             if (!Box(root, out Bounds box)) return false;
 
             Vector3 lo = box.min, hi = box.max;
@@ -151,6 +170,112 @@ namespace GulagRunners.Game
             grip.Across = size[wide];
             grip.Thick = size[thin];
             grip.Flat = grip.Across >= grip.Thick * ClearlyFlat ? Axis(thin) : Vector3.zero;
+            return true;
+        }
+
+        /// <summary>
+        /// The grip from the model's own vertices, or false when they cannot be read.
+        ///
+        /// Mesh data is only there when the importer was told to keep it (Read/Write), so
+        /// this is allowed to fail and the box rule above is what answers then. The eleven
+        /// weapons this game ships are marked readable; a pack dropped in tomorrow may not
+        /// be, and it will be gripped the blunter way rather than not at all.
+        /// </summary>
+        static bool Tip(GameObject root, out Grip grip)
+        {
+            grip = default;
+            if (root == null) return false;
+
+            Matrix4x4 toRoot = root.transform.worldToLocalMatrix;
+            Vector3 tip = Vector3.zero;
+            float far = 0f;
+            bool any = false;
+
+            foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Mesh mesh = mf.sharedMesh;
+                if (mesh == null || !mesh.isReadable) continue;
+
+                Matrix4x4 m = toRoot * mf.transform.localToWorldMatrix;
+                Vector3[] points = mesh.vertices;
+                for (int i = 0; i < points.Length; i++)
+                {
+                    Vector3 p = m.MultiplyPoint3x4(points[i]);
+                    float d = p.sqrMagnitude;
+                    if (d > far) { far = d; tip = p; }
+                    any = true;
+                }
+            }
+
+            if (!any || far <= 1e-8f) return false;
+
+            grip.Blade = tip.normalized;
+            grip.Reach = Mathf.Sqrt(far);
+
+            // And the rest of the shape, about that line: how far the butt hangs out the
+            // back of the hand, how wide it is across, and which way it is flat.
+            Vector3 blade = grip.Blade;
+            Vector3 u = Mathf.Abs(blade.x) < 0.9f
+                ? Vector3.Normalize(Vector3.Cross(blade, Vector3.right))
+                : Vector3.Normalize(Vector3.Cross(blade, Vector3.up));
+            Vector3 v = Vector3.Cross(blade, u);
+
+            float behind = 0f, uMin = 0f, uMax = 0f, vMin = 0f, vMax = 0f;
+            float uu = 0f, vv = 0f, uv = 0f;
+            int n = 0;
+
+            foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Mesh mesh = mf.sharedMesh;
+                if (mesh == null || !mesh.isReadable) continue;
+
+                Matrix4x4 m = toRoot * mf.transform.localToWorldMatrix;
+                Vector3[] points = mesh.vertices;
+                for (int i = 0; i < points.Length; i++)
+                {
+                    Vector3 p = m.MultiplyPoint3x4(points[i]);
+                    float along = Vector3.Dot(p, blade);
+                    if (-along > behind) behind = -along;
+
+                    float a = Vector3.Dot(p, u), b = Vector3.Dot(p, v);
+                    if (a < uMin) uMin = a;
+                    if (a > uMax) uMax = a;
+                    if (b < vMin) vMin = b;
+                    if (b > vMax) vMax = b;
+                    uu += a * a; vv += b * b; uv += a * b;
+                    n++;
+                }
+            }
+
+            grip.Behind = behind;
+            float wide = uMax - uMin, thin = vMax - vMin;
+            grip.Across = Mathf.Max(wide, thin);
+            grip.Thick = Mathf.Min(wide, thin);
+
+            // WHICH WAY IT IS FLAT, from the spread of the cloud rather than from the box.
+            //
+            // A sword's blade is a plane, and a plane authored at 20 degrees to the model's
+            // axes has a BOX that is nearly square -- so the box rule calls it round and
+            // leaves the roll to chance. The second moments do not care how the model was
+            // oriented: the smaller eigenvector of the two-by-two across the blade is the
+            // normal of the plane, whatever angle it sits at.
+            if (n > 0 && grip.Across >= grip.Thick * ClearlyFlat)
+            {
+                uu /= n; vv /= n; uv /= n;
+                float half = 0.5f * (uu + vv);
+                float diff = 0.5f * (uu - vv);
+                float r = Mathf.Sqrt(diff * diff + uv * uv);
+                float small = half - r;                      // the lesser eigenvalue
+
+                // Its eigenvector, taken the stable way: for a 2x2 the row that is not
+                // degenerate gives it, and uv == 0 means the axes are already the answer.
+                Vector2 e = Mathf.Abs(uv) > 1e-12f
+                    ? new Vector2(small - vv, uv).normalized
+                    : (uu <= vv ? new Vector2(1f, 0f) : new Vector2(0f, 1f));
+
+                grip.Flat = (u * e.x + v * e.y).normalized;
+            }
+
             return true;
         }
 
