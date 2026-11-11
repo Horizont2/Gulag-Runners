@@ -34,7 +34,7 @@ MonoBehaviour:
   - key: hud/slot/frame-dashed
     sprite: {fileID: 21300000, guid: 79d1081ceb60e804787de00e56d209ca, type: 3}
   - key: hud/slot/glow
-    sprite: {fileID: 21300000, guid: 906096623ac2b0844a11c940ee9beaf6, type: 3}
+    sprite: {fileID: 21300000, guid: 20b6a6114d647ae438efa364a8a9b5c9, type: 3}
   - key: hud/slot/swap-arrow
     sprite: {fileID: 21300000, guid: 4a54e9204dbbaee468422dff2e81db01, type: 3}
   - key: hud/bar/frame
