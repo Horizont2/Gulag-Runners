@@ -286,7 +286,10 @@ namespace GulagRunners.GameEditor
                 int bestScore = 0;
                 foreach (string path in paths)
                 {
-                    int score = Score(key, Path.GetFileNameWithoutExtension(path));
+                    string file = Path.GetFileNameWithoutExtension(path);
+                    if (!Agrees(key, file)) continue;
+
+                    int score = Score(key, file);
                     if (score > bestScore) { bestScore = score; best = path; }
                 }
 
@@ -303,20 +306,119 @@ namespace GulagRunners.GameEditor
         }
 
         /// <summary>
-        /// How well a filename answers to a key: how many of the key's own words it holds.
-        /// Two is the floor, so "frame" alone never wins a row that wanted "bar/frame".
+        /// Leaves that say nothing on their own. A file whose only agreement with a key is
+        /// one of these is a coincidence, not an answer.
+        ///
+        /// MEASURED ON THE REAL EXPORT, which is the only reason the list exists. The UI
+        /// folder holds Frames/BarFrame.png, and against "hud/slot/frame" that scores
+        /// exactly the floor of two -- the word "frame", counted twice for being the leaf --
+        /// while agreeing about nothing else: not the screen, not the piece. Pressing Fill
+        /// put the health bar's frame around the equipment slots, which is a wrong guess
+        /// that looks deliberate.
+        ///
+        /// A distinctive leaf still stands alone: PlayBackground.png wins
+        /// "menu/button/play" on the word "play" and should, because nothing else in the
+        /// folder is play-anything. The difference is not how many words matched, it is
+        /// whether the word that matched NARROWS anything.
+        /// </summary>
+        static readonly HashSet<string> Generic = new HashSet<string>
+        {
+            "frame", "fill", "background", "icon", "glow", "ring", "track", "plate",
+            "button", "arc", "panel", "dim", "divider", "knob", "scrim", "banner",
+            "source", "glyph", "primary", "secondary",
+        };
+
+        /// <summary>
+        /// Does this filename agree with the key about anything beyond a generic word?
+        ///
+        /// Either it matches a word that is not a generic leaf -- the screen, the group,
+        /// the piece -- or its leaf is distinctive enough to carry the match by itself.
+        /// </summary>
+        static bool Agrees(string key, string file)
+        {
+            List<string> words = Words(file);
+            List<string> leaf = Parts(Last(key));
+
+            foreach (string word in Parts(key))
+                if (!leaf.Contains(word) && words.Contains(word))
+                    return true;
+
+            foreach (string word in leaf)
+                if (!Generic.Contains(word) && words.Contains(word))
+                    return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// A filename as WORDS, not as a string to search inside.
+        ///
+        /// Contains() was the matcher's other wrong guess and the funnier one: "round" is
+        /// inside "backg-round", so BarBackground.png won the "menu/button/round" row by
+        /// spelling. Splitting on case and punctuation asks the question that was meant --
+        /// does the file NAME this thing -- rather than whether its letters happen to turn
+        /// up somewhere in the middle of another word.
+        /// </summary>
+        static List<string> Words(string file)
+        {
+            List<string> found = new List<string>();
+            string word = "";
+            for (int i = 0; i < file.Length; i++)
+            {
+                char c = file[i];
+                char before = i > 0 ? file[i - 1] : '\0';
+                char after = i + 1 < file.Length ? file[i + 1] : '\0';
+
+                // A word starts at a capital after a lower-case letter (BarFrame), at a
+                // capital that begins a capitalised word inside a run of capitals
+                // (EQFrame -> eq, frame), and wherever letters and digits meet
+                // (ring-154, FS002).
+                bool split = !char.IsLetterOrDigit(c)
+                             || (char.IsUpper(c) && char.IsLower(before))
+                             || (char.IsUpper(c) && char.IsUpper(before) && char.IsLower(after))
+                             || (char.IsDigit(c) && char.IsLetter(before))
+                             || (char.IsLetter(c) && char.IsDigit(before));
+
+                if (split && word.Length > 0) { found.Add(word.ToLowerInvariant()); word = ""; }
+                if (char.IsLetterOrDigit(c)) word += c;
+            }
+            if (word.Length > 0) found.Add(word.ToLowerInvariant());
+            return found;
+        }
+
+        /// <summary>A key as words: slashes and hyphens both separate.</summary>
+        static List<string> Parts(string key)
+        {
+            List<string> found = new List<string>();
+            foreach (string piece in key.ToLowerInvariant().Split('/'))
+                foreach (string word in piece.Split('-'))
+                    if (word.Length > 0) found.Add(word);
+            return found;
+        }
+
+        /// <summary>The last segment of a key: "hud/button/glyph-jump" is "glyph-jump".</summary>
+        static string Last(string key)
+        {
+            int at = key.LastIndexOf('/');
+            return at < 0 ? key : key.Substring(at + 1);
+        }
+
+        /// <summary>
+        /// How well a filename answers to a key: how many of the key's own words the file
+        /// NAMES. Two is the floor, so a single shared word never wins a row on its own.
         /// </summary>
         static int Score(string key, string file)
         {
-            string flat = file.ToLowerInvariant().Replace('_', '-').Replace(' ', '-');
-            string[] words = key.ToLowerInvariant().Split('/');
+            List<string> words = Words(file);
             int score = 0;
-            foreach (string word in words)
-                if (flat.Contains(word)) score++;
+            foreach (string word in Parts(key))
+                if (words.Contains(word)) score++;
 
             // The leaf is what the row is really called, so a file that has it counts
             // double -- "hud/bar/fill" against "bar-fill" beats it against "bar-frame".
-            if (flat.Contains(words[words.Length - 1])) score++;
+            foreach (string word in Parts(Last(key)))
+                if (words.Contains(word)) { score++; break; }
+
             return score;
         }
 
