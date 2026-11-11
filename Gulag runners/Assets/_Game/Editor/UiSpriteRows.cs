@@ -154,11 +154,19 @@ namespace GulagRunners.GameEditor
         }
 
         /// <summary>
-        /// The rows themselves. `needed` is the builder's own table: key, and the design
-        /// size to show beside it.
+        /// The rows themselves. `keys` is the builder's own table, `sizes` the design size
+        /// to show beside each one, and `notes` what the piece IS -- in English, under the
+        /// field, for whoever is filling the tool in.
+        ///
+        /// The note is not decoration. "hud/bar/fill" is obvious to the person who wrote
+        /// the builder and a guess to everybody else: is it the health bar or the stamina
+        /// bar, does it include the frame, is it drawn stretched or nine-sliced, and which
+        /// end does it empty from. Somebody dragging twenty-eight sprites in should not
+        /// have to open the source to find out, and a wrong guess here is a screen that
+        /// builds without complaint and looks wrong.
         /// </summary>
         public static void Rows(UiSpriteSet set, IList<string> keys, IList<Vector2> sizes,
-                                ref Vector2 scroll, float height = 300f)
+                                IList<string> notes, ref Vector2 scroll, float height = 360f)
         {
             if (set == null) return;
 
@@ -196,9 +204,23 @@ namespace GulagRunners.GameEditor
                 string label = Leaf(key);
                 string hint = size.x > 0f && size.y > 0f
                     ? $"{label}   ({size.x:0}x{size.y:0})" : label;
+                string note = notes != null && i < notes.Count ? notes[i] : null;
 
                 Sprite now = (Sprite)EditorGUILayout.ObjectField(
-                    new GUIContent(hint, key), was, typeof(Sprite), false);
+                    new GUIContent(hint, string.IsNullOrEmpty(note) ? key : $"{key}\n\n{note}"),
+                    was, typeof(Sprite), false);
+
+                if (!string.IsNullOrEmpty(note))
+                {
+                    // Under the field rather than only in the tooltip: a tooltip is found
+                    // by somebody who already suspects they need it.
+                    Rect line = EditorGUILayout.GetControlRect(
+                        false, EditorStyles.wordWrappedMiniLabel.CalcHeight(
+                            new GUIContent(note), EditorGUIUtility.currentViewWidth - 40f));
+                    line.xMin += EditorGUIUtility.labelWidth;
+                    GUI.Label(line, note, EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.Space(2);
+                }
 
                 if (now != was) set.Put(key, now);
             }

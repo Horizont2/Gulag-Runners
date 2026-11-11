@@ -52,6 +52,18 @@ FIGHT_WIDTH = 2.0
 # of the fight plane is a bar at the fighters' feet; six metres is the floor of a room.
 LINE_DEPTH = 1.5
 
+# And how LOUD it may be. The report after the line was thinned was "make it less
+# eye-catching, so it looks like part of the game" -- and the numbers behind that feeling
+# are the two below.
+#
+# Alpha, because a surface you cannot see through is not a surface: at 0.85 the line is a
+# painted strip lying on the arena, at 0.40 it is the top of something the stone continues
+# through. And emission against the arena's own bloom threshold, which is 1.0: any channel
+# at or over it is a strip the bloom then smears across the screen -- a marker drawn over
+# the game rather than a thing in it.
+LINE_ALPHA = 0.60
+LINE_EMISSION = 0.60
+
 # And a bar for somewhere to STAND, which is a different question and a much lower one. The
 # body is 0.30 m wide, so two body widths is a ledge two people can be on; the hanging cages
 # of Arena_Forest are 0.68 m across and are deliberately the last ground left. A check that
@@ -291,6 +303,53 @@ def floors(baked, min_width):
     return sorted(out)
 
 
+def material_of(docs, transform):
+    """The material on the waterline, as (name, alpha, brightest emission channel, on?).
+
+    Read from the ASSET rather than from the scene, because a material is a file and the
+    scene only points at it -- and the one thing worth knowing about this one is how loud
+    it is.
+    """
+    owner = None
+    for fid, (cls, body) in sorted(docs.items()):
+        if cls == 4 and fid == transform:
+            m = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+            owner = int(m.group(1)) if m else None
+    if owner is None:
+        return None
+
+    guid = None
+    for fid, (cls, body) in sorted(docs.items()):
+        if cls != 23:
+            continue
+        m = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        if not m or int(m.group(1)) != owner:
+            continue
+        g = re.search(r"- \{fileID: \d+, guid: (\w+), type: 2\}", body)
+        guid = g.group(1) if g else None
+
+    if guid is None:
+        return None
+
+    for base, _dirs, files in os.walk(os.path.join(ASSETS, "_Game", "Materials")):
+        for f in files:
+            if not f.endswith(".mat.meta"):
+                continue
+            text = open(os.path.join(base, f), encoding="utf-8", errors="replace").read()
+            if guid not in text:
+                continue
+            mat = open(os.path.join(base, f[:-5]), encoding="utf-8",
+                       errors="replace").read()
+            a = re.search(r"- _BaseColor: \{r: [-\d.eE+]+, g: [-\d.eE+]+, "
+                          r"b: [-\d.eE+]+, a: ([-\d.eE+]+)\}", mat)
+            e = re.search(r"- _EmissionColor: \{r: ([-\d.eE+]+), g: ([-\d.eE+]+), "
+                          r"b: ([-\d.eE+]+), a: [-\d.eE+]+\}", mat)
+            on = "_EMISSION" in mat
+            return (f[:-9], float(a.group(1)) if a else 1.0,
+                    max(float(v) for v in e.groups()) if e else 0.0, on)
+    return None
+
+
 def main(argv):
     only = None
     if "--scene" in argv:
@@ -439,6 +498,26 @@ def main(argv):
                     f"{scene}: the waterline sits at z {spos[2]:+.1f} and is {deep:.1f} m "
                     f"deep, so it misses the fight plane at z 0 entirely -- a bright line "
                     f"somewhere behind or in front of the only depth anybody is standing at.")
+
+        # --- and how loud the line is
+        surface_mat = material_of(docs, p["surface"]) if p["surface"] else None
+        if surface_mat:
+            name, alpha, emission, emitting = surface_mat
+            notes.append(f"  the line wears {name}: alpha {alpha:.2f}"
+                         + (f", emission {emission:.2f}" if emitting else ", no emission"))
+            if alpha > LINE_ALPHA:
+                problems.append(
+                    f"{scene}: the waterline is {alpha * 100:.0f}% opaque ({name}). That is "
+                    f"a painted strip lying on the arena rather than the top of something: "
+                    f"the stone has to carry on through it. Keep it under "
+                    f"{LINE_ALPHA * 100:.0f}%.")
+            if emitting and emission > LINE_EMISSION:
+                problems.append(
+                    f"{scene}: the waterline's emission is {emission:.2f} ({name}) against "
+                    f"an arena bloom threshold of 1.0, so the line is smeared across the "
+                    f"screen by the bloom and reads as a marker drawn over the game. The "
+                    f"smoke and the three lights are what it should read from; keep this "
+                    f"under {LINE_EMISSION:.2f}.")
 
         # --- and the cube's own collider
         solid = colliders_under(docs, p["body"]) + colliders_under(docs, p["owner"])
