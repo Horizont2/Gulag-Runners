@@ -380,8 +380,22 @@ def main():
     text = "".join(out)
 
     # ---------------------------------------------------------------- Egyptian stone
-    text = text.replace("guid: bdca320f74588434f875e8e66dbaba74",
-                        f"guid: {EGYPT_STONE}")
+    #
+    # By the REFERENCE, not by the guid. The mine's posts wear a material that lives
+    # INSIDE Sword_WallMount.fbx -- {fileID: 5653053145819516872, guid: bdca..., type: 3}
+    # -- and this was a bare `replace("guid: bdca...", EGYPT_STONE)`, which left that
+    # sub-object id pointing into a .mat file that holds exactly one object, 2100000. A
+    # reference to an id an asset does not have is a MISSING material: twelve CageLeft
+    # renderers and twelve prefab instances drawn in Unity's default grey. The same two
+    # words also hit Dawid's own two Sword_WallMount instances, whose m_SourcePrefab
+    # carries that guid, and turned them into prefab instances of a material -- which
+    # Unity cannot load, so his pair of wall swords left the level and no check said so.
+    # repair_egypt_stone.py fixes the scene this built before the rule was corrected.
+    text = text.replace(
+        "fileID: 5653053145819516872, guid: bdca320f74588434f875e8e66dbaba74, type: 3",
+        f"fileID: 2100000, guid: {EGYPT_STONE}, type: 2")
+    # The mine's floor material is a .mat of its own, always referenced as 2100000/type 2,
+    # so this one is a straight swap.
     text = text.replace("guid: 9ae1d73fdebd4f04f971f7144044b8c3",
                         f"guid: {EGYPT_GROUND}")
 
