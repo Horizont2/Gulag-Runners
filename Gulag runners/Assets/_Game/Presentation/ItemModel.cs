@@ -266,13 +266,7 @@ namespace GulagRunners.Game
         /// a glance on a phone, in the order every player already knows, and none of them
         /// the colour of the arena's own cold green-grey fog.
         /// </summary>
-        public static Color[] DefaultPalette() => new[]
-        {
-            new Color(0.40f, 0.42f, 0.45f),      // nothing in the slot: grey, barely lit
-            new Color(0.25f, 0.90f, 0.35f),      // common    — green
-            new Color(0.20f, 0.55f, 1.00f),      // rare      — blue
-            new Color(0.70f, 0.25f, 1.00f)       // legendary — violet
-        };
+        public static Color[] DefaultPalette() => UiPalette.Ramp();
 
         /// <summary>
         /// Puts the tier on a renderer without instantiating a material for it.

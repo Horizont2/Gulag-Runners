@@ -45,6 +45,7 @@ namespace GulagRunners.GameEditor
         // Dragged in, not scanned for: see UiSpriteSet.
         UiSpriteSet _set;
         Vector2 _scroll;
+        bool _onlyEmpty;
 
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
         readonly Dictionary<string, Vector2> _size = new Dictionary<string, Vector2>();
@@ -132,7 +133,8 @@ namespace GulagRunners.GameEditor
 
             if (_set != null)
             {
-                UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll, 260f);
+                UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll,
+                                  ref _onlyEmpty, 260f);
                 UiSpriteRows.FolderFill(_set, keys, ref _folderOpen, ref _folder);
             }
 
@@ -511,7 +513,7 @@ namespace GulagRunners.GameEditor
                 i.raycastTarget = false;
                 i.preserveAspect = false;
                 i.type = Image.Type.Simple;
-                i.color = new Color(1f, 1f, 1f, 1f);
+                i.color = UiPalette.Ink;
                 i.enabled = false;         // nothing to show until stills are dropped in
             }
 
@@ -559,13 +561,13 @@ namespace GulagRunners.GameEditor
                                     ring.x, ring.y, 1f, 0f);
             Image face = Picture(rt.gameObject, sprites, "search/button/close");
             face.raycastTarget = true;
-            face.color = new Color(1f, 1f, 1f, 0.45f);
+            face.color = UiPalette.Fade(UiPalette.Ink, 0.5f);
 
             Vector2 cross = Size("search/icon/close", 20, 20);
             Vector2 inset = (ring - cross) * 0.5f;
             RectTransform g = Make("Glyph", rt, inset.x, inset.y, cross.x, cross.y, 0f, 0f);
             Picture(g.gameObject, sprites, "search/icon/close").color =
-                new Color(1f, 1f, 1f, 0.8f);
+                UiPalette.Ink;
 
             Button button = Undo.AddComponent<Button>(rt.gameObject);
             button.targetGraphic = face;
@@ -597,11 +599,11 @@ namespace GulagRunners.GameEditor
             RectTransform track = Make("Bar", screen, (DesignW - barW) * 0.5f, 772,
                                        barW, bar.y, 0.5f, 0f);
             Picture(track.gameObject, sprites, "search/bar/track").color =
-                new Color(1f, 1f, 1f, 0.18f);
+                UiPalette.Fade(UiPalette.Ink, 0.2f);
 
             RectTransform fill = Make("Fill", track, 0, 0, barW, bar.y, 0f, 0f);
             Picture(fill.gameObject, sprites, "search/bar/fill").color =
-                new Color(1f, 1f, 1f, 0.92f);
+                UiPalette.Ink;
 
             MenuBar menuBar = Undo.AddComponent<MenuBar>(track.gameObject);
             menuBar.fill = fill;
@@ -702,7 +704,7 @@ namespace GulagRunners.GameEditor
 
         static void Dark(Image image, float alpha)
         {
-            image.color = new Color(0f, 0f, 0f, alpha);
+            image.color = UiPalette.Fade(UiPalette.Scrim, alpha / 0.8f);
         }
 
         static void EnsureEventSystem()

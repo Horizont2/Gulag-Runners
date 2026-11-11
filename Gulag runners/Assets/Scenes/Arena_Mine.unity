@@ -127614,9 +127614,9 @@ MonoBehaviour:
   - {fileID: 960000595}
   tierColours:
   - {r: 0.4, g: 0.42, b: 0.45, a: 1}
-  - {r: 0.25, g: 0.9, b: 0.35, a: 1}
-  - {r: 0.2, g: 0.55, b: 1, a: 1}
-  - {r: 0.7, g: 0.25, b: 1, a: 1}
+  - {r: 0.74, g: 0.78, b: 0.8, a: 1}
+  - {r: 0.3, g: 0.78, b: 0.98, a: 1}
+  - {r: 0.72, g: 0.3, b: 1, a: 1}
   glow: 0.5
   logChanges: 0
 --- !u!1 &960000526
@@ -130020,18 +130020,18 @@ MonoBehaviour:
   palette:
     self: {r: 0.28, g: 0.6, b: 1, a: 1}
     enemy: {r: 0.82, g: 0.18, b: 0.22, a: 1}
-    line: {r: 1, g: 1, b: 1, a: 0.8}
+    line: {r: 0.91, g: 0.93, b: 0.96, a: 0.85}
     disabledAlpha: 0.28
     spentAlpha: 0.28
-    common: {r: 0.25, g: 0.9, b: 0.35, a: 1}
-    rare: {r: 0.2, g: 0.55, b: 1, a: 1}
-    legendary: {r: 0.7, g: 0.25, b: 1, a: 1}
+    common: {r: 0.74, g: 0.78, b: 0.8, a: 1}
+    rare: {r: 0.3, g: 0.78, b: 0.98, a: 1}
+    legendary: {r: 0.72, g: 0.3, b: 1, a: 1}
     empty: {r: 0.4, g: 0.42, b: 0.45, a: 1}
-    attackGlyph: {r: 0.95, g: 0.33, b: 0.28, a: 1}
-    blockGlyph: {r: 0.38, g: 0.66, b: 1, a: 1}
-    actionGlyph: {r: 1, g: 0.82, b: 0.42, a: 1}
-    jumpGlyph: {r: 0.52, g: 0.88, b: 0.55, a: 1}
-    danger: {r: 1, g: 0.25, b: 0.2, a: 1}
+    attackGlyph: {r: 0.95, g: 0.35, b: 0.26, a: 1}
+    blockGlyph: {r: 0.4, g: 0.68, b: 1, a: 1}
+    actionGlyph: {r: 0.93, g: 0.84, b: 0.62, a: 1}
+    jumpGlyph: {r: 0.55, g: 0.86, b: 0.96, a: 1}
+    danger: {r: 1, g: 0.27, b: 0.22, a: 1}
   bar1:
     frame: {fileID: 960000489}
     fill: {fileID: 960000750}
@@ -131961,9 +131961,9 @@ MonoBehaviour:
   - {fileID: 960000587}
   tierColours:
   - {r: 0.4, g: 0.42, b: 0.45, a: 1}
-  - {r: 0.25, g: 0.9, b: 0.35, a: 1}
-  - {r: 0.2, g: 0.55, b: 1, a: 1}
-  - {r: 0.7, g: 0.25, b: 1, a: 1}
+  - {r: 0.74, g: 0.78, b: 0.8, a: 1}
+  - {r: 0.3, g: 0.78, b: 0.98, a: 1}
+  - {r: 0.72, g: 0.3, b: 1, a: 1}
   glow: 0.5
   logChanges: 0
 --- !u!1 &960000730

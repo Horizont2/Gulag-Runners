@@ -48,6 +48,7 @@ namespace GulagRunners.GameEditor
         // wrong on every one after it.
         UiSpriteSet _set;
         Vector2 _scroll;
+        bool _onlyEmpty;
         float _scale = 1f;
         float _readoutScale = 1f;
         float _buttonScale = 1f;
@@ -172,7 +173,8 @@ namespace GulagRunners.GameEditor
             _set = UiSpriteRows.Field(_set, "Menu Sprites", keys);
             if (_set == null) return;
 
-            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll, 300f);
+            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll,
+                              ref _onlyEmpty, 300f);
 
             EditorGUILayout.Space();
             _font = (Font)EditorGUILayout.ObjectField(
@@ -528,7 +530,9 @@ namespace GulagRunners.GameEditor
         }
 
         /// <summary>The one coloured thing on the screen besides PLAY.</summary>
-        static readonly Color Gold = new Color(0.91f, 0.64f, 0.24f);
+        // One amber for the whole game, from UiPalette: the menu used to carry its
+        // own (0.91, 0.64, 0.24) and the HUD's action glyph a third one.
+        static readonly Color Gold = UiPalette.Amber;
 
         /// <summary>Whatever was dropped in, or the one font that is always there.</summary>
         Font Face => _font != null
@@ -591,7 +595,7 @@ namespace GulagRunners.GameEditor
             t.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _readoutScale));
             t.alignment = TextAnchor.MiddleRight;
             t.raycastTarget = false;
-            t.color = new Color(1f, 1f, 1f, 0.92f);
+            t.color = UiPalette.Ink;
             t.font = Face;
             t.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -631,12 +635,12 @@ namespace GulagRunners.GameEditor
                                     648, play.x, play.y, 1f, 1f, _buttonScale);
             Image face = Picture(rt.gameObject, sprites, "menu/button/play", true);
             // The only coloured thing on the screen, and the one the eye has to find first.
-            face.color = new Color(0.91f, 0.64f, 0.24f);
+            face.color = UiPalette.Amber;
             face.raycastTarget = true;
 
             RectTransform wordRt = Make("PLAY", rt, 0, 0, play.x, play.y, 0f, 0f, _buttonScale);
             Text word = TextOn(wordRt, "PLAY", "Bold", 52, TextAnchor.MiddleCenter);
-            word.color = new Color(0.09f, 0.07f, 0.05f);
+            word.color = UiPalette.InkOnAmber;
 
             Button button = Undo.AddComponent<Button>(rt.gameObject);
             button.targetGraphic = face;
@@ -647,7 +651,7 @@ namespace GulagRunners.GameEditor
             RectTransform modeRt = Make("Mode", block, DesignW - 64 - 300, 648 + play.y + 10,
                                         300, 28, 1f, 1f, _buttonScale);
             Text mode = TextOn(modeRt, "MEDIEVAL", "Regular", 20, TextAnchor.MiddleRight);
-            mode.color = new Color(1f, 1f, 1f, 0.55f);
+            mode.color = UiPalette.InkSoft;
         }
 
         void BuildCorner(Transform root, Dictionary<string, Sprite> sprites, MenuUI view,
@@ -760,7 +764,7 @@ namespace GulagRunners.GameEditor
             t.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _readoutScale));
             t.alignment = align;
             t.raycastTarget = false;
-            t.color = new Color(1f, 1f, 1f, 0.92f);
+            t.color = UiPalette.Ink;
             t.font = Face;
             t.fontStyle = style == "Bold" || style == "Semi Bold" ? FontStyle.Bold : FontStyle.Normal;
             return t;

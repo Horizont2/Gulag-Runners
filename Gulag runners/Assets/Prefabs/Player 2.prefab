@@ -247,9 +247,9 @@ MonoBehaviour:
   fallbackLength: 0.3
   tierColours:
   - {r: 0.4, g: 0.42, b: 0.45, a: 1}
-  - {r: 0.25, g: 0.9, b: 0.35, a: 1}
-  - {r: 0.2, g: 0.55, b: 1, a: 1}
-  - {r: 0.7, g: 0.25, b: 1, a: 1}
+  - {r: 0.74, g: 0.78, b: 0.8, a: 1}
+  - {r: 0.3, g: 0.78, b: 0.98, a: 1}
+  - {r: 0.72, g: 0.3, b: 1, a: 1}
   glow: 0.15
   wornAt: 3
   wornColour: {r: 1, g: 0.25, b: 0.2, a: 1}

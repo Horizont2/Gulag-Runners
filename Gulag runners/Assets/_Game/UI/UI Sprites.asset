@@ -1,0 +1,129 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b200c6401b54646802321c0d4b7c229, type: 3}
+  m_Name: UI Sprites
+  m_EditorClassIdentifier: Assembly-CSharp-Editor::GulagRunners.GameEditor.UiSpriteSet
+  slots:
+  - key: hud/slot/frame
+    sprite: {fileID: 21300000, guid: 4b67f34bfa4228349a5b589c16fc377f, type: 3}
+  - key: hud/slot/frame-dashed
+    sprite: {fileID: 21300000, guid: 79d1081ceb60e804787de00e56d209ca, type: 3}
+  - key: hud/slot/glow
+    sprite: {fileID: 21300000, guid: 906096623ac2b0844a11c940ee9beaf6, type: 3}
+  - key: hud/slot/swap-arrow
+    sprite: {fileID: 21300000, guid: 4a54e9204dbbaee468422dff2e81db01, type: 3}
+  - key: hud/bar/frame
+    sprite: {fileID: 21300000, guid: c7ed3141282380a4d87780d881a89652, type: 3}
+  - key: hud/bar/fill
+    sprite: {fileID: 21300000, guid: 2475045443bd4cf498e35659ae0d85f0, type: 3}
+  - key: hud/pip
+    sprite: {fileID: 21300000, guid: 19cde3ad3a449f24782b3cb0a1ad6c91, type: 3}
+  - key: hud/button/ring-154
+    sprite: {fileID: 21300000, guid: a672385e0ea0be34b9d54cd6aa0b66f1, type: 3}
+  - key: hud/button/ring-130
+    sprite: {fileID: 21300000, guid: 86adfb26d13560d4d9d3d7a9b8167e16, type: 3}
+  - key: hud/button/ring-101
+    sprite: {fileID: 21300000, guid: b239b6041cb7d8245b3176ccc7f20a53, type: 3}
+  - key: hud/button/glyph-block
+    sprite: {fileID: 21300000, guid: 4f3a09fe590795a4eb525693c36a9571, type: 3}
+  - key: hud/button/glyph-action
+    sprite: {fileID: 21300000, guid: 4559a75408767ae40a064314d8aba4f1, type: 3}
+  - key: hud/button/glyph-jump
+    sprite: {fileID: 21300000, guid: 74844f83a83638e48bd8094a7e9f2ff7, type: 3}
+  - key: hud/joystick/ring
+    sprite: {fileID: 21300000, guid: 6668b94d0b7b4964da77508dee20b2fd, type: 3}
+  - key: hud/joystick/knob
+    sprite: {fileID: 21300000, guid: fac69a125f635da48824eeef31512cf7, type: 3}
+  - key: hud/sound/arc
+    sprite: {fileID: 21300000, guid: 0954569104bae6c4b8a520d85d1b1909, type: 3}
+  - key: hud/sound/source-chest
+    sprite: {fileID: 21300000, guid: 3efd970accc61974abf4dd5b20e62b00, type: 3}
+  - key: hud/icon/coif
+    sprite: {fileID: 21300000, guid: abc34731378c63d40a5fbbe216b0979a, type: 3}
+  - key: hud/icon/great-helm
+    sprite: {fileID: 21300000, guid: 2e96ebb0aa5c7db4891fcda6cb74858a, type: 3}
+  - key: hud/icon/chainmail
+    sprite: {fileID: 21300000, guid: cf3243c276c605340bb2c4a50e57d0d9, type: 3}
+  - key: hud/icon/plate
+    sprite: {fileID: 21300000, guid: 050356d265257a34b89d1172ab73ec0f, type: 3}
+  - key: hud/icon/club
+    sprite: {fileID: 21300000, guid: 2c7fd7614874178469e72b8e819bef30, type: 3}
+  - key: hud/icon/sword
+    sprite: {fileID: 21300000, guid: 678898500d015a643b2f7f9fcefb9948, type: 3}
+  - key: hud/icon/belt
+    sprite: {fileID: 21300000, guid: 6abeb512365068b408ea70eccbb86445, type: 3}
+  - key: hud/icon/bandage
+    sprite: {fileID: 21300000, guid: 3c2e28e0951c62a40a52f5501f3ed39b, type: 3}
+  - key: hud/mannequin
+    sprite: {fileID: 21300000, guid: 4d6107d01f674be4f9be22cc18b4f8d0, type: 3}
+  - key: hud/leaders
+    sprite: {fileID: 21300000, guid: 72a58c351aae6564a9494989b4f8f357, type: 3}
+  - key: hud/leaders-mirrored
+    sprite: {fileID: 21300000, guid: a2c1a606f6c881c45b67999edc64b864, type: 3}
+  - key: menu/icon/shield
+    sprite: {fileID: 21300000, guid: d2b49eddde78e75489e5d5379dbf84b4, type: 3}
+  - key: menu/icon/coin
+    sprite: {fileID: 21300000, guid: b53a204fb358a24438b065d341471fb9, type: 3}
+  - key: menu/icon/contract
+    sprite: {fileID: 21300000, guid: 84a4276679c8c3244aa4bd0c1df81421, type: 3}
+  - key: menu/icon/gear
+    sprite: {fileID: 21300000, guid: 250fa280434a44e4fa96a28390a38bce, type: 3}
+  - key: menu/icon/people
+    sprite: {fileID: 21300000, guid: da6c41c465669674c883a44406064f24, type: 3}
+  - key: menu/rank/bronze
+    sprite: {fileID: 21300000, guid: d621483ed67eb094a9fe6f42326ecb14, type: 3}
+  - key: menu/rank/silver
+    sprite: {fileID: 21300000, guid: 7bd20d72baa094849877e660300e58e7, type: 3}
+  - key: menu/rank/gold
+    sprite: {fileID: 21300000, guid: 079aa6d1e6148a044abe245ed980a918, type: 3}
+  - key: menu/rank/platinum
+    sprite: {fileID: 21300000, guid: 59f8ad89dc5489c4e849bbef2aefd0b4, type: 3}
+  - key: menu/rank/diamond
+    sprite: {fileID: 21300000, guid: 950973f82d48211488cfe13d1e2c3bdb, type: 3}
+  - key: menu/rank/runner
+    sprite: {fileID: 21300000, guid: 9a19d4780ded55f4abc07c3a72fdf040, type: 3}
+  - key: menu/bar/track
+    sprite: {fileID: 21300000, guid: bad750045aade3845b57afea3687d5c7, type: 3}
+  - key: menu/bar/fill
+    sprite: {fileID: 21300000, guid: 2475045443bd4cf498e35659ae0d85f0, type: 3}
+  - key: menu/plate
+    sprite: {fileID: 21300000, guid: 10d0606dbc390594585f1e7edf0586bf, type: 3}
+  - key: menu/button/play
+    sprite: {fileID: 21300000, guid: a7bd136559e729f419772635e8104f93, type: 3}
+  - key: menu/button/round
+    sprite: {fileID: 21300000, guid: 433039ae148eb3f4dbaceb5359d19c6e, type: 3}
+  - key: search/button/close
+    sprite: {fileID: 21300000, guid: a73b765bdcc8f6440bed4856e30b8ccf, type: 3}
+  - key: search/icon/close
+    sprite: {fileID: 21300000, guid: d1eb9362c06a40f41bf0ef982c02b1db, type: 3}
+  - key: search/bar/track
+    sprite: {fileID: 21300000, guid: bad750045aade3845b57afea3687d5c7, type: 3}
+  - key: search/bar/fill
+    sprite: {fileID: 21300000, guid: 2475045443bd4cf498e35659ae0d85f0, type: 3}
+  - key: search/scrim
+    sprite: {fileID: 21300000, guid: 09a64ec4f9ffbd74e8e7b364060c80fa, type: 3}
+  - key: result/dim
+    sprite: {fileID: 0}
+  - key: result/panel
+    sprite: {fileID: 21300000, guid: ccfd10ed64e6a804983f51301bea9740, type: 3}
+  - key: result/banner
+    sprite: {fileID: 0}
+  - key: result/divider
+    sprite: {fileID: 21300000, guid: 2d495a82650083a488d5c83456a9795b, type: 3}
+  - key: result/button/primary
+    sprite: {fileID: 21300000, guid: 8aba4fb2671613b45af61fe42c12ad07, type: 3}
+  - key: result/button/secondary
+    sprite: {fileID: 21300000, guid: 8aba4fb2671613b45af61fe42c12ad07, type: 3}
+  - key: result/icon/gold
+    sprite: {fileID: 21300000, guid: b53a204fb358a24438b065d341471fb9, type: 3}
+  - key: result/icon/league
+    sprite: {fileID: 21300000, guid: d2b49eddde78e75489e5d5379dbf84b4, type: 3}

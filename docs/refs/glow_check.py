@@ -254,10 +254,21 @@ def main():
     # ---- one ramp, everywhere. A chest and the item that comes out of it may not have
     # two ideas of what "rare" looks like, and the serialised arrays in prefabs and scenes
     # are a copy of the C# default that nothing keeps honest.
-    want = [tuple(round(float(v), 3) for v in m)
-            for m in re.findall(r"new Color\(([\d.]+)f, ([\d.]+)f, ([\d.]+)f\)",
-                                re.search(r"DefaultPalette\(\)(.*?)\};", models,
-                                          re.S).group(1))]
+    # THE RAMP MOVED, and this is where it is read from now: UiPalette, the one place the
+    # interface's colours live. ItemModel.DefaultPalette() returns UiPalette.Ramp(), so
+    # reading the C# literals out of ItemModel finds nothing at all -- which this check
+    # discovered by crashing rather than by saying so, and is the reason it now says so.
+    palette = read(os.path.join(GAME, "Presentation", "UiPalette.cs"))
+    want = []
+    for name in ("Empty", "Common", "Rare", "Legendary"):
+        m = re.search(r"public static readonly Color " + name +
+                      r" = new Color\(([\d.]+)f, ([\d.]+)f, ([\d.]+)f", palette)
+        if m is None:
+            problems.append(f"UiPalette has no {name} any more, so there is no ramp to "
+                            f"keep the prefabs and scenes in step with.")
+            want = []
+            break
+        want.append(tuple(round(float(v), 3) for v in m.groups()))
     for folder in ("Prefabs", "Scenes", "_Game"):
         root = os.path.join(ASSETS, folder)
         for dirpath, _, files in os.walk(root):

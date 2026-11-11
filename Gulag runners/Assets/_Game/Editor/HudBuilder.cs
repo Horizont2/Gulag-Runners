@@ -41,6 +41,7 @@ namespace GulagRunners.GameEditor
         Object _folder;              // optional, and only ever fills rows that are empty
         bool _folderOpen;
         Vector2 _scroll;
+        bool _onlyEmpty;
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
 
         // What multiple of the design this export came out at, and the size each sprite
@@ -259,7 +260,8 @@ namespace GulagRunners.GameEditor
             _set = UiSpriteRows.Field(_set, "HUD Sprites", keys);
             if (_set == null) return;
 
-            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll);
+            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll,
+                              ref _onlyEmpty);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Size on screen", EditorStyles.boldLabel);

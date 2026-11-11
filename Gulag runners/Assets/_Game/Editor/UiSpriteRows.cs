@@ -166,7 +166,8 @@ namespace GulagRunners.GameEditor
         /// builds without complaint and looks wrong.
         /// </summary>
         public static void Rows(UiSpriteSet set, IList<string> keys, IList<Vector2> sizes,
-                                IList<string> notes, ref Vector2 scroll, float height = 360f)
+                                IList<string> notes, ref Vector2 scroll, ref bool onlyEmpty,
+                                float height = 360f)
         {
             if (set == null) return;
 
@@ -176,6 +177,15 @@ namespace GulagRunners.GameEditor
             {
                 EditorGUILayout.LabelField($"{filled} of {keys.Count} filled in",
                                            EditorStyles.miniBoldLabel);
+
+                // The one question somebody filling this in actually has: what is LEFT.
+                // With most of the rows already carrying art, scrolling past them to find
+                // the empty ones is the whole of the work.
+                onlyEmpty = GUILayout.Toggle(
+                    onlyEmpty, new GUIContent($"Only what is missing ({keys.Count - filled})",
+                                              "Hide every row that already has a sprite."),
+                    EditorStyles.miniButton, GUILayout.Width(170));
+
                 if (GUILayout.Button("List what this screen needs", GUILayout.Width(190)))
                 {
                     int added = set.Sync(keys);
@@ -185,21 +195,42 @@ namespace GulagRunners.GameEditor
                 }
             }
 
+            if (onlyEmpty && filled == keys.Count)
+                EditorGUILayout.LabelField(
+                    "Every row on this screen has a sprite in it.",
+                    EditorStyles.wordWrappedMiniLabel);
+
             scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.Height(height));
 
             string group = null;
             for (int i = 0; i < keys.Count; i++)
             {
                 string key = keys[i];
+                Sprite was = set.Get(key);
+                if (onlyEmpty && was != null) continue;
+
                 string head = Group(key);
                 if (head != group)
                 {
                     group = head;
+
+                    // With the count, so a heading answers "is this part done" without
+                    // reading the rows under it.
+                    int whole = 0, got = 0;
+                    for (int j = 0; j < keys.Count; j++)
+                    {
+                        if (Group(keys[j]) != head) continue;
+                        whole++;
+                        if (set.Has(keys[j])) got++;
+                    }
+
                     EditorGUILayout.Space(4);
-                    EditorGUILayout.LabelField(head, EditorStyles.miniBoldLabel);
+                    EditorGUILayout.LabelField(
+                        got == whole ? $"{head}   —   all {whole}"
+                                     : $"{head}   —   {got} of {whole}",
+                        EditorStyles.miniBoldLabel);
                 }
 
-                Sprite was = set.Get(key);
                 Vector2 size = i < sizes.Count ? sizes[i] : Vector2.zero;
                 string label = Leaf(key);
                 string hint = size.x > 0f && size.y > 0f
@@ -236,12 +267,21 @@ namespace GulagRunners.GameEditor
             // Anything in the set this screen has no row for. Shown rather than hidden: a
             // key renamed in the builder leaves its sprite here, and this is the only
             // place that says so.
+            //
+            // ANOTHER SCREEN'S ROWS ARE NOT THAT. One set now holds the whole interface --
+            // 57 rows across four tools, which is what makes "the tools open already
+            // filled in" one file rather than four -- so without this the HUD window ends
+            // with twenty-nine lines of menu and search and result keys under a heading
+            // that reads like a warning. What is worth warning about is a key NOBODY asks
+            // for: that is a renamed row with somebody's sprite still in it.
+            string mine = keys.Count > 0 ? Screen(keys[0]) : null;
             bool said = false;
             for (int i = 0; i < set.slots.Count; i++)
             {
                 UiSpriteSet.Slot slot = set.slots[i];
                 if (slot == null || string.IsNullOrEmpty(slot.key) || keys.Contains(slot.key))
                     continue;
+                if (mine != null && Screen(slot.key) != mine) continue;
                 if (!said)
                 {
                     said = true;
@@ -420,6 +460,16 @@ namespace GulagRunners.GameEditor
                 if (words.Contains(word)) { score++; break; }
 
             return score;
+        }
+
+        /// <summary>
+        /// Which screen a key belongs to: the first segment, which every builder's rows
+        /// share and no two builders share with each other.
+        /// </summary>
+        static string Screen(string key)
+        {
+            int at = key.IndexOf('/');
+            return at < 0 ? key : key.Substring(0, at);
         }
 
         static string Group(string key)

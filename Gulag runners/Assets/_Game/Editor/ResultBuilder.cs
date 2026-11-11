@@ -139,6 +139,7 @@ namespace GulagRunners.GameEditor
 
         UiSpriteSet _set;
         Vector2 _scroll;
+        bool _onlyEmpty;
         bool _folderOpen;
         Object _folder;
 
@@ -148,7 +149,8 @@ namespace GulagRunners.GameEditor
             _set = UiSpriteRows.Field(_set, "Result Sprites", keys);
             if (_set == null) return;
 
-            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll, 300f);
+            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll,
+                              ref _onlyEmpty, 300f);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(
@@ -211,7 +213,7 @@ namespace GulagRunners.GameEditor
             // on the attack stick from driving a fighter who is already dead.
             Image dim = Undo.AddComponent<Image>(
                 Make("Dimmer", root, 0, 0, DesignW, DesignH, 0f).gameObject);
-            dim.color = new Color(0.04f, 0.04f, 0.05f, 0.78f);
+            dim.color = UiPalette.Scrim;
             dim.raycastTarget = true;
             Skin(dim, set, "result/dim");
 
@@ -224,9 +226,9 @@ namespace GulagRunners.GameEditor
                  (DesignW - 760f) * 0.5f, 195, 760, 150);
 
             MenuLabel headline = Line(root, "Headline", "VICTORY", 230, 110, 96,
-                                      new Color(0.96f, 0.88f, 0.70f));
+                                      UiPalette.Action);
             MenuLabel score = Line(root, "Score", "2 — 1", 360, 70, 56,
-                                   new Color(1f, 1f, 1f, 0.78f));
+                                   UiPalette.Ink);
 
             Slab(root, "Divider", set, "result/divider",
                  (DesignW - 520f) * 0.5f, 430, 520, 6);
@@ -236,9 +238,9 @@ namespace GulagRunners.GameEditor
             // second match worth playing, and it is the one the whole meta was written
             // for and never connected to.
             MenuLabel league = Line(root, "League", "SILVER III", 450, 44, 32,
-                                    new Color(1f, 1f, 1f, 0.55f));
+                                    UiPalette.InkSoft);
             MenuLabel gold = Line(root, "Gold", "+40", 492, 44, 32,
-                                  new Color(0.91f, 0.64f, 0.24f));
+                                  UiPalette.Amber);
 
             // The two little marks beside those lines, to the left of centre so they read
             // as belonging to the number rather than floating.
@@ -279,10 +281,10 @@ namespace GulagRunners.GameEditor
             wired.Add("rearm");
 
             Face(root, "Button / Rematch", "REMATCH", DesignW * 0.5f - 420, 560, 400, 104,
-                 new Color(0.91f, 0.64f, 0.24f), new Color(0.09f, 0.07f, 0.05f),
+                 UiPalette.Amber, UiPalette.InkOnAmber,
                  new UnityAction(view.Rematch), wired, set, "result/button/primary");
             Face(root, "Button / Menu", "MENU", DesignW * 0.5f + 20, 560, 400, 104,
-                 new Color(1f, 1f, 1f, 0.12f), new Color(0.93f, 0.93f, 0.93f),
+                 UiPalette.Fade(UiPalette.Ink, 0.14f), UiPalette.Ink,
                  new UnityAction(view.ToMenu), wired, set, "result/button/secondary");
 
             EnsureEventSystem();

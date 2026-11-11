@@ -25,17 +25,17 @@ namespace GulagRunners.Game
                  "pressure it is read wrong. Keyed to the viewer instead, it is never read " +
                  "wrong, at the cost of the two players seeing mirrored colours -- which " +
                  "neither of them can tell, because neither sees the other's screen.")]
-        public Color self = new Color(0.28f, 0.60f, 1f);
+        public Color self = UiPalette.Self;
 
         [Tooltip("The other fighter's bar. Red on both screens, for the same reason.\n\n" +
                  "Deliberately a deeper red than Danger, so that an opponent dropping into " +
                  "desperation still visibly BRIGHTENS rather than staying the red it " +
                  "already was.")]
-        public Color enemy = new Color(0.82f, 0.18f, 0.22f);
+        public Color enemy = UiPalette.Enemy;
 
         [Header("Interface")]
         [Tooltip("Every line of the interface. Alpha is carried here, not per element.")]
-        public Color line = new Color(1f, 1f, 1f, 0.8f);
+        public Color line = UiPalette.Ink;
 
         [Tooltip("A guard that cannot be raised, and anything else switched off.")]
         [Range(0f, 1f)] public float disabledAlpha = 0.28f;
@@ -44,26 +44,26 @@ namespace GulagRunners.Game
         [Range(0f, 1f)] public float spentAlpha = 0.28f;
 
         [Header("Rarity")]
-        public Color common = new Color(0.25f, 0.90f, 0.35f);
-        public Color rare = new Color(0.20f, 0.55f, 1.00f);
-        public Color legendary = new Color(0.70f, 0.25f, 1.00f);
-        public Color empty = new Color(0.40f, 0.42f, 0.45f);
+        public Color common = UiPalette.Common;
+        public Color rare = UiPalette.Rare;
+        public Color legendary = UiPalette.Legendary;
+        public Color empty = UiPalette.Empty;
 
         [Header("Button glyphs")]
         [Tooltip("The icon inside each ring. The RINGS stay white: they are interface, and " +
                  "docs/26 keeps the interface to one colour so that a glow means rarity and " +
                  "nothing else. The glyph inside is not interface, it is the verb — and a " +
                  "verb is found faster by colour than by shape, especially under a thumb.")]
-        public Color attackGlyph = new Color(0.95f, 0.33f, 0.28f);
-        public Color blockGlyph = new Color(0.38f, 0.66f, 1f);
-        public Color actionGlyph = new Color(1f, 0.82f, 0.42f);
-        public Color jumpGlyph = new Color(0.52f, 0.88f, 0.55f);
+        public Color attackGlyph = UiPalette.Attack;
+        public Color blockGlyph = UiPalette.Block;
+        public Color actionGlyph = UiPalette.Action;
+        public Color jumpGlyph = UiPalette.Jump;
 
         [Header("Danger")]
         [Tooltip("A weapon about to break, and health below the share where bare hands " +
                  "start hitting harder. One colour for both, because both mean the same " +
                  "thing to the player: this is about to be decided.")]
-        public Color danger = new Color(1f, 0.25f, 0.2f);
+        public Color danger = UiPalette.Danger;
 
         /// <summary>How brightly the glow behind a slot burns, by rarity.</summary>
         public float GlowAlpha(Rarity rarity) => rarity switch
