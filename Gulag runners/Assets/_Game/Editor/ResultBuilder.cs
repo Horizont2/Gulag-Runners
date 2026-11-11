@@ -22,18 +22,159 @@ namespace GulagRunners.GameEditor
     /// a screen assembled by hand is a screen somebody has to assemble again in the next
     /// scene, and SetupScene is already missing every component Arena_Demo was given.
     ///
-    /// Plain colours, no sprite sheet. The result screen has no artwork yet and inventing
-    /// a dependency on files that do not exist would mean a tool that cannot be run. It
-    /// lays out a dimmer, two lines and two buttons at the right sizes and in the right
-    /// places; skinning it is swapping the Image sprites, with nothing to rewire.
+    /// IT TAKES ART NOW, a row at a time, like the other three builders. It used to be a
+    /// one-click menu item that laid out flat colours, with "skinning it is swapping the
+    /// Image sprites" written where the work was: eight Images to find in a hierarchy that
+    /// only exists after the tool has run, and nothing anywhere saying which sprite went
+    /// where. Every row below is optional and every one of them falls back to the colour it
+    /// had before, so the screen still builds from an empty list -- but a filled list is
+    /// now a skinned result screen rather than a note in a file.
     /// </summary>
-    public static class ResultBuilder
+    public sealed class ResultBuilder : EditorWindow
     {
         const float DesignW = 1920f;
         const float DesignH = 864f;
 
         [MenuItem("Tools/Gulag Runners/Build the result screen")]
-        public static void Build()
+        public static void Open()
+        {
+            ResultBuilder w = GetWindow<ResultBuilder>(true, "Build the result screen");
+            w.minSize = new Vector2(460, 460);
+        }
+
+        // ---------------------------------------------------------------- what it needs
+
+        struct Asset
+        {
+            public string Key;
+            public float W, H;
+
+            /// <summary>Nine-slice border in 1x pixels; zero means the sprite is stretched
+            /// whole.</summary>
+            public Vector4 Border;
+
+            /// <summary>
+            /// What the piece is for, in English, under its row in the window. Every one of
+            /// these is optional, so the note also has to say what happens when it is left
+            /// empty -- otherwise an empty row looks like a mistake rather than a choice.
+            /// </summary>
+            public string What;
+
+            public Asset(string key, float w, float h, string what)
+            { Key = key; W = w; H = h; Border = Vector4.zero; What = what; }
+
+            public Asset(string key, float w, float h, float b, string what)
+            { Key = key; W = w; H = h; Border = new Vector4(b, b, b, b); What = what; }
+        }
+
+        static readonly Asset[] Needed =
+        {
+            new Asset("result/dim", 1920, 864,
+                      "The wash over the whole screen that puts the arena behind the "
+                      + "result. It is also what stops a thumb still resting on the attack "
+                      + "stick from driving a fighter who is already dead, so it is built "
+                      + "whether or not you fill this in. Leave it empty for the flat dark "
+                      + "it has now; fill it for a vignette or a texture, drawn full-bleed "
+                      + "and stretched."),
+            new Asset("result/panel", 1000, 460, 48,
+                      "The plate the result sits on: a slab behind the headline, the score "
+                      + "and the two meta lines, in the middle of the screen. Nine-sliced "
+                      + "with a wide border, because it is stretched to the design's "
+                      + "1000x460 and would be stretched again on another aspect. Leave it "
+                      + "empty and the lines sit straight on the dimmer, which is what the "
+                      + "screen does today."),
+            new Asset("result/banner", 760, 150,
+                      "The band behind the one word that says what happened -- VICTORY or "
+                      + "DEFEAT. The word itself stays text, because it is translated and "
+                      + "because the same screen has to say both; this is the thing it is "
+                      + "written on. Leave it empty for a word with nothing behind it."),
+            new Asset("result/divider", 520, 6,
+                      "The rule between the score and the two meta lines: a thin horizontal "
+                      + "flourish, six pixels tall at 1x. It is the only thing separating "
+                      + "\"who won\" from \"what it changed\". Stretched across its width, "
+                      + "so keep any detail in the middle rather than at the ends."),
+            new Asset("result/button/primary", 400, 104, 24,
+                      "The face of the REMATCH button -- the one the player is meant to "
+                      + "hit. Nine-sliced, drawn in its resting state: the builder leaves "
+                      + "the Button component to tint it for pressed and disabled, so a "
+                      + "highlight baked into the sprite will be tinted twice. Empty leaves "
+                      + "the orange slab it has now."),
+            new Asset("result/button/secondary", 400, 104, 24,
+                      "The face of the MENU button, which should read as the quieter of the "
+                      + "two: same size, same slicing, less contrast. If both buttons wear "
+                      + "the same sprite the screen stops saying which one to press."),
+            new Asset("result/icon/gold", 44, 44,
+                      "The coin that sits to the left of the purse line (\"+40\"). The "
+                      + "number comes from the recorder, so this is only the mark that says "
+                      + "the number is money. Empty means the number stands alone."),
+            new Asset("result/icon/league", 44, 44,
+                      "The badge to the left of the league line (\"SILVER III\"). The "
+                      + "menu's own rank badges are the obvious thing to drag in here -- the "
+                      + "same six exist in the menu tool -- and using the same art means a "
+                      + "promotion looks like the same badge in both places."),
+        };
+
+        static List<string> Keys()
+        {
+            List<string> keys = new List<string>(Needed.Length);
+            foreach (Asset a in Needed) keys.Add(a.Key);
+            return keys;
+        }
+
+        static List<Vector2> Sizes()
+        {
+            List<Vector2> sizes = new List<Vector2>(Needed.Length);
+            foreach (Asset a in Needed) sizes.Add(new Vector2(a.W, a.H));
+            return sizes;
+        }
+
+        static List<string> Notes()
+        {
+            List<string> notes = new List<string>(Needed.Length);
+            foreach (Asset a in Needed) notes.Add(a.What);
+            return notes;
+        }
+
+        // ---------------------------------------------------------------- window
+
+        UiSpriteSet _set;
+        Vector2 _scroll;
+        bool _folderOpen;
+        Object _folder;
+
+        void OnGUI()
+        {
+            List<string> keys = Keys();
+            _set = UiSpriteRows.Field(_set, "Result Sprites", keys);
+            if (_set == null) return;
+
+            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll, 300f);
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(
+                "Every row is optional. An empty one keeps the flat colour the screen is "
+                + "laid out in, so this builds and runs with nothing filled in -- the "
+                + "layout, the wiring and the buttons do not depend on the art.",
+                EditorStyles.wordWrappedMiniLabel);
+
+            UiSpriteRows.FolderFill(_set, keys, ref _folderOpen, ref _folder);
+
+            EditorGUILayout.Space();
+            using (new EditorGUI.DisabledScope(
+                       Object.FindFirstObjectByType<MatchState>() == null))
+                if (GUILayout.Button("Build the result screen", GUILayout.Height(34)))
+                    Build(_set);
+
+            if (Object.FindFirstObjectByType<MatchState>() == null)
+                EditorGUILayout.LabelField(
+                    "No MatchState in this scene, so there is no match for a result screen "
+                    + "to be the end of. Open an arena scene.",
+                    EditorStyles.wordWrappedMiniLabel);
+        }
+
+        // ---------------------------------------------------------------- the build
+
+        public static void Build(UiSpriteSet set)
         {
             MatchState match = Object.FindFirstObjectByType<MatchState>();
             if (match == null)
@@ -51,6 +192,14 @@ namespace GulagRunners.GameEditor
                 return;
             }
 
+            // Import settings written per sprite, before anything is placed, so a nine-slice
+            // border is in the ASSET rather than in a note somebody has to remember. The
+            // border is quoted at 1x and the export may be any multiple of that, so the
+            // ratio is measured from each sprite's own width.
+            if (set != null)
+                foreach (Asset a in Needed)
+                    Import(set.Get(a.Key), a);
+
             // Thrown away and rebuilt, so running it twice does not leave two of them --
             // and so an edit to this file is one menu click from being on screen.
             Transform old = canvas.transform.Find("Result");
@@ -64,11 +213,23 @@ namespace GulagRunners.GameEditor
                 Make("Dimmer", root, 0, 0, DesignW, DesignH, 0f).gameObject);
             dim.color = new Color(0.04f, 0.04f, 0.05f, 0.78f);
             dim.raycastTarget = true;
+            Skin(dim, set, "result/dim");
+
+            // The plate, then the band, then the lines on top of them: order in the
+            // hierarchy IS draw order on a canvas, and a panel added after the text covers
+            // the text.
+            Slab(root, "Plate", set, "result/panel",
+                 (DesignW - 1000f) * 0.5f, 170, 1000, 460);
+            Slab(root, "Banner", set, "result/banner",
+                 (DesignW - 760f) * 0.5f, 195, 760, 150);
 
             MenuLabel headline = Line(root, "Headline", "VICTORY", 230, 110, 96,
                                       new Color(0.96f, 0.88f, 0.70f));
             MenuLabel score = Line(root, "Score", "2 — 1", 360, 70, 56,
                                    new Color(1f, 1f, 1f, 0.78f));
+
+            Slab(root, "Divider", set, "result/divider",
+                 (DesignW - 520f) * 0.5f, 430, 520, 6);
 
             // What the match CHANGED, between the score and the buttons. A result screen
             // that only says who won is a scoreboard; this is the line that makes a
@@ -78,6 +239,13 @@ namespace GulagRunners.GameEditor
                                     new Color(1f, 1f, 1f, 0.55f));
             MenuLabel gold = Line(root, "Gold", "+40", 492, 44, 32,
                                   new Color(0.91f, 0.64f, 0.24f));
+
+            // The two little marks beside those lines, to the left of centre so they read
+            // as belonging to the number rather than floating.
+            Slab(root, "League mark", set, "result/icon/league",
+                 DesignW * 0.5f - 150f, 444, 44, 44);
+            Slab(root, "Gold mark", set, "result/icon/gold",
+                 DesignW * 0.5f - 90f, 486, 44, 44);
 
             MatchResultView view = Undo.AddComponent<MatchResultView>(root.gameObject);
             Undo.RecordObject(view, "Build the result screen");
@@ -112,10 +280,10 @@ namespace GulagRunners.GameEditor
 
             Face(root, "Button / Rematch", "REMATCH", DesignW * 0.5f - 420, 560, 400, 104,
                  new Color(0.91f, 0.64f, 0.24f), new Color(0.09f, 0.07f, 0.05f),
-                 new UnityAction(view.Rematch), wired);
+                 new UnityAction(view.Rematch), wired, set, "result/button/primary");
             Face(root, "Button / Menu", "MENU", DesignW * 0.5f + 20, 560, 400, 104,
                  new Color(1f, 1f, 1f, 0.12f), new Color(0.93f, 0.93f, 0.93f),
-                 new UnityAction(view.ToMenu), wired);
+                 new UnityAction(view.ToMenu), wired, set, "result/button/secondary");
 
             EnsureEventSystem();
 
@@ -124,9 +292,15 @@ namespace GulagRunners.GameEditor
             root.gameObject.SetActive(false);
 
             EditorUtility.SetDirty(canvas);
+
+            int skinned = 0;
+            if (set != null)
+                foreach (Asset a in Needed)
+                    if (set.Has(a.Key)) skinned++;
+
             Debug.Log(
                 $"Result screen built on \"{canvas.name}\": {string.Join(", ", wired)} " +
-                "wired.\n" +
+                $"wired, {skinned} of {Needed.Length} sprite row(s) used.\n" +
                 "It goes up " + view.showAfter.ToString("0.0") + " s after the match is " +
                 "decided, which is room for MatchOutcomeView's freeze, slow motion and " +
                 "camera push. Rematch deals a fresh series in this arena; Menu loads \"" +
@@ -150,6 +324,80 @@ namespace GulagRunners.GameEditor
             return null;
         }
 
+        /// <summary>
+        /// The import settings for one dragged sprite: a Sprite, uncompressed, unmipped,
+        /// with the nine-slice border this table asks for.
+        ///
+        /// The border is quoted in 1x design pixels and an export can be any multiple of
+        /// that, so the ratio comes from the sprite's own width against the design width.
+        /// Measured per sprite rather than once for the folder, which is both simpler and
+        /// exact when one piece was exported at a different size from the rest.
+        /// </summary>
+        static void Import(Sprite sprite, Asset asset)
+        {
+            if (sprite == null) return;
+
+            string path = AssetDatabase.GetAssetPath(sprite);
+            TextureImporter imp = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (imp == null) return;
+
+            float scale = asset.W > 0f && sprite.texture != null
+                ? Mathf.Max(0.01f, sprite.texture.width / asset.W) : 1f;
+            Vector4 border = asset.Border * scale;
+
+            bool change = imp.textureType != TextureImporterType.Sprite
+                          || imp.mipmapEnabled
+                          || imp.npotScale != TextureImporterNPOTScale.None
+                          || imp.textureCompression != TextureImporterCompression.Uncompressed
+                          || imp.spriteBorder != border;
+            if (!change) return;
+
+            imp.textureType = TextureImporterType.Sprite;
+            imp.spriteImportMode = SpriteImportMode.Single;
+            imp.npotScale = TextureImporterNPOTScale.None;
+            imp.mipmapEnabled = false;
+            imp.alphaIsTransparency = true;
+            imp.filterMode = FilterMode.Bilinear;
+            imp.wrapMode = TextureWrapMode.Clamp;
+            imp.textureCompression = TextureImporterCompression.Uncompressed;
+            if (asset.Border != Vector4.zero) imp.spriteBorder = border;
+            imp.SaveAndReimport();
+        }
+
+        /// <summary>
+        /// Puts a dragged sprite on an Image, or leaves the colour it was built with.
+        ///
+        /// White when a sprite is used: an Image tints its sprite by its colour, so the
+        /// flat fill that stands in for the art would otherwise be painted over the art.
+        /// </summary>
+        static void Skin(Image image, UiSpriteSet set, string key)
+        {
+            Sprite sprite = set != null ? set.Get(key) : null;
+            if (image == null || sprite == null) return;
+
+            image.sprite = sprite;
+            image.color = Color.white;
+            image.type = sprite.border == Vector4.zero ? Image.Type.Simple : Image.Type.Sliced;
+        }
+
+        /// <summary>
+        /// One decorative rect, and NOTHING at all when its row is empty.
+        ///
+        /// Not an empty Image: an Image with no sprite draws a white box, so a plate
+        /// nobody has drawn would be a white slab across the result rather than an absence.
+        /// </summary>
+        static void Slab(Transform parent, string name, UiSpriteSet set, string key,
+                         float x, float y, float w, float h)
+        {
+            Sprite sprite = set != null ? set.Get(key) : null;
+            if (sprite == null) return;
+
+            RectTransform rt = Make(name, parent, x, y, w, h, 0f);
+            Image image = Undo.AddComponent<Image>(rt.gameObject);
+            image.raycastTarget = false;
+            Skin(image, set, key);
+        }
+
         /// <summary>One centred line, behind a MenuLabel so a UnityEvent has a method.</summary>
         static MenuLabel Line(Transform parent, string name, string text, float y,
                               float h, int size, Color colour)
@@ -169,15 +417,16 @@ namespace GulagRunners.GameEditor
             return wrap;
         }
 
-        /// <summary>A coloured slab with a word on it, wired to one method.</summary>
+        /// <summary>A slab with a word on it, wired to one method, skinned if there is art.</summary>
         static void Face(Transform parent, string name, string word, float x, float y,
                          float w, float h, Color fill, Color ink, UnityAction action,
-                         List<string> wired)
+                         List<string> wired, UiSpriteSet set, string key)
         {
             RectTransform rt = Make(name, parent, x, y, w, h, 0f);
             Image face = Undo.AddComponent<Image>(rt.gameObject);
             face.color = fill;
             face.raycastTarget = true;
+            Skin(face, set, key);
 
             RectTransform wordRt = Make(word, rt, 0, 0, w, h, 0f);
             Text t = Undo.AddComponent<Text>(wordRt.gameObject);

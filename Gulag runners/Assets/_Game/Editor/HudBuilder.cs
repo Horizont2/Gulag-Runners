@@ -93,40 +93,162 @@ namespace GulagRunners.GameEditor
             public string Key;        // hud/slot/frame
             public float W, H;        // design size, 1x
             public Vector4 Border;    // nine-slice, in 1x pixels
-            public Asset(string key, float w, float h) { Key = key; W = w; H = h; Border = Vector4.zero; }
-            public Asset(string key, float w, float h, float b) { Key = key; W = w; H = h; Border = new Vector4(b, b, b, b); }
+
+            /// <summary>
+            /// What this piece IS, in English, shown under its row in the window.
+            ///
+            /// The key is a path and the path is a filing system, not an explanation:
+            /// "hud/bar/fill" does not say whether it is the health bar or the stamina
+            /// bar, whether the frame is part of it, which end it empties from, or that
+            /// it is stretched rather than nine-sliced. Somebody dragging twenty-eight
+            /// sprites in should not have to read this file to find out, and a wrong
+            /// guess is a HUD that builds without a word and looks wrong.
+            /// </summary>
+            public string What;
+
+            public Asset(string key, float w, float h, string what)
+            { Key = key; W = w; H = h; Border = Vector4.zero; What = what; }
+
+            public Asset(string key, float w, float h, float b, string what)
+            { Key = key; W = w; H = h; Border = new Vector4(b, b, b, b); What = what; }
         }
 
         static readonly Asset[] Needed =
         {
-            new Asset("hud/slot/frame", 64, 64, 12),
-            new Asset("hud/slot/frame-dashed", 64, 64, 12),
-            new Asset("hud/slot/glow", 88, 88),
-            new Asset("hud/slot/swap-arrow", 18, 18),
-            new Asset("hud/bar/frame", 440, 32, 8),
-            new Asset("hud/bar/fill", 424, 16, 4),
-            new Asset("hud/pip", 20, 20),
-            new Asset("hud/button/ring-154", 154, 154),
-            new Asset("hud/button/ring-130", 130, 130),
-            new Asset("hud/button/ring-101", 101, 101),
-            new Asset("hud/button/glyph-block", 48, 48),
-            new Asset("hud/button/glyph-action", 44, 44),
-            new Asset("hud/button/glyph-jump", 46, 46),
-            new Asset("hud/joystick/ring", 200, 200),
-            new Asset("hud/joystick/knob", 68, 68),
-            new Asset("hud/sound/arc", 210, 62),
-            new Asset("hud/sound/source-chest", 46, 46),
-            new Asset("hud/icon/coif", 32, 32),
-            new Asset("hud/icon/great-helm", 32, 32),
-            new Asset("hud/icon/chainmail", 32, 32),
-            new Asset("hud/icon/plate", 32, 32),
-            new Asset("hud/icon/club", 32, 32),
-            new Asset("hud/icon/sword", 32, 32),
-            new Asset("hud/icon/belt", 32, 32),
-            new Asset("hud/icon/bandage", 32, 32),
-            new Asset("hud/mannequin", 150, 330),
-            new Asset("hud/leaders", 115, 350),
-            new Asset("hud/leaders-mirrored", 115, 350),
+            new Asset("hud/slot/frame", 64, 64, 12,
+                      "The square around ONE equipment slot, for a slot with something in "
+                      + "it. Five of these sit along the bottom of the screen: helmet, "
+                      + "armour, weapon, belt, utility. Nine-sliced, so draw the corners "
+                      + "and leave the middle plain -- it is stretched to whatever the "
+                      + "slot size works out to on the device."),
+            new Asset("hud/slot/frame-dashed", 64, 64, 12,
+                      "The same square for an EMPTY slot, which is the only thing on the "
+                      + "column that says \"a belt would go here\" rather than \"this is a "
+                      + "belt\". Same size and same borders as the solid one; draw it as a "
+                      + "dashed or broken outline. Leave it empty and empty slots keep the "
+                      + "solid frame, which reads as a slot that is filled."),
+            new Asset("hud/slot/glow", 88, 88,
+                      "A soft halo BEHIND an equipment square, bigger than the square. Its "
+                      + "alpha is driven by the item's rarity, so draw it white and let the "
+                      + "tint do the colour: a plain blurred blob, no edge, nothing readable "
+                      + "in it. Optional -- without it rarity shows only in the frame tint."),
+            new Asset("hud/slot/swap-arrow", 18, 18,
+                      "The tiny arrow that appears on a slot when what you are standing on "
+                      + "would REPLACE what is in it. It is the only hint that picking a "
+                      + "thing up costs you the thing you are carrying, so it wants to be "
+                      + "legible at 18 px: an arrow, not an icon with detail in it."),
+            new Asset("hud/bar/frame", 440, 32, 8,
+                      "The empty health bar: the socket the fill sits in, drawn for BOTH "
+                      + "fighters (the opponent's is the mirror of yours, flipped by the "
+                      + "builder). Nine-sliced along its length, so keep the ends distinct "
+                      + "and the middle repeatable. It does not move or empty -- that is "
+                      + "the fill."),
+            new Asset("hud/bar/fill", 424, 16, 4,
+                      "The red that drains out of the health bar. Slightly smaller than the "
+                      + "frame because it sits INSIDE it, and drawn as one flat run: the "
+                      + "builder shortens it from the right by setting the rect, so any "
+                      + "pattern along it will be cut off rather than squashed."),
+            new Asset("hud/pip", 20, 20,
+                      "One round counter -- the little lamp that lights up for each round a "
+                      + "fighter has won, in a row between the two health bars. Drawn LIT; "
+                      + "the builder dims it for a round nobody has won yet, so do not draw "
+                      + "an empty version."),
+            new Asset("hud/button/ring-154", 154, 154,
+                      "The biggest round button face, 154 px at 1x: the attack stick's ring "
+                      + "on the right of the screen. Just the ring and whatever sits behind "
+                      + "it -- the glyph is a separate row -- and transparent in the middle, "
+                      + "because the thumb has to see where it is pushing."),
+            new Asset("hud/button/ring-130", 130, 130,
+                      "The middle round button face, for block and dodge. Same drawing as "
+                      + "the big ring, one size down; the builder picks which ring each "
+                      + "button gets, so these three are sizes rather than roles."),
+            new Asset("hud/button/ring-101", 101, 101,
+                      "The smallest round button face: jump and the action button. Same "
+                      + "family again -- if the three rings do not look like one set, the "
+                      + "controls read as three different games."),
+            new Asset("hud/button/glyph-block", 48, 48,
+                      "The symbol drawn ON the block button -- a shield, a guard, whatever "
+                      + "the art says blocking is. White or near-white: the builder tints "
+                      + "it, and a glyph with its own colour fights the tint. No ring in "
+                      + "it, that is the row above."),
+            new Asset("hud/button/glyph-action", 44, 44,
+                      "The symbol on the ACTION button, which is the one hand you use for "
+                      + "everything that is not fighting: force a chest, pick a weapon up, "
+                      + "grab a ladder. A hand or a grab reads better here than a lock or a "
+                      + "chest, because the button does all three."),
+            new Asset("hud/button/glyph-jump", 46, 46,
+                      "The symbol on the jump button. Up is the whole message; an arrow or "
+                      + "a boot both work, as long as it is the loudest glyph of the three "
+                      + "-- jump is the button a player hits in a panic."),
+            new Asset("hud/joystick/ring", 200, 200,
+                      "The movement stick's base, bottom-left: the circle the thumb drags "
+                      + "inside. Faint on purpose -- it is under a thumb most of the match "
+                      + "and never looked at. Transparent middle, so the knob reads against "
+                      + "the arena rather than against a disc."),
+            new Asset("hud/joystick/knob", 68, 68,
+                      "The part of the movement stick that MOVES: the smaller disc the "
+                      + "builder slides inside the ring. It should be the brighter of the "
+                      + "two, because its offset from the middle is the only feedback that "
+                      + "the stick has read the thumb at all."),
+            new Asset("hud/sound/arc", 210, 62,
+                      "The off-screen cue: a thin arc that appears at the edge of the "
+                      + "screen pointing at a noise you cannot see -- a chest the other "
+                      + "player is forcing. Draw it pointing RIGHT and fading out at both "
+                      + "ends; the builder rotates it. Invisible for most of a match, so "
+                      + "keep it quiet enough not to be mistaken for damage."),
+            new Asset("hud/sound/source-chest", 46, 46,
+                      "The small icon that rides in the middle of that arc and says what "
+                      + "the noise WAS -- a chest. It is the difference between \"something "
+                      + "over there\" and \"he is opening the gold one\", so it has to be "
+                      + "recognisable at 46 px."),
+            new Asset("hud/icon/coif", 32, 32,
+                      "The silhouette for the light helmet, drawn in the helmet slot when "
+                      + "one is worn. All eight of these icons are read in a glance at arm's "
+                      + "length: one shape, flat, no shading, and distinct from the other "
+                      + "helmet in OUTLINE rather than in detail."),
+            new Asset("hud/icon/great-helm", 32, 32,
+                      "The silhouette for the heavy helmet. Its job is to be distinguishable "
+                      + "from the coif at a glance -- same slot, better protection -- so "
+                      + "make the outline obviously bigger or more closed."),
+            new Asset("hud/icon/chainmail", 32, 32,
+                      "The silhouette for light body armour, in the armour slot. Against "
+                      + "plate, below, the difference should read as weight: a shirt against "
+                      + "a cuirass."),
+            new Asset("hud/icon/plate", 32, 32,
+                      "The silhouette for heavy body armour. The player decides whether to "
+                      + "spend a slot on it from this icon alone, so heavier has to LOOK "
+                      + "heavier than the chainmail."),
+            new Asset("hud/icon/club", 32, 32,
+                      "The silhouette for a blunt weapon in the weapon slot. It stands for "
+                      + "the whole blunt family -- club, mace, hammer -- so draw the family, "
+                      + "not one of them."),
+            new Asset("hud/icon/sword", 32, 32,
+                      "The silhouette for a bladed weapon, standing for the whole edged "
+                      + "family. Blunt against edged is the one weapon distinction the slot "
+                      + "makes, so these two icons have to differ at 32 px."),
+            new Asset("hud/icon/belt", 32, 32,
+                      "The silhouette for the belt slot -- the carried-capacity item. A belt "
+                      + "or a pouch; it is the slot people forget they have, so it is worth "
+                      + "being the most literal icon of the eight."),
+            new Asset("hud/icon/bandage", 32, 32,
+                      "The silhouette for the utility slot: a bandage, a flask, a tool. The "
+                      + "one consumable icon, so a cross or a wrap reads faster than "
+                      + "anything clever."),
+            new Asset("hud/mannequin", 150, 330,
+                      "The wire figure the equipment squares hang off on the design sheet. "
+                      + "It belongs on a design sheet rather than over an arena -- the "
+                      + "\"Mannequin + leaders\" toggle below is off for a reason -- so this "
+                      + "is only needed if you want the sheet's look in the scene."),
+            new Asset("hud/leaders", 115, 350,
+                      "The thin lines that run from the mannequin out to the equipment "
+                      + "squares, for the left-hand side. Drawn once pointing one way; the "
+                      + "row below is the same art for the other side. Only used with the "
+                      + "mannequin."),
+            new Asset("hud/leaders-mirrored", 115, 350,
+                      "The same leader lines for the RIGHT-hand side. A separate row rather "
+                      + "than a flip because a mirrored line with an arrow or a cap on it is "
+                      + "not the same drawing -- if yours is symmetrical, drag the same file "
+                      + "into both."),
         };
 
         // ---------------------------------------------------------------- window
@@ -137,7 +259,7 @@ namespace GulagRunners.GameEditor
             _set = UiSpriteRows.Field(_set, "HUD Sprites", keys);
             if (_set == null) return;
 
-            UiSpriteRows.Rows(_set, keys, Sizes(), ref _scroll);
+            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Size on screen", EditorStyles.boldLabel);
@@ -205,6 +327,14 @@ namespace GulagRunners.GameEditor
             List<Vector2> sizes = new List<Vector2>(Needed.Length);
             foreach (Asset a in Needed) sizes.Add(new Vector2(a.W, a.H));
             return sizes;
+        }
+
+        /// <summary>And what each one is for, in English, under its row.</summary>
+        static List<string> Notes()
+        {
+            List<string> notes = new List<string>(Needed.Length);
+            foreach (Asset a in Needed) notes.Add(a.What);
+            return notes;
         }
 
         /// <summary>

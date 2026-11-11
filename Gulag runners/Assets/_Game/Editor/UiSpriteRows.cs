@@ -214,9 +214,17 @@ namespace GulagRunners.GameEditor
                 {
                     // Under the field rather than only in the tooltip: a tooltip is found
                     // by somebody who already suspects they need it.
+                    //
+                    // The height is measured at the width the text will actually be drawn
+                    // at -- the column to the RIGHT of the label, not the whole window --
+                    // or a four-line note is given room for two and the rest is clipped,
+                    // which is a worse state than no note at all.
+                    float room = Mathf.Max(
+                        120f, EditorGUIUtility.currentViewWidth - EditorGUIUtility.labelWidth
+                              - 34f);
                     Rect line = EditorGUILayout.GetControlRect(
                         false, EditorStyles.wordWrappedMiniLabel.CalcHeight(
-                            new GUIContent(note), EditorGUIUtility.currentViewWidth - 40f));
+                            new GUIContent(note), room));
                     line.xMin += EditorGUIUtility.labelWidth;
                     GUI.Label(line, note, EditorStyles.wordWrappedMiniLabel);
                     EditorGUILayout.Space(2);

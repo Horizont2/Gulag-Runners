@@ -66,25 +66,57 @@ namespace GulagRunners.GameEditor
 
             public bool Sliced => Border != Vector4.zero;
 
-            public Asset(string key, float w, float h, float b = 0f)
-            { Key = key; W = w; H = h; Border = new Vector4(b, b, b, b); }
+            /// <summary>
+            /// What the piece is for, in English, under its row in the window. Five rows
+            /// is few enough to guess at and still worth saying: "search/scrim" is not a
+            /// word anybody outside this file knows.
+            /// </summary>
+            public string What;
 
-            public Asset(string key, float w, float h, float l, float b, float r, float t)
-            { Key = key; W = w; H = h; Border = new Vector4(l, b, r, t); }
+            public Asset(string key, float w, float h, string what)
+            { Key = key; W = w; H = h; Border = Vector4.zero; What = what; }
+
+            public Asset(string key, float w, float h, float b, string what)
+            { Key = key; W = w; H = h; Border = new Vector4(b, b, b, b); What = what; }
+
+            public Asset(string key, float w, float h, float l, float b, float r, float t,
+                         string what)
+            { Key = key; W = w; H = h; Border = new Vector4(l, b, r, t); What = what; }
         }
 
         static readonly Asset[] Needed =
         {
-            new Asset("search/button/close", 56, 56),
-            new Asset("search/icon/close", 20, 20),
+            new Asset("search/button/close", 56, 56,
+                      "The round face of the CANCEL button on the searching-for-a-match "
+                      + "screen: the way out while the queue is running. Draw the ring and "
+                      + "leave the middle clear -- the cross is the next row -- and make it "
+                      + "big enough to hit without aiming, because it is pressed by somebody "
+                      + "who has changed their mind."),
+            new Asset("search/icon/close", 20, 20,
+                      "The cross drawn on that button. White or near-white: the builder "
+                      + "tints it, and a glyph with its own colour fights the tint."),
             // Left and right only. Both bars are capsules: the caps are the first and
             // last 2 px and everything between them is a straight run, so the stretch is
             // horizontal and there is nothing to slice vertically. A border on all four
             // sides of a sprite 4 px tall leaves a middle slice zero pixels high, which
             // is exact at this one height and garbage at any other.
-            new Asset("search/bar/track", 120, 4, 2, 0, 2, 0),
-            new Asset("search/bar/fill", 120, 4, 2, 0, 2, 0),
-            new Asset("search/scrim", 8, 320),
+            new Asset("search/bar/track", 120, 4, 2, 0, 2, 0,
+                      "The empty groove of the thin progress bar under the \"searching\" "
+                      + "text. A capsule 4 px tall: the first and last 2 px are the round "
+                      + "caps and everything between is a straight run, which is why it is "
+                      + "sliced left and right ONLY -- slicing it vertically at this height "
+                      + "leaves no middle at all."),
+            new Asset("search/bar/fill", 120, 4, 2, 0, 2, 0,
+                      "The part of that bar that fills while the queue runs. Same capsule, "
+                      + "same slicing, brighter: it is the only thing on the screen that "
+                      + "says the game has not frozen, so it should read even on a phone "
+                      + "held at arm's length."),
+            new Asset("search/scrim", 8, 320,
+                      "The soft dark gradient behind the whole panel, stretched across the "
+                      + "screen -- what stops the arena or the menu behind it competing "
+                      + "with the text. Draw it 8 px wide and TALL: it is one column of "
+                      + "pixels stretched sideways, so only the vertical fade matters. "
+                      + "Black to transparent is usually all it needs."),
         };
 
         // ---------------------------------------------------------------- window
@@ -100,7 +132,7 @@ namespace GulagRunners.GameEditor
 
             if (_set != null)
             {
-                UiSpriteRows.Rows(_set, keys, Sizes(), ref _scroll, 150f);
+                UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll, 260f);
                 UiSpriteRows.FolderFill(_set, keys, ref _folderOpen, ref _folder);
             }
 
@@ -111,7 +143,13 @@ namespace GulagRunners.GameEditor
                                "label comes out in Unity's built-in Arial."),
                 _font, typeof(Font), false);
             _textScale = EditorGUILayout.Slider(
-                new GUIContent("Text size", "Against the design sheet."),
+                new GUIContent("Text size",
+                               "Every label on this panel at once, against the design "
+                               + "sheet: 1 is the size it was drawn at. The sheet was "
+                               + "drawn to be reviewed on a monitor, so a phone usually "
+                               + "wants it a little bigger -- the words have to be "
+                               + "readable while the queue runs and the player is not "
+                               + "looking closely."),
                 _textScale, 0.6f, 1.6f);
 
             EditorGUILayout.Space();
@@ -138,6 +176,14 @@ namespace GulagRunners.GameEditor
             List<Vector2> sizes = new List<Vector2>(Needed.Length);
             foreach (Asset a in Needed) sizes.Add(new Vector2(a.W, a.H));
             return sizes;
+        }
+
+        /// <summary>And what each one is for, in English, under its row.</summary>
+        static List<string> Notes()
+        {
+            List<string> notes = new List<string>(Needed.Length);
+            foreach (Asset a in Needed) notes.Add(a.What);
+            return notes;
         }
 
         /// <summary>

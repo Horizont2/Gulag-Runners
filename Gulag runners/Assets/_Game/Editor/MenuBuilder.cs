@@ -70,29 +70,91 @@ namespace GulagRunners.GameEditor
             public string Key;
             public float W, H;
             public Vector4 Border;
-            public Asset(string key, float w, float h) { Key = key; W = w; H = h; Border = Vector4.zero; }
-            public Asset(string key, float w, float h, float b)
-            { Key = key; W = w; H = h; Border = new Vector4(b, b, b, b); }
+
+            /// <summary>
+            /// What the piece is for, in English, printed under its row. The key is a
+            /// filing path, not an explanation: "menu/plate" does not say that it is the
+            /// pill behind a number in the top bar, nor that it is nine-sliced and will be
+            /// stretched to whatever the number needs.
+            /// </summary>
+            public string What;
+
+            public Asset(string key, float w, float h, string what)
+            { Key = key; W = w; H = h; Border = Vector4.zero; What = what; }
+
+            public Asset(string key, float w, float h, float b, string what)
+            { Key = key; W = w; H = h; Border = new Vector4(b, b, b, b); What = what; }
         }
 
         static readonly Asset[] Needed =
         {
-            new Asset("menu/icon/shield", 24, 24),
-            new Asset("menu/icon/coin", 24, 24),
-            new Asset("menu/icon/contract", 24, 24),
-            new Asset("menu/icon/gear", 24, 24),
-            new Asset("menu/icon/people", 24, 24),
-            new Asset("menu/rank/bronze", 24, 24),
-            new Asset("menu/rank/silver", 24, 24),
-            new Asset("menu/rank/gold", 24, 24),
-            new Asset("menu/rank/platinum", 24, 24),
-            new Asset("menu/rank/diamond", 24, 24),
-            new Asset("menu/rank/runner", 24, 24),
-            new Asset("menu/bar/track", 430, 10, 5),
-            new Asset("menu/bar/fill", 430, 10, 5),
-            new Asset("menu/plate", 300, 52, 26),
-            new Asset("menu/button/play", 400, 112, 14),
-            new Asset("menu/button/round", 66, 66),
+            new Asset("menu/icon/shield", 24, 24,
+                      "The little icon beside the RATING number in the top bar -- the "
+                      + "player's ladder standing. Flat, one colour, read at 24 px: the top "
+                      + "bar is five of these in a row and they only work as a set."),
+            new Asset("menu/icon/coin", 24, 24,
+                      "The icon beside the GOLD the player has. It is the number people "
+                      + "look at first, so this is the one icon worth making the brightest "
+                      + "of the five."),
+            new Asset("menu/icon/contract", 24, 24,
+                      "The icon beside the daily CONTRACT count -- the jobs the meta hands "
+                      + "out each day. A scroll or a sheet; it has to differ from the gear "
+                      + "at a glance, since both end up grey."),
+            new Asset("menu/icon/gear", 24, 24,
+                      "The settings icon in the top bar. The one icon players expect to "
+                      + "recognise without learning it, so draw the obvious cog."),
+            new Asset("menu/icon/people", 24, 24,
+                      "The icon for how many players are online, or for the friends list. "
+                      + "Two figures read better than one at this size -- one figure reads "
+                      + "as the player themselves."),
+            new Asset("menu/rank/bronze", 24, 24,
+                      "The league badge for BRONZE, the lowest of the six. These six are "
+                      + "one set and the player's whole sense of progress: the shape should "
+                      + "stay and only the metal change, so the climb reads as the same "
+                      + "badge getting better."),
+            new Asset("menu/rank/silver", 24, 24,
+                      "The badge for SILVER, second of the six. Same silhouette as bronze, "
+                      + "different metal -- if the shapes differ, the player cannot tell a "
+                      + "promotion from a different icon."),
+            new Asset("menu/rank/gold", 24, 24,
+                      "The badge for GOLD, third of six. The middle of the ladder, where "
+                      + "most players live, so this is the one seen most often."),
+            new Asset("menu/rank/platinum", 24, 24,
+                      "The badge for PLATINUM, fourth of six. Cooler and brighter than "
+                      + "gold; it is worth a visible jump, because this is where the ladder "
+                      + "stops being everybody."),
+            new Asset("menu/rank/diamond", 24, 24,
+                      "The badge for DIAMOND, fifth of six. The last badge with a colour "
+                      + "name, so it can afford to be the showiest of the metals."),
+            new Asset("menu/rank/runner", 24, 24,
+                      "The badge for RUNNER, the top league and the game's own name for the "
+                      + "best. Not a metal: this one is allowed to break the set, because "
+                      + "reaching it should not look like more of the same."),
+            new Asset("menu/bar/track", 430, 10, 5,
+                      "The empty groove of the progress bar under the rating -- how far "
+                      + "through the current league the player is. Nine-sliced across its "
+                      + "length: ends distinct, middle repeatable. It never moves; the fill "
+                      + "does."),
+            new Asset("menu/bar/fill", 430, 10, 5,
+                      "The part of that bar that is FULL, drawn inside the track. One flat "
+                      + "run, nine-sliced the same way -- the builder shortens it from the "
+                      + "right, so anything patterned along it gets cut rather than "
+                      + "squashed."),
+            new Asset("menu/plate", 300, 52, 26,
+                      "The pill behind a number or a word in the top bar -- the dark rounded "
+                      + "slab the icon and the text sit on. Nine-sliced with a 26 px border, "
+                      + "because the same sprite is stretched behind \"4\" and behind "
+                      + "\"12,480\"."),
+            new Asset("menu/button/play", 400, 112, 14,
+                      "The big PLAY button at the bottom: the one thing on the screen the "
+                      + "player is meant to hit. Nine-sliced, drawn in its normal state -- "
+                      + "the builder tints it for pressed and disabled, so do not bake a "
+                      + "highlight in."),
+            new Asset("menu/button/round", 66, 66,
+                      "The small round button face the secondary actions use -- settings, "
+                      + "friends, back. One sprite for all of them, with the glyph coming "
+                      + "from the icon rows above, so draw the ring and leave the middle "
+                      + "clear."),
         };
 
         /// <summary>The six, in League order, so the badge component can be filled by index.</summary>
@@ -110,7 +172,7 @@ namespace GulagRunners.GameEditor
             _set = UiSpriteRows.Field(_set, "Menu Sprites", keys);
             if (_set == null) return;
 
-            UiSpriteRows.Rows(_set, keys, Sizes(), ref _scroll, 240f);
+            UiSpriteRows.Rows(_set, keys, Sizes(), Notes(), ref _scroll, 300f);
 
             EditorGUILayout.Space();
             _font = (Font)EditorGUILayout.ObjectField(
@@ -124,7 +186,12 @@ namespace GulagRunners.GameEditor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Size on screen", EditorStyles.boldLabel);
             _readoutScale = EditorGUILayout.Slider(
-                new GUIContent("Readouts", "League, rank bar, gold, contracts, the name."),
+                new GUIContent("Readouts",
+                               "The top bar as a whole: the league badge, the rank bar, "
+                               + "gold, contracts and the player's name. 1 is the size "
+                               + "they were drawn at on the 1920-wide sheet; below about "
+                               + "0.8 the numbers stop being readable at arm's length, "
+                               + "which is where a phone is held."),
                 _readoutScale, 0.5f, 1.4f);
             _buttonScale = EditorGUILayout.Slider(
                 new GUIContent("Buttons",
@@ -160,6 +227,14 @@ namespace GulagRunners.GameEditor
             List<Vector2> sizes = new List<Vector2>(Needed.Length);
             foreach (Asset a in Needed) sizes.Add(new Vector2(a.W, a.H));
             return sizes;
+        }
+
+        /// <summary>And what each one is for, in English, under its row.</summary>
+        static List<string> Notes()
+        {
+            List<string> notes = new List<string>(Needed.Length);
+            foreach (Asset a in Needed) notes.Add(a.What);
+            return notes;
         }
 
         /// <summary>The paths behind the dragged sprites: what the import and the build read.</summary>
