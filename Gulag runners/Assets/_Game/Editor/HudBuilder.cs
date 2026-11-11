@@ -718,11 +718,28 @@ namespace GulagRunners.GameEditor
             }
 
             GameObject old = GameObject.Find(RootName);
+
+            // The RESULT SCREEN lives under this root, because ResultBuilder hangs it off
+            // the canvas and this object IS the canvas. So rebuilding the HUD used to take
+            // it with it: arena_ready_check found two arenas with no MatchResultView left
+            // in them at all after the tools were run, and three with NetMatch's hud and
+            // result fields emptied -- which NetMatch survives by calling
+            // FindFirstObjectByType, in an order Unity does not define, on the one
+            // reference that decides which fighter the HUD on this phone belongs to.
+            //
+            // So it is carried across: out of the old root before the destroy, back under
+            // the new one after. Undo.SetTransformParent rather than SetParent, or an undo
+            // of the build leaves the result screen parented to nothing.
+            Transform keep = old != null ? old.transform.Find("Result") : null;
+            if (keep != null) Undo.SetTransformParent(keep, null, "Build HUD");
+
             if (old != null) Undo.DestroyObjectImmediate(old);
 
             GameObject rootGo = new GameObject(RootName,
                 typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             Undo.RegisterCreatedObjectUndo(rootGo, "Build HUD");
+
+            if (keep != null) Undo.SetTransformParent(keep, rootGo.transform, "Build HUD");
 
             Canvas canvas = rootGo.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -759,6 +776,21 @@ namespace GulagRunners.GameEditor
             if (fighters.Length > 0) view.player1 = fighters[0];
             if (fighters.Length > 1) view.player2 = fighters[1];
             view.matchState = Object.FindFirstObjectByType<MatchState>();
+
+            // And NetMatch gets the new HUD, because the old one it was holding has just
+            // been destroyed. Left empty NetMatch finds one itself, which is fine in a
+            // scene with one HUD and is not what this field is for: on the guest's phone
+            // it is the reference that decides which fighter the HUD belongs to, and a
+            // FindFirstObjectByType in an undefined order is not a decision.
+            GulagRunners.Net.NetMatch net =
+                Object.FindFirstObjectByType<GulagRunners.Net.NetMatch>();
+            if (net != null)
+            {
+                Undo.RecordObject(net, "Build HUD");
+                net.hud = view;
+                EditorUtility.SetDirty(net);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(net);
+            }
 
             string input = WireInput(view, ring, knob, aimRing, aimKnob);
 

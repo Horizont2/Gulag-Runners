@@ -1142,7 +1142,7 @@ MonoBehaviour:
   link: {fileID: 72155630}
   match: {fileID: 2012403445}
   view: {fileID: 1064138585}
-  hud: {fileID: 0}
+  hud: {fileID: 254672490}
   result: {fileID: 0}
   recorder: {fileID: 1615960440}
   catchUpLimit: 6

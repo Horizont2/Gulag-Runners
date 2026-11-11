@@ -84203,8 +84203,8 @@ MonoBehaviour:
   link: {fileID: 1370685656}
   match: {fileID: 1900000400}
   view: {fileID: 1900000135}
-  hud: {fileID: 0}
-  result: {fileID: 0}
+  hud: {fileID: 367346951}
+  result: {fileID: 695239900}
   recorder: {fileID: 1994619513}
   catchUpLimit: 6
   substituteAfter: 2.5

@@ -10784,7 +10784,7 @@ MonoBehaviour:
   link: {fileID: 960000031}
   match: {fileID: 960000733}
   view: {fileID: 960000470}
-  hud: {fileID: 0}
+  hud: {fileID: 962777039}
   result: {fileID: 0}
   recorder: {fileID: 960000611}
   catchUpLimit: 6

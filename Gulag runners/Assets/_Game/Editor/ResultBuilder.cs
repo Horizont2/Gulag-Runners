@@ -270,6 +270,22 @@ namespace GulagRunners.GameEditor
             recorder.localPlayer = view.localPlayer;
             PrefabUtility.RecordPrefabInstancePropertyModifications(recorder);
 
+            // NetMatch holds the result screen for the same reason it holds the HUD: both
+            // carry a "which fighter is me" that is wrong on the guest's phone until it
+            // corrects them. This panel is thrown away and rebuilt on every run, so the
+            // reference has to be handed over on every run too -- otherwise the field
+            // silently empties and NetMatch falls back to finding one in an order Unity
+            // does not define.
+            GulagRunners.Net.NetMatch net =
+                Object.FindFirstObjectByType<GulagRunners.Net.NetMatch>();
+            if (net != null)
+            {
+                Undo.RecordObject(net, "Build the result screen");
+                net.result = view;
+                EditorUtility.SetDirty(net);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(net);
+            }
+
             List<string> wired = new List<string>();
             Wire(view.HeadlineChanged, headline.Set, "headline", wired);
             Wire(view.ScoreChanged, score.Set, "score", wired);
