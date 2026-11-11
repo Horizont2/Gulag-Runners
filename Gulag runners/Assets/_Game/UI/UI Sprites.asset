@@ -13,6 +13,22 @@ MonoBehaviour:
   m_Name: UI Sprites
   m_EditorClassIdentifier: Assembly-CSharp-Editor::GulagRunners.GameEditor.UiSpriteSet
   slots:
+  - key: result/dim
+    sprite: {fileID: 0}
+  - key: result/panel
+    sprite: {fileID: 21300000, guid: ccfd10ed64e6a804983f51301bea9740, type: 3}
+  - key: result/banner
+    sprite: {fileID: 0}
+  - key: result/divider
+    sprite: {fileID: 21300000, guid: 2d495a82650083a488d5c83456a9795b, type: 3}
+  - key: result/button/primary
+    sprite: {fileID: 21300000, guid: 8aba4fb2671613b45af61fe42c12ad07, type: 3}
+  - key: result/button/secondary
+    sprite: {fileID: 21300000, guid: 8aba4fb2671613b45af61fe42c12ad07, type: 3}
+  - key: result/icon/gold
+    sprite: {fileID: 21300000, guid: b53a204fb358a24438b065d341471fb9, type: 3}
+  - key: result/icon/league
+    sprite: {fileID: 21300000, guid: d2b49eddde78e75489e5d5379dbf84b4, type: 3}
   - key: hud/slot/frame
     sprite: {fileID: 21300000, guid: 4b67f34bfa4228349a5b589c16fc377f, type: 3}
   - key: hud/slot/frame-dashed
@@ -111,19 +127,3 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 2475045443bd4cf498e35659ae0d85f0, type: 3}
   - key: search/scrim
     sprite: {fileID: 21300000, guid: 09a64ec4f9ffbd74e8e7b364060c80fa, type: 3}
-  - key: result/dim
-    sprite: {fileID: 0}
-  - key: result/panel
-    sprite: {fileID: 21300000, guid: ccfd10ed64e6a804983f51301bea9740, type: 3}
-  - key: result/banner
-    sprite: {fileID: 0}
-  - key: result/divider
-    sprite: {fileID: 21300000, guid: 2d495a82650083a488d5c83456a9795b, type: 3}
-  - key: result/button/primary
-    sprite: {fileID: 21300000, guid: 8aba4fb2671613b45af61fe42c12ad07, type: 3}
-  - key: result/button/secondary
-    sprite: {fileID: 21300000, guid: 8aba4fb2671613b45af61fe42c12ad07, type: 3}
-  - key: result/icon/gold
-    sprite: {fileID: 21300000, guid: b53a204fb358a24438b065d341471fb9, type: 3}
-  - key: result/icon/league
-    sprite: {fileID: 21300000, guid: d2b49eddde78e75489e5d5379dbf84b4, type: 3}
