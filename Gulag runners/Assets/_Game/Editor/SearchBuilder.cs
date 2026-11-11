@@ -87,27 +87,40 @@ namespace GulagRunners.GameEditor
 
         static readonly Asset[] Needed =
         {
-            new Asset("search/button/close", 56, 56,
+            // 116, where the sheet said 56. 56 units is 4.4 mm on a 6.5" phone and this
+            // is the way OUT of a queue: it is pressed by somebody who has changed their
+            // mind and is not aiming. 116 is 9 mm, the figure in docs/23, and the same
+            // number the menu's round buttons and the HUD's smallest ring carry.
+            new Asset("search/button/close", 116, 116,
                       "The round face of the CANCEL button on the searching-for-a-match "
                       + "screen: the way out while the queue is running. Draw the ring and "
                       + "leave the middle clear -- the cross is the next row -- and make it "
                       + "big enough to hit without aiming, because it is pressed by somebody "
                       + "who has changed their mind."),
-            new Asset("search/icon/close", 20, 20,
+            // 60, where the sheet said 20, and the two numbers are related: close.png
+            // draws on 55% of its own file in both directions, so a 20-unit box showed
+            // 0.9 mm of cross. 60 puts 33 units of drawing on screen -- 2.6 mm -- and
+            // still leaves a clear ring around it inside the 116 face.
+            new Asset("search/icon/close", 60, 60,
                       "The cross drawn on that button. White or near-white: the builder "
-                      + "tints it, and a glyph with its own colour fights the tint."),
+                      + "tints it, and a glyph with its own colour fights the tint. Any "
+                      + "transparent margin inside the file comes straight off how big "
+                      + "the cross reads, so draw it to the edges."),
             // Left and right only. Both bars are capsules: the caps are the first and
             // last 2 px and everything between them is a straight run, so the stretch is
             // horizontal and there is nothing to slice vertically. A border on all four
             // sides of a sprite 4 px tall leaves a middle slice zero pixels high, which
             // is exact at this one height and garbage at any other.
-            new Asset("search/bar/track", 120, 4, 2, 0, 2, 0,
+            // 8 tall, not 4. The layout runs this bar 1000 units wide, and 4 units of
+            // height is 0.31 mm -- four pixels on a 1080p phone, a hairline rather than a
+            // bar. 8 units is 0.62 mm, and the caps grow with it.
+            new Asset("search/bar/track", 120, 8, 4, 0, 4, 0,
                       "The empty groove of the thin progress bar under the \"searching\" "
-                      + "text. A capsule 4 px tall: the first and last 2 px are the round "
+                      + "text. A capsule 8 px tall: the first and last 4 px are the round "
                       + "caps and everything between is a straight run, which is why it is "
                       + "sliced left and right ONLY -- slicing it vertically at this height "
                       + "leaves no middle at all."),
-            new Asset("search/bar/fill", 120, 4, 2, 0, 2, 0,
+            new Asset("search/bar/fill", 120, 8, 4, 0, 4, 0,
                       "The part of that bar that fills while the queue runs. Same capsule, "
                       + "same slicing, brighter: it is the only thing on the screen that "
                       + "says the game has not frozen, so it should read even on a phone "
@@ -336,6 +349,23 @@ namespace GulagRunners.GameEditor
         }
 
         /// <summary>
+        /// What multiple of its design size this one file came out at, measured from the
+        /// WIDTH -- the dimension the layout anchors on.
+        /// </summary>
+        static float Ratio(Asset asset, Sprite sprite)
+        {
+            if (asset.W <= 0f || sprite == null) return 1f;
+            return Mathf.Max(0.01f, sprite.rect.width / asset.W);
+        }
+
+        /// <summary>The same question before the sprite exists, straight off the texture.</summary>
+        static float Ratio(Asset asset, Texture2D texture)
+        {
+            if (asset.W <= 0f || texture == null) return 1f;
+            return Mathf.Max(0.01f, texture.width / asset.W);
+        }
+
+        /// <summary>
         /// White at the bottom, nothing at the top, eased. White so the screen can tint it
         /// black — the same rule as every other sprite in this project, and the reason
         /// there is one scrim file rather than two that drift apart.
@@ -371,8 +401,12 @@ namespace GulagRunners.GameEditor
             imp.sRGBTexture = true;
             imp.textureCompression = TextureImporterCompression.Uncompressed;
             imp.wrapMode = TextureWrapMode.Clamp;
-            imp.spritePixelsPerUnit = 100f * Mathf.Max(0.01f, _scale);
-            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * _scale;
+            // Per sprite, not per set: a set-wide multiple is wrong for
+            // most files in a project wearing two exports, and wrong here is a
+            // nine-slice corner drawn at three times its size or a third of it.
+            float at = Ratio(asset, AssetDatabase.LoadAssetAtPath<Texture2D>(path));
+            imp.spritePixelsPerUnit = 100f * at;
+            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * at;
 
             imp.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
@@ -397,7 +431,15 @@ namespace GulagRunners.GameEditor
                 Sprite s = Import(a);
                 if (s == null) continue;
                 sprites[a.Key] = s;
-                _size[a.Key] = new Vector2(s.rect.width, s.rect.height) / _scale;
+                // Per sprite, not per set: see HudBuilder.Build for what one voted
+                // multiple did to a set dressed from two exports. The width then equals
+                // the design width, and where the HEIGHT disagrees by more than a quarter
+                // the sheet wins -- a squashed capsule is visible and fixable, a panel
+                // that has grown over the text under it is not.
+                float own = Ratio(a, s);
+                Vector2 native = new Vector2(s.rect.width, s.rect.height) / own;
+                _size[a.Key] = a.H > 0f && Mathf.Abs(native.y - a.H) > a.H * 0.25f
+                    ? new Vector2(a.W, a.H) : native;
             }
 
             GameObject old = GameObject.Find(RootName);
@@ -546,7 +588,7 @@ namespace GulagRunners.GameEditor
             string first = search.tips != null && search.tips.Length > 0
                 ? search.tips[0]
                 : "";
-            MenuLabel tip = LabelOn(rt, first, 20, TextAnchor.UpperLeft, false, 0.82f);
+            MenuLabel tip = LabelOn(rt, first, 24, TextAnchor.UpperLeft, false, 0.82f);
             tip.target.lineSpacing = 1.45f;
             UnityEventTools.AddPersistentListener(search.tipChanged,
                 new UnityAction<string>(tip.Set));
@@ -556,14 +598,14 @@ namespace GulagRunners.GameEditor
         void BuildCancel(Transform screen, Dictionary<string, Sprite> sprites,
                          MatchSearch search, List<string> wired)
         {
-            Vector2 ring = Size("search/button/close", 56, 56);
+            Vector2 ring = Size("search/button/close", 116, 116);
             RectTransform rt = Make("Button / Cancel", screen, DesignW - 64 - ring.x, 52,
                                     ring.x, ring.y, 1f, 0f);
             Image face = Picture(rt.gameObject, sprites, "search/button/close");
             face.raycastTarget = true;
             face.color = UiPalette.Fade(UiPalette.Ink, 0.5f);
 
-            Vector2 cross = Size("search/icon/close", 20, 20);
+            Vector2 cross = Size("search/icon/close", 60, 60);
             Vector2 inset = (ring - cross) * 0.5f;
             RectTransform g = Make("Glyph", rt, inset.x, inset.y, cross.x, cross.y, 0f, 0f);
             Picture(g.gameObject, sprites, "search/icon/close").color =
@@ -578,23 +620,27 @@ namespace GulagRunners.GameEditor
         void BuildStatus(Transform screen, Dictionary<string, Sprite> sprites,
                          MatchSearch search, List<string> wired)
         {
-            RectTransform phaseRt = Make("Phase", screen, (DesignW - 900) * 0.5f, 672,
-                                         900, 44, 0.5f, 0f);
-            MenuLabel phase = LabelOn(phaseRt, "SEARCHING", 30, TextAnchor.UpperCenter,
+            // 40 units of type in a box tall enough for it, starting 8 units higher so
+            // the line below it stays where it was: the one word that says the queue is
+            // running was 2.3 mm tall, and this screen is read from across a room while
+            // the player waits.
+            RectTransform phaseRt = Make("Phase", screen, (DesignW - 900) * 0.5f, 664,
+                                         900, 52, 0.5f, 0f);
+            MenuLabel phase = LabelOn(phaseRt, "SEARCHING", 40, TextAnchor.UpperCenter,
                                       true, 0.95f);
             UnityEventTools.AddPersistentListener(search.phaseChanged,
                 new UnityAction<string>(phase.Set));
             wired.Add("phase");
 
             RectTransform detailRt = Make("Detail", screen, (DesignW - 900) * 0.5f, 722,
-                                          900, 30, 0.5f, 0f);
-            MenuLabel detail = LabelOn(detailRt, "SILVER III  ·  0 S", 18,
+                                          900, 34, 0.5f, 0f);
+            MenuLabel detail = LabelOn(detailRt, "SILVER III  ·  0 S", 24,
                                        TextAnchor.UpperCenter, false, 0.55f);
             UnityEventTools.AddPersistentListener(search.detailChanged,
                 new UnityAction<string>(detail.Set));
             wired.Add("detail");
 
-            Vector2 bar = Size("search/bar/track", 120, 4);
+            Vector2 bar = Size("search/bar/track", 120, 8);
             const float barW = 1000f;
             RectTransform track = Make("Bar", screen, (DesignW - barW) * 0.5f, 772,
                                        barW, bar.y, 0.5f, 0f);

@@ -89,45 +89,53 @@ namespace GulagRunners.GameEditor
 
         static readonly Asset[] Needed =
         {
-            new Asset("menu/icon/shield", 24, 24,
+            // 40, where the sheet said 24, and the same 40 as the six league badges
+            // below: this is drawn in the badge's own rect when the player is unranked.
+            // 24 units is 1.9 mm on a 6.5" phone -- the size of a full stop -- and what
+            // the eye gets is smaller again, because every icon in both exports is drawn
+            // inset in its file. The sizes here are now what the screen is BUILT at; the
+            // layout used to multiply them by 1.42, 1.25, 1.15 and 1.1 at four different
+            // call sites, so the window showed 24 and the menu built 34.
+            new Asset("menu/icon/shield", 40, 40,
                       "The little icon beside the RATING number in the top bar -- the "
-                      + "player's ladder standing. Flat, one colour, read at 24 px: the top "
-                      + "bar is five of these in a row and they only work as a set."),
-            new Asset("menu/icon/coin", 24, 24,
+                      + "player's ladder standing. Flat, one colour, and drawn to the "
+                      + "edges of its file: the top bar is five of these in a row and they "
+                      + "only work as a set."),
+            new Asset("menu/icon/coin", 36, 36,
                       "The icon beside the GOLD the player has. It is the number people "
                       + "look at first, so this is the one icon worth making the brightest "
                       + "of the five."),
-            new Asset("menu/icon/contract", 24, 24,
+            new Asset("menu/icon/contract", 42, 42,
                       "The icon beside the daily CONTRACT count -- the jobs the meta hands "
                       + "out each day. A scroll or a sheet; it has to differ from the gear "
                       + "at a glance, since both end up grey."),
-            new Asset("menu/icon/gear", 24, 24,
+            new Asset("menu/icon/gear", 44, 44,
                       "The settings icon in the top bar. The one icon players expect to "
                       + "recognise without learning it, so draw the obvious cog."),
-            new Asset("menu/icon/people", 24, 24,
+            new Asset("menu/icon/people", 40, 40,
                       "The icon for how many players are online, or for the friends list. "
                       + "Two figures read better than one at this size -- one figure reads "
                       + "as the player themselves."),
-            new Asset("menu/rank/bronze", 24, 24,
+            new Asset("menu/rank/bronze", 40, 40,
                       "The league badge for BRONZE, the lowest of the six. These six are "
                       + "one set and the player's whole sense of progress: the shape should "
                       + "stay and only the metal change, so the climb reads as the same "
                       + "badge getting better."),
-            new Asset("menu/rank/silver", 24, 24,
+            new Asset("menu/rank/silver", 40, 40,
                       "The badge for SILVER, second of the six. Same silhouette as bronze, "
                       + "different metal -- if the shapes differ, the player cannot tell a "
                       + "promotion from a different icon."),
-            new Asset("menu/rank/gold", 24, 24,
+            new Asset("menu/rank/gold", 40, 40,
                       "The badge for GOLD, third of six. The middle of the ladder, where "
                       + "most players live, so this is the one seen most often."),
-            new Asset("menu/rank/platinum", 24, 24,
+            new Asset("menu/rank/platinum", 40, 40,
                       "The badge for PLATINUM, fourth of six. Cooler and brighter than "
                       + "gold; it is worth a visible jump, because this is where the ladder "
                       + "stops being everybody."),
-            new Asset("menu/rank/diamond", 24, 24,
+            new Asset("menu/rank/diamond", 40, 40,
                       "The badge for DIAMOND, fifth of six. The last badge with a colour "
                       + "name, so it can afford to be the showiest of the metals."),
-            new Asset("menu/rank/runner", 24, 24,
+            new Asset("menu/rank/runner", 40, 40,
                       "The badge for RUNNER, the top league and the game's own name for the "
                       + "best. Not a metal: this one is allowed to break the set, because "
                       + "reaching it should not look like more of the same."),
@@ -146,13 +154,26 @@ namespace GulagRunners.GameEditor
                       + "slab the icon and the text sit on. Nine-sliced with a 26 px border, "
                       + "because the same sprite is stretched behind \"4\" and behind "
                       + "\"12,480\"."),
-            new Asset("menu/button/play", 400, 112, 14,
+            // 116 tall, not 112: docs/23 wants 9 mm under a thumb and 112 units is 8.8 mm.
+            //
+            // Four units, and they do more than four units of work. The rect is sized
+            // from the sprite unless the sprite disagrees with this row by more than a
+            // quarter, and PlayBackground.png is 580x204 -- 2.84:1 against 3.45:1. At 112
+            // that was a 26% disagreement, so the sheet won and the art was squashed into
+            // 112; at 116 it is 21%, so the ART wins and the button is built at its own
+            // shape, 400x141. 11 mm of amber, undistorted, which is what the biggest
+            // button in the game should have been all along.
+            new Asset("menu/button/play", 400, 116, 14,
                       "The big PLAY button at the bottom: the one thing on the screen the "
                       + "player is meant to hit. Nine-sliced, drawn in its normal state -- "
                       + "the builder tints it for pressed and disabled, so do not bake a "
                       + "highlight in."),
-            new Asset("menu/button/round", 66, 66,
-                      "The small round button face the secondary actions use -- settings, "
+            // 116, where the sheet said 66. 66 units is 5.2 mm: a target a thumb misses,
+            // on settings and friends. 116 is this game's smallest round control, the
+            // same number the HUD's smallest ring and the search screen's cancel now
+            // carry, so the three read as one size rather than three guesses.
+            new Asset("menu/button/round", 116, 116,
+                      "The round button face the secondary actions use -- settings, "
                       + "friends, back. One sprite for all of them, with the glyph coming "
                       + "from the icon rows above, so draw the ring and leave the middle "
                       + "clear."),
@@ -257,6 +278,25 @@ namespace GulagRunners.GameEditor
         // ---------------------------------------------------------------- import
 
         /// <summary>
+        /// What multiple of its design size this one file came out at.
+        ///
+        /// From the WIDTH, because width is what every layout here anchors on, and a rect
+        /// whose width is wrong is a rect in the wrong place as well as the wrong size.
+        /// </summary>
+        static float Ratio(Asset asset, Sprite sprite)
+        {
+            if (asset.W <= 0f || sprite == null) return 1f;
+            return Mathf.Max(0.01f, sprite.rect.width / asset.W);
+        }
+
+        /// <summary>The same question before the sprite exists, straight off the texture.</summary>
+        static float Ratio(Asset asset, Texture2D texture)
+        {
+            if (asset.W <= 0f || texture == null) return 1f;
+            return Mathf.Max(0.01f, texture.width / asset.W);
+        }
+
+        /// <summary>
         /// The import settings from HudBuilder, applied for you.
         ///
         /// Mip maps and compression are both off on purpose so thin lines stay crisp,
@@ -289,9 +329,13 @@ namespace GulagRunners.GameEditor
             // against the canvas's own 100 that divisor is 1, so a 5 px corner exported
             // at 4x draws as a 20 UNIT corner -- which is what made the HUD look heavy
             // for several passes before anybody found it.
-            imp.spritePixelsPerUnit = 100f * Mathf.Max(0.01f, _scale);
+            // Per sprite, not per set: a set-wide multiple is wrong for
+            // most files in a project wearing two exports, and wrong here is a
+            // nine-slice corner drawn at three times its size or a third of it.
+            float at = Ratio(asset, AssetDatabase.LoadAssetAtPath<Texture2D>(path));
+            imp.spritePixelsPerUnit = 100f * at;
 
-            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * _scale;
+            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * at;
 
             imp.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
@@ -348,17 +392,26 @@ namespace GulagRunners.GameEditor
                 Sprite s = Import(a);
                 if (s == null) continue;
                 sprites[a.Key] = s;
+                // PER SPRITE, which is the whole of "some elements came out very small,
+                // or in bad places": this used to divide every file by ONE measured
+                // multiple, and the project now wears two exports at once -- the older at a
+                // flat 4x, the newer white one at anything from 1.27x to 4.5x. Divided by
+                // the wrong number a file lands at the wrong WIDTH, and the PLAY button
+                // came out 185 units wide where the sheet says 400.
+                float own = Ratio(a, s);
+                Vector2 native = new Vector2(s.rect.width, s.rect.height) / own;
 
-                // The design size is what the layout was drawn against; the file is what
-                // arrived. Where they disagree the FILE wins -- a rect forced to the design
-                // size squashes the art -- and the disagreement is reported, not swallowed.
-                Vector2 native = new Vector2(s.rect.width, s.rect.height) / _scale;
-                _size[a.Key] = native;
-                if (a.W > 0f && a.H > 0f &&
-                    (Mathf.Abs(native.x - a.W) > a.W * 0.02f ||
-                     Mathf.Abs(native.y - a.H) > a.H * 0.02f))
-                    odd.Add($"{a.Key} is {native.x:0}x{native.y:0}, not the {a.W:0}x{a.H:0} " +
-                            "the layout expected");
+                // The width is then the design width by construction, so a disagreement
+                // can only be in the height -- and there the sheet wins, because the layout
+                // has rows underneath it. A squashed plate is a thing somebody can see and
+                // redraw; a menu that has quietly eaten its own next row is not.
+                bool disagrees = a.H > 0f && Mathf.Abs(native.y - a.H) > a.H * 0.25f;
+                _size[a.Key] = disagrees ? new Vector2(a.W, a.H) : native;
+                if (disagrees)
+                    odd.Add($"{a.Key} is drawn {s.rect.width:0}x{s.rect.height:0} and the " +
+                            $"row is {a.W:0}x{a.H:0}, so it is squashed into the sheet's " +
+                            "rect. Redraw it to the row's shape, or change the row's " +
+                            "design size to the art's");
             }
 
             GameObject old = GameObject.Find(RootName);
@@ -465,7 +518,7 @@ namespace GulagRunners.GameEditor
             RectTransform block = Panel("League", root);
             float k = _readoutScale;
 
-            Vector2 badge = Size("menu/rank/silver", 24, 24) * 1.42f;
+            Vector2 badge = Size("menu/rank/silver", 40, 40);
             RectTransform badgeRt = Make("Badge", block, 64, 52, badge.x, badge.y, 0f, 0f, k);
             Image badgeImage = Picture(badgeRt.gameObject, sprites, "menu/rank/silver", false);
 
@@ -513,7 +566,7 @@ namespace GulagRunners.GameEditor
             // from the figure it belongs to. A purse that grows from 240 to 24 000 moves
             // the coin here; it moved nothing there, which is the same bug seen twice.
             RectTransform goldRow = Row(block, "Gold", 64, 54, 10);
-            Vector2 coin = Size("menu/icon/coin", 24, 24) * 1.25f;
+            Vector2 coin = Size("menu/icon/coin", 36, 36);
             Image coinImage = Icon(goldRow, sprites, "menu/icon/coin", coin);
             coinImage.color = Gold;
 
@@ -522,7 +575,7 @@ namespace GulagRunners.GameEditor
             Wire(view.goldChanged, gold.Set, "gold", wired, dead);
 
             RectTransform dailyRow = Row(block, "Contracts", 64, 104, 10);
-            Vector2 scroll = Size("menu/icon/contract", 24, 24) * 1.1f;
+            Vector2 scroll = Size("menu/icon/contract", 42, 42);
             Icon(dailyRow, sprites, "menu/icon/contract", scroll);
 
             MenuLabel daily = LabelIn(dailyRow, "Contracts", "1 / 3", 26, false);
@@ -620,7 +673,7 @@ namespace GulagRunners.GameEditor
 
             RectTransform nameRt = Make("Player name", rt, 0, 0, plate.x, plate.y, 0f, 0f,
                                         _readoutScale);
-            MenuLabel label = LabelOn(nameRt, "RUNNER_7", "Semi Bold", 24, TextAnchor.MiddleCenter);
+            MenuLabel label = LabelOn(nameRt, "RUNNER_7", "Semi Bold", 32, TextAnchor.MiddleCenter);
             Wire(view.playerNameChanged, label.Set, "player name", wired, dead);
         }
 
@@ -628,7 +681,7 @@ namespace GulagRunners.GameEditor
                        List<string> wired, List<string> dead)
         {
             RectTransform block = Panel("Play", root);
-            Vector2 play = Size("menu/button/play", 400, 112);
+            Vector2 play = Size("menu/button/play", 400, 116);
 
             // 648 from the top on the sheet, which is 104 up from the bottom edge.
             RectTransform rt = Make("Button / PLAY", block, DesignW - 64 - play.x,
@@ -649,8 +702,8 @@ namespace GulagRunners.GameEditor
 
             // Directly under the button, by the sheet's own ten-unit gap.
             RectTransform modeRt = Make("Mode", block, DesignW - 64 - 300, 648 + play.y + 10,
-                                        300, 28, 1f, 1f, _buttonScale);
-            Text mode = TextOn(modeRt, "MEDIEVAL", "Regular", 20, TextAnchor.MiddleRight);
+                                        300, 32, 1f, 1f, _buttonScale);
+            Text mode = TextOn(modeRt, "MEDIEVAL", "Regular", 24, TextAnchor.MiddleRight);
             mode.color = UiPalette.InkSoft;
         }
 
@@ -658,7 +711,7 @@ namespace GulagRunners.GameEditor
                          List<string> wired, List<string> dead)
         {
             RectTransform block = Panel("Corner", root);
-            Vector2 round = Size("menu/button/round", 66, 66);
+            Vector2 round = Size("menu/button/round", 116, 116);
 
             Round(block, sprites, view, "Button / Settings", "menu/icon/gear",
                   64, round, view.Settings, wired);
@@ -675,7 +728,7 @@ namespace GulagRunners.GameEditor
             Image ring = Picture(rt.gameObject, sprites, "menu/button/round", false);
             ring.raycastTarget = true;
 
-            Vector2 glyph = Size(glyphKey, 24, 24) * 1.15f;
+            Vector2 glyph = Size(glyphKey, 44, 44);
             Vector2 inset = (size - glyph) * 0.5f;
             RectTransform g = Make("Glyph", rt, inset.x, inset.y, glyph.x, glyph.y, 0f, 0f,
                                    _buttonScale);

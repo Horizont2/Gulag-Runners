@@ -93,13 +93,16 @@ namespace GulagRunners.GameEditor
                       + "flourish, six pixels tall at 1x. It is the only thing separating "
                       + "\"who won\" from \"what it changed\". Stretched across its width, "
                       + "so keep any detail in the middle rather than at the ends."),
-            new Asset("result/button/primary", 400, 104, 24,
+            // 116 tall, not 104: docs/23 wants 9 mm under a thumb and 104 units is 8.1.
+            // They grow UPWARDS at the call site, so the row keeps the bottom edge the
+            // sheet gave it and the overhang past the plate does not change.
+            new Asset("result/button/primary", 400, 116, 24,
                       "The face of the REMATCH button -- the one the player is meant to "
                       + "hit. Nine-sliced, drawn in its resting state: the builder leaves "
                       + "the Button component to tint it for pressed and disabled, so a "
                       + "highlight baked into the sprite will be tinted twice. Empty leaves "
                       + "the orange slab it has now."),
-            new Asset("result/button/secondary", 400, 104, 24,
+            new Asset("result/button/secondary", 400, 116, 24,
                       "The face of the MENU button, which should read as the quieter of the "
                       + "two: same size, same slicing, less contrast. If both buttons wear "
                       + "the same sprite the screen stops saying which one to press."),
@@ -220,18 +223,15 @@ namespace GulagRunners.GameEditor
             // The plate, then the band, then the lines on top of them: order in the
             // hierarchy IS draw order on a canvas, and a panel added after the text covers
             // the text.
-            Slab(root, "Plate", set, "result/panel",
-                 (DesignW - 1000f) * 0.5f, 170, 1000, 460);
-            Slab(root, "Banner", set, "result/banner",
-                 (DesignW - 760f) * 0.5f, 195, 760, 150);
+            Slab(root, "Plate", set, "result/panel", Centre("result/panel"), 170);
+            Slab(root, "Banner", set, "result/banner", Centre("result/banner"), 195);
 
             MenuLabel headline = Line(root, "Headline", "VICTORY", 230, 110, 96,
                                       UiPalette.Action);
             MenuLabel score = Line(root, "Score", "2 — 1", 360, 70, 56,
                                    UiPalette.Ink);
 
-            Slab(root, "Divider", set, "result/divider",
-                 (DesignW - 520f) * 0.5f, 430, 520, 6);
+            Slab(root, "Divider", set, "result/divider", Centre("result/divider"), 430);
 
             // What the match CHANGED, between the score and the buttons. A result screen
             // that only says who won is a scoreboard; this is the line that makes a
@@ -245,9 +245,9 @@ namespace GulagRunners.GameEditor
             // The two little marks beside those lines, to the left of centre so they read
             // as belonging to the number rather than floating.
             Slab(root, "League mark", set, "result/icon/league",
-                 DesignW * 0.5f - 150f, 444, 44, 44);
+                 DesignW * 0.5f - 150f, 444);
             Slab(root, "Gold mark", set, "result/icon/gold",
-                 DesignW * 0.5f - 90f, 486, 44, 44);
+                 DesignW * 0.5f - 90f, 486);
 
             MatchResultView view = Undo.AddComponent<MatchResultView>(root.gameObject);
             Undo.RecordObject(view, "Build the result screen");
@@ -280,10 +280,13 @@ namespace GulagRunners.GameEditor
             UnityEventTools.AddPersistentListener(view.Hidden, new UnityAction(recorder.Rearm));
             wired.Add("rearm");
 
-            Face(root, "Button / Rematch", "REMATCH", DesignW * 0.5f - 420, 560, 400, 104,
+            // 548, where the sheet said 560: the faces are 12 units taller than the
+            // sheet drew them (9 mm for a thumb, docs/23) and they grow upwards, so the
+            // row keeps the bottom edge it had and the gold line above still clears it.
+            Face(root, "Button / Rematch", "REMATCH", DesignW * 0.5f - 420, 548,
                  UiPalette.Amber, UiPalette.InkOnAmber,
                  new UnityAction(view.Rematch), wired, set, "result/button/primary");
-            Face(root, "Button / Menu", "MENU", DesignW * 0.5f + 20, 560, 400, 104,
+            Face(root, "Button / Menu", "MENU", DesignW * 0.5f + 20, 548,
                  UiPalette.Fade(UiPalette.Ink, 0.14f), UiPalette.Ink,
                  new UnityAction(view.ToMenu), wired, set, "result/button/secondary");
 
@@ -383,14 +386,36 @@ namespace GulagRunners.GameEditor
         }
 
         /// <summary>
+        /// The size this row is laid out at, from the table and nowhere else.
+        ///
+        /// This screen used to pass its own literals -- Slab(..., 1000, 460) beside a row
+        /// that said 1000x460 -- and two numbers that have to agree are one number that
+        /// will not. The table drives the nine-slice border and the pixels-per-unit of
+        /// every import, so a rect that disagreed with it would have drawn a 48-unit
+        /// corner at the wrong scale and nothing would have said so.
+        /// </summary>
+        static Vector2 Design(string key)
+        {
+            foreach (Asset a in Needed)
+                if (a.Key == key) return new Vector2(a.W, a.H);
+            return new Vector2(100f, 100f);
+        }
+
+        /// <summary>Where a row starts if it is centred on the screen.</summary>
+        static float Centre(string key) => (DesignW - Design(key).x) * 0.5f;
+
+        /// <summary>
         /// One decorative rect, and NOTHING at all when its row is empty.
         ///
         /// Not an empty Image: an Image with no sprite draws a white box, so a plate
         /// nobody has drawn would be a white slab across the result rather than an absence.
         /// </summary>
         static void Slab(Transform parent, string name, UiSpriteSet set, string key,
-                         float x, float y, float w, float h)
+                         float x, float y)
         {
+            Vector2 size = Design(key);
+            float w = size.x, h = size.y;
+
             Sprite sprite = set != null ? set.Get(key) : null;
             if (sprite == null) return;
 
@@ -421,9 +446,12 @@ namespace GulagRunners.GameEditor
 
         /// <summary>A slab with a word on it, wired to one method, skinned if there is art.</summary>
         static void Face(Transform parent, string name, string word, float x, float y,
-                         float w, float h, Color fill, Color ink, UnityAction action,
+                         Color fill, Color ink, UnityAction action,
                          List<string> wired, UiSpriteSet set, string key)
         {
+            Vector2 size = Design(key);
+            float w = size.x, h = size.y;
+
             RectTransform rt = Make(name, parent, x, y, w, h, 0f);
             Image face = Undo.AddComponent<Image>(rt.gameObject);
             face.color = fill;

@@ -128,16 +128,24 @@ namespace GulagRunners.GameEditor
                       + "belt\". Same size and same borders as the solid one; draw it as a "
                       + "dashed or broken outline. Leave it empty and empty slots keep the "
                       + "solid frame, which reads as a slot that is filled."),
-            new Asset("hud/slot/glow", 88, 88,
+            // 160, not the 88 this row carried while BuildColumn asked for 160: the window
+            // showed one number and an empty row built the other, and the generated glow
+            // is drawn at whatever this says. A halo 88 across a 64 square is a rim.
+            new Asset("hud/slot/glow", 160, 160,
                       "A soft halo BEHIND an equipment square, bigger than the square. Its "
                       + "alpha is driven by the item's rarity, so draw it white and let the "
                       + "tint do the colour: a plain blurred blob, no edge, nothing readable "
                       + "in it. Optional -- without it rarity shows only in the frame tint."),
-            new Asset("hud/slot/swap-arrow", 18, 18,
-                      "The tiny arrow that appears on a slot when what you are standing on "
+            // 44, where the sheet said 18. 18 units is 1.4 mm on a 6.5" phone and the art
+            // only draws on half of its own width, so the arrow itself came out 0.7 mm --
+            // a grey speck on the one hint that a pickup COSTS you something.
+            new Asset("hud/slot/swap-arrow", 44, 44,
+                      "The arrow that appears on a slot when what you are standing on "
                       + "would REPLACE what is in it. It is the only hint that picking a "
-                      + "thing up costs you the thing you are carrying, so it wants to be "
-                      + "legible at 18 px: an arrow, not an icon with detail in it."),
+                      + "thing up costs you the thing you are carrying, so it hangs off "
+                      + "the corner of the square like a badge: an arrow, not an icon with "
+                      + "detail in it, and drawn to the edges of its file -- a margin "
+                      + "inside the PNG comes straight off the size it reads at."),
             new Asset("hud/bar/frame", 440, 32, 8,
                       "The empty health bar: the socket the fill sits in, drawn for BOTH "
                       + "fighters (the opponent's is the mirror of yours, flipped by the "
@@ -149,11 +157,15 @@ namespace GulagRunners.GameEditor
                       + "frame because it sits INSIDE it, and drawn as one flat run: the "
                       + "builder shortens it from the right by setting the rect, so any "
                       + "pattern along it will be cut off rather than squashed."),
-            new Asset("hud/pip", 20, 20,
+            // 36, where the sheet said 20. A lamp 1.6 mm across is read at a glance by
+            // nobody, and these are read at a glance or not at all: they are the only
+            // thing on screen that says how much stamina is left.
+            new Asset("hud/pip", 36, 36,
                       "One round counter -- the little lamp that lights up for each round a "
-                      + "fighter has won, in a row between the two health bars. Drawn LIT; "
-                      + "the builder dims it for a round nobody has won yet, so do not draw "
-                      + "an empty version."),
+                      + "fighter has won, and the same mark again for each point of "
+                      + "stamina, in a row between the two health bars. Drawn LIT and "
+                      + "filling its own file; the builder dims it for a round nobody has "
+                      + "won yet, so do not draw an empty version."),
             new Asset("hud/button/ring-154", 154, 154,
                       "The biggest round button face, 154 px at 1x: the attack stick's ring "
                       + "on the right of the screen. Just the ring and whatever sits behind "
@@ -163,10 +175,14 @@ namespace GulagRunners.GameEditor
                       "The middle round button face, for block and dodge. Same drawing as "
                       + "the big ring, one size down; the builder picks which ring each "
                       + "button gets, so these three are sizes rather than roles."),
-            new Asset("hud/button/ring-101", 101, 101,
+            // 116, not 101: docs/23 wants 9 mm under a thumb and 101 units is 7.9 mm. The
+            // name is the row's, not a measurement -- the three rings stay a set of three
+            // sizes, and this is still the smallest of them.
+            new Asset("hud/button/ring-101", 116, 116,
                       "The smallest round button face: jump and the action button. Same "
                       + "family again -- if the three rings do not look like one set, the "
-                      + "controls read as three different games."),
+                      + "controls read as three different games. 116 units is the smallest "
+                      + "a thumb target gets in this game: 9 mm on a 6.5\" phone."),
             new Asset("hud/button/glyph-block", 48, 48,
                       "The symbol drawn ON the block button -- a shield, a guard, whatever "
                       + "the art says blocking is. White or near-white: the builder tints "
@@ -191,7 +207,11 @@ namespace GulagRunners.GameEditor
                       + "builder slides inside the ring. It should be the brighter of the "
                       + "two, because its offset from the middle is the only feedback that "
                       + "the stick has read the thumb at all."),
-            new Asset("hud/sound/arc", 210, 62,
+            // 210x101, because the art IS 444x213 and the sheet said 3.39:1. Forced into
+            // the sheet's rect a 2.08:1 arc is not a shallower arc, it is a squashed one,
+            // and the cue is placed off the joystick rather than off the sheet, so a
+            // taller box moves nothing.
+            new Asset("hud/sound/arc", 210, 101,
                       "The off-screen cue: a thin arc that appears at the edge of the "
                       + "screen pointing at a noise you cannot see -- a chest the other "
                       + "player is forcing. Draw it pointing RIGHT and fading out at both "
@@ -202,36 +222,42 @@ namespace GulagRunners.GameEditor
                       + "the noise WAS -- a chest. It is the difference between \"something "
                       + "over there\" and \"he is opening the gold one\", so it has to be "
                       + "recognisable at 46 px."),
-            new Asset("hud/icon/coif", 32, 32,
+            // 44, where the sheet said 32. These eight are the one place in the HUD that
+            // carries DETAIL rather than a shape -- a coif against a great helm, a club
+            // against a sword -- and the set is drawn inset in its own files: bandage.png
+            // covers 75% of its width and 48% of its height, so a 32-unit square showed
+            // 1.9 x 1.2 mm of drawing. At 44 the smallest of them reaches 2.5 mm, which
+            // is the least anything on a phone can be and still be told apart.
+            new Asset("hud/icon/coif", 44, 44,
                       "The silhouette for the light helmet, drawn in the helmet slot when "
                       + "one is worn. All eight of these icons are read in a glance at arm's "
                       + "length: one shape, flat, no shading, and distinct from the other "
                       + "helmet in OUTLINE rather than in detail."),
-            new Asset("hud/icon/great-helm", 32, 32,
+            new Asset("hud/icon/great-helm", 44, 44,
                       "The silhouette for the heavy helmet. Its job is to be distinguishable "
                       + "from the coif at a glance -- same slot, better protection -- so "
                       + "make the outline obviously bigger or more closed."),
-            new Asset("hud/icon/chainmail", 32, 32,
+            new Asset("hud/icon/chainmail", 44, 44,
                       "The silhouette for light body armour, in the armour slot. Against "
                       + "plate, below, the difference should read as weight: a shirt against "
                       + "a cuirass."),
-            new Asset("hud/icon/plate", 32, 32,
+            new Asset("hud/icon/plate", 44, 44,
                       "The silhouette for heavy body armour. The player decides whether to "
                       + "spend a slot on it from this icon alone, so heavier has to LOOK "
                       + "heavier than the chainmail."),
-            new Asset("hud/icon/club", 32, 32,
+            new Asset("hud/icon/club", 44, 44,
                       "The silhouette for a blunt weapon in the weapon slot. It stands for "
                       + "the whole blunt family -- club, mace, hammer -- so draw the family, "
                       + "not one of them."),
-            new Asset("hud/icon/sword", 32, 32,
+            new Asset("hud/icon/sword", 44, 44,
                       "The silhouette for a bladed weapon, standing for the whole edged "
                       + "family. Blunt against edged is the one weapon distinction the slot "
                       + "makes, so these two icons have to differ at 32 px."),
-            new Asset("hud/icon/belt", 32, 32,
+            new Asset("hud/icon/belt", 44, 44,
                       "The silhouette for the belt slot -- the carried-capacity item. A belt "
                       + "or a pouch; it is the slot people forget they have, so it is worth "
                       + "being the most literal icon of the eight."),
-            new Asset("hud/icon/bandage", 32, 32,
+            new Asset("hud/icon/bandage", 44, 44,
                       "The silhouette for the utility slot: a bandage, a flask, a tool. The "
                       + "one consumable icon, so a cross or a wrap reads faster than "
                       + "anything clever."),
@@ -368,6 +394,26 @@ namespace GulagRunners.GameEditor
         /// chain blurs and the first thing a block compressor turns to porridge. It is
         /// also the whole visual language, so there is nothing left once it goes.
         /// </summary>
+        /// <summary>
+        /// What multiple of its design size this one file came out at.
+        ///
+        /// From the WIDTH, because width is what every layout in this project anchors on:
+        /// the bars start at 134 and 1346, the controls at 1430 and 1576, and a rect whose
+        /// width is wrong is a rect in the wrong place as well as the wrong size.
+        /// </summary>
+        static float Ratio(Asset asset, Sprite sprite)
+        {
+            if (asset.W <= 0f || sprite == null) return 1f;
+            return Mathf.Max(0.01f, sprite.rect.width / asset.W);
+        }
+
+        /// <summary>The same question before the sprite exists, straight off the texture.</summary>
+        static float Ratio(Asset asset, Texture2D texture)
+        {
+            if (asset.W <= 0f || texture == null) return 1f;
+            return Mathf.Max(0.01f, texture.width / asset.W);
+        }
+
         Sprite Import(Asset asset)
         {
             if (!_found.TryGetValue(asset.Key, out string path)) return null;
@@ -396,14 +442,18 @@ namespace GulagRunners.GameEditor
             // spritePPU / canvasReferencePPU before drawing. At 100 against the canvas's
             // own 100 that divisor is 1, so the 12 px corner of a square exported at 4x
             // drew as a 48 UNIT corner -- four times the design, on every bar frame and
-            // every equipment square, which is most of why the HUD looked heavy. Set from
-            // the export scale it draws at 12, and the sprite's native size becomes its
-            // design size into the bargain.
-            imp.spritePixelsPerUnit = 100f * Mathf.Max(0.01f, _scale);
+            // every equipment square, which is most of why the HUD looked heavy.
+            //
+            // PER SPRITE, from this file's own multiple of the design rather than one
+            // voted for the whole set: with two exports in the project at 1.27x to 4.5x,
+            // a set-wide number is wrong for most of the files in it, and wrong here means
+            // a corner drawn at three times its size or a third of it.
+            float at = Ratio(asset, AssetDatabase.LoadAssetAtPath<Texture2D>(path));
+            imp.spritePixelsPerUnit = 100f * at;
 
             // The border is quoted at 1x and the file is whatever scale it exported at,
             // so it is scaled by the export rather than typed in twice.
-            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * _scale;
+            if (asset.Border != Vector4.zero) imp.spriteBorder = asset.Border * at;
 
             imp.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
@@ -632,18 +682,39 @@ namespace GulagRunners.GameEditor
                 if (s == null) continue;
                 sprites[a.Key] = s;
 
-                // The design size is what the layout was drawn against; the file is what
-                // actually turned up. Where the two disagree the FILE wins. Forced into
-                // the design rect, a 444x213 export of a 210x62 frame is not a thin arc
-                // any more, it is a grey slab -- which is exactly what the sound
-                // indicator rendered as. The disagreement is reported, not swallowed.
-                Vector2 native = new Vector2(s.rect.width, s.rect.height) / _scale;
-                _size[a.Key] = native;
-                if (a.W > 0f && a.H > 0f &&
-                    (Mathf.Abs(native.x - a.W) > a.W * 0.02f ||
-                     Mathf.Abs(native.y - a.H) > a.H * 0.02f))
-                    odd.Add($"{a.Key} is {native.x:0}x{native.y:0}, not the {a.W:0}x{a.H:0} " +
-                            "the layout expected");
+                // What multiple of the design THIS FILE came out at, and the rect that
+                // follows from it.
+                //
+                // PER SPRITE, and that is the whole of "some elements came out very small,
+                // or in bad places". It used to divide every file by ONE measured multiple
+                // -- the value the most files agreed on -- which was true while one export
+                // dressed the whole interface and is false now: the project wears two at
+                // once, the older one at a flat 4x and the newer white one at anything from
+                // 1.27x to 4.5x, because it was drawn to look right rather than to a grid.
+                // Divided by the wrong number, a file lands at the wrong WIDTH: the PLAY
+                // button came out 185 units wide where the sheet says 400, the health bar
+                // 140 where it says 440, each one sitting in a position computed for the
+                // size it was supposed to be. Small, and in the wrong place, from one
+                // number.
+                float own = Ratio(a, s);
+                Vector2 native = new Vector2(s.rect.width, s.rect.height) / own;
+
+                // Which leaves the shapes. Measured per sprite the WIDTH is the design
+                // width by construction, so a disagreement can only be in the height --
+                // and there the sheet wins, because the layout has rows underneath: the
+                // white bar frame is 5.6:1 against the row's 13.75:1, and letting the art
+                // decide would make it 79 units tall where 32 was planned, swallowing the
+                // stamina charges at 80 and the names at 104. A squashed frame is a thing
+                // somebody can see and redraw; a HUD that has quietly eaten two of its own
+                // rows is not.
+                bool disagrees = a.H > 0f && Mathf.Abs(native.y - a.H) > a.H * 0.25f;
+                _size[a.Key] = disagrees ? new Vector2(a.W, a.H) : native;
+                if (disagrees)
+                    odd.Add($"{a.Key} is drawn {s.rect.width:0}x{s.rect.height:0} " +
+                            $"({s.rect.width / Mathf.Max(1f, s.rect.height):0.00}:1) and the " +
+                            $"row is {a.W:0}x{a.H:0} ({a.W / Mathf.Max(1f, a.H):0.00}:1), so " +
+                            "it is drawn into the sheet's rect and squashed. Redraw it to " +
+                            "the row's shape, or change the row's design size to the art's");
             }
 
             GameObject old = GameObject.Find(RootName);
@@ -774,19 +845,25 @@ namespace GulagRunners.GameEditor
 
             // The names, outside each bar and pushed against the same edge it is. Which
             // bar is blue already says who you are; the names say who the other one is.
-            view.name1 = Label(bar, "Name / P1", "RUNNER_1", 134, 104, 320, 30,
+            //
+            // 124 from the top, not 104: the stamina row above them is 36 units tall now
+            // rather than 20, and a name at 104 would have the last pip drawn through it.
+            // The band is the bar at 36, the pips at 80 and the name under both.
+            view.name1 = Label(bar, "Name / P1", "RUNNER_1", 134, 124, 320, 30,
                                0f, TextAnchor.UpperLeft, 24);
-            view.name2 = Label(bar, "Name / P2", "RUNNER_2", 1920 - 134 - 320, 104, 320, 30,
+            view.name2 = Label(bar, "Name / P2", "RUNNER_2", 1920 - 134 - 320, 124, 320, 30,
                                1f, TextAnchor.UpperRight, 24);
 
             // The series, grouped under the clock rather than scattered along the bars:
             // one place that answers "how does the match stand", with each fighter's
             // marks on their own side of it.
-            view.roundLabel = Label(bar, "Round Of", "ROUND 1 / 3", 800, 86, 320, 28,
-                                    0.5f, TextAnchor.UpperCenter, 22);
+            // 24, not 22, in a box tall enough for it: 22 units is 1.7 mm of type, and a
+            // line of Arial at 24 in a 28-unit box is clipped by uGUI rather than wrapped.
+            view.roundLabel = Label(bar, "Round Of", "ROUND 1 / 3", 800, 86, 320, 32,
+                                    0.5f, TextAnchor.UpperCenter, 24);
 
             // Three marks wide, because three is the longest a best-of-three runs.
-            float pip = Size("hud/pip", 20, 20).x;
+            float pip = Size("hud/pip", 36, 36).x;
             float marks = pip * 3f + 16f;
             view.wins1 = Marks(bar, sprites, "Wins / P1", 800 - 24 - marks, 90, 0.5f);
             view.wins2 = Marks(bar, sprites, "Wins / P2", 1120 + 24, 90, 0.5f);
@@ -818,7 +895,7 @@ namespace GulagRunners.GameEditor
         {
             const int most = 3;
             const float gap = 8f;
-            float size = Size("hud/pip", 20, 20).x;
+            float size = Size("hud/pip", 36, 36).x;
 
             RectTransform row = Make(name, parent, x, y,
                                      most * size + (most - 1) * gap, size, anchor, 0f,
@@ -861,7 +938,7 @@ namespace GulagRunners.GameEditor
             float k = _readoutScale;
             const int count = 4;
             const float gap = 8f;
-            float size = Size("hud/pip", 20, 20).x;
+            float size = Size("hud/pip", 36, 36).x;
             float width = count * size + (count - 1) * gap;
 
             RectTransform row = Make(name, parent, anchor >= 0.5f ? x - width : x, y,
@@ -909,8 +986,8 @@ namespace GulagRunners.GameEditor
 
             Vector2 square = Size("hud/slot/frame", 64, 64);
             Vector2 halo = Size("hud/slot/glow", 160, 160);
-            Vector2 iconSize = Size("hud/icon/coif", 32, 32);
-            Vector2 swapSize = Size("hud/slot/swap-arrow", 18, 18);
+            Vector2 iconSize = Size("hud/icon/coif", 44, 44);
+            Vector2 swapSize = Size("hud/slot/swap-arrow", 44, 44);
 
             // Along the BOTTOM MIDDLE, not down the left.
             //
@@ -957,8 +1034,13 @@ namespace GulagRunners.GameEditor
                                             iconSize.x, iconSize.y, 0f, 0f, k);
                 Image icon = Picture(iconRt.gameObject, sprites, row.icon, false);
 
-                RectTransform swapRt = Make("Swap arrow", rt, square.x - swapSize.x * 1.1f,
-                                            -swapSize.y / 3f, swapSize.x, swapSize.y,
+                // A badge on the corner, which means a FRACTION of the arrow hangs off the
+                // square rather than a fixed 1.1 of it: at 18 units that formula sat the
+                // arrow neatly over the corner and at 44 it walked it into the middle of
+                // the square, over the item it is talking about. 0.6 leaves 40% of the
+                // arrow outside the frame and still 6 units clear of the next slot.
+                RectTransform swapRt = Make("Swap arrow", rt, square.x - swapSize.x * 0.6f,
+                                            -swapSize.y * 0.25f, swapSize.x, swapSize.y,
                                             0f, 0f, k);
                 Picture(swapRt.gameObject, sprites, "hud/slot/swap-arrow", false);
                 swapRt.gameObject.SetActive(false);
@@ -999,7 +1081,7 @@ namespace GulagRunners.GameEditor
 
             RectTransform sound = Panel("Off-screen cue", root);
 
-            Vector2 arcSize = Size("hud/sound/arc", 210, 62);
+            Vector2 arcSize = Size("hud/sound/arc", 210, 101);
             RectTransform arc = Make("Arc", sound, 140, 572, arcSize.x, arcSize.y, 0f, 1f,
                                      _readoutScale);
 

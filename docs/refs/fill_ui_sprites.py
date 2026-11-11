@@ -47,7 +47,13 @@ MAP = {
     "hud/slot/swap-arrow":     (None,                            "HUD/slot/swap-arrow.png"),
     "hud/bar/frame":           ("Frames/BarFrame.png",           "HUD/bar/frame.png"),
     "hud/bar/fill":            ("Fill/BarFill.png",              "HUD/bar/fill.png"),
-    "hud/pip":                 ("Icons/RoundIcon.png",           "HUD/pip.png"),
+    # The white export's RoundIcon.png is a TROPHY -- a cup with a stem, 25 px of drawing
+    # in a 75 px box -- and this row is the little lamp that lights up for a round won and
+    # for each point of stamina. Four narrow cups in a row where four dots belong is the
+    # one mapping in this table that was wrong rather than borrowed, and ui_fit_check found
+    # it by measuring the ink: 33% of the file across and 89% down is not a dot.
+    # The older export's pip.png is a diamond that fills its own box, so it wins here.
+    "hud/pip":                 (None,                            "HUD/pip.png"),
     "hud/button/ring-154":     ("Controls/ControlBackground.png", "HUD/button/ring-154.png"),
     "hud/button/ring-130":     (None,                            "HUD/button/ring-130.png"),
     "hud/button/ring-101":     (None,                            "HUD/button/ring-101.png"),
