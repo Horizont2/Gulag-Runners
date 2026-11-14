@@ -59,7 +59,8 @@ SET = os.path.join(ASSETS, "_Game", "UI", "UI Sprites.asset")
 BUILDERS = (("HudBuilder.cs", "the combat HUD"),
             ("MenuBuilder.cs", "the main menu"),
             ("SearchBuilder.cs", "the search panel"),
-            ("ResultBuilder.cs", "the result screen"))
+            ("ResultBuilder.cs", "the result screen"),
+            ("ShopBuilder.cs", "the shop"))
 
 # The result screen is laid out at the SIZE IN ITS TABLE, every row, because it is made of
 # slabs and a slab stretches: Slab() and Face() take their rect from Design(key) and skin

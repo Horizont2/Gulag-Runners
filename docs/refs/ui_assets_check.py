@@ -36,13 +36,15 @@ OLDER = os.path.join("_Game", "UI")
 BUILDERS = (("HudBuilder.cs", "the combat HUD"),
             ("MenuBuilder.cs", "the main menu"),
             ("SearchBuilder.cs", "the search panel"),
-            ("ResultBuilder.cs", "the result screen"))
+            ("ResultBuilder.cs", "the result screen"),
+            ("ShopBuilder.cs", "the shop"))
 
 # Rows that are MEANT to be empty: the builder lays them out as a flat colour and says so
 # in its own note. An empty row here is a decision, not a gap.
 BY_DESIGN = {
     "result/dim": "the builder lays a flat UiPalette.Scrim; art is optional",
     "result/banner": "the headline is text on nothing until somebody draws a band",
+    "shop/icon/lock": "nothing in either export is a padlock, and the price says it anyway",
 }
 
 # UiSpriteRows.Generic, mirrored. Kept in step by drifted(), below.
@@ -236,7 +238,8 @@ def main():
         print(("  " + n) if n.startswith(" ") else ("  note: " + n))
     for p in problems:
         print("  " + p)
-    print(f"ui_assets_check: {len(problems)} problem(s); {white + older} of 57 row(s) "
+    asked = sum(len(keys_of(os.path.join(EDITOR, name))) for name, _what in BUILDERS)
+    print(f"ui_assets_check: {len(problems)} problem(s); {white + older} of {asked} row(s) "
           f"dressed, {len(borrowed)} of them from the older export")
     return 1 if problems else 0
 

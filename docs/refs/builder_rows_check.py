@@ -24,7 +24,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 EDITOR = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game", "Editor")
 
-BUILDERS = ("HudBuilder.cs", "MenuBuilder.cs", "SearchBuilder.cs", "ResultBuilder.cs")
+BUILDERS = ("HudBuilder.cs", "MenuBuilder.cs", "SearchBuilder.cs",
+            "ResultBuilder.cs", "ShopBuilder.cs")
 
 # Twelve words is not a style rule, it is the shortest thing that can answer "what is this
 # and how is it drawn". Under it, the note is the key with articles in it.

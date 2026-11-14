@@ -108,6 +108,27 @@ MAP = {
     "search/bar/fill":         ("Fill/BarFill.png",              "Search/bar/fill.png"),
     "search/scrim":            (None,                            "Search/scrim.png"),
 
+    # ---- the shop, which is also the inventory
+    #
+    # Almost every file the white export had spare ends up here, and that is not a
+    # coincidence: Backgrounds/ and Frames/ were drawn as PAIRS for a screen with a list
+    # of things in it, which is what a shop is. The two closes and the scrim are the
+    # search screen's, because a way out is a way out.
+    "menu/icon/skins":         ("Icons/SkinsIcon.png",           None),
+
+    "shop/scrim":              (None,                            "Search/scrim.png"),
+    "shop/panel":              ("Frames/ProfileFrame.png",       None),
+    "shop/tab":                ("Backgrounds/IconBackground.png", None),
+    "shop/tab-on":             ("Frames/IconFrame.png",          None),
+    "shop/row":                ("Backgrounds/MoneyBackground.png", None),
+    "shop/row-on":             ("Backgrounds/EQBackground.png",  None),
+    "shop/slot":               ("Frames/EQFrame.png",            "HUD/slot/frame.png"),
+    "shop/button/act":         ("Frames/PlayFrame.png",          None),
+    "shop/button/close":       (None,                            "Search/button/close.png"),
+    "shop/icon/close":         (None,                            "Search/icon/close.png"),
+    # Nothing in either export is a padlock, and a lock drawn out of a frame is a frame.
+    "shop/icon/lock":          (None,                            None),
+
     # ---- the result screen, which is new and has no export of its own
     #
     # dim and banner stay EMPTY on purpose: the builder lays the dimmer in as a flat

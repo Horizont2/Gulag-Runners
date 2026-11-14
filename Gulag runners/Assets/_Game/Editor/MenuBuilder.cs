@@ -112,6 +112,15 @@ namespace GulagRunners.GameEditor
             new Asset("menu/icon/gear", 44, 44,
                       "The settings icon in the top bar. The one icon players expect to "
                       + "recognise without learning it, so draw the obvious cog."),
+            // The white export shipped SkinsIcon.png and no row asked for it, which was
+            // the shape of the hole: MenuUI.Shop() existed, the panel field existed, and
+            // nothing in the menu opened either. A screen nothing opens is a screen that
+            // is not in the game.
+            new Asset("menu/icon/skins", 44, 44,
+                      "The glyph on the SHOP button, bottom left beside settings and "
+                      + "friends. A hanger, a shirt, a mask -- whatever reads as \"what I "
+                      + "look like\" rather than as \"what I buy\": docs/09 sells only "
+                      + "cosmetics, so this is the wardrobe and not a till."),
             new Asset("menu/icon/people", 40, 40,
                       "The icon for how many players are online, or for the friends list. "
                       + "Two figures read better than one at this size -- one figure reads "
@@ -717,6 +726,11 @@ namespace GulagRunners.GameEditor
                   64, round, view.Settings, wired);
             Round(block, sprites, view, "Button / Friends", "menu/icon/people",
                   64 + round.x + 18, round, view.Friends, wired);
+
+            // Third along, because the order is the order they are used in: what the
+            // game sounds like, who you play with, and what you look like.
+            Round(block, sprites, view, "Button / Shop", "menu/icon/skins",
+                  64 + (round.x + 18) * 2f, round, view.Shop, wired);
         }
 
         void Round(RectTransform parent, Dictionary<string, Sprite> sprites, MenuUI view,

@@ -312,15 +312,28 @@ INHERITED = {
 
 CONTROL = {"if", "else", "for", "foreach", "while", "switch", "case", "do", "using",
            "lock", "return", "throw", "catch", "fixed", "yield", "select", "where",
-           "from", "in", "is", "as", "new", "get", "set", "add", "remove", "init"}
+           "from", "in", "is", "as", "new", "get", "set", "add", "remove", "init",
+           # A MODIFIER in front of a tuple return type reads as a call to itself:
+           # "public static (int slow, int quick) Days(" has "static (" in it. These are
+           # never method names, so excluding them costs nothing and stops the one false
+           # alarm a tuple-returning method produces.
+           "public", "private", "protected", "internal", "static", "readonly", "sealed",
+           "override", "virtual", "async", "partial", "extern", "unsafe", "abstract",
+           "implicit", "explicit", "operator", "delegate", "event", "const"}
 
 # A declaration's return type may be a generic with spaces in it -- Dictionary<string,
 # Sprite> -- so the type is matched as "a word, optionally followed by a bracketed lump",
 # not as one token of word characters. Missing that read six real methods as undefined.
+# A TUPLE return type is a type in brackets -- (int slow, int quick) Days(int price) --
+# and the "a word, maybe with a bracketed lump" rule above cannot see one, so the method
+# read as undefined everywhere it was called. It is matched as its own alternative rather
+# than by loosening the word rule, because a loose rule here reads "if (ready) Draw(" as
+# a definition of Draw.
 DEFINE = re.compile(
     r"(?m)^[ \t]*(?:(?:public|private|protected|internal|static|readonly|sealed|override|"
     r"virtual|async|partial|new|extern|unsafe|abstract|implicit|explicit|operator)\s+)*"
-    r"[\w\.\?]+(?:<[^()=;]*>)?(?:\[\s*\])?\s+(\w+)\s*(?:<[^>()]*>)?\s*\(")
+    r"(?:\(\s*[\w\.\?<>,\[\]\s]+\)|[\w\.\?]+(?:<[^()=;]*>)?(?:\[\s*\])?)"
+    r"\s+(\w+)\s*(?:<[^>()]*>)?\s*\(")
 
 # And a delegate in a variable is called like a method: Action paint = ...; paint();
 DELEGATE = re.compile(

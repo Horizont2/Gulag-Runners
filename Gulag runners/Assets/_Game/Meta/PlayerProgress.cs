@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GulagRunners.Meta
@@ -26,6 +27,21 @@ namespace GulagRunners.Meta
         [Header("Purse")]
         [Tooltip("docs/09: gold only ever buys cosmetics. Nothing in the arena reads it.")]
         public int gold;
+
+        [Header("The wardrobe")]
+        [Tooltip("Every cosmetic this player owns, by id, oldest first.\n\n" +
+                 "Ids and not indices: a catalogue that gains an item in the middle must " +
+                 "not silently hand everybody somebody else's hat. The id is the key in " +
+                 "the catalogue, in the save file and in the shop, and it only has to " +
+                 "agree with itself.")]
+        public List<string> owned = new List<string>();
+
+        [Tooltip("What is worn, one id per category, in the order of the Cosmetic.Slot " +
+                 "enum. Empty means the default look for that slot.\n\n" +
+                 "One per slot rather than a set, because a second hat is not a thing a " +
+                 "fighter can wear and a shop that lets you equip two is a shop with a " +
+                 "bug waiting in it.")]
+        public List<string> equipped = new List<string>();
 
         [Header("Ladder — hidden from the player, shown only as a league")]
         [Tooltip("The Glicko-2 rating. docs/09 is explicit that this number is never shown: " +
@@ -67,8 +83,13 @@ namespace GulagRunners.Meta
         /// What the saved shape is. Raise it when a field changes meaning, and teach
         /// <see cref="Load"/> how to read the one before — a save that silently loads as
         /// something else is worse than one that fails to load at all.
+        ///
+        /// 3 adds the wardrobe: what is owned and what is worn. A v2 save has neither,
+        /// which reads correctly as a player who has bought nothing — so there is nothing
+        /// to convert, and <see cref="Load"/> says so rather than leaving the reader to
+        /// wonder whether something was lost.
         /// </summary>
-        const int Version = 2;
+        const int Version = 3;
 
         /// <summary>Days of play in a row that earn docs/09's weekly streak.</summary>
         public const int DaysInAStreak = 7;
@@ -201,6 +222,22 @@ namespace GulagRunners.Meta
             if (persist) Save();
         }
 
+        static int Count(List<string> list) => list?.Count ?? 0;
+
+        /// <summary>
+        /// A saved list, back as a list. An empty string is an empty list and not a list
+        /// holding one empty id, which is the difference between a wardrobe with nothing
+        /// in it and one holding a cosmetic called "".
+        /// </summary>
+        static List<string> Split(string saved)
+        {
+            List<string> out_ = new List<string>();
+            if (string.IsNullOrEmpty(saved)) return out_;
+            foreach (string part in saved.Split('|'))
+                if (!string.IsNullOrEmpty(part)) out_.Add(part);
+            return out_;
+        }
+
         /// <summary>Spends gold if there is enough. True when it went through.</summary>
         public bool Spend(int cost)
         {
@@ -217,6 +254,8 @@ namespace GulagRunners.Meta
             rating = 1500; deviation = 350; volatility = 0.06;
             matchesPlayed = matchesWon = dailiesDone = daysInARow = 0;
             lastPlayedDay = -1;
+            owned = new List<string>();
+            equipped = new List<string>();
             if (persist) Save();
             saveState = "wiped";
         }
@@ -242,10 +281,17 @@ namespace GulagRunners.Meta
             PlayerPrefs.SetInt(Key + "dailies", dailiesDone);
             PlayerPrefs.SetInt(Key + "day", lastPlayedDay);
             PlayerPrefs.SetInt(Key + "inarow", daysInARow);
+
+            // One line each, joined by a character an id may not contain. A JSON blob here
+            // would be the same data with a parser in front of it, and PlayerPrefs is a
+            // string store: the simplest thing that cannot be written wrong is a list of
+            // ids with a separator the ids are checked against (see CosmeticCatalogue).
+            PlayerPrefs.SetString(Key + "owned", string.Join("|", owned ?? new List<string>()));
+            PlayerPrefs.SetString(Key + "worn", string.Join("|", equipped ?? new List<string>()));
             PlayerPrefs.Save();
 
             saveState = $"saved v{Version}: {gold}g, {matchesPlayed} played, "
-                        + $"{daysInARow} day(s) in a row";
+                        + $"{daysInARow} day(s) in a row, {Count(owned)} owned";
         }
 
         public void Load()
@@ -291,8 +337,13 @@ namespace GulagRunners.Meta
             lastPlayedDay = PlayerPrefs.GetInt(Key + "day", lastPlayedDay);
             daysInARow = Mathf.Max(0, PlayerPrefs.GetInt(Key + "inarow", daysInARow));
 
+            owned = Split(PlayerPrefs.GetString(Key + "owned", ""));
+            equipped = Split(PlayerPrefs.GetString(Key + "worn", ""));
+
             saveState = $"loaded v{found}: {gold}g, {matchesPlayed} played, "
-                        + $"{daysInARow} day(s) in a row";
+                        + $"{daysInARow} day(s) in a row, {Count(owned)} owned"
+                        + (found < 3 ? " (a v" + found + " save: it owned no cosmetics, "
+                                     + "which is what an empty wardrobe means)" : "");
         }
 
         /// <summary>

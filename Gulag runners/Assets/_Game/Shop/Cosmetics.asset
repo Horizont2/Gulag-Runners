@@ -1,0 +1,162 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c05e71c3a4f9426ab2f1d7e85c3a9f10, type: 3}
+  m_Name: Cosmetics
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Meta.CosmeticCatalogue
+  items:
+  - id: runner.default
+    shown: RUNNER
+    slot: 0
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: default
+  - id: runner.ash
+    shown: ASH
+    slot: 0
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: runner.copper
+    shown: COPPER
+    slot: 0
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: runner.nightjar
+    shown: NIGHTJAR
+    slot: 0
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: weapon.default
+    shown: AS FOUND
+    slot: 1
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: default
+  - id: weapon.bone
+    shown: BONE HANDLE
+    slot: 1
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: weapon.riverstone
+    shown: RIVER STONE
+    slot: 1
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: weapon.goldleaf
+    shown: GOLD LEAF
+    slot: 1
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: emote.default
+    shown: NOTHING
+    slot: 2
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: default
+  - id: emote.salute
+    shown: SALUTE
+    slot: 2
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: emote.sit
+    shown: SIT DOWN
+    slot: 2
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: graffiti.default
+    shown: BARE WALL
+    slot: 3
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: default
+  - id: graffiti.tally
+    shown: TALLY MARKS
+    slot: 3
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: graffiti.crown
+    shown: CROWN
+    slot: 3
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: knockout.default
+    shown: PLAIN
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: default
+  - id: knockout.dust
+    shown: DUST
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: knockout.embers
+    shown: EMBERS
+    slot: 4
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: knockout.flood
+    shown: THE FLOOD
+    slot: 4
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: frame.default
+    shown: PLAIN FRAME
+    slot: 5
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: default
+  - id: frame.bronze
+    shown: BRONZE FRAME
+    slot: 5
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: frame.runner
+    shown: RUNNER FRAME
+    slot: 5
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
