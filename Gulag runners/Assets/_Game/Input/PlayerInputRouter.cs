@@ -38,16 +38,22 @@ namespace GulagRunners.Game
             // average of a touch stick resting at zero and a pad being used, which is
             // half as far as asked -- so they compete rather than add.
             InputFlags flags = InputFlags.None;
-            int bestX = 0, bestY = 0, bestPush = 0;
+            int bestX = 0, bestY = 0, bestPush = 0, choice = 0;
             for (int i = 0; i < _sources.Count; i++)
             {
                 TickInput t = _sources[i].Read();
                 flags |= t.Flags;
 
+                // The touch on a lock is a NUMBER in those bits, not a set of them, so it
+                // cannot be OR'd with the rest: option 1 from the pad and option 2 from a
+                // keyboard would arrive as option 3, which is a wrong answer nobody gave.
+                // First source with one wins, and in practice only one ever has one.
+                if (choice == 0) choice = t.Flags.Choice();
+
                 int push = t.AimX * t.AimX + t.AimY * t.AimY;
                 if (push > bestPush) { bestPush = push; bestX = t.AimX; bestY = t.AimY; }
             }
-            return new TickInput(flags, bestX, bestY);
+            return new TickInput(flags.WithChoice(choice), bestX, bestY);
         }
     }
 }

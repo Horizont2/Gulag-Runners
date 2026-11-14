@@ -32,7 +32,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 EDITOR = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game", "Editor")
 
 BUILDERS = ("HudBuilder.cs", "MenuBuilder.cs", "SearchBuilder.cs", "ResultBuilder.cs",
-            "ShopBuilder.cs")
+            "ShopBuilder.cs", "PuzzleBuilder.cs")
 
 # The sheet every builder lays out on, and what a unit is worth on a 6.5" phone
 # (docs/23): 1920 units across 150 mm of glass.
@@ -51,6 +51,9 @@ ALLOWED = {
     "SearchBuilder.cs": {"Scrim"},
     "ResultBuilder.cs": {"Scrim"},
     "ShopBuilder.cs": {"Scrim"},
+    # The lock plate is MOVED every frame -- PuzzleView puts it over the fighter and does
+    # its own clamping to the sheet -- so where the builder leaves it says nothing.
+    "PuzzleBuilder.cs": {"Plate"},
 }
 
 
@@ -223,6 +226,16 @@ def vector(expr, env, table):
     raise Unreadable(expr)
 
 
+def pretty(arg):
+    """The name a Make call gives a rect, readable. An interpolated one keeps its hole."""
+    s = arg.strip()
+    if s.startswith('$"') and s.endswith('"'):
+        s = s[2:-1]
+    elif s.startswith('"') and s.endswith('"'):
+        s = s[1:-1]
+    return re.sub(r"\{\s*(.*?)\s*\}", lambda m: "{" + m.group(1).replace(" ", "") + "}", s)
+
+
 def split_args(inside):
     """Top-level commas only."""
     out, buf, depth = [], [], 0
@@ -276,7 +289,11 @@ class Walk:
                     hi = int(value(stop, env, self.table))
                 except Unreadable:
                     continue
-                turns = sorted({lo, hi - 1}) if hi > lo else []
+                # First, second and last. The last turn is where a list runs off the end of
+                # the sheet; the second is where a row sits on top of the one before it,
+                # and that one only shows against its NEIGHBOUR -- the first and the last
+                # of six targets 60 units apart are 300 apart and look perfectly fine.
+                turns = sorted(t for t in {lo, lo + 1, hi - 1} if lo <= t < hi)
                 for t in turns:
                     self.run(inner, dict(env, **{var: float(t)}))
             else:
@@ -307,18 +324,39 @@ class Walk:
             self.rects[m.group(1)] = dict(name="(root)", left=0.0, top=0.0,
                                           w=DESIGN_W, h=DESIGN_H, parent=None, var=m.group(1))
             return
+
+        # A rect pinned to the middle of its parent rather than laid out from a corner.
+        m = re.match(r"^RectTransform\s+(\w+)\s*=\s*Centre\(", stmt)
+        if m and (call_args(stmt, "Centre") or []).__len__() == 4:
+            args = call_args(stmt, "Centre")
+            parent = self.rects.get(args[1].strip()) or dict(
+                name="(canvas)", left=0.0, top=0.0, w=DESIGN_W, h=DESIGN_H, parent=None, var="")
+            try:
+                w = value(args[2], env, self.table)
+                h = value(args[3], env, self.table)
+            except Unreadable as e:
+                self.unread.append((pretty(args[0]), str(e)))
+                self.rects.pop(m.group(1), None)
+                return
+            rect = dict(name=pretty(args[0]),
+                        left=parent["left"] + (parent["w"] - w) / 2,
+                        top=parent["top"] + (parent["h"] - h) / 2,
+                        w=w, h=h, parent=parent, var=m.group(1))
+            self.made.append(rect)
+            self.rects[m.group(1)] = rect
+            return
         if "Make(" not in stmt:
             return
         args = call_args(stmt, "Make")
-        if args is None or len(args) < 7:
+        # Six arguments is a Make whose anchor is the top left and nothing else; seven or
+        # more carries the anchor, the vertical anchor and a cluster scale.
+        if args is None or len(args) < 6:
             return
         var = None
         m = re.match(r"^RectTransform\s+(\w+)\s*=", stmt)
         if m:
             var = m.group(1)
-        name = args[0].strip().strip('"')
-        if name.startswith("$"):
-            name = name[2:-1] if name.endswith('"') else name
+        name = pretty(args[0])
         parent = self.rects.get(args[1].strip())
         if parent is None:
             parent = dict(name="(canvas)", left=0.0, top=0.0, w=DESIGN_W, h=DESIGN_H,
@@ -328,7 +366,7 @@ class Walk:
             fy = value(args[3], env, self.table)
             w = value(args[4], env, self.table)
             h = value(args[5], env, self.table)
-            ax = value(args[6], env, self.table)
+            ax = value(args[6], env, self.table) if len(args) > 6 else 0.0
             va = value(args[7], env, self.table) if len(args) > 7 else 0.0
             k = value(args[8], env, self.table) if len(args) > 8 else 1.0
         except Unreadable as e:
@@ -427,8 +465,9 @@ def main():
         for i in range(len(taps)):
             for j in range(i + 1, len(taps)):
                 a, b = taps[i], taps[j]
-                if a["name"] == b["name"]:
-                    continue
+                # Two turns of one loop carry the SAME name here, because the name is an
+                # interpolated string this cannot read -- and they are exactly the pair
+                # worth comparing, since a row of targets only overlaps its neighbour.
                 if hits(a, b):
                     problems.append(
                         f"{builder}: the tap targets \"{a['name']}\" and \"{b['name']}\" "

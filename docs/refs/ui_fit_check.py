@@ -60,7 +60,8 @@ BUILDERS = (("HudBuilder.cs", "the combat HUD"),
             ("MenuBuilder.cs", "the main menu"),
             ("SearchBuilder.cs", "the search panel"),
             ("ResultBuilder.cs", "the result screen"),
-            ("ShopBuilder.cs", "the shop"))
+            ("ShopBuilder.cs", "the shop"),
+            ("PuzzleBuilder.cs", "the lock panel"))
 
 # The result screen is laid out at the SIZE IN ITS TABLE, every row, because it is made of
 # slabs and a slab stretches: Slab() and Face() take their rect from Design(key) and skin
