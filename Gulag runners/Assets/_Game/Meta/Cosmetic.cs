@@ -21,20 +21,28 @@ namespace GulagRunners.Meta
         /// <summary>The fighter's own model. MenuFighter already holds them all, switched off.</summary>
         Runner = 0,
 
-        /// <summary>What a weapon looks like in the hand. The weapon it IS does not change.</summary>
+        /// <summary>
+        /// How every weapon is finished -- rust, bone, gilt. ONE finish across the whole
+        /// rack rather than a skin per weapon: the weapon in your hand is whatever the
+        /// arena gave you, so a skin for one of twelve is a thing you would see about
+        /// twice an evening. The weapon it IS does not change.
+        /// </summary>
         Weapon = 1,
 
-        /// <summary>A gesture, fired between rounds and at the result screen.</summary>
-        Emote = 2,
-
-        /// <summary>A mark left on the arena's wall. Seen by both players.</summary>
-        Graffiti = 3,
-
         /// <summary>What happens on screen when the other man goes down.</summary>
-        Knockout = 4,
+        Knockout = 2,
 
-        /// <summary>The border around the player's name and league in the menu.</summary>
-        Frame = 5,
+        /// <summary>The plate the player's name sits on, in the menu and on both HUDs.</summary>
+        Plate = 3,
+
+        /// <summary>
+        /// The face of a lock (docs/04). You look at one every time you pick a chest
+        /// instead of forcing it, several times a match, and nobody else ever sees it.
+        /// </summary>
+        Lock = 4,
+
+        /// <summary>How the fighter stands in the menu, and how he wins on the result screen.</summary>
+        Pose = 5,
     }
 
     /// <summary>
@@ -181,7 +189,7 @@ namespace GulagRunners.Meta
         /// <summary>How many slots there are, once, so nothing counts the enum by hand.</summary>
         public static readonly Slot[] Slots =
         {
-            Slot.Runner, Slot.Weapon, Slot.Emote, Slot.Graffiti, Slot.Knockout, Slot.Frame,
+            Slot.Runner, Slot.Weapon, Slot.Knockout, Slot.Plate, Slot.Lock, Slot.Pose,
         };
 
         /// <summary>What to call a slot on a tab.</summary>
@@ -189,10 +197,10 @@ namespace GulagRunners.Meta
         {
             Slot.Runner => "RUNNERS",
             Slot.Weapon => "WEAPONS",
-            Slot.Emote => "EMOTES",
-            Slot.Graffiti => "GRAFFITI",
             Slot.Knockout => "KNOCKOUTS",
-            _ => "FRAMES",
+            Slot.Plate => "PLATES",
+            Slot.Lock => "LOCKS",
+            _ => "POSES",
         };
     }
 }

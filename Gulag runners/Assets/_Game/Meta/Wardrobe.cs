@@ -52,6 +52,13 @@ namespace GulagRunners.Meta
         /// The fallback is here rather than in the save so that an id the catalogue has
         /// dropped -- an item pulled from sale, a renamed key -- reads as the default look
         /// instead of as a fighter with no model.
+        ///
+        /// The saved id has to BELONG to the slot it was found in, and that is not
+        /// belt-and-braces: the save is a list indexed by the enum, so the day the enum is
+        /// reordered -- as it was when emotes and graffiti came off sale -- every old save
+        /// has its ids one or two places out. Checking the slot turns that from a knockout
+        /// effect worn as a lock face into the default, which is what a save written for a
+        /// shop that no longer exists should read as.
         /// </summary>
         public static string WornIn(CosmeticCatalogue catalogue, List<string> equipped,
                                     Slot slot)
@@ -60,8 +67,9 @@ namespace GulagRunners.Meta
             if (equipped != null && at < equipped.Count)
             {
                 string saved = equipped[at];
-                if (!string.IsNullOrEmpty(saved) && catalogue != null
-                    && catalogue.Find(saved) != null)
+                Cosmetic found = !string.IsNullOrEmpty(saved) && catalogue != null
+                    ? catalogue.Find(saved) : null;
+                if (found != null && found.slot == slot)
                     return saved;
             }
             Cosmetic fallback = catalogue != null ? catalogue.DefaultIn(slot) : null;

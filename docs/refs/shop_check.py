@@ -2,8 +2,8 @@
 
 docs/09 is unusually specific for a design note, and every number in it is checkable:
 
-    Gold is spent on ONLY cosmetics: runner skins, weapon skins, emotes, graffiti on the
-    arena walls, knockout effects, profile frames.
+    Gold is spent on ONLY cosmetics: runner skins, weapon finishes, knockout effects,
+    name plates, lock faces, menu poses.
     A T1 skin costs 800, a T3 skin 3000. An active player earns 250-350 a day, so a
     cosmetic is three to ten days away without paying.
     IRON RULE: gold never buys power.
@@ -40,8 +40,15 @@ PRICES = {0: 800, 1: 1600, 2: 3000}
 A_DAY_LOW, A_DAY_HIGH = 250, 350
 DAYS_LOW, DAYS_HIGH = 3, 10
 
-# The six it allows, in the order the save indexes them by.
-SLOTS = ("Runner", "Weapon", "Emote", "Graffiti", "Knockout", "Frame")
+# The six that are actually made and seen, in the order the save indexes them by.
+#
+# docs/09 named six categories and this is not the same six: emotes and graffiti came off
+# sale, locks and poses went on. The reason is docs/01 -- the other player cannot be seen
+# for most of a match, so a gesture and a mark on a far wall are bought by nobody, while a
+# lock face is looked at several times a match by the one person paying for it. The RULE
+# the list enforces is unchanged and is the only one that matters: six, and a seventh is
+# how "gold never buys power" goes, one innocent enum value at a time.
+SLOTS = ("Runner", "Weapon", "Knockout", "Plate", "Lock", "Pose")
 
 
 def read(path):
@@ -197,8 +204,17 @@ def main():
     if 'PlayerPrefs.SetString(Key + "worn"' not in progress:
         problems.append("PlayerProgress never writes what is equipped to PlayerPrefs")
 
-    # ---- and the iron rule, as a rule about the code rather than about intentions
+    # ---- the save is indexed by the enum, so the enum moving is a real event
     wardrobe = read(os.path.join(GAME, "Meta", "Wardrobe.cs"))
+    worn = re.search(r"(?s)public static string WornIn\(.*?\n        \}", wardrobe)
+    if not worn or not re.search(r"\.slot\s*==\s*slot", worn.group(0)):
+        problems.append(
+            "Wardrobe.WornIn does not check that a saved id BELONGS to the slot it was "
+            "found in. The worn list is indexed by the Slot enum, so the day that enum is "
+            "reordered -- as it was when emotes and graffiti came off sale -- every old "
+            "save is one or two places out, and a knockout effect is worn as a lock face")
+
+    # ---- and the iron rule, as a rule about the code rather than about intentions
     for word in ("Damage", "Health", "Armour", "Speed", "Reach"):
         if re.search(r"\b" + word + r"\b", wardrobe):
             problems.append(f"Wardrobe mentions {word}. Gold never buys power (docs/09), "

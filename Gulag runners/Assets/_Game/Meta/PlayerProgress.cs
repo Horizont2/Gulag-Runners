@@ -88,8 +88,18 @@ namespace GulagRunners.Meta
         /// which reads correctly as a player who has bought nothing — so there is nothing
         /// to convert, and <see cref="Load"/> says so rather than leaving the reader to
         /// wonder whether something was lost.
+        ///
+        /// 4 narrows what is on sale. Emotes and graffiti came off — in a game where the
+        /// other player cannot be seen, a gesture and a mark on a far wall are bought by
+        /// nobody — and locks and poses went on, so the slot enum is REORDERED. The worn
+        /// list is indexed by that enum, so a v3 save has its ids one or two places out.
+        /// There is nothing to convert here either: <see cref="Wardrobe.WornIn"/> checks
+        /// that a saved id belongs to the slot it was found in, so an id that has shifted
+        /// reads as the slot's default, and an id for a slot that no longer exists is
+        /// simply never asked for again. What was OWNED is kept: it cost gold, and a
+        /// category coming back would find it still paid for.
         /// </summary>
-        const int Version = 3;
+        const int Version = 4;
 
         /// <summary>Days of play in a row that earn docs/09's weekly streak.</summary>
         public const int DaysInAStreak = 7;
@@ -343,7 +353,12 @@ namespace GulagRunners.Meta
             saveState = $"loaded v{found}: {gold}g, {matchesPlayed} played, "
                         + $"{daysInARow} day(s) in a row, {Count(owned)} owned"
                         + (found < 3 ? " (a v" + found + " save: it owned no cosmetics, "
-                                     + "which is what an empty wardrobe means)" : "");
+                                     + "which is what an empty wardrobe means)"
+                        : found < 4 ? " (a v" + found + " save: what is worn was written "
+                                    + "against the older slots, so anything that no longer "
+                                    + "lines up reads as that slot's default. Nothing owned "
+                                    + "was lost)"
+                                    : "");
         }
 
         /// <summary>

@@ -47,9 +47,9 @@ MonoBehaviour:
     tier: 0
     price: 0
     isDefault: 1
-    applies: default
+    applies: 
   - id: weapon.bone
-    shown: BONE HANDLE
+    shown: BONE
     slot: 1
     tier: 0
     price: 0
@@ -69,94 +69,108 @@ MonoBehaviour:
     price: 0
     isDefault: 0
     applies: 
-  - id: emote.default
-    shown: NOTHING
-    slot: 2
-    tier: 0
-    price: 0
-    isDefault: 1
-    applies: default
-  - id: emote.salute
-    shown: SALUTE
-    slot: 2
-    tier: 0
-    price: 0
-    isDefault: 0
-    applies: 
-  - id: emote.sit
-    shown: SIT DOWN
-    slot: 2
-    tier: 1
-    price: 0
-    isDefault: 0
-    applies: 
-  - id: graffiti.default
-    shown: BARE WALL
-    slot: 3
-    tier: 0
-    price: 0
-    isDefault: 1
-    applies: default
-  - id: graffiti.tally
-    shown: TALLY MARKS
-    slot: 3
-    tier: 0
-    price: 0
-    isDefault: 0
-    applies: 
-  - id: graffiti.crown
-    shown: CROWN
-    slot: 3
-    tier: 1
-    price: 0
-    isDefault: 0
-    applies: 
   - id: knockout.default
     shown: PLAIN
-    slot: 4
+    slot: 2
     tier: 0
     price: 0
     isDefault: 1
-    applies: default
+    applies: 
   - id: knockout.dust
     shown: DUST
-    slot: 4
+    slot: 2
     tier: 0
     price: 0
     isDefault: 0
     applies: 
   - id: knockout.embers
     shown: EMBERS
-    slot: 4
+    slot: 2
     tier: 1
     price: 0
     isDefault: 0
     applies: 
   - id: knockout.flood
     shown: THE FLOOD
+    slot: 2
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: plate.default
+    shown: BARE PLATE
+    slot: 3
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+  - id: plate.tally
+    shown: TALLY MARKS
+    slot: 3
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: plate.crown
+    shown: CROWN
+    slot: 3
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: plate.sector
+    shown: SECTOR SEVEN
+    slot: 3
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: lock.default
+    shown: RUSTED IRON
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+  - id: lock.temple
+    shown: TEMPLE STONE
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: lock.bone
+    shown: BONE
+    slot: 4
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+  - id: lock.brass
+    shown: BRASS
     slot: 4
     tier: 2
     price: 0
     isDefault: 0
     applies: 
-  - id: frame.default
-    shown: PLAIN FRAME
+  - id: pose.default
+    shown: AT EASE
     slot: 5
     tier: 0
     price: 0
     isDefault: 1
-    applies: default
-  - id: frame.bronze
-    shown: BRONZE FRAME
+    applies: 
+  - id: pose.guard
+    shown: ON GUARD
     slot: 5
     tier: 0
     price: 0
     isDefault: 0
     applies: 
-  - id: frame.runner
-    shown: RUNNER FRAME
+  - id: pose.sit
+    shown: SITTING
     slot: 5
-    tier: 2
+    tier: 1
     price: 0
     isDefault: 0
     applies: 
