@@ -41,9 +41,22 @@ namespace GulagRunners.GameEditor
         const float DesignH = 864f;
         const string RootName = "Shop UI";
 
-        // The column on the right: where it starts, how wide, and the gutter around it.
-        const float ColumnX = 1060f;
-        const float ColumnW = 1920f - ColumnX - 64f;
+        // The sheet on the right and the two columns inside it. These are the numbers the
+        // Figma file draws, and they are here rather than scattered through the build
+        // because the thing that went wrong last time was arithmetic, not taste: eight
+        // rows at a pitch of 142 need 1 136 units of column and there were 700, so half
+        // the list was built underneath the button and off the bottom of the phone.
+        const float SheetX = 960f;              // the sheet: here to the right edge, full height
+        const float RailX = 992f;               // the six tabs, down the near edge of it
+        const float RailY = 54f;
+        const float RailStep = 128f;            // 116 of tab, 12 of air
+        const float ListX = 1132f;              // the title, the list, the message
+        const float ListRight = 1888f;          // and where all three stop
+        const float ListW = ListRight - ListX;  // 756
+        const float ListY = 160f;
+        const float RowStep = 140f;             // 132 of row, 8 of air
+        const float BarY = 724f;                // the bottom bar: filter left, button right
+        const int Rows = 4;                     // what fits above it on an 864-unit sheet
         const float Gutter = 24f;
 
         Object _folder;
@@ -93,28 +106,32 @@ namespace GulagRunners.GameEditor
                       + "matters -- it is darkest under the list on the right and clears "
                       + "towards the fighter on the left, because he is the thing being "
                       + "sold and must not be dimmed."),
-            new Asset("shop/panel", 760, 700, 40,
-                      "The plate the list stands on, down the right-hand side. "
-                      + "Nine-sliced with a 40 px corner; it stretches to whatever height "
-                      + "the categories leave. Quiet: everything readable on this screen "
-                      + "sits ON it."),
+            new Asset("shop/panel", 960, 864, 40,
+                      "The sheet the list stands on: the right half of the screen, full "
+                      + "height, hard against the right edge. Nine-sliced with a 40 px "
+                      + "corner. Quiet: everything readable on this screen sits ON it, "
+                      + "and the fighter keeps the left half to himself."),
             new Asset("shop/tab", 116, 116, 24,
                       "One category tab, unselected -- runners, weapons, emotes, graffiti, "
-                      + "knockouts, frames. Six of them in a row above the list, and 116 "
-                      + "units is 9 mm, the smallest a thumb target gets in this game."),
+                      + "knockouts, frames. Six of them DOWN the near edge of the sheet, "
+                      + "and 116 units is 9 mm, the smallest a thumb target gets here."),
             new Asset("shop/tab-on", 116, 116, 24,
                       "The same tab, SELECTED. It is a separate row rather than a tint "
                       + "because \"which category am I in\" is the one thing this screen "
                       + "must never be ambiguous about, and a tint is ambiguous on a "
                       + "phone in sunlight."),
-            new Asset("shop/row", 700, 132, 28,
+            new Asset("shop/row", 756, 132, 28,
                       "One item in the list: the strip an icon, a name and a price sit on. "
                       + "132 units tall is 10.3 mm -- over the thumb floor, because the "
                       + "whole row is the tap target."),
-            new Asset("shop/row-on", 700, 132, 28,
+            new Asset("shop/row-on", 756, 132, 28,
                       "The same strip for the item currently being tried on. Again a row "
-                      + "of its own: the player has to see at a glance which of the eight "
+                      + "of its own: the player has to see at a glance which of the four "
                       + "things on screen is the one the button at the bottom will act on."),
+            new Asset("shop/rarity", 8, 88, 4,
+                      "The bar down the left edge of a row, tinted common, rare or "
+                      + "legendary. Colour at the edge is read before anything on the row "
+                      + "is read, which is why the rarity lives there and not in a word."),
             new Asset("shop/slot", 96, 96, 20,
                       "The square the item's picture sits in, at the left of a row. Empty "
                       + "while the art for a cosmetic does not exist yet, which is most of "
@@ -124,7 +141,8 @@ namespace GulagRunners.GameEditor
                       + "its resting state and tinted by the builder -- amber when it can "
                       + "be pressed, flat ink when it cannot."),
             new Asset("shop/button/close", 116, 116,
-                      "The round face of the way out, top right. Same 116 as the menu's "
+                      "The round face of the way out, top left, over the fighter and "
+                      + "clear of the sheet. Same 116 as the menu's "
                       + "round buttons and the search screen's cancel: one round control "
                       + "size in the game."),
             new Asset("shop/icon/close", 60, 60,
@@ -133,6 +151,13 @@ namespace GulagRunners.GameEditor
             new Asset("shop/icon/lock", 56, 56,
                       "The mark on a row that is not owned yet. Small and quiet -- the "
                       + "price is the real statement and this is the footnote."),
+            new Asset("shop/filter", 320, 76, 38,
+                      "The owned-only control at the bottom left. This one piece is the "
+                      + "whole difference between the shop and the inventory (docs/36), "
+                      + "so it is a named target and not a word to be tapped."),
+            new Asset("shop/filter/knob", 48, 48,
+                      "The knob inside it, slid left or right by MenuSwitch. Round, and "
+                      + "the only piece on the screen that moves."),
         };
 
         // ---------------------------------------------------------------- window
@@ -309,25 +334,26 @@ namespace GulagRunners.GameEditor
             wash.color = UiPalette.Fade(UiPalette.Scrim, 0.92f);
             wash.raycastTarget = true;        // and it eats taps meant for the menu behind
 
-            // ---- the plate the list stands on
-            Vector2 plate = Size("shop/panel", 760, 700);
-            RectTransform column = Make("Column", root, ColumnX, 96, ColumnW, 700, 0f, 0f);
+            // ---- the sheet the whole list stands on: full height, hard against the right
+            // edge, so the fighter keeps the left two thirds of the phone to himself.
+            Vector2 plate = Size("shop/panel", DesignW - SheetX, DesignH);
+            RectTransform column = Make("Sheet", root, SheetX, 0, plate.x, plate.y, 0f, 0f);
             Picture(column.gameObject, sprites, "shop/panel", true).color = UiPalette.Plate;
-            _ = plate;
 
-            // ---- the purse, above the plate on the right
-            RectTransform goldRt = Make("Gold", root, ColumnX, 36, ColumnW, 48, 0f, 0f);
-            Text gold = TextOn(goldRt, "1 240", 36, TextAnchor.MiddleRight, true);
+            // ---- the purse, at the top right of the sheet
+            RectTransform goldRt = Make("Gold", root, ListRight - 260, 40, 260, 76, 0f, 0f);
+            Text gold = TextOn(goldRt, "1 240", 34, TextAnchor.MiddleRight, true);
             gold.color = UiPalette.Amber;
             Wire(view.goldChanged, Label(gold).Set);
 
-            // ---- the six tabs
+            // ---- the six tabs, DOWN the near edge. Across the top they would have to
+            // share a line with the purse, and six tabs plus a purse is 1 020 units of
+            // want in 796 of room; down the edge they fit the height exactly.
             Vector2 tab = Size("shop/tab", 116, 116);
             for (int i = 0; i < CosmeticCatalogue.Slots.Length; i++)
             {
-                float x = ColumnX + i * (tab.x + 12f);
                 RectTransform rt = Make($"Tab / {CosmeticCatalogue.Name(CosmeticCatalogue.Slots[i])}",
-                                        column, x - ColumnX, -tab.y - 12f, tab.x, tab.y, 0f, 0f);
+                                        root, RailX, RailY + i * RailStep, tab.x, tab.y, 0f, 0f);
                 Image face = Picture(rt.gameObject, sprites, i == 0 ? "shop/tab-on" : "shop/tab",
                                      true);
                 face.color = i == 0 ? UiPalette.Amber : UiPalette.Fade(UiPalette.Ink, 0.18f);
@@ -340,51 +366,107 @@ namespace GulagRunners.GameEditor
                     button.onClick, new UnityAction<int>(view.OpenSlot), which);
             }
 
-            // ---- the category's name and how much of it is owned
-            RectTransform titleRt = Make("Category", column, Gutter, Gutter, 420, 44, 0f, 0f);
-            Text title = TextOn(titleRt, "RUNNERS", 34, TextAnchor.MiddleLeft, true);
+            // ---- the category's name, and how much of it is owned beside it
+            RectTransform titleRt = Make("Category", root, ListX, 54, 420, 56, 0f, 0f);
+            Text title = TextOn(titleRt, "RUNNERS", 44, TextAnchor.MiddleLeft, true);
             Wire(view.slotChanged, Label(title).Set);
 
-            RectTransform countRt = Make("Owned", column, ColumnW - Gutter - 220, Gutter,
-                                         220, 44, 0f, 0f);
-            Text count = TextOn(countRt, "1 / 4", 30, TextAnchor.MiddleRight, false);
+            RectTransform countRt = Make("Owned", root, 1280, 68, 320, 34, 0f, 0f);
+            Text count = TextOn(countRt, "1 / 4", 28, TextAnchor.MiddleRight, false);
             count.color = UiPalette.InkSoft;
             Wire(view.countedChanged, Label(count).Set);
 
-            // ---- the rows. Eight of them, built once and filled by whatever lists the
+            // ---- the line the screen speaks on, under the title. It is never blank:
+            // ShopUI.Hint is what it says when nothing has happened yet.
+            RectTransform saidRt = Make("Said", root, ListX, 122, ListW, 34, 0f, 0f);
+            Text said = TextOn(saidRt, "ONE TOUCH TRIES IT ON - NOTHING IS SPENT", 28,
+                               TextAnchor.MiddleLeft, false);
+            said.color = UiPalette.InkSoft;
+            Wire(view.saidChanged, Label(said).Set);
+
+            // ---- the rows. FOUR of them, built once and filled by whatever lists the
             // catalogue at run time: a screen that instantiates rows is a screen that
             // allocates while a thumb is moving.
-            Vector2 row = Size("shop/row", 700, 132);
+            //
+            // Four and not eight because four is what fits. 864 units of phone, less the
+            // title line and the bottom bar, leaves 552 for the list, and a row is 132
+            // with 8 of air: 4 x 140 = 560 - 8 of trailing air = 552, to the unit. The
+            // widest category in the catalogue holds four, so nothing is hidden.
+            Vector2 row = Size("shop/row", ListW, 132);
             Vector2 slot = Size("shop/slot", 96, 96);
-            for (int i = 0; i < 8; i++)
+            Vector2 bar = Size("shop/rarity", 8, 88);
+            for (int i = 0; i < Rows; i++)
             {
-                float y = Gutter + 68f + i * (row.y + 10f);
-                RectTransform rt = Make($"Row {i + 1}", column, Gutter, y,
-                                        ColumnW - Gutter * 2f, row.y, 0f, 0f);
+                RectTransform rt = Make($"Row {i + 1}", root, ListX, ListY + i * RowStep,
+                                        row.x, row.y, 0f, 0f);
                 Image strip = Picture(rt.gameObject, sprites, i == 0 ? "shop/row-on" : "shop/row",
                                       true);
-                strip.color = i == 0 ? UiPalette.Fade(UiPalette.Amber, 0.22f)
-                                     : UiPalette.Fade(UiPalette.Ink, 0.08f);
+                strip.color = i == 0 ? UiPalette.Fade(UiPalette.Amber, 0.18f)
+                                     : UiPalette.Fade(UiPalette.Ink, 0.06f);
                 strip.raycastTarget = true;
 
-                RectTransform icon = Make("Slot", rt, 16, (row.y - slot.y) * 0.5f,
+                // The rarity reads as an edge, not as a word: colour at the left of the
+                // strip is seen before anything on it has been read.
+                RectTransform edge = Make("Rarity", rt, 18, (row.y - bar.y) * 0.5f,
+                                          bar.x, bar.y, 0f, 0f);
+                Picture(edge.gameObject, sprites, "shop/rarity", true).color = UiPalette.Common;
+
+                RectTransform icon = Make("Slot", rt, 44, (row.y - slot.y) * 0.5f,
                                           slot.x, slot.y, 0f, 0f);
                 Picture(icon.gameObject, sprites, "shop/slot", true).color =
-                    UiPalette.Fade(UiPalette.Ink, 0.14f);
+                    UiPalette.Fade(UiPalette.Ink, 0.12f);
 
-                RectTransform nameRt = Make("Name", rt, 16 + slot.x + 20, 26, 360, 44, 0f, 0f);
+                RectTransform nameRt = Make("Name", rt, 158, 24, 360, 44, 0f, 0f);
                 TextOn(nameRt, "ASH", 34, TextAnchor.MiddleLeft, true);
 
-                RectTransform priceRt = Make("Price", rt, ColumnW - Gutter * 2f - 240, 26,
-                                             220, 44, 0f, 0f);
-                Text price = TextOn(priceRt, "800", 32, TextAnchor.MiddleRight, false);
+                RectTransform kindRt = Make("Kind", rt, 158, 70, 360, 34, 0f, 0f);
+                Text kind = TextOn(kindRt, "COMMON", 28, TextAnchor.MiddleLeft, false);
+                kind.color = UiPalette.Common;
+
+                RectTransform priceRt = Make("Price", rt, row.x - 26 - 240, 44, 240, 44, 0f, 0f);
+                Text price = TextOn(priceRt, "800", 34, TextAnchor.MiddleRight, true);
                 price.color = UiPalette.Amber;
             }
 
-            // ---- the one button, bottom right of the column
+            // ---- the bottom bar: the filter on the left, the one button on the right
+            Vector2 filter = Size("shop/filter", 320, 76);
+            RectTransform filterRt = Make("Button / Owned only", root, ListX, BarY + 26,
+                                          filter.x, filter.y, 0f, 0f);
+            Image filterFace = Picture(filterRt.gameObject, sprites, "shop/filter", true);
+            filterFace.color = UiPalette.Fade(UiPalette.Ink, 0.08f);
+            filterFace.raycastTarget = true;
+
+            Vector2 knob = Size("shop/filter/knob", 48, 48);
+            RectTransform knobRt = Make("Knob", filterRt, 8, (filter.y - knob.y) * 0.5f,
+                                        knob.x, knob.y, 0f, 0f);
+            Picture(knobRt.gameObject, sprites, "shop/filter/knob").color = UiPalette.Empty;
+
+            RectTransform onlyRt = Make("Label", filterRt, 76, 0,
+                                        filter.x - 76f - 20f, filter.y, 0f, 0f);
+            Text only = TextOn(onlyRt, "OWNED ONLY", 28, TextAnchor.MiddleLeft, true);
+            only.color = UiPalette.InkSoft;
+
+            Button filterButton = Undo.AddComponent<Button>(filterRt.gameObject);
+            filterButton.targetGraphic = filterFace;
+            UnityEventTools.AddPersistentListener(filterButton.onClick,
+                                                  new UnityAction(view.Flip));
+
+            // and the switch that draws which way it is pointing
+            MenuSwitch shown = Undo.AddComponent<MenuSwitch>(filterRt.gameObject);
+            shown.face = filterFace;
+            shown.text = only;
+            shown.knob = knobRt;
+            shown.knobOff = 8f;
+            shown.knobOn = filter.x - 8f - knob.x;
+            shown.onFace = UiPalette.Fade(UiPalette.Amber, 0.22f);
+            shown.offFace = UiPalette.Fade(UiPalette.Ink, 0.08f);
+            shown.onText = UiPalette.Ink;
+            shown.offText = UiPalette.InkSoft;
+            UnityEventTools.AddPersistentListener(view.filterChanged,
+                                                  new UnityAction<bool>(shown.Set));
+
             Vector2 act = Size("shop/button/act", 400, 128);
-            RectTransform actRt = Make("Button / Act", column,
-                                       ColumnW - Gutter - act.x, 700 - Gutter - act.y,
+            RectTransform actRt = Make("Button / Act", root, ListRight - act.x, BarY,
                                        act.x, act.y, 0f, 0f);
             Image actFace = Picture(actRt.gameObject, sprites, "shop/button/act", true);
             actFace.color = UiPalette.Amber;
@@ -399,17 +481,24 @@ namespace GulagRunners.GameEditor
             act_.targetGraphic = actFace;
             UnityEventTools.AddPersistentListener(act_.onClick, new UnityAction(view.Act));
 
-            // ---- what just happened, under the button
-            RectTransform saidRt = Make("Said", column, Gutter, 700 - Gutter - 44,
-                                        ColumnW - Gutter * 2f - act.x - 20, 44, 0f, 0f);
-            Text said = TextOn(saidRt, "", 28, TextAnchor.MiddleLeft, false);
-            said.color = UiPalette.InkSoft;
-            Wire(view.saidChanged, Label(said).Set);
+            // A button that cannot do anything has to LOOK like it, or the player taps a
+            // dead rectangle and concludes the game is broken rather than that they are
+            // short of gold. The message under the title says which.
+            MenuSwitch live = Undo.AddComponent<MenuSwitch>(actRt.gameObject);
+            live.target = act_;
+            live.face = actFace;
+            live.text = verb;
+            live.onFace = UiPalette.Amber;
+            live.offFace = UiPalette.Fade(UiPalette.Ink, 0.06f);
+            live.onText = UiPalette.InkOnAmber;
+            live.offText = UiPalette.Empty;
+            live.startOn = true;
+            UnityEventTools.AddPersistentListener(view.canActChanged,
+                                                  new UnityAction<bool>(live.Set));
 
-            // ---- the way out
+            // ---- the way out, top left, over the fighter and clear of the sheet
             Vector2 close = Size("shop/button/close", 116, 116);
-            RectTransform closeRt = Make("Button / Close", root,
-                                         DesignW - 64 - close.x, 36, close.x, close.y, 0f, 0f);
+            RectTransform closeRt = Make("Button / Close", root, 64, 36, close.x, close.y, 0f, 0f);
             Image closeFace = Picture(closeRt.gameObject, sprites, "shop/button/close");
             closeFace.color = UiPalette.Fade(UiPalette.Ink, 0.5f);
             closeFace.raycastTarget = true;

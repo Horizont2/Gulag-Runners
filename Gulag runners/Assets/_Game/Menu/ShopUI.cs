@@ -84,6 +84,10 @@ namespace GulagRunners.Game
                  "whatever tints the frame; UiPalette.Ramp is the one ramp in the game.")]
         public UnityEvent<int> tierChanged;
 
+        [Tooltip("Whether the owned-only filter is on -- that is, whether this screen is " +
+                 "being the inventory. Wire it to the control that shows it.")]
+        public UnityEvent<bool> filterChanged;
+
         [Tooltip("What just happened, in one line: \"BOUGHT\", \"NOT ENOUGH GOLD\". The " +
                  "screen says it under the button and clears it on the next pick.")]
         public UnityEvent<string> saidChanged;
@@ -138,8 +142,19 @@ namespace GulagRunners.Game
         public void ShowOwnedOnly(bool only)
         {
             ownedOnly = only;
+            Say(only ? Owned : Hint);
             Show();
+            listChanged?.Invoke();
         }
+
+        /// <summary>
+        /// The same toggle for a Button, which carries no argument of its own.
+        ///
+        /// A UnityEvent can hold a fixed bool, but a fixed bool cannot flip anything: the
+        /// control on the screen is one target that means "the other one", so the method
+        /// it calls has to read the state rather than be told it.
+        /// </summary>
+        public void Flip() => ShowOwnedOnly(!ownedOnly);
 
         /// <summary>
         /// One tap on a row: pick it and WEAR it for the look of it.
@@ -236,6 +251,7 @@ namespace GulagRunners.Game
 
             goldChanged?.Invoke(progress != null ? progress.gold.ToString("N0") : "0");
             slotChanged?.Invoke(CosmeticCatalogue.Name(slot));
+            filterChanged?.Invoke(ownedOnly);
 
             int have = Wardrobe.OwnedIn(catalogue, owned, slot);
             int all = catalogue != null ? catalogue.InSlot(slot).Count : 0;
@@ -264,6 +280,12 @@ namespace GulagRunners.Game
                 : canAfford);
         }
 
-        void Say(string line) => saidChanged?.Invoke(line);
+        // The line under the title is never blank. An empty line is a gap the layout has
+        // to hold open anyway, so it may as well say the one thing a first-time player
+        // cannot guess: that touching a row costs nothing.
+        const string Hint = "ONE TOUCH TRIES IT ON - NOTHING IS SPENT";
+        const string Owned = "SHOWING WHAT YOU OWN";
+
+        void Say(string line) => saidChanged?.Invoke(string.IsNullOrEmpty(line) ? Hint : line);
     }
 }
