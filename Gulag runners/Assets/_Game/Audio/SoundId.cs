@@ -50,6 +50,12 @@ namespace GulagRunners.Game
         // ---- match
         RoundStart = 70,
         Siren = 71,
-        RoundEnd = 72
+        RoundEnd = 72,
+
+        /// <summary>The pressure building under the floor, three seconds before the gas.</summary>
+        PoisonWarn = 73,
+
+        /// <summary>The clank and the hiss of it coming out. Heard through every floor.</summary>
+        PoisonVent = 74
     }
 }

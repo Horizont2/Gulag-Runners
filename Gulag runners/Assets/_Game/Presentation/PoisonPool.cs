@@ -186,6 +186,17 @@ namespace GulagRunners.Game
         }
 
         Bounds _flooded;
+        float _level;
+
+        /// <summary>
+        /// Where the waterline is in world space right now: the one height in the arena a
+        /// player has to READ, and everything under it is lost ground.
+        ///
+        /// Asked for rather than worked out again, because two places computing the same
+        /// height from the same level is two places that can disagree -- and the thing
+        /// that would disagree is what the player is shown against what bites them.
+        /// </summary>
+        public float SurfaceY => _flooded.min.y + _flooded.size.y * _level;
         Vector3 _scale;
         Vector3 _surfaceScale;
         Vector3 _mistScale;
@@ -259,6 +270,7 @@ namespace GulagRunners.Game
         /// </summary>
         void Fill(float p)
         {
+            _level = p;
             Transform moved = body != null ? body : transform;
 
             Vector3 scale = _scale;
