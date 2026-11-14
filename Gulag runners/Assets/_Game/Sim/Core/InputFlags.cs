@@ -32,6 +32,23 @@ namespace GulagRunners.Sim
         /// </summary>
         Dodge  = 1 << 5,
         Action = 1 << 6,   // pick up, open a chest, grab
+
+        /// <summary>
+        /// Which thing on a lock was touched this tick, 1..7, with 0 for "nothing".
+        ///
+        /// Three bits rather than a field of its own, and that is not a trick: the flags
+        /// already travel as an INT on the wire (LanLink), so bits 8 to 10 cost nothing at
+        /// all -- a puzzle touch adds zero bytes to a packet at 60 Hz. docs/04 never needs
+        /// more than six options on one lock, so three bits is one spare.
+        ///
+        /// Touches go through the input stream like every other intent because of rollback:
+        /// anything the simulation reads that was not in the stored input is a desync
+        /// waiting for a bad connection, and "which rune did he tap" is exactly that.
+        /// </summary>
+        Choice0 = 1 << 8,
+        Choice1 = 1 << 9,
+        Choice2 = 1 << 10,
+        ChoiceMask = Choice0 | Choice1 | Choice2,
     }
 
     public static class InputFlagsExtensions
@@ -53,6 +70,21 @@ namespace GulagRunners.Sim
             if (f.Has(InputFlags.Down)) y -= 1;
             if (f.Has(InputFlags.Up)) y += 1;
             return y;
+        }
+
+        /// <summary>Which thing on the lock was touched, 1..7. Zero for none.</summary>
+        public static int Choice(this InputFlags f) => ((int)(f & InputFlags.ChoiceMask)) >> 8;
+
+        /// <summary>
+        /// The same flags carrying a touch. Out of range is no touch at all rather than a
+        /// wrapped one: a touch on option nine is a bug upstream, and a lock that answered it
+        /// as option one would hide that bug behind a wrong answer.
+        /// </summary>
+        public static InputFlags WithChoice(this InputFlags f, int option)
+        {
+            InputFlags bare = f & ~InputFlags.ChoiceMask;
+            if (option < 1 || option > 7) return bare;
+            return bare | (InputFlags)(option << 8);
         }
     }
 }

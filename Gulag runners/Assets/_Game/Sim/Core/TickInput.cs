@@ -46,8 +46,20 @@ namespace GulagRunners.Sim
         /// does NOT accumulate -- it takes the newer reading, because an aim is a position
         /// and the one that counts is where the thumb ended up.
         /// </summary>
-        public static TickInput Merge(TickInput older, TickInput newer) =>
-            new TickInput(older.Flags | newer.Flags, newer.AimX, newer.AimY);
+        public static TickInput Merge(TickInput older, TickInput newer)
+        {
+            // The buttons OR together. The touch on a lock cannot: option 1 and option 2
+            // OR'd are option 3, which is a wrong answer nobody gave. The FIRST touch in the
+            // window wins, for the same reason the buttons accumulate at all -- it is the one
+            // the thumb actually made, and the second one belongs to the next tick.
+            int first = older.Flags.Choice();
+            InputFlags bits = (older.Flags | newer.Flags) & ~InputFlags.ChoiceMask;
+            int choice = first != 0 ? first : newer.Flags.Choice();
+            return new TickInput(bits.WithChoice(choice), newer.AimX, newer.AimY);
+        }
+
+        /// <summary>Which thing on a lock this tick touched, 1..7, or 0.</summary>
+        public int Choice() => Flags.Choice();
 
         static short Clamp(int v) => (short)(v < -1000 ? -1000 : (v > 1000 ? 1000 : v));
     }

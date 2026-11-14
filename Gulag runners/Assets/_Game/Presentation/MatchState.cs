@@ -464,7 +464,16 @@ namespace GulagRunners.Game
             // the arena have the same chests and different things in them, which is what makes
             // the scavenge phase a set of decisions rather than a race down a known list.
             if (world != null)
+            {
                 LootTable.Deal(world.Chests, ChestStates, NextSeed());
+
+                // And the locks (docs/04), from a seed of their own so that adding a puzzle to
+                // a chest does not change what is inside any of them. Both players deal the
+                // same round from the same seed, which is rule 7 -- the same spread of
+                // difficulty on both sides of the arena -- without anybody having to agree
+                // about it over the wire.
+                PuzzleBank.Deal(world.Chests, ChestStates, NextSeed());
+            }
             GroundItems = GroundItem.Pool(groundItemCapacity);
             _tickOwner = null;
         }

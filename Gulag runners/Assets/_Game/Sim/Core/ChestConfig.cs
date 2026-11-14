@@ -14,6 +14,38 @@ namespace GulagRunners.Sim
         public int ToolWear;
     }
 
+    /// <summary>What a lock costs to get wrong, and what it costs to get right (docs/04).</summary>
+    public struct PuzzleConfig
+    {
+        /// <summary>
+        /// How long the lock takes nothing after a wrong touch. Sixty frames is the one
+        /// second docs/04 asks for, and it is the ONLY price of a mistake -- there is no
+        /// attempt counter, because a lock-out would turn an optimisation into a barrier.
+        /// </summary>
+        public int WrongFrames;
+
+        /// <summary>
+        /// A wrong touch is loud, on purpose. It is the sound that tells the other player
+        /// where you are, and it is also the sound a player can make deliberately on a far
+        /// safe to pull them the wrong way. docs/04 calls that emergent and keeps it.
+        /// </summary>
+        public NoiseLevel WrongNoise;
+
+        /// <summary>
+        /// And solving it is quiet, which is the entire reason to learn the locks: forcing
+        /// a safe is six seconds heard across half the arena, and this is three and nearly
+        /// silent.
+        /// </summary>
+        public NoiseLevel SolveNoise;
+
+        public static PuzzleConfig Default() => new PuzzleConfig
+        {
+            WrongFrames = 60,
+            WrongNoise = NoiseLevel.Loud,
+            SolveNoise = NoiseLevel.Quiet
+        };
+    }
+
     /// <summary>
     /// Every number behind the chest table of docs/03, in one place.
     ///
@@ -32,6 +64,9 @@ namespace GulagRunners.Sim
 
         /// <summary>How often opening re-announces itself, in frames.</summary>
         public int NoiseFrames;
+
+        /// <summary>The quiet way in: what a lock costs (docs/04).</summary>
+        public PuzzleConfig Puzzle;
 
         public ChestKindConfig For(ChestKind kind) => kind switch
         {
@@ -62,6 +97,7 @@ namespace GulagRunners.Sim
 
             c.DecayMultiplier = 2;
             c.NoiseFrames = 20;
+            c.Puzzle = PuzzleConfig.Default();
             return c;
         }
     }

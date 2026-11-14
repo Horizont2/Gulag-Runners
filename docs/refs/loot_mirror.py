@@ -175,6 +175,17 @@ def deal(chests, seed):
 DECAY_MUL = 2
 NOISE_FRAMES = 20
 
+# How loud a thing is (NoiseLevel). In a game where the other player cannot be seen this is
+# part of the simulation, not a property of an audio clip.
+SILENT, QUIET, MEDIUM, LOUD = 0, 1, 2, 3
+
+# What a lock costs to get wrong, and what it costs to get right (docs/04). One second of
+# the lock taking nothing is the ENTIRE price of a mistake: no attempt counter, because a
+# lock-out would turn an optimisation into a barrier.
+PUZZLE_WRONG_FRAMES = 60
+PUZZLE_WRONG_NOISE = LOUD
+PUZZLE_SOLVE_NOISE = QUIET
+
 # ---------------------------------------------------------------- loot on the floor (DropConfig)
 D = dict(POP_X=M(1400), POP_Y=M(3600), DROP_X=M(1100), DROP_Y=M(2200),
          GRAV=M(22000), MAXFALL=M(14000), BOUNCE=M(150),
@@ -298,14 +309,22 @@ def step_ground(ground, w):
 
 
 class Chest:
-    def __init__(s, kind, contents, box):
+    def __init__(s, kind, contents, box, has_puzzle=False):
         s.kind, s.contents, s.box = kind, contents, box
         s.progress, s.opened, s.opener = 0, False, -1
+        # The lock (docs/04). None until a round deals one; `pdone` is which of its touches
+        # have been made and `pstun` is how long it sulks after a wrong one. Neither drains
+        # and neither belongs to the opener: being hit keeps the progress, and a safe
+        # somebody else started can be finished.
+        s.has_puzzle = has_puzzle
+        s.puzzle = None
+        s.pdone, s.pstun = 0, 0
 
 
 def fresh(chests):
     for c in chests:
         c.progress, c.opened, c.opener = 0, False, -1
+        c.pdone, c.pstun = 0, 0
 
 
 class Inv:
@@ -396,7 +415,15 @@ def body(s):
 
 
 def available(chest, player):
-    return not chest.opened and (chest.opener < 0 or chest.opener == player)
+    """May this player work on this chest at all?
+
+    The claim is about FORCING: progress drains, and a thing that drains has to drain for
+    exactly one player on exactly one tick or the two clients disagree. A lock has nothing
+    to drain -- the touches already made stay made and belong to nobody -- so a chest with
+    an unsolved lock is open to both players, which docs/04 asks for by name. What the
+    second player may not do is pry it."""
+    locked = chest.puzzle is not None and chest.puzzle.exists
+    return not chest.opened and (chest.opener < 0 or chest.opener == player or locked)
 
 
 def find(s, player, chests):
@@ -499,8 +526,15 @@ def loot_step(s, player, inp, chests, ground=None):
 
     chest = chests[target]
     cfg = CHEST_CFG[chest.kind]
-    chest.opener = player
-    s.opening = target
+
+    # The claim, and only for the player who is prying. Somebody who walks up to a lock
+    # another player is forcing may touch the lock -- that is the whole of "finish somebody
+    # else's safe" -- but he does not take the chest off them, and he never adds a
+    # thousandth to their progress.
+    mine = chest.opener < 0 or chest.opener == player
+    if mine:
+        chest.opener = player
+        s.opening = target
 
     # Turn to what you are prying at: the search animation has to have something to face, and
     # the loot step runs last in the tick, so this is the final word on facing for the frame.
@@ -512,19 +546,47 @@ def loot_step(s, player, inp, chests, ground=None):
     elif centre < s.x - dead: s.facing = -1
 
     tool = not s.inv.bare
-    chest.progress += pry_milli(s.inv.weapon)
-
-    if s.stepn == 0:
-        s.noise = cfg["tool_noise"] if tool else cfg["bare_noise"]
-        s.stepn = NOISE_FRAMES
-
     needed = cfg["bare"] * BARE_GAIN
-    if chest.progress < needed:
-        return
+
+    # ---- the quiet way in (docs/04)
+    #
+    # A lock is an OPTIMISATION, never a gate: everything here can be skipped by holding
+    # the button, which is the branch below it. What it buys is three seconds instead of
+    # six and near-silence instead of a noise heard across half the arena.
+    picked = False
+    if chest.puzzle is not None and chest.puzzle.exists:
+        if chest.pstun > 0:
+            chest.pstun -= 1          # sulking after a wrong touch; no lock-out, just time
+            return
+        choice = (inp >> 8) & 7
+        if choice != 0:
+            now = chest.puzzle.press(chest.pdone, choice)
+            if now < 0:
+                chest.pstun = PUZZLE_WRONG_FRAMES
+                s.noise = PUZZLE_WRONG_NOISE
+                s.stepn = NOISE_FRAMES
+                return
+            chest.pdone = now
+            if not chest.puzzle.solved(now):
+                s.noise = SILENT          # a right touch makes no sound at all
+                return
+            picked = True
+
+    if not picked:
+        if not mine:
+            return                    # somebody else is prying this one; their progress
+        chest.progress += pry_milli(s.inv.weapon)
+
+        if s.stepn == 0:
+            s.noise = cfg["tool_noise"] if tool else cfg["bare_noise"]
+            s.stepn = NOISE_FRAMES
+
+        if chest.progress < needed:
+            return
 
     chest.progress, chest.opened, chest.opener = needed, True, -1
     s.opening = -1
-    if tool:
+    if tool and not picked:
         s.inv.spend(cfg["wear"])
     cx = chest.box[0] + (chest.box[2] - chest.box[0]) // 2
     cy = chest.box[1] + (chest.box[3] - chest.box[1]) // 2
@@ -533,7 +595,9 @@ def loot_step(s, player, inp, chests, ground=None):
     away = 1 if offset > meaningful else (-1 if offset < -meaningful else (-1 if s.facing >= 0 else 1))
     pop(ground, chest.contents, cx, cy, away)
     s.opened_chest = target
-    s.noise = 3
+    # A chest FORCED open is heard across the floor. One that was picked is not, and that
+    # difference is the whole argument for learning the locks (docs/04).
+    s.noise = PUZZLE_SOLVE_NOISE if picked else LOUD
 
 
 def frames_to_open(kind, weapon):

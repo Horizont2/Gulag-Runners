@@ -67,8 +67,16 @@ namespace GulagRunners.Sim
             ChestDef def = world.Chests[target];
             ChestKindConfig kind = cfg.For(def.Kind);
 
-            state.Opener = playerIndex;
-            s.OpeningChest = target;
+            // The claim, and only for the player who is prying. A player who walks up to a
+            // lock somebody else is forcing may touch the lock -- that is the whole of
+            // "finish somebody else's safe" -- but he does not take the chest off them, and
+            // he never adds a thousandth to their progress.
+            bool mine = state.Opener < 0 || state.Opener == playerIndex;
+            if (mine)
+            {
+                state.Opener = playerIndex;
+                s.OpeningChest = target;
+            }
 
             // Turn to what you are prying at. A fighter levering a crate open with his back to
             // it is the kind of thing nobody files and everybody sees, and the search animation
@@ -83,21 +91,70 @@ namespace GulagRunners.Sim
             if (chestX > s.Position.X + deadzone) s.Facing = 1;
             else if (chestX < s.Position.X - deadzone) s.Facing = -1;
 
-            // The weapon is the crowbar. Bare hands are slower and quieter, and that is the trade
-            // the whole scavenge phase is built on (docs/03).
+            int needed = kind.BareFrames * BareGain;
             bool tool = !s.Inventory.BareHanded;
-            int gain = s.Inventory.WeaponDef.PrySpeed.ToMilli();
-            if (gain < 1) gain = 1;
-            state.Progress += gain;
 
-            if (s.StepNoiseTimer == 0)
+            // ---- the quiet way in (docs/04)
+            //
+            // A lock is an OPTIMISATION, never a gate: everything below can be skipped by
+            // simply holding the button, which is the branch after it. What the lock buys is
+            // three seconds instead of six, and near-silence instead of a noise heard across
+            // half the arena -- and in a game where the other player cannot be seen, that is
+            // the larger half of the prize.
+            bool picked = false;
+            if (state.Puzzle.Exists)
             {
-                s.Noise = tool ? kind.ToolNoise : kind.BareNoise;
-                s.StepNoiseTimer = cfg.NoiseFrames;
+                if (state.PuzzleStun > 0)
+                {
+                    // The lock is sulking after a wrong touch. It takes nothing for a second,
+                    // and that second is the entire price: no attempt counter, no lock-out.
+                    state.PuzzleStun--;
+                    return;
+                }
+
+                int choice = input.Choice();
+                if (choice != 0)
+                {
+                    int now = state.Puzzle.Press(state.PuzzleDone, choice);
+                    if (now < 0)
+                    {
+                        state.PuzzleStun = (byte)cfg.Puzzle.WrongFrames;
+                        s.Noise = cfg.Puzzle.WrongNoise;
+                        s.StepNoiseTimer = cfg.NoiseFrames;
+                        return;
+                    }
+
+                    state.PuzzleDone = (byte)now;
+                    if (!state.Puzzle.Solved(now))
+                    {
+                        // A right touch makes no sound at all. Being heard is what the player
+                        // is paying to avoid.
+                        s.Noise = NoiseLevel.Silent;
+                        return;
+                    }
+                    picked = true;
+                }
             }
 
-            int needed = kind.BareFrames * BareGain;
-            if (state.Progress < needed) return;
+            if (!picked)
+            {
+                // Somebody else is prying this one open. Their progress is theirs.
+                if (!mine) return;
+
+                // The weapon is the crowbar. Bare hands are slower and quieter, and that is the
+                // trade the whole scavenge phase is built on (docs/03).
+                int gain = s.Inventory.WeaponDef.PrySpeed.ToMilli();
+                if (gain < 1) gain = 1;
+                state.Progress += gain;
+
+                if (s.StepNoiseTimer == 0)
+                {
+                    s.Noise = tool ? kind.ToolNoise : kind.BareNoise;
+                    s.StepNoiseTimer = cfg.NoiseFrames;
+                }
+
+                if (state.Progress < needed) return;
+            }
 
             // Open.
             state.Progress = needed;
@@ -106,8 +163,9 @@ namespace GulagRunners.Sim
             s.OpeningChest = -1;
 
             // Spend the lever before taking the prize, so a weapon that breaks on the last chest
-            // breaks even when that chest held its replacement.
-            if (tool) s.Inventory.SpendWeapon(kind.ToolWear);
+            // breaks even when that chest held its replacement. A lock that was picked cost the
+            // weapon nothing, because the weapon was never used on it.
+            if (tool && !picked) s.Inventory.SpendWeapon(kind.ToolWear);
 
             // The loot comes OUT; it does not appear in a slot. Seeing it land is the payoff for
             // the time and the noise just spent, and it is what makes a full slot a decision
@@ -122,7 +180,10 @@ namespace GulagRunners.Sim
             Pop(ground, prize, centre, ThrowDirection(in s, in def.Box), in drop);
 
             s.OpenedChest = target;
-            s.Noise = NoiseLevel.Loud;             // a chest coming open is heard across the floor
+
+            // A chest FORCED open is heard across the floor. One that was picked is not, and
+            // that difference is the whole argument for learning the locks (docs/04).
+            s.Noise = picked ? cfg.Puzzle.SolveNoise : NoiseLevel.Loud;
         }
 
         // ---------------------------------------------------------------- loot on the floor
@@ -421,8 +482,20 @@ namespace GulagRunners.Sim
             return -1;
         }
 
+        /// <summary>
+        /// May this player work on this chest at all?
+        ///
+        /// The claim is about FORCING: progress drains, and a thing that drains has to drain
+        /// for exactly one player on exactly one tick or the two clients disagree. A lock has
+        /// nothing to drain -- the touches already made stay made and belong to nobody -- so a
+        /// chest with an unsolved lock on it is open to both players, and docs/04 is explicit
+        /// that it should be: finishing a safe somebody else started is, in its words, the
+        /// sweetest moment in the game. What the second player may NOT do is pry it; that is
+        /// still the claim holder's alone, and <see cref="Step"/> enforces it.
+        /// </summary>
         static bool Available(in ChestSimState state, int playerIndex) =>
-            !state.Opened && (state.Opener < 0 || state.Opener == playerIndex);
+            !state.Opened &&
+            (state.Opener < 0 || state.Opener == playerIndex || state.Puzzle.Exists);
 
         /// <summary>Seconds this chest takes for a player holding this weapon. For tools and UI.</summary>
         public static int FramesToOpen(ChestKind kind, ItemId weapon, in ChestConfig cfg)
