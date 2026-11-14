@@ -110,6 +110,23 @@ namespace GulagRunners.Game
             return mine;
         }
 
+        /// <summary>
+        /// What a category opens on: whatever the player already has on, so the screen
+        /// opens on them rather than on the first thing for sale.
+        ///
+        /// The lock opens on the piece fitted to its FIRST part, because a lock is a set
+        /// of pieces and there is no one thing it is "wearing" -- and that is also the
+        /// honest place to start improving from.
+        /// </summary>
+        string OpeningPick()
+        {
+            if (slot == Slot.Lock)
+                return Wardrobe.FittedTo(catalogue, progress != null ? progress.parts : null,
+                                         CosmeticCatalogue.Parts[0]);
+            return Wardrobe.WornIn(catalogue, progress != null ? progress.equipped : null,
+                                   slot);
+        }
+
         void Awake()
         {
             if (progress == null) progress = FindFirstObjectByType<PlayerProgress>();
@@ -120,9 +137,7 @@ namespace GulagRunners.Game
         {
             // Opening the shop picks what is already worn in the open category, so the
             // screen opens on the player rather than on the first thing for sale.
-            if (string.IsNullOrEmpty(picked))
-                picked = Wardrobe.WornIn(catalogue, progress != null ? progress.equipped : null,
-                                         slot);
+            if (string.IsNullOrEmpty(picked)) picked = OpeningPick();
             Show();
         }
 
@@ -131,8 +146,7 @@ namespace GulagRunners.Game
         {
             if (which < 0 || which >= CosmeticCatalogue.Slots.Length) return;
             slot = CosmeticCatalogue.Slots[which];
-            picked = Wardrobe.WornIn(catalogue, progress != null ? progress.equipped : null,
-                                     slot);
+            picked = OpeningPick();
             Say("");
             Show();
             Preview();
@@ -184,7 +198,8 @@ namespace GulagRunners.Game
             Cosmetic item = catalogue.Find(picked);
             if (item == null) return;
 
-            if (Wardrobe.IsWorn(catalogue, progress.equipped, picked))
+            if (Wardrobe.IsWorn(catalogue, progress.equipped, picked)
+                || Wardrobe.IsFitted(catalogue, progress.parts, picked))
             {
                 Say("ALREADY WORN");
                 return;
@@ -193,12 +208,14 @@ namespace GulagRunners.Game
             Deal what;
             if (Wardrobe.Owns(catalogue, progress.owned, picked))
             {
-                what = Wardrobe.Equip(catalogue, progress.owned, progress.equipped, picked);
+                what = Wardrobe.Equip(catalogue, progress.owned, progress.equipped,
+                                      progress.parts, picked);
             }
             else
             {
                 int gold = progress.gold;
                 what = Wardrobe.Buy(catalogue, ref gold, progress.owned, progress.equipped,
+                                    progress.parts,
                                     picked);
                 progress.gold = gold;
             }
@@ -272,12 +289,15 @@ namespace GulagRunners.Game
 
             bool mine = Wardrobe.Owns(catalogue, owned, item.id);
             priceChanged?.Invoke(mine ? "OWNED" : item.Cost.ToString("N0"));
-            verbChanged?.Invoke(Wardrobe.Verb(catalogue, owned, worn, item.id));
+            verbChanged?.Invoke(Wardrobe.Verb(catalogue, owned, worn,
+                                              progress != null ? progress.parts : null,
+                                              item.id));
 
             bool canAfford = progress != null && progress.gold >= item.Cost;
-            canActChanged?.Invoke(mine
-                ? !Wardrobe.IsWorn(catalogue, worn, item.id)
-                : canAfford);
+            bool already = item.slot == Slot.Lock
+                ? Wardrobe.IsFitted(catalogue, progress != null ? progress.parts : null, item.id)
+                : Wardrobe.IsWorn(catalogue, worn, item.id);
+            canActChanged?.Invoke(mine ? !already : canAfford);
         }
 
         // The line under the title is never blank. An empty line is a gap the layout has

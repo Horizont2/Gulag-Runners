@@ -50,6 +50,11 @@ DAYS_LOW, DAYS_HIGH = 3, 10
 # how "gold never buys power" goes, one innocent enum value at a time.
 SLOTS = ("Runner", "Weapon", "Knockout", "Plate", "Lock", "Pose")
 
+# And the Lock slot is the one built out of PIECES, in the order its own save indexes
+# them by. The lock belongs to the player and to nobody else, so it is improved a corner
+# at a time rather than replaced whole.
+LOCK_PARTS = ("Plate", "Bezel", "Keys", "Bolts", "Glow")
+
 
 def read(path):
     return open(path, encoding="utf-8", errors="replace").read()
@@ -68,7 +73,7 @@ def catalogue():
             continue
         if current is None:
             continue
-        m = re.match(r"\s*(shown|slot|tier|price|isDefault|applies): (.*)$", line)
+        m = re.match(r"\s*(shown|slot|tier|price|isDefault|applies|part): (.*)$", line)
         if m:
             current[m.group(1)] = m.group(2).strip()
     return rows
@@ -127,6 +132,10 @@ def main():
         if not mine:
             problems.append(f"the {name} slot has nothing in it at all, so its tab opens "
                             f"on an empty list")
+            continue
+        # The lock is the one slot built out of pieces, so it has one free piece per PART
+        # rather than one per slot. That is checked below, where the parts are.
+        if name == "Lock":
             continue
         if len(defaults) != 1:
             problems.append(
@@ -203,6 +212,59 @@ def main():
         problems.append("PlayerProgress never writes the owned list to PlayerPrefs")
     if 'PlayerPrefs.SetString(Key + "worn"' not in progress:
         problems.append("PlayerProgress never writes what is equipped to PlayerPrefs")
+
+    # ---- the lock, which is the one slot built out of PIECES
+    #
+    # It is the player's own thing: nobody else ever sees it, and it is in front of them
+    # several times a match by choice, so it is improved a corner at a time. Everything
+    # below is what keeps that from turning into an advantage.
+    lock = [r for r in rows if r.get("slot") == "4"]
+    notes.append(f"the lock is built from {len(LOCK_PARTS)} part(s), {len(lock)} piece(s) "
+                 f"in all")
+    for i, name in enumerate(LOCK_PARTS):
+        mine = [r for r in lock if (r.get("part") or "0") == str(i)]
+        free = [r for r in mine if r.get("isDefault") == "1"]
+        notes.append(f"    {name}: {len(mine)} piece(s), {len(free)} free")
+        if not mine:
+            problems.append(f"the lock's {name} has no pieces at all, so that corner of "
+                            f"the lock cannot be drawn")
+            continue
+        if len(free) != 1:
+            problems.append(
+                f"the lock's {name} has {len(free)} free piece(s) and needs exactly one. "
+                f"A part with none is a lock with a hole in it before anything is bought; "
+                f"a part with two is a coin toss")
+
+    strays = [r for r in lock
+              if (r.get("part") or "0") not in {str(i) for i in range(len(LOCK_PARTS))}]
+    for r in strays:
+        problems.append(f"{r['id']} is part {r.get('part')} of the lock, which is not one "
+                        f"of the {len(LOCK_PARTS)}")
+
+    outside = [r for r in rows
+               if r.get("slot") != "4" and (r.get("part") or "0") != "0"]
+    for r in outside:
+        problems.append(f"{r['id']} is not a lock piece but carries a part. Only the lock "
+                        f"is built out of pieces, and a part on anything else is a second "
+                        f"meaning for a field that already has one")
+
+    # And the rule that keeps the whole idea honest: a piece of the lock may decorate it
+    # and may not make it easier to READ. Everything that carries information is drawn by
+    # PuzzleView over whatever was bought, so the check is that PuzzleView still owns
+    # those layers -- a lock that is easier to read is a lock that opens faster, and gold
+    # does not buy that.
+    view = os.path.join(GAME, "Presentation", "PuzzleView.cs")
+    if os.path.exists(view):
+        drawn = read(view)
+        for layer, why in (("optionGlyphs", "the rune, the arrow and the gear ARE the "
+                                            "puzzle"),
+                           ("optionMarks", "the tick says which half of the answer is in"),
+                           ("pips", "the pips say how hard it is before you start")):
+            if layer not in drawn:
+                problems.append(
+                    f"PuzzleView no longer draws {layer}, so nothing stops a bought piece "
+                    f"of the lock from drawing it instead -- and {why}. Gold does not buy "
+                    f"a lock that is easier to read (docs/09)")
 
     # ---- the save is indexed by the enum, so the enum moving is a real event
     wardrobe = read(os.path.join(GAME, "Meta", "Wardrobe.cs"))

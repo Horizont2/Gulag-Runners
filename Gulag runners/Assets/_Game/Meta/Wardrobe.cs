@@ -76,6 +76,63 @@ namespace GulagRunners.Meta
             return fallback != null ? fallback.id : "";
         }
 
+        /// <summary>
+        /// Which piece is fitted to one part of the lock, or that part's free default.
+        ///
+        /// The lock is the only thing in the wardrobe built out of PIECES rather than worn
+        /// whole, and the reason is in <see cref="LockPart"/>: it belongs to the player and
+        /// to nobody else, and it is in front of them several times a match by choice. So
+        /// it is improved a corner at a time, and the list it is saved in is its own.
+        /// </summary>
+        public static string FittedTo(CosmeticCatalogue catalogue, List<string> parts,
+                                      LockPart part)
+        {
+            int at = (int)part;
+            if (parts != null && at < parts.Count)
+            {
+                string saved = parts[at];
+                Cosmetic found = !string.IsNullOrEmpty(saved) && catalogue != null
+                    ? catalogue.Find(saved) : null;
+                if (found != null && found.slot == Slot.Lock && found.part == part)
+                    return saved;
+            }
+            Cosmetic fallback = catalogue != null ? catalogue.DefaultIn(part) : null;
+            return fallback != null ? fallback.id : "";
+        }
+
+        /// <summary>True when that exact piece is the one fitted.</summary>
+        public static bool IsFitted(CosmeticCatalogue catalogue, List<string> parts, string id)
+        {
+            Cosmetic item = catalogue != null ? catalogue.Find(id) : null;
+            if (item == null || item.slot != Slot.Lock) return false;
+            return FittedTo(catalogue, parts, item.part) == id;
+        }
+
+        /// <summary>Fits a piece to the lock, if it is owned.</summary>
+        public static Deal Fit(CosmeticCatalogue catalogue, List<string> owned,
+                               List<string> parts, string id)
+        {
+            Cosmetic item = catalogue != null ? catalogue.Find(id) : null;
+            if (item == null || item.slot != Slot.Lock) return Deal.NoSuchItem;
+            if (!Owns(catalogue, owned, id)) return Deal.NotOwned;
+
+            int at = (int)item.part;
+            while (parts.Count <= at) parts.Add("");
+            parts[at] = id;
+            return Deal.Equipped;
+        }
+
+        /// <summary>How many pieces of one part of the lock are owned, for "2 / 4".</summary>
+        public static int OwnedIn(CosmeticCatalogue catalogue, List<string> owned,
+                                  LockPart part)
+        {
+            int n = 0;
+            if (catalogue == null) return 0;
+            foreach (Cosmetic c in catalogue.InPart(part))
+                if (Owns(catalogue, owned, c.id)) n++;
+            return n;
+        }
+
         /// <summary>True when that exact id is what the slot is wearing.</summary>
         public static bool IsWorn(CosmeticCatalogue catalogue, List<string> equipped,
                                   string id)
@@ -90,11 +147,15 @@ namespace GulagRunners.Meta
         /// written before a slot existed is shorter than the enum.
         /// </summary>
         public static Deal Equip(CosmeticCatalogue catalogue, List<string> owned,
-                                 List<string> equipped, string id)
+                                 List<string> equipped, List<string> parts, string id)
         {
             Cosmetic item = catalogue != null ? catalogue.Find(id) : null;
             if (item == null) return Deal.NoSuchItem;
             if (!Owns(catalogue, owned, id)) return Deal.NotOwned;
+
+            // A piece of the lock goes on the lock. One way in, so that nothing has to
+            // remember which of the six slots is the one built out of pieces.
+            if (item.slot == Slot.Lock) return Fit(catalogue, owned, parts, id);
 
             int at = (int)item.slot;
             while (equipped.Count <= at) equipped.Add("");
@@ -108,7 +169,7 @@ namespace GulagRunners.Meta
         /// can take money, and it is the same place that hands over the goods.
         /// </summary>
         public static Deal Buy(CosmeticCatalogue catalogue, ref int gold, List<string> owned,
-                               List<string> equipped, string id)
+                               List<string> equipped, List<string> parts, string id)
         {
             Cosmetic item = catalogue != null ? catalogue.Find(id) : null;
             if (item == null) return Deal.NoSuchItem;
@@ -117,16 +178,25 @@ namespace GulagRunners.Meta
 
             gold -= item.Cost;
             owned.Add(id);
-            Equip(catalogue, owned, equipped, id);
+            Equip(catalogue, owned, equipped, parts, id);
             return Deal.Bought;
         }
 
         /// <summary>What the one button at the bottom of the shop should say right now.</summary>
         public static string Verb(CosmeticCatalogue catalogue, List<string> owned,
-                                  List<string> equipped, string id)
+                                  List<string> equipped, List<string> parts, string id)
         {
             Cosmetic item = catalogue != null ? catalogue.Find(id) : null;
             if (item == null) return "";
+
+            // A piece of the lock is FITTED rather than worn, and the button says so: you
+            // are not putting the lock on, you are building it.
+            if (item.slot == Slot.Lock)
+            {
+                if (IsFitted(catalogue, parts, id)) return "FITTED";
+                return Owns(catalogue, owned, id) ? "FIT" : "BUY";
+            }
+
             if (IsWorn(catalogue, equipped, id)) return "WORN";
             if (Owns(catalogue, owned, id)) return "EQUIP";
             return "BUY";

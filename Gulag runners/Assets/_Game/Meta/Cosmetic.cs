@@ -46,6 +46,44 @@ namespace GulagRunners.Meta
     }
 
     /// <summary>
+    /// The pieces a lock is built from, and the only part of the wardrobe that works this
+    /// way.
+    ///
+    /// The lock is the player's own thing. It is the one object in the game that nobody
+    /// else ever sees -- the fighter is seen at the fight, the name plate on both HUDs, the
+    /// knockout by whoever just lost -- and it is in front of the player several times a
+    /// match, for three seconds at a time, by choice. That makes it the one place where
+    /// buying a PIECE rather than a whole look is worth the extra machinery: a lock gets
+    /// better slowly, a corner at a time, and it ends up looking like nobody else's.
+    ///
+    /// It is also the cheapest thing in the game to make. Every piece here is a UI sprite.
+    ///
+    /// THE RULE THAT KEEPS IT HONEST: not one of these may change how READABLE the puzzle
+    /// is. Everything that carries information -- the rune, the arrow, the gear, the tick
+    /// on a touch already made, the red of a lock that is sulking, and how many pips are
+    /// lit -- is NOT for sale and is drawn by <see cref="PuzzleView"/> over whatever the
+    /// player has bought. A lock that is easier to read is a lock that opens faster, and
+    /// gold does not buy that (docs/09).
+    /// </summary>
+    public enum LockPart : byte
+    {
+        /// <summary>The body it is all built on. Rusted iron, temple stone, bone, brass.</summary>
+        Plate = 0,
+
+        /// <summary>The rim around that body.</summary>
+        Bezel = 1,
+
+        /// <summary>The FACE of the touch targets. Not what is drawn on them.</summary>
+        Keys = 2,
+
+        /// <summary>Corner ornament. The one piece that carries nothing at all.</summary>
+        Bolts = 3,
+
+        /// <summary>The light behind the lock while it is being worked on.</summary>
+        Glow = 4,
+    }
+
+    /// <summary>
     /// How a cosmetic is priced, and the only three prices in the game.
     ///
     /// docs/09 fixes the ends of the range: a T1 skin is 800 gold and a T3 is 3000, with
@@ -96,9 +134,14 @@ namespace GulagRunners.Meta
         public bool isDefault;
 
         [Tooltip("Optional. The key the APPLIER uses, when it is not the id: a runner skin " +
-                 "names a MenuSkin on the fighter, a frame names a sprite row. Empty means " +
+                 "names a MenuSkin on the fighter, a plate names a sprite row. Empty means " +
                  "the id is the key.")]
         public string applies = "";
+
+        [Tooltip("Lock slot only: WHICH PIECE of the lock this is. The lock is the one " +
+                 "thing in the game that belongs to the player and to nobody else, so it " +
+                 "is improved a piece at a time rather than replaced whole.")]
+        public LockPart part = LockPart.Plate;
 
         /// <summary>What it costs, with the tier's price standing in for a zero.</summary>
         public int Cost => price > 0 ? price : Prices.Of(tier);
@@ -191,6 +234,42 @@ namespace GulagRunners.Meta
         {
             Slot.Runner, Slot.Weapon, Slot.Knockout, Slot.Plate, Slot.Lock, Slot.Pose,
         };
+
+        /// <summary>The pieces of a lock, in the order the save indexes them by.</summary>
+        public static readonly LockPart[] Parts =
+        {
+            LockPart.Plate, LockPart.Bezel, LockPart.Keys, LockPart.Bolts, LockPart.Glow,
+        };
+
+        /// <summary>What to call a piece of the lock, on its row.</summary>
+        public static string Name(LockPart part) => part switch
+        {
+            LockPart.Plate => "BODY",
+            LockPart.Bezel => "RIM",
+            LockPart.Keys => "KEYS",
+            LockPart.Bolts => "BOLTS",
+            _ => "GLOW",
+        };
+
+        /// <summary>Everything in the Lock slot that is this piece, in catalogue order.</summary>
+        public List<Cosmetic> InPart(LockPart part)
+        {
+            List<Cosmetic> found = new List<Cosmetic>();
+            if (items == null) return found;
+            foreach (Cosmetic c in items)
+                if (c != null && c.slot == Slot.Lock && c.part == part) found.Add(c);
+            return found;
+        }
+
+        /// <summary>The free piece everybody starts with, for one part of the lock.</summary>
+        public Cosmetic DefaultIn(LockPart part)
+        {
+            if (items == null) return null;
+            foreach (Cosmetic c in items)
+                if (c != null && c.slot == Slot.Lock && c.part == part && c.isDefault)
+                    return c;
+            return null;
+        }
 
         /// <summary>What to call a slot on a tab.</summary>
         public static string Name(Slot slot) => slot switch

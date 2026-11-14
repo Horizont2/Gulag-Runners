@@ -43,6 +43,14 @@ namespace GulagRunners.Meta
                  "bug waiting in it.")]
         public List<string> equipped = new List<string>();
 
+        [Tooltip("The lock, a piece at a time: one id per Cosmetic.LockPart. Empty means " +
+                 "that piece's free default.\n\n" +
+                 "A list of its own rather than more entries on the one above, because the " +
+                 "lock is the only thing in the wardrobe built out of pieces, and folding " +
+                 "five of them into a list indexed by the slot enum would make that enum " +
+                 "mean two things at once.")]
+        public List<string> parts = new List<string>();
+
         [Header("Ladder — hidden from the player, shown only as a league")]
         [Tooltip("The Glicko-2 rating. docs/09 is explicit that this number is never shown: " +
                  "a visible rating is a thing to blame yourself for after one unlucky chest.")]
@@ -98,8 +106,13 @@ namespace GulagRunners.Meta
         /// reads as the slot's default, and an id for a slot that no longer exists is
         /// simply never asked for again. What was OWNED is kept: it cost gold, and a
         /// category coming back would find it still paid for.
+        ///
+        /// 5 adds the lock's PIECES. The lock is the one thing in the wardrobe that is
+        /// built a corner at a time rather than worn whole (Cosmetic.LockPart), so it
+        /// saves as its own list. A v4 save has no such list, which reads correctly as a
+        /// lock with nothing fitted to it yet — every piece its free default.
         /// </summary>
-        const int Version = 4;
+        const int Version = 5;
 
         /// <summary>Days of play in a row that earn docs/09's weekly streak.</summary>
         public const int DaysInAStreak = 7;
@@ -298,6 +311,7 @@ namespace GulagRunners.Meta
             // ids with a separator the ids are checked against (see CosmeticCatalogue).
             PlayerPrefs.SetString(Key + "owned", string.Join("|", owned ?? new List<string>()));
             PlayerPrefs.SetString(Key + "worn", string.Join("|", equipped ?? new List<string>()));
+            PlayerPrefs.SetString(Key + "parts", string.Join("|", parts ?? new List<string>()));
             PlayerPrefs.Save();
 
             saveState = $"saved v{Version}: {gold}g, {matchesPlayed} played, "
@@ -349,16 +363,31 @@ namespace GulagRunners.Meta
 
             owned = Split(PlayerPrefs.GetString(Key + "owned", ""));
             equipped = Split(PlayerPrefs.GetString(Key + "worn", ""));
+            parts = Split(PlayerPrefs.GetString(Key + "parts", ""));
 
             saveState = $"loaded v{found}: {gold}g, {matchesPlayed} played, "
                         + $"{daysInARow} day(s) in a row, {Count(owned)} owned"
-                        + (found < 3 ? " (a v" + found + " save: it owned no cosmetics, "
-                                     + "which is what an empty wardrobe means)"
-                        : found < 4 ? " (a v" + found + " save: what is worn was written "
-                                    + "against the older slots, so anything that no longer "
-                                    + "lines up reads as that slot's default. Nothing owned "
-                                    + "was lost)"
-                                    : "");
+                        + Older(found);
+        }
+
+        /// <summary>
+        /// What an older save is missing, said in the load line rather than left for the
+        /// reader to work out. In order, because each case is the one before it plus more:
+        /// a v3 save is also short of the lock's pieces, and a v2 save is short of
+        /// everything.
+        /// </summary>
+        static string Older(int found)
+        {
+            if (found >= Version) return "";
+            if (found < 3)
+                return $" (a v{found} save: it owned no cosmetics, which is what an empty "
+                     + "wardrobe means)";
+            if (found < 4)
+                return $" (a v{found} save: what is worn was written against the older "
+                     + "slots, so anything that no longer lines up reads as that slot's "
+                     + "default, and the lock has no pieces fitted. Nothing owned was lost)";
+            return $" (a v{found} save: the lock has no pieces fitted, which is what a lock "
+                 + "nobody has improved looks like)";
         }
 
         /// <summary>
