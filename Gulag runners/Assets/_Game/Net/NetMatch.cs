@@ -95,6 +95,9 @@ namespace GulagRunners.Net
         public int delay;
         public int roundTripMs;
 
+        // What the sentence above last said, so it is only written again when it changed.
+        int _saidDelay = -1, _saidTrip = -1, _saidSide = -1;
+
         float _accumulator;
         bool _primed;
         bool _holding;
@@ -262,8 +265,26 @@ namespace GulagRunners.Net
                 _accumulator = Mathf.Min(_accumulator, PlayerController.SecondsPerTick);
 
             roundTripMs = link.RoundTrip;
-            state = link.Desync
-                    ?? $"tick {tick}, as player {link.LocalPlayer + 1}, {delay} tick(s) of input budget for {roundTripMs} ms";
+
+            // Rebuilt only when it would READ differently. tick, delay and roundTripMs
+            // each have a field of their own above, so the sentence does not repeat the
+            // tick -- and a string built at 60 Hz to say what three ints already say is
+            // about five kilobytes a second of garbage for a line nobody is reading while
+            // they play. A desync message wins, and that one is rare by definition.
+            string desync = link.Desync;
+            if (desync != null)
+            {
+                state = desync;
+            }
+            else if (delay != _saidDelay || roundTripMs != _saidTrip
+                     || link.LocalPlayer != _saidSide)
+            {
+                _saidDelay = delay;
+                _saidTrip = roundTripMs;
+                _saidSide = link.LocalPlayer;
+                state = $"player {link.LocalPlayer + 1}, {delay} tick(s) of input budget "
+                        + $"for {roundTripMs} ms";
+            }
             Draw(_accumulator / PlayerController.SecondsPerTick);
         }
 

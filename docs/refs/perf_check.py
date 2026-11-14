@@ -355,7 +355,14 @@ def main():
             f"does not need more than 512")
 
     # ---- garbage per frame
-    hot = []
+    #
+    # Being INSIDE Update is not the same as running every frame, and a check that cannot
+    # tell them apart is a check nobody reads twice. A GetComponent under
+    # `if (inv.Weapon != _weapon)` runs when the weapon changes; a warning under
+    # `if (!_warned)` runs once ever. Both are correct code. What is not correct is an
+    # allocation sitting at the top of the method, where nothing guards it -- so that is
+    # the problem, and everything deeper is a note worth reading and nothing more.
+    hot, guarded = [], []
     for cs in walk(os.path.join(ASSETS, "_Game"), ".cs"):
         rel = os.path.relpath(cs, os.path.join(ASSETS, "_Game"))
         if rel.split(os.sep)[0] in ALLOWED:
@@ -364,26 +371,52 @@ def main():
         for name, body, line in bodies(text, PER_FRAME):
             for pattern, why in IN_FRAME:
                 for m in re.finditer(pattern, body):
-                    hot.append((rel, name, line + body[:m.start()].count("\n"),
-                                why, m.group(0).strip()))
+                    before = body[:m.start()]
+                    depth = before.count("{") - before.count("}")
 
-    notes.append(f"{len(hot)} allocation(s) or lookup(s) inside a per-frame method")
-    kinds = {}
-    for rel, name, line, why, what in hot:
-        kinds.setdefault(why, []).append(f"{rel}:{line} in {name}()")
-    for why, where in sorted(kinds.items(), key=lambda kv: -len(kv[1])):
-        notes.append(f"    {len(where):3d}  {why}")
-        for one in where[:3]:
-            notes.append(f"         {one}")
-        if len(where) > 3:
-            notes.append(f"         and {len(where) - 3} more")
+                    # Two ways code is guarded, and only one of them is a brace. The other
+                    # is the LATCH: `if (_warned) return;` at the top of the method and
+                    # `_warned = true;` below it, which is how every one-shot warning in
+                    # this project is written -- it runs once in the life of the process.
+                    #
+                    # An early return on its own does NOT count. Nearly every per-frame
+                    # method starts with one, and after it the rest runs every frame; a
+                    # rule that treated that as safe would excuse the whole file.
+                    latched = set(re.findall(r"\b(\w+)\s*=\s*true\s*;", body))
+                    asked = set()
+                    for g in re.finditer(r"if\s*\(([^)]*)\)\s*return\b", before):
+                        asked |= set(re.findall(r"\b(\w+)\b", g.group(1)))
+                    once = bool(latched & asked)
+
+                    where = (rel, name, line + before.count("\n"), why, m.group(0).strip())
+                    (guarded if depth > 1 or once else hot).append(where)
+
+    def listing(rows, head):
+        notes.append(head)
+        kinds = {}
+        for rel, name, line, why, what in rows:
+            kinds.setdefault(why, []).append(f"{rel}:{line} in {name}()")
+        for why, where in sorted(kinds.items(), key=lambda kv: -len(kv[1])):
+            notes.append(f"    {len(where):3d}  {why}")
+            for one in where[:3]:
+                notes.append(f"         {one}")
+            if len(where) > 3:
+                notes.append(f"         and {len(where) - 3} more")
+
+    if hot:
+        listing(hot, f"{len(hot)} allocation(s) with NOTHING guarding them, in a method "
+                     f"that runs every frame")
+    if guarded:
+        listing(guarded, f"{len(guarded)} more inside a condition -- they cost nothing "
+                         f"while the condition is false, which is the normal case")
 
     if hot:
         problems.append(
-            f"{len(hot)} thing(s) allocate or search inside a method that runs every "
-            f"frame. At 60 Hz the collections they cause are the dropped frames nobody "
-            f"can reproduce in the editor -- cache the lookups in Awake, keep one list "
-            f"and clear it, and build strings only when the text has changed")
+            f"{len(hot)} thing(s) allocate or search every single frame, with no "
+            f"condition in front of them. At 60 Hz the collections they cause are the "
+            f"dropped frames nobody can reproduce in the editor -- cache the lookups in "
+            f"Awake, keep one list and clear it, and build strings only when the text "
+            f"has changed")
 
     for n in notes:
         print(("  " + n) if n.startswith(" ") else ("  note: " + n))

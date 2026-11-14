@@ -293,6 +293,10 @@ namespace GulagRunners.Game
                  "playing what is above.")]
         public string nowOnArms;
 
+        // What that line last said, so it is only written again when it changed.
+        string _saidArms;
+        int _saidWeight = -1;
+
         int _currentHash;
         int _upperHash;
         float _upperWeight;
@@ -404,9 +408,23 @@ namespace GulagRunners.Game
             if (s.HitStopTimer > 0) animator.speed = 0f;
 
             nowPlaying = state;
-            nowOnArms = split && _upperWeight > 0.001f
-                ? $"{arms}  ({_upperWeight:0.00})"
-                : "";
+
+            // An inspector line, rebuilt only when it would read differently. Built every
+            // frame it was a string allocated sixty times a second for something nobody
+            // looks at while they are playing.
+            bool showArms = split && _upperWeight > 0.001f;
+            int hundredths = Mathf.RoundToInt(_upperWeight * 100f);
+            if (!showArms)
+            {
+                if (!string.IsNullOrEmpty(nowOnArms)) nowOnArms = "";
+                _saidArms = null;
+            }
+            else if (hundredths != _saidWeight || arms != _saidArms)
+            {
+                _saidWeight = hundredths;
+                _saidArms = arms;
+                nowOnArms = $"{arms}  ({_upperWeight:0.00})";
+            }
         }
 
         /// <summary>
