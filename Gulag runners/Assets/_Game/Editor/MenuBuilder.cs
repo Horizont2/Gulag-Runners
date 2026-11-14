@@ -6,6 +6,7 @@ using UnityEditor.Events;
 // Names which UnityEventTools is meant. Unity has only one; the reference assemblies
 // compile_check builds against carry a second, and an alias is the honest way to say so.
 using UnityEventTools = UnityEditor.Events.UnityEventTools;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -52,7 +53,7 @@ namespace GulagRunners.GameEditor
         float _scale = 1f;
         float _readoutScale = 1f;
         float _buttonScale = 1f;
-        Font _font;
+        TMP_FontAsset _font;
 
         readonly Dictionary<string, string> _found = new Dictionary<string, string>();
         readonly Dictionary<string, Vector2> _size = new Dictionary<string, Vector2>();
@@ -207,13 +208,7 @@ namespace GulagRunners.GameEditor
                               ref _onlyEmpty, 300f);
 
             EditorGUILayout.Space();
-            _font = (Font)EditorGUILayout.ObjectField(
-                new GUIContent("Typeface",
-                               "Optional. The sheet is set in Inter; this project ships no " +
-                               "font and no TextMeshPro, so without one here every label " +
-                               "comes out in Unity's built-in Arial and the screen will " +
-                               "not read like the mock-up. Import Inter and drop it in."),
-                _font, typeof(Font), false);
+            _font = UiText.Field(_font);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Size on screen", EditorStyles.boldLabel);
@@ -597,8 +592,8 @@ namespace GulagRunners.GameEditor
         static readonly Color Gold = UiPalette.Amber;
 
         /// <summary>Whatever was dropped in, or the one font that is always there.</summary>
-        Font Face => _font != null
-            ? _font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        TMP_FontAsset Face => _font != null
+            ? _font : UiText.DefaultFace();
 
         /// <summary>
         /// A row pinned to the right edge that is exactly as wide as what is in it.
@@ -652,16 +647,15 @@ namespace GulagRunners.GameEditor
             Undo.RegisterCreatedObjectUndo(go, "Build the menu");
             go.transform.SetParent(row, false);
 
-            Text t = Undo.AddComponent<Text>(go);
+            TextMeshProUGUI t = Undo.AddComponent<TextMeshProUGUI>(go);
             t.text = chars;
-            t.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _readoutScale));
-            t.alignment = TextAnchor.MiddleRight;
+            t.fontSize = Mathf.Max(8f, size * _readoutScale);
+            t.alignment = UiText.Align(TextAnchor.MiddleRight);
             t.raycastTarget = false;
             t.color = UiPalette.Ink;
             t.font = Face;
-            t.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
+            t.overflowMode = TextOverflowModes.Overflow;
 
             MenuLabel label = Undo.AddComponent<MenuLabel>(go);
             label.target = t;
@@ -701,7 +695,7 @@ namespace GulagRunners.GameEditor
             face.raycastTarget = true;
 
             RectTransform wordRt = Make("PLAY", rt, 0, 0, play.x, play.y, 0f, 0f, _buttonScale);
-            Text word = TextOn(wordRt, "PLAY", "Bold", 52, TextAnchor.MiddleCenter);
+            TextMeshProUGUI word = TextOn(wordRt, "PLAY", "Bold", 52, TextAnchor.MiddleCenter);
             word.color = UiPalette.InkOnAmber;
 
             Button button = Undo.AddComponent<Button>(rt.gameObject);
@@ -712,7 +706,7 @@ namespace GulagRunners.GameEditor
             // Directly under the button, by the sheet's own ten-unit gap.
             RectTransform modeRt = Make("Mode", block, DesignW - 64 - 300, 648 + play.y + 10,
                                         300, 32, 1f, 1f, _buttonScale);
-            Text mode = TextOn(modeRt, "MEDIEVAL", "Regular", 24, TextAnchor.MiddleRight);
+            TextMeshProUGUI mode = TextOn(modeRt, "MEDIEVAL", "Regular", 24, TextAnchor.MiddleRight);
             mode.color = UiPalette.InkSoft;
         }
 
@@ -824,23 +818,23 @@ namespace GulagRunners.GameEditor
             return rt;
         }
 
-        Text TextOn(RectTransform rt, string chars, string style, float size, TextAnchor align)
+        TextMeshProUGUI TextOn(RectTransform rt, string chars, string style, float size, TextAnchor align)
         {
-            Text t = Undo.AddComponent<Text>(rt.gameObject);
+            TextMeshProUGUI t = Undo.AddComponent<TextMeshProUGUI>(rt.gameObject);
             t.text = chars;
-            t.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _readoutScale));
-            t.alignment = align;
+            t.fontSize = Mathf.Max(8f, size * _readoutScale);
+            t.alignment = UiText.Align(align);
             t.raycastTarget = false;
             t.color = UiPalette.Ink;
             t.font = Face;
-            t.fontStyle = style == "Bold" || style == "Semi Bold" ? FontStyle.Bold : FontStyle.Normal;
+            t.fontStyle = style == "Bold" || style == "Semi Bold" ? FontStyles.Bold : FontStyles.Normal;
             return t;
         }
 
         MenuLabel LabelOn(RectTransform rt, string chars, string style, float size,
                           TextAnchor align)
         {
-            Text t = TextOn(rt, chars, style, size, align);
+            TextMeshProUGUI t = TextOn(rt, chars, style, size, align);
             MenuLabel label = Undo.AddComponent<MenuLabel>(rt.gameObject);
             label.target = t;
             label.placeholder = chars;

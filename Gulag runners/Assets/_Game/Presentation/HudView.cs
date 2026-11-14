@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using GulagRunners.Sim;
@@ -492,7 +493,7 @@ namespace GulagRunners.Game
             // A clock that does not move is worse than no clock: the whole of docs/01 is a
             // match on a timer, and an interface that shows a stopped one is lying about
             // the only thing on screen the player cannot work out for himself.
-            if (clock is Text label)
+            if (clock is TMP_Text label)
             {
                 string now = ClockText();
                 if (label.text != now) label.text = now;

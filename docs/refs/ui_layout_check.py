@@ -432,6 +432,19 @@ def main():
         walk = Walk(table)
         walk.run(body, dict(env))
 
+        # Legacy text is a bitmap font rasterised at one size, and the CanvasScaler scales
+        # every screen in this game -- 1920x864 onto everything from 720p to 1440p -- so a
+        # legacy label is a blurred label on almost every phone there is. TMP draws from a
+        # distance field and is sharp at any size. One of them going back in would not be
+        # visible in a diff of six hundred lines, so it is a rule.
+        for m in re.finditer(r"AddComponent<Text>|\bUnityEngine\.UI\.Text\b|"
+                             r"AddComponent<InputField>", text):
+            problems.append(
+                f"{builder} builds a legacy {m.group(0)}. The whole interface is "
+                f"TextMeshPro: a bitmap font goes soft the moment the CanvasScaler "
+                f"touches it, which on a 1920x864 sheet is always. Use UiText.On, and "
+                f"TMP_InputField for a box that is typed into")
+
         allowed = ALLOWED.get(builder, set())
         notes.append(f"{builder}: {len(walk.made)} rect(s) placed, "
                      f"{len(walk.taps)} of them take taps"

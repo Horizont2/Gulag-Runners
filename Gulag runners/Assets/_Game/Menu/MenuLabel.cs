@@ -1,5 +1,5 @@
+using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace GulagRunners.Game
 {
@@ -23,22 +23,22 @@ namespace GulagRunners.Game
     public sealed class MenuLabel : MonoBehaviour
     {
         [Tooltip("The text to write into. Left empty, one is looked for on this object.")]
-        public Text target;
+        public TMP_Text target;
 
         [Tooltip("What it says while the game is not running, so the screen can be laid " +
                  "out against something that looks like real content.")]
         public string placeholder = "";
 
-        void Reset() => target = GetComponent<Text>();
+        void Reset() => target = GetComponent<TMP_Text>();
 
         void Awake()
         {
-            if (target == null) target = GetComponent<Text>();
+            if (target == null) target = GetComponent<TMP_Text>();
         }
 
         public void Set(string value)
         {
-            if (target == null) target = GetComponent<Text>();
+            if (target == null) target = GetComponent<TMP_Text>();
             if (target != null && target.text != value) target.text = value;
         }
     }

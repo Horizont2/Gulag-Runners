@@ -6,6 +6,7 @@ using UnityEditor.Events;
 // Names which UnityEventTools is meant. Unity has only one; the reference assemblies
 // compile_check builds against carry a second, and an alias is the honest way to say so.
 using UnityEventTools = UnityEditor.Events.UnityEventTools;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -39,7 +40,7 @@ namespace GulagRunners.GameEditor
 
         Object _folder;
         bool _folderOpen;
-        Font _font;
+        TMP_FontAsset _font;
         float _scale = 4f;
         float _textScale = 1f;
         // Dragged in, not scanned for: see UiSpriteSet.
@@ -152,11 +153,7 @@ namespace GulagRunners.GameEditor
             }
 
             EditorGUILayout.Space();
-            _font = (Font)EditorGUILayout.ObjectField(
-                new GUIContent("Typeface",
-                               "Optional. This project ships no font, so without one every " +
-                               "label comes out in Unity's built-in Arial."),
-                _font, typeof(Font), false);
+            _font = UiText.Field(_font);
             _textScale = EditorGUILayout.Slider(
                 new GUIContent("Text size",
                                "Every label on this panel at once, against the design "
@@ -704,22 +701,21 @@ namespace GulagRunners.GameEditor
             return rt;
         }
 
-        Font Face => _font != null
-            ? _font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        TMP_FontAsset Face => _font != null
+            ? _font : UiText.DefaultFace();
 
         MenuLabel LabelOn(RectTransform rt, string chars, float size, TextAnchor align,
                           bool bold, float alpha)
         {
-            Text t = Undo.AddComponent<Text>(rt.gameObject);
+            TextMeshProUGUI t = Undo.AddComponent<TextMeshProUGUI>(rt.gameObject);
             t.text = chars;
-            t.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _textScale));
-            t.alignment = align;
+            t.fontSize = Mathf.Max(8f, size * _textScale);
+            t.alignment = UiText.Align(align);
             t.raycastTarget = false;
             t.color = new Color(1f, 1f, 1f, alpha);
             t.font = Face;
-            t.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
+            t.overflowMode = TextOverflowModes.Overflow;
 
             MenuLabel label = Undo.AddComponent<MenuLabel>(rt.gameObject);
             label.target = t;

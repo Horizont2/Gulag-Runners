@@ -76,6 +76,11 @@ BUILTIN = {
     "UnityEngine.Behaviour": {"set_enabled": ["bool"]},
     "UnityEngine.UI.Image": {"set_fillAmount": ["float"], "set_enabled": ["bool"]},
     "UnityEngine.UI.Text": {"set_text": ["string"], "set_enabled": ["bool"]},
+    # The game's own labels are TMP -- a bitmap font goes soft under a CanvasScaler, and
+    # this one scales 1920x864 onto every phone there is. The legacy row stays above for
+    # anything in a third-party prefab that still carries one.
+    "TMPro.TMP_Text": {"set_text": ["string"], "set_enabled": ["bool"]},
+    "TMPro.TextMeshProUGUI": {"set_text": ["string"], "set_enabled": ["bool"]},
     "UnityEngine.UI.Slider": {"set_value": ["float"]},
     "UnityEngine.Canvas": {"set_enabled": ["bool"]},
 }

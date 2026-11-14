@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEditor;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -162,27 +163,30 @@ namespace GulagRunners.GameEditor
             box.raycastTarget = true;
 
             RectTransform textRt = Make("Text", rt, 20, 0, 580, 88);
-            Text text = Undo.AddComponent<Text>(textRt.gameObject);
+            TextMeshProUGUI text = Undo.AddComponent<TextMeshProUGUI>(textRt.gameObject);
             text.fontSize = 34;
             text.color = new Color(0.93f, 0.93f, 0.93f);
-            text.alignment = TextAnchor.MiddleLeft;
-            text.supportRichText = false;
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.alignment = UiText.Align(TextAnchor.MiddleLeft);
+            text.richText = false;
+            text.font = UiText.DefaultFace();
 
             RectTransform hintRt = Make("Hint", rt, 20, 0, 580, 88);
-            Text hint = Undo.AddComponent<Text>(hintRt.gameObject);
+            TextMeshProUGUI hint = Undo.AddComponent<TextMeshProUGUI>(hintRt.gameObject);
             hint.text = "host's address, e.g. 192.168.1.14";
             hint.fontSize = 32;
             hint.color = new Color(1f, 1f, 1f, 0.35f);
-            hint.alignment = TextAnchor.MiddleLeft;
+            hint.alignment = UiText.Align(TextAnchor.MiddleLeft);
             hint.raycastTarget = false;
-            hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            hint.font = UiText.DefaultFace();
 
-            InputField field = Undo.AddComponent<InputField>(rt.gameObject);
+            // TMP's own field, because its text component is a TMP_Text: a legacy
+            // InputField cannot be handed one, and mixing the two is how a project ends
+            // up with a box whose caret is in a different font from its contents.
+            TMP_InputField field = Undo.AddComponent<TMP_InputField>(rt.gameObject);
             field.targetGraphic = box;
             field.textComponent = text;
             field.placeholder = hint;
-            field.lineType = InputField.LineType.SingleLine;
+            field.lineType = TMP_InputField.LineType.SingleLine;
             field.characterLimit = 45;              // an IPv6 address, with room to spare
 
             // A button as well as the end-edit, because a soft keyboard's "done" is not
@@ -216,14 +220,14 @@ namespace GulagRunners.GameEditor
                               float h, int size, Color colour)
         {
             RectTransform rt = Make(name, parent, 0, y, DesignW, h);
-            Text label = Undo.AddComponent<Text>(rt.gameObject);
+            TextMeshProUGUI label = Undo.AddComponent<TextMeshProUGUI>(rt.gameObject);
             label.text = text;
             label.fontSize = size;
             label.color = colour;
-            label.alignment = TextAnchor.MiddleCenter;
-            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            label.alignment = UiText.Align(TextAnchor.MiddleCenter);
+            label.overflowMode = TextOverflowModes.Overflow;
             label.raycastTarget = false;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.font = UiText.DefaultFace();
 
             MenuLabel wrap = Undo.AddComponent<MenuLabel>(rt.gameObject);
             wrap.target = label;
@@ -241,13 +245,13 @@ namespace GulagRunners.GameEditor
             face.raycastTarget = true;
 
             RectTransform wordRt = Make(word, rt, 0, 0, w, h);
-            Text t = Undo.AddComponent<Text>(wordRt.gameObject);
+            TextMeshProUGUI t = Undo.AddComponent<TextMeshProUGUI>(wordRt.gameObject);
             t.text = word;
             t.fontSize = 44;
             t.color = ink;
-            t.alignment = TextAnchor.MiddleCenter;
+            t.alignment = UiText.Align(TextAnchor.MiddleCenter);
             t.raycastTarget = false;
-            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            t.font = UiText.DefaultFace();
 
             Button button = Undo.AddComponent<Button>(rt.gameObject);
             button.targetGraphic = face;

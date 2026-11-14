@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -902,16 +903,16 @@ namespace GulagRunners.GameEditor
         }
 
         /// <summary>One line of text at its design place.</summary>
-        Text Label(Transform parent, string name, string text, float x, float y,
+        TextMeshProUGUI Label(Transform parent, string name, string text, float x, float y,
                    float w, float h, float anchor, TextAnchor align, float size)
         {
             RectTransform rt = Make(name, parent, x, y, w, h, anchor, 0f, _readoutScale);
-            Text label = Undo.AddComponent<Text>(rt.gameObject);
+            TextMeshProUGUI label = Undo.AddComponent<TextMeshProUGUI>(rt.gameObject);
             label.text = text;
-            label.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _readoutScale));
-            label.alignment = align;
+            label.fontSize = Mathf.Max(8f, size * _readoutScale);
+            label.alignment = UiText.Align(align);
             label.raycastTarget = false;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.font = UiText.DefaultFace();
             return label;
         }
 

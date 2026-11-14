@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEditor;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -446,13 +447,13 @@ namespace GulagRunners.GameEditor
                               float h, int size, Color colour)
         {
             RectTransform rt = Make(name, parent, 0, y, DesignW, h, 0f);
-            Text label = Undo.AddComponent<Text>(rt.gameObject);
+            TextMeshProUGUI label = Undo.AddComponent<TextMeshProUGUI>(rt.gameObject);
             label.text = text;
             label.fontSize = size;
             label.color = colour;
-            label.alignment = TextAnchor.MiddleCenter;
+            label.alignment = UiText.Align(TextAnchor.MiddleCenter);
             label.raycastTarget = false;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.font = UiText.DefaultFace();
 
             MenuLabel wrap = Undo.AddComponent<MenuLabel>(rt.gameObject);
             wrap.target = label;
@@ -475,13 +476,13 @@ namespace GulagRunners.GameEditor
             Skin(face, set, key);
 
             RectTransform wordRt = Make(word, rt, 0, 0, w, h, 0f);
-            Text t = Undo.AddComponent<Text>(wordRt.gameObject);
+            TextMeshProUGUI t = Undo.AddComponent<TextMeshProUGUI>(wordRt.gameObject);
             t.text = word;
             t.fontSize = 44;
             t.color = ink;
-            t.alignment = TextAnchor.MiddleCenter;
+            t.alignment = UiText.Align(TextAnchor.MiddleCenter);
             t.raycastTarget = false;
-            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            t.font = UiText.DefaultFace();
 
             Button button = Undo.AddComponent<Button>(rt.gameObject);
             button.targetGraphic = face;

@@ -4,6 +4,7 @@ using UnityEditor.Events;
 // Names which UnityEventTools is meant. Unity has only one; the reference assemblies
 // compile_check builds against carry a second, and an alias is the honest way to say so.
 using UnityEventTools = UnityEditor.Events.UnityEventTools;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -61,7 +62,7 @@ namespace GulagRunners.GameEditor
 
         Object _folder;
         bool _folderOpen;
-        Font _font;
+        TMP_FontAsset _font;
         float _textScale = 1f;
         UiSpriteSet _set;
         CosmeticCatalogue _catalogue;
@@ -186,11 +187,7 @@ namespace GulagRunners.GameEditor
                                "the screen still builds and lists nothing."),
                 _catalogue, typeof(CosmeticCatalogue), false);
 
-            _font = (Font)EditorGUILayout.ObjectField(
-                new GUIContent("Typeface",
-                               "Optional. This project ships no font, so without one every " +
-                               "label comes out in Unity's built-in Arial."),
-                _font, typeof(Font), false);
+            _font = UiText.Field(_font);
 
             _textScale = EditorGUILayout.Slider(
                 new GUIContent("Text size",
@@ -342,7 +339,7 @@ namespace GulagRunners.GameEditor
 
             // ---- the purse, at the top right of the sheet
             RectTransform goldRt = Make("Gold", root, ListRight - 260, 40, 260, 76, 0f, 0f);
-            Text gold = TextOn(goldRt, "1 240", 34, TextAnchor.MiddleRight, true);
+            TextMeshProUGUI gold = TextOn(goldRt, "1 240", 34, TextAnchor.MiddleRight, true);
             gold.color = UiPalette.Amber;
             Wire(view.goldChanged, Label(gold).Set);
 
@@ -368,18 +365,18 @@ namespace GulagRunners.GameEditor
 
             // ---- the category's name, and how much of it is owned beside it
             RectTransform titleRt = Make("Category", root, ListX, 54, 420, 56, 0f, 0f);
-            Text title = TextOn(titleRt, "RUNNERS", 44, TextAnchor.MiddleLeft, true);
+            TextMeshProUGUI title = TextOn(titleRt, "RUNNERS", 44, TextAnchor.MiddleLeft, true);
             Wire(view.slotChanged, Label(title).Set);
 
             RectTransform countRt = Make("Owned", root, 1280, 68, 320, 34, 0f, 0f);
-            Text count = TextOn(countRt, "1 / 4", 28, TextAnchor.MiddleRight, false);
+            TextMeshProUGUI count = TextOn(countRt, "1 / 4", 28, TextAnchor.MiddleRight, false);
             count.color = UiPalette.InkSoft;
             Wire(view.countedChanged, Label(count).Set);
 
             // ---- the line the screen speaks on, under the title. It is never blank:
             // ShopUI.Hint is what it says when nothing has happened yet.
             RectTransform saidRt = Make("Said", root, ListX, 122, ListW, 34, 0f, 0f);
-            Text said = TextOn(saidRt, "ONE TOUCH TRIES IT ON - NOTHING IS SPENT", 28,
+            TextMeshProUGUI said = TextOn(saidRt, "ONE TOUCH TRIES IT ON - NOTHING IS SPENT", 28,
                                TextAnchor.MiddleLeft, false);
             said.color = UiPalette.InkSoft;
             Wire(view.saidChanged, Label(said).Set);
@@ -420,11 +417,11 @@ namespace GulagRunners.GameEditor
                 TextOn(nameRt, "ASH", 34, TextAnchor.MiddleLeft, true);
 
                 RectTransform kindRt = Make("Kind", rt, 158, 70, 360, 34, 0f, 0f);
-                Text kind = TextOn(kindRt, "COMMON", 28, TextAnchor.MiddleLeft, false);
+                TextMeshProUGUI kind = TextOn(kindRt, "COMMON", 28, TextAnchor.MiddleLeft, false);
                 kind.color = UiPalette.Common;
 
                 RectTransform priceRt = Make("Price", rt, row.x - 26 - 240, 44, 240, 44, 0f, 0f);
-                Text price = TextOn(priceRt, "800", 34, TextAnchor.MiddleRight, true);
+                TextMeshProUGUI price = TextOn(priceRt, "800", 34, TextAnchor.MiddleRight, true);
                 price.color = UiPalette.Amber;
             }
 
@@ -443,7 +440,7 @@ namespace GulagRunners.GameEditor
 
             RectTransform onlyRt = Make("Label", filterRt, 76, 0,
                                         filter.x - 76f - 20f, filter.y, 0f, 0f);
-            Text only = TextOn(onlyRt, "OWNED ONLY", 28, TextAnchor.MiddleLeft, true);
+            TextMeshProUGUI only = TextOn(onlyRt, "OWNED ONLY", 28, TextAnchor.MiddleLeft, true);
             only.color = UiPalette.InkSoft;
 
             Button filterButton = Undo.AddComponent<Button>(filterRt.gameObject);
@@ -473,7 +470,7 @@ namespace GulagRunners.GameEditor
             actFace.raycastTarget = true;
 
             RectTransform verbRt = Make("Verb", actRt, 0, 0, act.x, act.y, 0f, 0f);
-            Text verb = TextOn(verbRt, "BUY", 44, TextAnchor.MiddleCenter, true);
+            TextMeshProUGUI verb = TextOn(verbRt, "BUY", 44, TextAnchor.MiddleCenter, true);
             verb.color = UiPalette.InkOnAmber;
             Wire(view.verbChanged, Label(verb).Set);
 
@@ -594,26 +591,25 @@ namespace GulagRunners.GameEditor
             return image;
         }
 
-        Font Face => _font != null
-            ? _font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        TMP_FontAsset Face => _font != null
+            ? _font : UiText.DefaultFace();
 
-        Text TextOn(RectTransform rt, string chars, float size, TextAnchor align, bool bold)
+        TextMeshProUGUI TextOn(RectTransform rt, string chars, float size, TextAnchor align, bool bold)
         {
-            Text t = Undo.AddComponent<Text>(rt.gameObject);
+            TextMeshProUGUI t = Undo.AddComponent<TextMeshProUGUI>(rt.gameObject);
             t.text = chars;
-            t.fontSize = Mathf.Max(8, Mathf.RoundToInt(size * _textScale));
-            t.alignment = align;
+            t.fontSize = Mathf.Max(8f, size * _textScale);
+            t.alignment = UiText.Align(align);
             t.raycastTarget = false;
             t.color = UiPalette.Ink;
             t.font = Face;
-            t.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
+            t.overflowMode = TextOverflowModes.Overflow;
             return t;
         }
 
         /// <summary>A label a UnityEvent can call, because an event needs a method.</summary>
-        static MenuLabel Label(Text text)
+        static MenuLabel Label(TMP_Text text)
         {
             MenuLabel label = text.gameObject.GetComponent<MenuLabel>();
             if (label == null) label = Undo.AddComponent<MenuLabel>(text.gameObject);
