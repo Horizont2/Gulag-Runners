@@ -1,4 +1,6 @@
-"""A second way up each floor of Arena_Egypt, on the stairs its author already drew.
+"""A second way up each floor of the Egypt arena, on the stairs its author drew.
+
+The arena is loc3_new.unity: Dawid's own scene, with the machinery in it.
 
 WHAT THIS IS FOR. chest_check measures the arena in seconds and says, with two ladders:
 "the 5th chest each player can reach is 12.83 s away for P1 and 18.85 s for P2 -- that is
@@ -31,7 +33,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENE = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes",
-                     "Arena_Egypt.unity")
+                     "loc3_new.unity")
 
 # (the ladder to copy, the x for the copy, the suffix for its name, why there)
 #
@@ -149,7 +151,7 @@ def main():
 
     if made:
         io.open(SCENE, "w", encoding="utf-8").write(text)
-        print(f"  wrote Arena_Egypt.unity with {made} more climb(s)")
+        print(f"  wrote loc3_new.unity with {made} more climb(s)")
     else:
         print("  nothing to add")
     return 0

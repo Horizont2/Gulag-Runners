@@ -17,7 +17,14 @@ The other direction (copy the machinery into his scene) means remapping several 
 documents of HUD and systems, every one of which is wired to the others by fileID. One
 mistake there is a scene that opens with half a HUD and no explanation.
 
-    python3 build_egypt.py            builds Assets/Scenes/Arena_Egypt.unity
+RETIRED. The arena is HIS scene now -- Assets/Scenes/loc3_new.unity, with the machinery
+in it -- so there is nothing left for this to build and running it would make a second
+Egypt out of the arena itself. It stays as the record of how the machinery was moved, and
+of two mistakes worth keeping: the global guid replace that broke twenty-nine references
+(see repair_egypt_stone.py) and "his three slabs are the mine's floors to the centimetre",
+which was true everywhere except the front edge (see his_layout.py).
+
+    python3 build_egypt.py            says the above and stops
 """
 import io
 import math
@@ -197,6 +204,23 @@ def mirrored_ladders(rows, taken):
 
 
 def main():
+    """Kept for the record, and it does not run any more.
+
+    This wrote Assets/Scenes/Arena_Egypt.unity, a copy of the mine wearing Dawid's temple.
+    There is no Arena_Egypt now: the arena is HIS scene, loc3_new.unity, with the
+    machinery in it and the map pool and the build list pointing at it. Running this again
+    would build a second Egypt arena out of a level that is already the arena -- machinery
+    and all -- so it stops here instead.
+
+    What it did and why it did it that way is in docs/34; the passes that still have work
+    to do are polish_egypt.py (the night), egypt_climbs.py (the two mirrored ladders),
+    his_layout.py (the floors and the mine's frame) and repair_egypt_stone.py, and all
+    four act on loc3_new.unity and are idempotent.
+    """
+    print("  build_egypt is retired: the arena is Assets/Scenes/loc3_new.unity now, and "
+          "this would build a second one out of it. See docs/34.")
+    return 1
+
     mine_text = io.open(MINE, encoding="utf-8").read()
     egypt_text = io.open(EGYPT, encoding="utf-8").read()
 

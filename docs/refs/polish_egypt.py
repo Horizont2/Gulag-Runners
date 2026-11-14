@@ -1,10 +1,10 @@
-"""The look of Arena_Egypt: it is NIGHT, and seven flames are what you see by.
+"""The look of the Egypt arena (loc3_new.unity): NIGHT, and seven flames to see by.
 
 "loc3_new is the Egypt arena and the one you made playable is just the old version of it
 -- it is the NIGHT Egypt arena."
 
 Measured before changed, because the first half of that is not what the files say:
-Arena_Egypt already carries 201 of loc3_new's 201 prefab instances (ui-era build_egypt.py
+The arena already carried 201 of loc3_new's 201 prefab instances (build_egypt.py
 took them from loc3_new, not from loc3, and the only two it left behind are a pair of
 wall-mounted swords). What was the old version was the LIGHT. Dawid lit his level with one
 cubemap -- FS000_Night_02_Moonless -- and this pass had given the transplant a SUNSET:
@@ -60,7 +60,7 @@ sys.path.insert(0, HERE)
 import arena_demo_geometry as geometry                        # noqa: E402
 
 ASSETS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets")
-SCENE = os.path.join(ASSETS, "Scenes", "Arena_Egypt.unity")
+SCENE = os.path.join(ASSETS, "Scenes", "loc3_new.unity")
 GRADE = os.path.join(ASSETS, "Settings", "Arena_Egypt_Grade.asset")
 
 GRADE_GUID = "7c1b0d93a6f54c5f9d2e8ab41f0c37d2"
@@ -561,7 +561,7 @@ def main():
     text = under_the_temple(text)
 
     io.open(SCENE, "w", encoding="utf-8").write(text)
-    print("  wrote Arena_Egypt.unity")
+    print("  wrote loc3_new.unity")
 
 
 if __name__ == "__main__":

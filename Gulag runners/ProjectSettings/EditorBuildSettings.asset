@@ -18,8 +18,8 @@ EditorBuildSettings:
     path: Assets/Scenes/Arena_Mine.unity
     guid: 5463c2bdf29e1d841ab22387e42a96bb
   - enabled: 1
-    path: Assets/Scenes/Arena_Egypt.unity
-    guid: e9a4c1b7d5f2486fb0c3a7e51d2946f8
+    path: Assets/Scenes/loc3_new.unity
+    guid: 01a0849a1ebc1ac45a85239a6c22bc6e
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

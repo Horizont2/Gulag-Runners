@@ -1,4 +1,4 @@
-"""Twenty-nine broken asset references in Arena_Egypt, from one global find-and-replace.
+"""Twenty-nine broken asset references in the Egypt arena, from one find-and-replace.
 
 WHAT WENT WRONG. build_egypt.py re-skinned the mine's border posts and floors in Egyptian
 stone the cheapest way there is:
@@ -38,7 +38,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENE = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes",
-                     "Arena_Egypt.unity")
+                     "loc3_new.unity")
 
 SWORD = "bdca320f74588434f875e8e66dbaba74"      # Sword_WallMount.fbx
 STONE = "2f518aa449f624949b9d99fa0722626a"      # CGM_EgyptPack/Material/LVL_3.mat
@@ -73,7 +73,7 @@ def main():
         return 0
 
     io.open(SCENE, "w", encoding="utf-8").write(text)
-    print("  wrote Arena_Egypt.unity")
+    print("  wrote loc3_new.unity")
     return 0
 
 

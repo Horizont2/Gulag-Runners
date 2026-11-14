@@ -1,4 +1,7 @@
-"""Arena_Egypt's collision is HIS blockout now, not the mine's pit.
+"""The Egypt arena's collision is HIS blockout, not the mine's pit.
+
+The arena is loc3_new.unity, which is his scene; this is what was done to the floors
+and to the mine's frame on the way there.
 
 "In the old Egypt arena there is the old arena LAYOUT." Measured, two things in that scene
 were the mine's rather than Dawid's, and both are the layout in the sense that matters --
@@ -47,8 +50,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
-EGYPT = os.path.join(SCENES, "Arena_Egypt.unity")
-HIS = os.path.join(SCENES, "loc3_new.unity")
+EGYPT = os.path.join(SCENES, "loc3_new.unity")
 
 # the mine's slab here  <-  his slab there, and the FRONT edge to pull it to.
 #
@@ -63,9 +65,19 @@ HIS = os.path.join(SCENES, "loc3_new.unity")
 # below it plus half a body, and no further, or it is a ceiling over that storey instead of
 # a floor above it. The numbers are read off depth_check after each move, because moving the
 # middle floor forward moves the budget of the one above it.
+# The WHOLE placement of each upper slab, not just the part that changes: his local x, his
+# height, his width, and the z span the fight needs.
+#
+# Written down rather than read out of loc3_new, because loc3_new IS this scene now -- and
+# a pass that reads the file it writes copied the middle floor onto the top one the second
+# time it ran. That cost the top floor its HEIGHT, which a pass that only rewrote z could
+# not heal, and chest_check found it: "2 full storey(s)", and the two top safes left with
+# 2.12 m of air under them. So every number this depends on is in the table.
+#
+#          slab        his x    his y   his width   front    back
 FLOORS = (
-    ("Cube (3)", "Cube (2)", -1.82),      # depth_check: "could come to z -1.82"
-    ("Cube (4)", "Cube (3)", -1.22),      # once the middle is at -1.82, this is its budget
+    ("Cube (3)",       0.019,   3.149,  30.368612,  -1.82,  +2.87),
+    ("Cube (4)",      -0.090,   5.272,  30.638622,  -1.22,  +4.83),
 )
 
 FRAME = "CageLeft"
@@ -100,43 +112,38 @@ def place(body):
 
 
 def main():
-    his = documents(io.open(HIS, encoding="utf-8").read())
     text = io.open(EGYPT, encoding="utf-8").read()
     docs = documents(text)
 
     # ---- the two upper floors: his back edge, the front edge the rule allows
-    for mine_name, his_name, front in FLOORS:
-        a, b = named(docs, mine_name), named(his, his_name)
-        if a is None or b is None:
-            print(f"  {mine_name} <- {his_name}: one of them is not a single object; skipped")
+    for mine_name, his_x, his_y, his_w, front, back in FLOORS:
+        a = named(docs, mine_name)
+        if a is None:
+            print(f"  {mine_name}: not a single object in this scene; skipped")
             continue
-        at, bt = transform_of(docs, a), transform_of(his, b)
+        at = transform_of(docs, a)
         was_pos, was_scale = place(docs[at][1])
-        pos, scale = place(his[bt][1])
-        if None in (was_pos, was_scale, pos, scale):
-            print(f"  {mine_name}: no position or scale to copy; skipped")
+        if None in (was_pos, was_scale):
+            print(f"  {mine_name}: no position or scale to write; skipped")
             continue
-        # His numbers first, then the front edge. The slab's parent turns local x into
-        # world depth and leaves local z as world z, so a world span [front, back] is a
-        # local scale.x of back - front centred at local z (front + back) / 2.
-        his_z = float(re.search(r"z: ([-\d.eE+]+)", pos).group(1))
-        his_depth = float(re.search(r"x: ([-\d.eE+]+)", scale).group(1))
-        back = his_z + his_depth / 2.0
+
+        # The slab's parent turns local x into world depth and leaves local z as world
+        # z, so a world span [front, back] is a local scale.x of back - front centred at
+        # local z (front + back) / 2. Local y is the storey's height and local scale.z is
+        # its width along the arena, both his.
         depth = back - front
         at_z = front + depth / 2.0
-
-        pos = re.sub(r"z: [-\d.eE+]+", f"z: {at_z:.6g}", pos)
-        scale = re.sub(r"x: [-\d.eE+]+", f"x: {depth:.6g}", scale, count=1)
+        pos = "  m_LocalPosition: {x: %.6g, y: %.6g, z: %.6g}" % (his_x, his_y, at_z)
+        scale = "  m_LocalScale: {x: %.6g, y: 0.23572, z: %.6g}" % (depth, his_w)
 
         if (was_pos, was_scale) == (pos, scale):
-            print(f"  {mine_name} already stands where it should")
+            print(f"  {mine_name} already stands at z {front:+.2f}..{back:+.2f}")
             continue
         body = docs[at][1]
-        fixed = body.replace(was_pos, pos).replace(was_scale, scale)
-        text = text.replace(body, fixed)
+        text = text.replace(body, body.replace(was_pos, pos).replace(was_scale, scale))
         docs = documents(text)
-        print(f"  {mine_name} <- {his_name}: z {front:+.2f}..{back:+.2f} "
-              f"({depth:.2f} m deep; his back edge, the front edge the rule allows)")
+        print(f"  {mine_name}: z {front:+.2f}..{back:+.2f} ({depth:.2f} m deep; "
+              f"his back edge, the front edge the rule allows)")
 
     # ---- the mine's frame
     gone = 0
@@ -167,7 +174,7 @@ def main():
           if gone else "  the mine's frame is already gone")
 
     io.open(EGYPT, "w", encoding="utf-8").write(text)
-    print("  wrote Arena_Egypt.unity")
+    print("  wrote loc3_new.unity")
     return 0
 
 
