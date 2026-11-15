@@ -312,7 +312,6 @@ def main(argv):
     for name in recipes.FOR_PROP:
         if name not in measured:
             problems.append(f"FOR_PROP names {name} and there is no {name}.wav.")
-    both = sorted(set(recipes.FOR_PROP) & mapped - set(recipes.FOR_PROP))
     for name in sorted(set(recipes.FOR_PROP)):
         if any(name in names for names in recipes.FOR_SOUND.values()):
             problems.append(
