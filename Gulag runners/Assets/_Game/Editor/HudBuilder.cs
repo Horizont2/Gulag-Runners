@@ -2,6 +2,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Events;
+// Names which UnityEventTools is meant. Unity has only one; the reference
+// assemblies compile_check builds against carry a second.
+using UnityEventTools = UnityEditor.Events.UnityEventTools;
+using UnityEngine.Events;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -789,6 +794,17 @@ namespace GulagRunners.GameEditor
             {
                 Undo.RecordObject(net, "Build HUD");
                 net.hud = view;
+
+                // And the two things it has always said out loud now have somewhere to
+                // land. Found rather than carried down through four method calls: there
+                // is one of these on a HUD and it is built eight lines up.
+                NetNotice speaks = rootGo.GetComponentInChildren<NetNotice>(true);
+                if (speaks != null)
+                {
+                    Wire(net.WaitingChanged, new UnityAction<string>(speaks.Say));
+                    Wire(net.Substituted, new UnityAction(speaks.Substituted));
+                }
+
                 EditorUtility.SetDirty(net);
                 PrefabUtility.RecordPrefabInstancePropertyModifications(net);
             }
@@ -900,6 +916,38 @@ namespace GulagRunners.GameEditor
             float marks = pip * 3f + 16f;
             view.wins1 = Marks(bar, sprites, "Wins / P1", 800 - 24 - marks, 90, 0.5f);
             view.wins2 = Marks(bar, sprites, "Wins / P2", 1120 + 24, 90, 0.5f);
+
+            // The one line the NETWORK speaks on, under the round label and centred.
+            // NetMatch has said two things since it was written -- the other player has
+            // stopped answering, and a bot has their fighter now -- and until this label
+            // existed nothing drew either. A freeze that explains itself is a wait; the
+            // same freeze with nothing on it is a hang.
+            //
+            // Empty at rest, so the HUD is no busier than it was for the whole of a
+            // match where nothing goes wrong.
+            TextMeshProUGUI notice = Label(bar, "Net Notice", "", 560, 162, 800, 44,
+                                           0.5f, TextAnchor.UpperCenter, 30);
+            NetNotice speaks = Undo.AddComponent<NetNotice>(notice.gameObject);
+            speaks.target = notice;
+            speaks.waiting = UiPalette.Amber;
+            speaks.settled = UiPalette.Ink;
+        }
+
+        /// <summary>Replaces whatever was wired, so running the tool twice wires once.</summary>
+        static void Wire(UnityEvent<string> raised, UnityAction<string> call)
+        {
+            if (raised == null) return;
+            for (int i = raised.GetPersistentEventCount() - 1; i >= 0; i--)
+                UnityEventTools.RemovePersistentListener(raised, i);
+            UnityEventTools.AddPersistentListener(raised, call);
+        }
+
+        static void Wire(UnityEvent raised, UnityAction call)
+        {
+            if (raised == null) return;
+            for (int i = raised.GetPersistentEventCount() - 1; i >= 0; i--)
+                UnityEventTools.RemovePersistentListener(raised, i);
+            UnityEventTools.AddPersistentListener(raised, call);
         }
 
         /// <summary>One line of text at its design place.</summary>
