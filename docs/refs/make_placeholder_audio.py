@@ -493,7 +493,7 @@ def swing(length=0.16, top=2600.0, bottom=900.0, q=1.3, body=0.0, peak_at=0.62):
         yield v * a
 
 
-def flesh(length=0.17, f0=320.0, f1=110.0, crack=1.0, drive=1.8):
+def flesh(length=0.17, f0=320.0, f1=165.0, crack=1.0, drive=2.2):
     """A blow landing on a man. A thud with a short crack on top.
 
     Three layers and each one is doing a job the other two cannot. The THUD is a sine dropping
@@ -504,31 +504,40 @@ def flesh(length=0.17, f0=320.0, f1=110.0, crack=1.0, drive=1.8):
     the middle, and it is the only one of the three that sounds wet.
 
     THE FIRST VERSION OF THIS DROPPED TO 58 HZ AND WAS WRONG, and the measurement is what said
-    so: a spectrum with 100% of its energy under 500 Hz, on a game that ships to phones. A
-    phone speaker is a centimetre across and does nothing below about 300 Hz, so the most
-    important sound in the game (docs/38 puts AttackHit first of twelve) would have arrived as
-    a faint click on the device every player is holding. The klaxon in this same file already
-    knew that — it sits at 311 and 415 Hz for the same reason. So the thud lands at 110 Hz with
-    its drop starting at 320, which is still heard as a thud, and the mid band is where the
-    weight actually comes from on a small speaker.
+    so: 95% of its energy below 150 Hz, on a game that ships to phones. A phone speaker is a
+    centimetre across and does nothing much below 250 Hz, so the most important sound in the
+    game (docs/38 puts AttackHit first of twelve) would have arrived as a faint click on the
+    device every player is actually holding. The klaxon in this same file already knew that —
+    it sits at 311 and 415 Hz for the same reason. So: the drop ends at 165 Hz instead, the
+    thud carries its second and third harmonics at 45% and 18% so there is real content at 330
+    and 495 Hz where a small speaker does work, and the meat and the crack were raised until
+    an eighth of the energy sits above 400 Hz rather than a hundredth.
+
+    It was not raised further than that on purpose. `armour` is the sound this one has to be
+    told apart from and it has 94% of ITS energy between 400 Hz and 1.2 kHz, so the two
+    histograms barely overlap at these settings and that is worth more than making this one
+    brighter. The measured spectral centres are 404 Hz against 724, and the decays 68 ms
+    against 190 — through a floor, pitched to 0.85 and at a third of the volume, that is still
+    "the short dark one" against "the long bright one".
 
     The saturator is the hitstop of docs/20 in audio: a blow slightly over its own ceiling
     reads as a blow that was harder than the speaker. The crack is added AFTER it rather than
     through it — a saturator driven by the thud compresses everything riding on the thud, and
-    the first attempt lost the crack entirely that way, which measured as nothing at all above
+    an earlier attempt lost the crack entirely that way, which measured as nothing at all above
     2 kHz on a sound whose whole job is to arrive on one frame.
     """
     n = int(RATE * length)
     bright = highpass(1800.0)
-    wet = lowpass(700.0)
+    wet = lowpass(900.0)
     phase = 0.0
     for i in range(n):
         t = i / RATE
         phase += 2 * math.pi * (f0 + (f1 - f0) * min(1.0, t / 0.022)) / RATE
-        thud = math.sin(phase) * env(t, length, 0.0012, 1, 7.0)
-        meat = wet(noise()) * env(t, length, 0.001, 1, 12.0) * 1.1
-        slap = bright(noise()) * env(t, length, 0.0004, 1, 55.0) * 1.6 * crack
-        yield soft(thud * 0.95 + meat * 0.8, drive) * 0.85 + slap * 0.5
+        thud = (math.sin(phase) + 0.45 * math.sin(2 * phase) + 0.18 * math.sin(3 * phase)) \
+            * env(t, length, 0.0012, 1, 7.0)
+        meat = wet(noise()) * env(t, length, 0.001, 1, 12.0) * 3.5
+        slap = bright(noise()) * env(t, length, 0.0004, 1, 30.0) * 3.0 * crack
+        yield soft(thud * 0.80 + meat, drive) * 0.85 + slap * 0.40
 
 
 def armour(length=0.30, base=640.0, ratios=(1.0, 1.72, 2.41, 3.33, 4.62, 6.15), thump=0.5):
@@ -563,7 +572,7 @@ def armour(length=0.30, base=640.0, ratios=(1.0, 1.72, 2.41, 3.33, 4.62, 6.15), 
         yield soft(v, 1.4)
 
 
-def block(length=0.13, f0=240.0, f1=115.0, knock=330.0, drive=2.6):
+def block(length=0.13, f0=240.0, f1=155.0, knock=330.0, drive=2.6):
     """A hit that did not work. Absorbed, dead, no ring.
 
     Everything here is subtraction. The low thud of `flesh` but with a decay four times as
@@ -577,19 +586,21 @@ def block(length=0.13, f0=240.0, f1=115.0, knock=330.0, drive=2.6):
     cannot blur into each other at any distance or through any floor. They are the two possible
     answers to the same input and the player has about 100 ms to tell which one he got.
 
-    240 Hz down to 115 rather than the 150 to 70 this started at, for the reason written out at
-    length in `flesh`: a phone speaker does not move below about 300 Hz, and a dead sound that
-    is also inaudible is not dead, it is missing.
+    240 Hz down to 155 rather than the 150 to 70 this started at, with a second harmonic, for
+    the reason written out at length in `flesh`: a phone speaker does not move much below
+    250 Hz, and a dead sound that is also inaudible is not dead, it is missing. Deadness is a
+    property of the DECAY — 31 ms to −30 dB, measured — not of the band, so this can be dragged
+    up into the register a phone reproduces without becoming a ring.
     """
     n = int(RATE * length)
-    dull = lowpass(700.0)
+    dull = lowpass(900.0)
     cap = lowpass(1100.0)
     phase = 0.0
     for i in range(n):
         t = i / RATE
         phase += 2 * math.pi * (f0 + (f1 - f0) * min(1.0, t / 0.02)) / RATE
-        v = math.sin(phase) * env(t, length, 0.002, 1, 14.0) * 0.9
-        v += dull(noise()) * env(t, length, 0.001, 1, 20.0) * 1.0
+        v = (math.sin(phase) + 0.45 * math.sin(2 * phase)) * env(t, length, 0.002, 1, 14.0) * 0.9
+        v += dull(noise()) * env(t, length, 0.001, 1, 20.0) * 2.6
         v += math.sin(2 * math.pi * knock * t) * env(t, length, 0.001, 1, 30.0) * 0.45
         yield cap(soft(v, drive))
 
@@ -675,10 +686,10 @@ def death(length=1.05):
     phase = settle_phase = 0.0
     for i in range(n):
         t = i / RATE
-        phase += 2 * math.pi * (250.0 - 165.0 * min(1.0, t / 0.05)) / RATE
-        v = (math.sin(phase) + 0.35 * math.sin(2 * phase) + 0.16 * math.sin(3 * phase)) \
+        phase += 2 * math.pi * (250.0 - 140.0 * min(1.0, t / 0.05)) / RATE
+        v = (math.sin(phase) + 0.50 * math.sin(2 * phase) + 0.25 * math.sin(3 * phase)) \
             * env(t, length, 0.002, 1, 2.4) * 0.9
-        v += cap(bits(noise())) * bell(min(1.0, t / 0.34), 0.10, 1.3, 1.2) * 1.5
+        v += cap(bits(noise())) * bell(min(1.0, t / 0.34), 0.10, 1.3, 1.2) * 4.0
         v += rumble(noise()) * env(t, length, 0.01, 1, 1.8) * 0.45
         if t > 0.26:
             u = t - 0.26
@@ -946,8 +957,12 @@ def main():
     # seconds one clip is a rifle, and this is the sound the whole hit-feel chord of docs/20
     # was already playing to.
     make("Hit_Flesh_A", 0.70, flesh)
-    make("Hit_Flesh_B", 0.70, flesh, 0.155, 240.0, 62.0)
-    make("Hit_Flesh_C", 0.68, flesh, 0.185, 186.0, 52.0, 0.8, 2.1)
+    # The variants move the drop and the length, never the register: a variant that lands in a
+    # different band is not a variant, it is a second sound, and the first pass at these two
+    # put 72% of their energy under 150 Hz while the A clip put 87% of its own between 150 and
+    # 400. Two hits in a row would have sounded like two different events.
+    make("Hit_Flesh_B", 0.70, flesh, 0.155, 368.0, 185.0)
+    make("Hit_Flesh_C", 0.68, flesh, 0.185, 286.0, 172.0, 0.8, 2.6)
     make("Swing_Light_A", 0.35, swing)
     make("Swing_Light_B", 0.35, swing, 0.148, 2880.0, 1040.0, 1.2)
     make("Swing_Light_C", 0.34, swing, 0.172, 2360.0, 820.0, 1.45, 0.0, 0.58)
@@ -969,7 +984,7 @@ def main():
     # The two answers to the same input, 100 ms apart. Two variants each; a flurry of blocks
     # happens, a flurry of parries does not.
     make("Block_Impact_A", 0.52, block)
-    make("Block_Impact_B", 0.52, block, 0.118, 164.0, 76.0, 262.0)
+    make("Block_Impact_B", 0.52, block, 0.118, 268.0, 168.0, 372.0)
     make("Parry_A", 0.66, parry)
     make("Parry_B", 0.66, parry, 0.315, 1312.0)
 

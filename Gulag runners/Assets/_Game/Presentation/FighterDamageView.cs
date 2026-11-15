@@ -305,9 +305,44 @@ namespace GulagRunners.Game
             _flashLeft = flashSeconds;
         }
 
+        /// <summary>
+        /// Throw the hit's particles, in whichever way the thing wired here actually works.
+        ///
+        /// There are two kinds of effect and they are started differently, which is a trap
+        /// worth spelling out because getting it wrong fails SILENTLY:
+        ///
+        ///   A LOOSE system -- one emitter, no children, the kind a pack usually ships for
+        ///   a blood spray -- wants Emit(n). How hard the hit was is how MANY.
+        ///
+        ///   An AUTHORED effect is several systems under one parent, because the layers
+        ///   need different materials and different render modes (the sparks are stretched
+        ///   billboards, the ring is not, and a sub-emitter cannot have either). Those want
+        ///   Play(withChildren), and Emit on the parent would fire the parent's own emitter
+        ///   -- which has no renderer -- and leave all five layers dark. Nothing would
+        ///   error; the hit would simply have no particles, and it would look like a tuning
+        ///   problem for a week.
+        ///
+        /// How hard the hit was changes the SIZE of an authored effect and not the count.
+        /// Multiplying an authored composition by damage is how you get two hundred sparks
+        /// out of a design that was built around nine: the arrangement is the effect, and
+        /// scaling the arrangement keeps it while scaling the population destroys it.
+        /// </summary>
         void Spray(ParticleSystem system, int damage)
         {
-            if (system == null || particlesPerDamage <= 0) return;
+            if (system == null) return;
+
+            float hard = Mathf.Clamp01(damage / 25f);
+
+            if (system.transform.childCount > 0
+                && system.GetComponentsInChildren<ParticleSystem>(true).Length > 1)
+            {
+                float k = Mathf.Lerp(0.8f, 1.3f, hard);
+                system.transform.localScale = new Vector3(k, k, k);
+                system.Play(true);
+                return;
+            }
+
+            if (particlesPerDamage <= 0) return;
             int count = Mathf.Clamp(damage * particlesPerDamage, 1, 200);
             system.Emit(count);
         }
