@@ -364,7 +364,13 @@ def klaxon(length=0.95):
         v += 0.3 * math.sin(2 * math.pi * f * 2 * t)
         gate = 0.0 if (t % 0.42) > 0.34 else 1.0
         edge = min(1.0, (t % 0.42) / 0.012, max(0.0, (0.34 - (t % 0.42)) / 0.012))
-        yield v * gate * edge * 0.45
+        # The gate's cycle is 0.42 s and the file is 0.95 long, so the last pulse was CUT OFF
+        # MID-TONE at 0.49 of full scale: an audible click at the end of every shutter warning,
+        # committed and unnoticed because nothing had ever looked at the last sample. Found by
+        # placeholder_audio_check, which fails on an edge away from zero for this reason. The
+        # fade is twelve milliseconds, short enough not to change the warning's rhythm.
+        out = min(1.0, (length - t) / 0.012)
+        yield v * gate * edge * out * 0.45
 
 
 def slam(length=0.80):
@@ -904,6 +910,18 @@ FOR_SOUND = {
     "PoisonVent":       ("Poison_Vent",),
 }
 
+# The four that are NOT in the sound table and are not supposed to be.
+#
+# docs/14 puts these on AudioSources sitting on the props themselves — the twelve cage and gate
+# sources in the forest — rather than on a SoundId, because they belong to a thing in the arena
+# at a fixed place rather than to something a fighter did. audio_check already has a rule for
+# them from the other end: an AudioSource with a clip and its component disabled, which is how
+# all twelve of those were found silent.
+#
+# Written down because the alternative is a check that cannot tell a clip the game plays
+# through a prop from a clip nothing can ever play at all.
+FOR_PROP = ("Cage_Jerk", "Cage_Haul", "Shutter_Warn", "Shutter_Slam")
+
 
 def main():
     os.makedirs(OUT, exist_ok=True)
@@ -911,7 +929,10 @@ def main():
     wav("Cage_Jerk", clank())
     wav("Cage_Haul", haul())
     wav("Shutter_Warn", klaxon())
-    wav("Shutter_Slam", slam())
+    # Shutter_Slam peaked at 0.96, which is a third of a decibel of headroom — not clipping,
+    # but close enough that the check's ceiling and this file were arguing, and the ceiling is
+    # right: a margin that small is a margin nobody can rely on. Given a level like the rest.
+    wav("Shutter_Slam", level(slam(), 0.88))
     wav("Siren_Pulse", pulse())
 
     # The information ladder of docs/01 stands on these: in the blind phase they are the only

@@ -56,7 +56,7 @@ RATE = recipes.RATE          # one rate for the whole folder: see the note on MI
 CHANNELS = 1                 # the hearing model does the panning (docs/14); stereo is wasted
 WIDTH = 2
 
-PEAK_CEILING = 0.96          # above this the saturation is the file's, not the player's
+PEAK_CEILING = 0.92          # above this the saturation is the file's, not the player's
 PEAK_FLOOR = 0.05            # below this it is a file nobody will believe fired
 RMS_FLOOR = 0.004            # a single tick in two seconds of silence passes a peak test
 SHORTEST = 0.03              # under 30 ms nothing has a character, only a click
@@ -300,12 +300,26 @@ def main(argv):
                     f"a row, so a wrong entry there is advice pointing at nothing.")
 
     mapped = {n for names in recipes.FOR_SOUND.values() for n in names}
+    mapped |= set(recipes.FOR_PROP)
     orphans = sorted(set(measured) - mapped)
     if orphans:
         problems.append(
-            f"{len(orphans)} file(s) that no SoundId claims: {', '.join(orphans)}. A clip no "
-            f"row can point at is a clip nothing will ever play. Add it to FOR_SOUND or delete "
-            f"it.")
+            f"{len(orphans)} file(s) that nothing claims: {', '.join(orphans)}. A clip that is "
+            f"in no SoundId's row and on no prop is a clip nothing can ever play. Put it in "
+            f"FOR_SOUND, or in FOR_PROP if it belongs to an AudioSource in the arena, or "
+            f"delete it.")
+
+    for name in recipes.FOR_PROP:
+        if name not in measured:
+            problems.append(f"FOR_PROP names {name} and there is no {name}.wav.")
+    both = sorted(set(recipes.FOR_PROP) & mapped - set(recipes.FOR_PROP))
+    for name in sorted(set(recipes.FOR_PROP)):
+        if any(name in names for names in recipes.FOR_SOUND.values()):
+            problems.append(
+                f"{name} is in FOR_PROP and in FOR_SOUND. A clip is played either by a prop's "
+                f"own AudioSource or through the sound table, and the two paths have different "
+                f"volumes — the table's goes through the hearing model and the prop's does "
+                f"not (docs/14) — so one sound on both is one sound at two levels.")
 
     known = set(ids())
     for sound in sorted(recipes.FOR_SOUND):
@@ -315,37 +329,42 @@ def main(argv):
                 f"those clips are for, the game cannot ask for it.")
 
     # ---------------------------------------------------------- the pairs, measured
-    for dark, brightest, dark_max, bright_min, ratio, why in PAIRS:
-        a = [measured[n] for n in recipes.FOR_SOUND.get(dark, ()) if n in measured]
-        b = [measured[n] for n in recipes.FOR_SOUND.get(brightest, ()) if n in measured]
+    #
+    # The worst clip on each side is what counts, not the average: the backend picks between
+    # variants at random, so a pair that is distinct on average and blurred on one combination
+    # of clips is a pair that occasionally lies to the player.
+    for low, high, lo_hz, hi_hz, low_max, high_min, ratio, why in PAIRS:
+        a = [n for n in recipes.FOR_SOUND.get(low, ()) if n in audio]
+        b = [n for n in recipes.FOR_SOUND.get(high, ()) if n in audio]
         if not a or not b:
             continue
 
-        da = max(m["bright"] for m in a)
-        db = min(m["bright"] for m in b)
-        ta = max(m["decay"] for m in a)
-        tb = min(m["decay"] for m in b)
+        ta = max(tilt(audio[n], lo_hz, hi_hz) for n in a)
+        tb = min(tilt(audio[n], lo_hz, hi_hz) for n in b)
+        da = max(measured[n]["decay"] for n in a)
+        db = min(measured[n]["decay"] for n in b)
 
-        notes.append(f"{dark} vs {brightest}: {da * 100:.0f}% against {db * 100:.0f}% of the "
-                     f"energy above {BRIGHT_FROM:.0f} Hz, ringing {ta * 1000:.0f} ms against "
-                     f"{tb * 1000:.0f} ms")
+        notes.append(f"{low} vs {high}: tilt {ta:.2f} against {tb:.2f} "
+                     f"({lo_hz:.0f} Hz / {hi_hz:.0f} Hz), ringing {da * 1000:.0f} ms against "
+                     f"{db * 1000:.0f} ms")
 
-        if da > dark_max:
+        if ta > low_max:
             problems.append(
-                f"{dark} has {da * 100:.0f}% of its energy above {BRIGHT_FROM:.0f} Hz, over "
-                f"the {dark_max * 100:.0f}% it is allowed, so it is drifting into "
-                f"{brightest}'s band. {why}")
-        if db < bright_min:
+                f"{low} reads {ta:.2f} on the {lo_hz:.0f}/{hi_hz:.0f} Hz tilt, over the "
+                f"{low_max:.2f} it is allowed, so it has drifted up into {high}'s register. "
+                f"{why}")
+        if tb < high_min:
             problems.append(
-                f"{brightest} has only {db * 100:.0f}% of its energy above "
-                f"{BRIGHT_FROM:.0f} Hz, under the {bright_min * 100:.0f}% it needs, so it is "
-                f"drifting into {dark}'s band. {why}")
-        if tb < ta * ratio:
+                f"{high} reads {tb:.2f} on the {lo_hz:.0f}/{hi_hz:.0f} Hz tilt, under the "
+                f"{high_min:.2f} it needs, so it has drifted down into {low}'s register. "
+                f"{why}")
+        if db < da * ratio:
             problems.append(
-                f"{brightest} rings {tb * 1000:.0f} ms against {dark}'s {ta * 1000:.0f}, and "
-                f"it needs {ratio}x to stay apart from it. Length is the one thing the hearing "
-                f"model cannot take away — volume and brightness it can — so this is the "
-                f"property these two are told apart by at a distance. {why}")
+                f"{high} rings {db * 1000:.0f} ms against {low}'s {da * 1000:.0f}, and it "
+                f"needs {ratio}x to stay apart from it. How long a sound lasts is the one "
+                f"property the hearing model cannot take away — volume it can, and distance "
+                f"eats brightness too — so this is what these two are told apart by at the far "
+                f"end of the arena and through a floor. {why}")
 
     for n in notes:
         print("  note: " + n)
