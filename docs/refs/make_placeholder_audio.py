@@ -687,7 +687,7 @@ def death(length=1.05):
         yield v
 
 
-def jump(length=0.13, cloth=900.0, voice=165.0, hum=0.12):
+def jump(length=0.13, cloth=900.0, voice=165.0, hum=0.16):
     """Cloth and effort, quiet.
 
     Jumping is the most repeated thing in the game after walking, so the brief for this one is
@@ -696,10 +696,16 @@ def jump(length=0.13, cloth=900.0, voice=165.0, hum=0.12):
     heard it four hundred times in a match would ask for it to be turned off.
 
     The faint 165 Hz under the cloth is the only part that says a person did this rather than a
-    curtain moving, and it is at a tenth of the level of everything else for that reason.
+    curtain moving, and it is at a sixth of the level of everything else for that reason.
+
+    Capped at 2.3 kHz rather than 3, which is the one thing separating this from `dodge` and
+    from `swing` that does not depend on level. Measured, the three sit at roughly 2.4, 5.2 and
+    3.2 kHz of spectral centre: a jump is the dark one, a dodge the bright one, and a swing the
+    one in between that MOVES. A jump that read as a swing would be a sound telling a lie in a
+    game where you cannot see the man making it.
     """
     n = int(RATE * length)
-    rub, cap = highpass(cloth), lowpass(3000.0)
+    rub, cap = highpass(cloth), lowpass(2300.0)
     breath = lowpass(1400.0)
     phase = 0.0
     for i in range(n):
@@ -752,8 +758,8 @@ def ladder_grab(length=0.10, rungs=(420.0, 980.0, 1870.0), knock=140.0):
     for i in range(n):
         t = i / RATE
         v = slap_lo(slap_hi(noise())) * env(t, length, 0.0004, 1, 42.0) * 1.2
-        v += ring(t, length, 1.0, rungs, (22.0, 30.0, 40.0), 0.8, ph) * 0.6
-        v += math.sin(2 * math.pi * knock * t) * env(t, length, 0.001, 1, 18.0) * 0.5
+        v += ring(t, length, 1.0, rungs, (14.0, 20.0, 28.0), 0.55, ph) * 0.85
+        v += math.sin(2 * math.pi * knock * t) * env(t, length, 0.001, 1, 18.0) * 0.3
         yield v
 
 
@@ -790,27 +796,30 @@ def poison_warn(length=2.0):
     that is this clip's job.
 
     "From below" is a statement about spectrum, not about panning. Everything here is under
-    300 Hz: a sub rising from 36 Hz to 72 Hz over two seconds with the plates of the floor
-    rattling at 7 Hz on top of it, and nothing above that at all. 36 Hz is well below what a
-    phone speaker can reproduce, so the second and third harmonics are carried at 30% and 14%
-    and they are what the pitch is actually heard through — the fundamental exists for the
-    player on headphones, and the rise is audible either way.
+    420 Hz: a sub rising from 42 Hz to 96 Hz over two seconds with the plates of the floor
+    rattling at 7 Hz on top of it, and nothing above that at all. This is the one sound in the
+    file allowed to live mostly where a phone speaker cannot follow, because it is the one
+    sound whose MEANING is that it is coming from under the floor — but it still has to be
+    heard, so the second and third harmonics are carried at 45% and 26% rather than token
+    level, and the plate rattle runs up to 260 Hz where a phone does work. On headphones the
+    fundamental is there; on a phone the harmonics and the rattle carry the rise. Haptics, when
+    they arrive, are this sound's natural other half.
 
     Two seconds inside a three-second brace, deliberately: it fades out over the last 160 ms
     and leaves a second of nothing before the clank, which is a better use of the third second
     than filling it.
     """
     n = int(RATE * length)
-    plate, cap = lowpass(180.0), lowpass(300.0)
+    plate, cap = lowpass(260.0), lowpass(420.0)
     phase = 0.0
     for i in range(n):
         t = i / RATE
         k = t / length
-        phase += 2 * math.pi * (36.0 + 36.0 * (k ** 1.3)) / RATE
-        sub = math.sin(phase) + 0.30 * math.sin(2 * phase) + 0.14 * math.sin(3 * phase)
+        phase += 2 * math.pi * (42.0 + 54.0 * (k ** 1.3)) / RATE
+        sub = math.sin(phase) + 0.45 * math.sin(2 * phase) + 0.26 * math.sin(3 * phase)
         rattle = plate(noise()) * (0.5 + 0.5 * math.sin(2 * math.pi * 7.0 * t))
         swell = (k ** 1.8) * (1.0 - max(0.0, (k - 0.92) / 0.08) ** 2)
-        yield cap(sub * 0.75 + rattle * 0.45) * swell
+        yield cap(sub * 0.75 + rattle * 0.55) * swell
 
 
 def poison_vent(length=0.80, base=430.0):
@@ -839,10 +848,14 @@ def poison_vent(length=0.80, base=430.0):
         t = i / RATE
         k = t / length
         v = noise() * env(t, length, 0.0004, 1, 90.0) * 0.8
-        v += ring(t, length, base, ratios, (9.0, 12.0, 16.0, 21.0, 26.0), 0.6, ph) * 0.55
-        phase += 2 * math.pi * (90.0 - 50.0 * min(1.0, t / 0.05)) / RATE
-        v += math.sin(phase) * env(t, length, 0.002, 1, 5.0) * 0.6
-        v += air(noise(), 2600.0 - 1700.0 * k) * bell(k, 0.10, 1.4, 1.1) * 1.1
+        v += ring(t, length, base, ratios, (9.0, 12.0, 16.0, 21.0, 26.0), 0.6, ph) * 0.8
+        phase += 2 * math.pi * (160.0 - 80.0 * min(1.0, t / 0.05)) / RATE
+        v += math.sin(phase) * env(t, length, 0.002, 1, 5.0) * 0.7
+        # The release gets its own, shorter window than the file: at the level and the length
+        # the first attempt gave it, the measured spectrum was 91% above 2 kHz, which is a
+        # sound best described as a hiss somebody put a clank in front of. "One hard event"
+        # means the clank is the event, so the gas is done by 550 ms and the metal outlasts it.
+        v += air(noise(), 2600.0 - 1700.0 * k) * bell(min(1.0, t / 0.55), 0.10, 1.4, 1.5) * 0.6
         yield v
 
 
