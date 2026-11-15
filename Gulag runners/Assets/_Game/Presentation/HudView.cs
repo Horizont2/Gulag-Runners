@@ -60,6 +60,24 @@ namespace GulagRunners.Game
         public Color actionGlyph = UiPalette.Action;
         public Color jumpGlyph = UiPalette.Jump;
 
+        [Header("How a button answers the thumb")]
+        [Tooltip("How far an available button sinks when pressed, as a fraction of its "
+                 + "size. Small on purpose: these rings are 130 units across and a thumb "
+                 + "covers most of one, so the movement is read at the EDGE. Anything "
+                 + "bigger looks like the button is falling over.")]
+        [Range(0f, 0.2f)] public float pressDepth = 0.07f;
+
+        [Tooltip("How far a REFUSED button sinks. Less than an available one, and it does "
+                 + "not brighten at all: the thumb is acknowledged, the action is not "
+                 + "promised. A refused press that moved as much as a working one would be "
+                 + "the control lying about what just happened.")]
+        [Range(0f, 0.2f)] public float refusedPress = 0.03f;
+
+        [Tooltip("How much an available button brightens while held. The lift IS the "
+                 + "promise that something happened, which is why only an available button "
+                 + "gets it.")]
+        [Range(0f, 0.5f)] public float pressLift = 0.18f;
+
         [Header("Danger")]
         [Tooltip("A weapon about to break, and health below the share where bare hands " +
                  "start hitting harder. One colour for both, because both mean the same " +
@@ -158,6 +176,20 @@ namespace GulagRunners.Game
     {
         public Graphic ring;
         public Graphic glyph;
+
+        /// <summary>
+        /// How far into its press this button is, nought to one, and which kind of press.
+        ///
+        /// Kept on the button and not in a dictionary somewhere because there are three of
+        /// them and they are already a serialized class: a parallel structure keyed by
+        /// button would be a second thing to keep in step with the first.
+        /// </summary>
+        [System.NonSerialized] public float press;
+        [System.NonSerialized] public bool refused;
+        [System.NonSerialized] public bool wasHeld;
+
+        /// <summary>The scale the ring is at. Cached so a frame that changes nothing writes nothing.</summary>
+        [System.NonSerialized] public float scale = 1f;
     }
 
     /// <summary>Which palette colour a button's glyph takes.</summary>
@@ -643,10 +675,92 @@ namespace GulagRunners.Game
             // by another weapon now (docs/31), and what used to flash here is a thing the
             // player can simply SEE: their own blade knocked aside.
             PaintStick(aim);
-            PaintButton(dodge, GlyphInk.Block, false);
-            PaintButton(action, GlyphInk.Action, false);
-            PaintButton(jump, GlyphInk.Jump, false);
+
+            // The three buttons, each told whether the thumb is on it and whether pressing
+            // it would do anything.
+            //
+            // `disabled` used to be a hard-coded false on all three lines. The parameter was
+            // there, the painting honoured it, and nothing ever passed it a real value -- so
+            // a player tapping DODGE with no stamina got no dodge, no explanation, and a
+            // button that looked exactly as it always had. That is the difference between a
+            // game that is hard and a game that is broken, and from the thumb's side they
+            // are indistinguishable.
+            PlayerController me = Mine();
+            InputFlags held = Held(me);
+
+            PaintButton(dodge, GlyphInk.Block,
+                        (held & InputFlags.Dodge) != 0, CanDodge(me));
+            PaintButton(action, GlyphInk.Action,
+                        (held & InputFlags.Action) != 0, CanAct(me));
+            PaintButton(jump, GlyphInk.Jump,
+                        (held & InputFlags.Jump) != 0, CanJump(me));
         }
+
+        /// <summary>This device's fighter, or null before the match has wired one.</summary>
+        PlayerController Mine() => localPlayer == 0 ? player1 : player2;
+
+        /// <summary>
+        /// What the thumb is doing RIGHT NOW, straight off the input source rather than out
+        /// of the simulation's last tick.
+        ///
+        /// It has to be the live read. The simulation runs at 60 Hz with rollback, and the
+        /// state a view sees can be a frame or two behind or briefly rewound -- which is
+        /// invisible everywhere else in this HUD, and would be the one thing a player could
+        /// feel here. A button that lights 30 ms after the finger lands does not read as
+        /// late; it reads as unresponsive, which is the single worst thing a touchscreen
+        /// control can be.
+        /// </summary>
+        static InputFlags Held(PlayerController me) =>
+            me != null && Application.isPlaying ? me.ReadLocalInput().Flags : InputFlags.None;
+
+        /// <summary>
+        /// Would a dodge happen if they pressed it?
+        ///
+        /// Asked with the simulation's OWN condition and the simulation's own number --
+        /// CombatMotor gates a dodge on `StaminaCharges >= move.DodgeStaminaCost` and the
+        /// cost comes off PlayerController.Config. A copy of that number in the HUD would be
+        /// a second source of truth for a rule, and the day somebody tuned the cost the
+        /// button would start lying.
+        /// </summary>
+        static bool CanDodge(PlayerController me)
+        {
+            if (me == null || !Application.isPlaying) return true;
+            return me.State.StaminaCharges >= me.Config.DodgeStaminaCost;
+        }
+
+        /// <summary>
+        /// Would the action button do anything?
+        ///
+        /// Always yes, and that is a DECISION rather than an oversight, which is why it is a
+        /// method with a reason in it and not a `true` at the call site. The two are the same
+        /// to the compiler and nothing like each other to the next person reading it: the
+        /// original bug on these three lines was a literal nobody had thought about.
+        ///
+        /// The reason: the action button is the game's catch-all -- pick up, open a chest,
+        /// grab a ladder, touch a lock -- and what is in reach is worked out inside
+        /// LootMotor and PlayerMotor as they run, not published anywhere a view can ask. Even
+        /// if it were, greying this one out would be wrong: reach changes as the fighter
+        /// walks, so the button would flicker on and off along a wall of crates, and a
+        /// control that flickers is worse than one that is merely optimistic.
+        ///
+        /// What would make it real: a `bool SomethingInReach` output on PlayerSimState, set
+        /// where the motors already know. Then this reads it and the lie ends.
+        /// </summary>
+        static bool CanAct(PlayerController me) => true;
+
+        /// <summary>
+        /// Would the jump button do anything?
+        ///
+        /// Always yes, and deliberately, for a reason docs/38 is proud of: there is coyote
+        /// time (6 frames) and a jump buffer (7 frames), so a jump pressed slightly before
+        /// landing or slightly after walking off an edge DOES happen. A button greyed out on
+        /// the frames the fighter is technically airborne would be telling the player their
+        /// input was refused at the exact moments the game goes out of its way to accept it.
+        ///
+        /// So this is not a gap to fill later. Greying the jump button would make the control
+        /// less honest, not more.
+        /// </summary>
+        static bool CanJump(PlayerController me) => true;
 
         /// <summary>
         /// The attack stick, tinted like the old attack ring was. Red, because it is
@@ -660,18 +774,84 @@ namespace GulagRunners.Game
             Tint(stick.knob, Fade(palette.attackGlyph, 0.92f));
         }
 
-        void PaintButton(HudButton button, GlyphInk ink, bool disabled)
+        /// <summary>
+        /// A button, told whether the thumb is on it and whether pressing it does anything.
+        ///
+        /// Three states and not two, and the third is the one that matters. A press that
+        /// WORKED and a press that was REFUSED must not look the same, because the game's
+        /// answer to each is different and the player has no other way to tell them apart:
+        /// a dodge that did not happen for want of stamina looks, from the thumb, exactly
+        /// like a dodge the game failed to notice. One is information and the other is a
+        /// bug, and a control that cannot distinguish them trains the player to distrust it.
+        ///
+        ///   AVAILABLE, untouched   full ink, resting size
+        ///   AVAILABLE, held        brighter, pressed IN -- it took the input
+        ///   UNAVAILABLE, held      dimmed and pressed in, but it does NOT brighten: the
+        ///                          thumb is acknowledged, the action is not promised
+        ///
+        /// The press is instant on the way down and springs back on the way up. That
+        /// asymmetry is deliberate: a control must never lag behind the finger arriving,
+        /// and easing the release is what stops three buttons looking like a strobe during
+        /// a fast exchange.
+        /// </summary>
+        void PaintButton(HudButton button, GlyphInk ink, bool held, bool available)
         {
             if (button == null) return;
+
+            bool disabled = !available;
+
+            // Down at once, back over about an eighth of a second. unscaledDeltaTime,
+            // because hit stop freezes Time.deltaTime and a button that stops answering
+            // mid-freeze is a button that feels like a dropped input -- during the exact
+            // few frames after a blow lands, when the player is pressing hardest.
+            if (held) button.press = 1f;
+            else if (button.press > 0f)
+                button.press = Mathf.Max(0f, button.press - Time.unscaledDeltaTime / 0.12f);
+
+            // Which KIND of press this is, latched on the way down so that letting go of a
+            // refused button does not make it flash as it springs back.
+            if (held && !button.wasHeld) button.refused = disabled;
+            button.wasHeld = held;
+
+            float push = button.press * (button.refused ? refusedPress : pressDepth);
 
             // The ring is interface and stays white; the glyph is the verb and is coloured.
             Color ring = disabled ? Fade(palette.line, palette.disabledAlpha) : palette.line;
             Color glyph = Ink(ink);
             if (disabled) glyph = Fade(glyph, palette.disabledAlpha);
 
+            // Only an available button brightens. See the summary: the lift IS the promise.
+            if (!button.refused && button.press > 0f)
+            {
+                ring = Lift(ring, button.press * pressLift);
+                glyph = Lift(glyph, button.press * pressLift);
+            }
+
             Tint(button.ring, ring);
             Tint(button.glyph, glyph);
+
+            // Scale last, and only when it has actually moved. Writing a Transform every
+            // frame dirties the Canvas every frame, which on a mobile UI is a full rebuild
+            // of the batch for nothing.
+            float want = 1f - push;
+            if (!Mathf.Approximately(want, button.scale))
+            {
+                button.scale = want;
+                if (button.ring != null)
+                    button.ring.transform.localScale = new Vector3(want, want, 1f);
+            }
         }
+
+        /// <summary>
+        /// Towards white without washing out, and without touching alpha.
+        ///
+        /// Lerping to white would take a saturated glyph grey on the way, which reads as the
+        /// button going OUT rather than lighting up. Adding to each channel keeps the hue
+        /// and just raises it.
+        /// </summary>
+        static Color Lift(Color c, float by) =>
+            new Color(Mathf.Min(1f, c.r + by), Mathf.Min(1f, c.g + by),
+                      Mathf.Min(1f, c.b + by), c.a);
 
         Color Ink(GlyphInk ink) => ink switch
         {
@@ -714,9 +894,14 @@ namespace GulagRunners.Game
             }
 
             PaintStick(aim);
-            PaintButton(dodge, GlyphInk.Block, false);
-            PaintButton(action, GlyphInk.Action, false);
-            PaintButton(jump, GlyphInk.Jump, false);
+
+            // At rest, before a tick has run: nothing is held and everything is offered.
+            // Literals are right HERE and nowhere else -- there is no simulation yet to ask,
+            // and a button greyed out on the start screen would promise the player a
+            // restriction that does not exist.
+            PaintButton(dodge, GlyphInk.Block, false, true);
+            PaintButton(action, GlyphInk.Action, false, true);
+            PaintButton(jump, GlyphInk.Jump, false, true);
 
             foreach (Graphic g in lineArt) Tint(g, Fade(palette.line, lineArtAlpha));
         }

@@ -122,6 +122,20 @@ namespace GulagRunners.Game
                  "in this component is worth looking at.")]
         public bool drawGizmo = true;
 
+        [Header("The blow coming back")]
+        [Tooltip("Metres the grip is thrown back at the moment a blow lands. The simulation "
+                 + "already holds the fighter still for the recoil (PlayerMotor lumps it in "
+                 + "with hitstun); this is that pause made visible.\n\n"
+                 + "Small. A fighter at this scale is under two metres and the arm is about "
+                 + "0.7 of one, so 12 cm is a definite kick and 30 would be the hand "
+                 + "leaving the body. 0 switches it off.")]
+        [Range(0f, 0.4f)] public float recoilKick = 0.12f;
+
+        [Tooltip("How much of that the TIP takes, as a fraction. Under 1 so the weapon "
+                 + "pivots in the hand rather than sliding backwards whole — a blocked "
+                 + "swing turns the blade, it does not retract it.")]
+        [Range(0f, 1f)] public float recoilTipShare = 0.45f;
+
         Vector3 _grip;
         Vector3 _tip;
         bool _have;
@@ -355,11 +369,74 @@ namespace GulagRunners.Game
             grip += slip;
             tip += slip;
 
+            Kick(ref grip, ref tip, in s);
+
             _grip = grip;
             _tip = tip;
             _have = true;
             return true;
         }
+
+        /// <summary>
+        /// The blow coming back up the arm.
+        ///
+        /// <see cref="PlayerSimState.RecoilTimer"/> has existed since the combat motor was
+        /// written and NO VIEW HAS EVER READ IT. The simulation sets it on the tick a blow
+        /// lands and uses it to hold the attacker still -- PlayerMotor lumps it in with
+        /// hitstun and stagger -- so the commitment is already real and already felt as a
+        /// pause. It was simply never SEEN. The fighter froze for a moment after connecting
+        /// and nothing about the arm said why.
+        ///
+        /// Which leaves the hit lopsided. Everything that happens on a landed blow happens
+        /// to the man receiving it: he flashes, he bleeds, he is shoved. The one throwing it
+        /// gets a camera shake and an arm that carries on as though it had passed through
+        /// air. A weapon that meets a body has to be stopped by it, and the player holding
+        /// it should see the stop.
+        ///
+        /// Done here, at the end of the one method that works out where the hand is, so
+        /// every consumer -- the IK goal, the weapon socket, the gizmo -- agrees about it.
+        /// Two places applying a kick would be two slightly different kicks, and the gizmo
+        /// would stop being worth drawing.
+        ///
+        /// Presentation only. The simulation decides the recoil and its length; this decides
+        /// nothing and writes nothing back (docs/06).
+        /// </summary>
+        void Kick(ref Vector3 grip, ref Vector3 tip, in PlayerSimState s)
+        {
+            int now = s.RecoilTimer;
+            if (now <= 0)
+            {
+                _recoilPeak = 0;
+                return;
+            }
+
+            // How long THIS recoil was, learnt by watching it start rather than by reaching
+            // for CombatConfig. The timer only ever counts down, so a rise is a new blow and
+            // its first value is its full length -- and a rollback that re-lands the same
+            // blow re-learns the same number, which a cached config lookup would also do but
+            // with a dependency this file does not otherwise need.
+            if (now > _recoilPeak) _recoilPeak = now;
+            if (_recoilPeak <= 0) return;
+
+            // Hardest at the moment of contact, gone by the time the fighter can move again.
+            // Squared, so the arm snaps back and then settles instead of drifting home at a
+            // constant speed, which reads as the weapon being heavy rather than as the hand
+            // being slow.
+            float left = now / (float)_recoilPeak;
+            float amount = left * left * recoilKick;
+
+            Vector3 back = grip - tip;
+            if (back.sqrMagnitude < 1e-8f) return;
+            back.Normalize();
+
+            // The grip comes back further than the tip, so the weapon does not just slide
+            // backwards -- it pivots in the hand, which is what a blocked swing does.
+            grip += back * amount;
+            tip += back * amount * recoilTipShare;
+        }
+
+        /// <summary>The length of the recoil being played, learnt from its first frame.</summary>
+        int _recoilPeak;
 
         static float M(Fix v) => v.Raw / (float)Fix.RawOne;
 

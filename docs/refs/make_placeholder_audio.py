@@ -11,8 +11,54 @@ every hook can be heard to fire, in the right place, at the right moment — and
 replacing them later is dropping a file over a file rather than wiring anything.
 
 Run:  cd docs/refs && python3 make_placeholder_audio.py
+
+
+THE COMBAT PASS
+---------------
+The first sixteen files covered walking, landing, chests and the room. The FIGHT had nothing:
+audio_check read 24 rows in the table with a clip in 12, and the twelve without one were
+AttackSwingLight, AttackSwingHeavy, AttackHit, AttackHitArmoured, BlockImpact, Parry, Stagger,
+Death, Jump, Dodge, LadderGrab and LadderOut — that is, everything a fighter does. docs/38 § 1
+is the whole argument and it comes to this: the three other layers of a blow are already built
+(hitstop, camera trauma, the weapon trail; docs/20) and all three of them are playing to a
+sound that does not exist. A hit with no sound does not land. Added here with the two the gas
+announcement posts, PoisonWarn and PoisonVent, which had no clip either.
+
+It is not decoration. docs/01 keeps the other man OFF SCREEN for most of a match — separate
+floors, a 2.5D side view, a dark scavenge phase — so sound is the primary information channel
+rather than a layer over one, and docs/14 spends the whole hearing model on making it legible:
+range by noise level, a quarter of the range at full volume, and a sound from another storey at
+×0.45 volume and ×0.6 range, ×0.8 and pitched down to 0.85 again by UnityAudioBackend.
+
+That last number is the constraint these recipes are actually written against. A placeholder
+has to survive being made quieter, duller and lower and STILL answer the question the player is
+asking, so two pairs are designed as opposites rather than as variations:
+
+  AttackHit vs AttackHitArmoured   flesh is a low thud and a 25 ms crack, over inside 170 ms,
+      four fifths of its energy under 500 Hz. Armour is six INHARMONIC partials from 600 Hz to
+      4 kHz ringing for a quarter of a second. Volume attenuates; duration and pitchedness do
+      not, so "how long did that last and did it have a note in it" is a question a muffled,
+      distant clip can still answer. It is the one that matters most: it tells you the other
+      man has found armour (docs/03).
+  Parry vs BlockImpact   the parry is the brightest thing in the game, high-passed at 380 Hz so
+      it has no bottom at all, two detuned sets of partials beating against each other. The
+      block is low-passed at 1.1 kHz so it has no top at all, soft-clipped hard, and dead in
+      110 ms. Nothing in either overlaps the other's band. The parry rewards the hardest input
+      in the game and it has to sound like a reward from across the arena.
+
+Two or three variants wherever a sound fires more than once a fight, because SoundEntry already
+picks a clip at random and a single clip on a sound that fires every two seconds is what makes a
+game sound cheap — the same reason the walk got Step_Quiet_A and _B. Death gets exactly one: it
+happens once a match, and a death that sounds different every time is a death the player has to
+learn twice.
+
+Levels are set, not hoped for: every new file is normalised to a stated peak (`make`), so the
+mix is a column of numbers in `main` that can be argued with rather than whatever the synthesis
+happened to produce. Nothing reaches full scale — a clipping placeholder teaches everybody the
+wrong level, and placeholder_audio_check fails on one. Jump and Dodge sit at a fifth of full
+scale on purpose: they fire constantly and the job of a constant sound is to not be noticed.
 """
-import array, io, math, os, random, struct
+import array, io, math, os, random, struct, uuid, zlib
 
 RATE = 22050
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -21,6 +67,55 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # Fixed, so a re-run produces byte-identical files and a diff stays empty unless the recipe
 # changed. A placeholder that churns every build is a placeholder nobody will dare replace.
 RNG = random.Random(0x6A1A6)
+
+# The importer settings the first sixteen files were committed with, byte for byte, with the
+# guid as the only thing that differs between them. Written by the tool rather than left to
+# Unity because a .meta Unity invents on import is a .meta that is not in git: the next person
+# to clone gets a different guid, every scene reference to the clip dangles, and the table
+# empties itself. An existing .meta is never touched — see `meta`.
+META = """fileFormatVersion: 2
+guid: {guid}
+AudioImporter:
+  externalObjects: {{}}
+  serializedVersion: 7
+  defaultSettings:
+    serializedVersion: 2
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 1
+    conversionMode: 0
+    preloadAudioData: 0
+  platformSettingOverrides: {{}}
+  forceToMono: 0
+  normalize: 1
+  preloadAudioData: 0
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"""
+
+
+def meta(path):
+    """A .meta beside the clip, with a guid that is generated ONCE and then left alone.
+
+    This is the whole reason the tool writes them. A guid is an identity, not a setting: the
+    scene's sound table points at `guid: 148f49...`, so a tool that minted a fresh guid on
+    every run would silently empty every row it had just filled, and a re-run would show up as
+    sixteen deleted assets and sixteen new ones in the diff. So: if there is a .meta, it wins,
+    whatever is in it — somebody may have changed the import settings on purpose and that is
+    their business, not this tool's.
+    """
+    at = path + ".meta"
+    if os.path.exists(at):
+        return False
+    with open(at, "w", encoding="utf-8", newline="\n") as f:
+        f.write(META.format(guid=uuid.uuid4().hex))
+    return True
 
 
 def wav(name, samples):
@@ -34,7 +129,13 @@ def wav(name, samples):
     path = os.path.join(OUT, name + ".wav")
     with open(path, "wb") as f:
         f.write(head + raw)
-    print(f"  {name}.wav  {len(raw) / RATE / 2:.2f} s")
+
+    # Measured off the samples that were actually written, not off the recipe's intention.
+    # Nobody here can listen to these, so the numbers are the only review they get.
+    peak = max((abs(v) for v in data), default=0) / 32767.0
+    rms = (sum(v * v for v in data) / max(1, len(data))) ** 0.5 / 32767.0
+    print(f"  {name}.wav  {len(raw) / RATE / 2:.3f} s  peak {peak:.2f}  rms {rms:.3f}"
+          + ("  +meta" if meta(path) else ""))
     return path
 
 
@@ -48,6 +149,182 @@ def env(t, length, attack=0.005, release=0.5, curve=2.0):
 
 def noise():
     return RNG.uniform(-1.0, 1.0)
+
+
+# --------------------------------------------------------------------------------------
+# The toolkit the combat pass needed and the first sixteen files did without.
+#
+# Those sixteen shape noise by multiplying it by a wobble, which is cheap and reads as a
+# wobble. Air, cloth, metal and a dead blocked blow are all the same noise through different
+# FILTERS, and the difference between the two pairs that have to be told apart at a distance
+# is entirely a difference of band, so there was no way to write them without real ones.
+#
+# Everything here is a closure with its own state rather than a class, which keeps the recipes
+# below reading as one expression per layer, the way the originals do.
+# --------------------------------------------------------------------------------------
+
+def lowpass(hz):
+    """One pole, six dB an octave. Gentle on purpose: air and cloth are broad, not resonant."""
+    a = 1.0 - math.exp(-2.0 * math.pi * hz / RATE)
+    state = [0.0]
+
+    def step(x):
+        state[0] += a * (x - state[0])
+        return state[0]
+
+    return step
+
+
+def highpass(hz):
+    """The same pole, subtracted. This is what makes a parry bright and a block dull."""
+    low = lowpass(hz)
+    return lambda x: x - low(x)
+
+
+# A Chamberlin state-variable filter goes unstable as its corner approaches a quarter of the
+# sample rate, and at 22050 Hz that is not far away. 15.5% of the rate is 3.4 kHz, which is
+# comfortably inside the stable region at the Q values used here and above the top of every
+# swing and scrape in the file. Anything brighter than that is written as partials instead,
+# where there is no filter to go unstable.
+SVF_TOP = RATE * 0.155
+
+
+def bandpass(hz, q=1.2):
+    """Two poles with a resonance. A formant, or the one note a struck rung has."""
+    f = 2.0 * math.sin(math.pi * min(hz, SVF_TOP) / RATE)
+    damp = 1.0 / q
+    low, band = [0.0], [0.0]
+
+    def step(x):
+        high = x - low[0] - damp * band[0]
+        band[0] += f * high
+        low[0] += f * band[0]
+        return band[0]
+
+    return step
+
+
+def sweep_bandpass(q=1.2):
+    """The same filter with the corner handed in per sample: a swing, or a boot scraping."""
+    damp = 1.0 / q
+    low, band = [0.0], [0.0]
+
+    def step(x, hz):
+        f = 2.0 * math.sin(math.pi * min(hz, SVF_TOP) / RATE)
+        high = x - low[0] - damp * band[0]
+        band[0] += f * high
+        low[0] += f * band[0]
+        return band[0]
+
+    return step
+
+
+def sweep_highpass():
+    """A moving corner, for gas that slows down as it leaves the pipe."""
+    state = [0.0]
+
+    def step(x, hz):
+        a = 1.0 - math.exp(-2.0 * math.pi * hz / RATE)
+        state[0] += a * (x - state[0])
+        return x - state[0]
+
+    return step
+
+
+def bell(k, peak_at=0.6, rise=2.0, fall=1.4):
+    """Grows, arrives, goes — for anything that passes the ear rather than being struck.
+
+    Zero at both ends by construction, which is not a detail: a buffer that starts or ends on
+    a non-zero sample clicks on every single play, and on a sound that fires every two seconds
+    that click is the thing the player ends up hearing. placeholder_audio_check measures the
+    first and last sample of every file for exactly this.
+    """
+    if k <= 0.0:
+        return 0.0
+    if k <= peak_at:
+        return (k / peak_at) ** rise
+    return max(0.0, 1.0 - (k - peak_at) / max(1e-6, 1.0 - peak_at)) ** fall
+
+
+def soft(v, drive=1.8):
+    """A saturator. On an impact it reads as weight; on a blocked blow, as the top being eaten.
+
+    Bounded to ±1 so the intermediate numbers in a recipe stay readable. The level the file is
+    actually written at is set once, afterwards, by `make`.
+    """
+    return math.tanh(v * drive) / math.tanh(drive)
+
+
+def ring(t, length, base, ratios, decays, tilt=0.6, phases=None):
+    """Struck metal: partials at INHARMONIC ratios, the high ones dying first.
+
+    Harmonic ratios would be a bell or a tuned pipe, which is the one thing a piece of prison
+    armour is not. The tilt is why it reads as steel and not as a chime: in real metal the
+    upper partials lose their energy fastest, so each one gets a shorter decay than the one
+    below it, and what is left after a tenth of a second is a dull note rather than a sparkle.
+
+    Partials above Nyquist are dropped rather than left to alias — an aliased partial lands at
+    a frequency nobody chose, and at 22050 Hz that is the difference between a ring and a
+    whistle sitting underneath it.
+    """
+    v = 0.0
+    for j, r in enumerate(ratios):
+        f = base * r
+        if f >= RATE * 0.47:
+            continue
+        ph = phases[j] if phases else 0.0
+        v += math.sin(2 * math.pi * f * t + ph) * (1.0 / (1.0 + tilt * j)) \
+            * env(t, length, 0.0006, 1, decays[j])
+    return v
+
+
+def spread(count):
+    """A random starting phase per partial.
+
+    With every partial starting at zero the first sample is the sum of all of them, which is a
+    spike three times the height of the ring behind it — and since `make` normalises to the
+    peak, that spike would make the ring itself inaudible. Scattering the phases is how an
+    impact keeps its transient without swallowing the thing the transient announces.
+    """
+    return [RNG.uniform(0.0, 2.0 * math.pi) for _ in range(count)]
+
+
+def level(samples, peak):
+    """Scale a finished buffer so its loudest sample is exactly `peak`.
+
+    Shape is untouched — it is one multiply — so this decides the MIX and nothing else. Worth
+    doing rather than tuning coefficients until the numbers come out right: the levels then sit
+    in one column in `main` where they can be compared with each other, which is the only way
+    to answer "is the dodge quieter than the kill" without being able to hear either.
+    """
+    buf = list(samples)
+    high = max((abs(v) for v in buf), default=0.0)
+    return buf if high < 1e-9 else [v * (peak / high) for v in buf]
+
+
+def own_stream(name):
+    """Give one file its own noise, derived from its name.
+
+    The first sixteen share a single stream in call order, so inserting a seventeenth sound in
+    the middle of that list would re-roll every file after it: a one-line change, a diff with
+    nine rewritten binaries in it, and no way to tell which one the change was supposed to
+    affect. Keyed off the name instead, each file is independent of every other and of the
+    order they are generated in. crc32 and not hash(), because hash() is salted per process
+    and would produce a different file on every run.
+    """
+    global RNG
+    RNG = random.Random(zlib.crc32(name.encode("utf-8")) ^ 0x6A1A6)
+
+
+def make(name, peak, recipe, *args, **kw):
+    """One file: its own noise, its recipe, its stated level, its .meta.
+
+    The recipe is handed over as a function rather than called by the caller because the stream
+    has to be swapped BEFORE the generator starts drawing from it, and a generator expression
+    passed as an argument has already been built by then.
+    """
+    own_stream(name)
+    return wav(name, level(recipe(*args, **kw), peak))
 
 
 def clank(length=0.26):
