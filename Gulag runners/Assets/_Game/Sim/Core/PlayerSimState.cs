@@ -243,6 +243,19 @@ namespace GulagRunners.Sim
 
         public bool JustDied;
 
+        /// <summary>
+        /// What took the last point of health, set once by <see cref="CombatMotor.Wound"/>
+        /// on the tick the fighter dies and left alone after.
+        ///
+        /// Only the simulation knows this, which is why it is here rather than worked out by
+        /// a view. The case that makes the difference is the one presentation cannot read: a
+        /// fighter the gas has been biting all the way up who is then finished by a mace, and
+        /// a fighter a mace nearly finished who then drowns. Both end on zero health with the
+        /// gas at their chest, and they are not the same death -- docs/09's "kill with a
+        /// hazard" pays for one of them and not the other.
+        /// </summary>
+        public DeathCause KilledBy;
+
         /// <summary>Output: damage taken this tick, for the view to react to.</summary>
         public short DamageTaken;
 
@@ -338,6 +351,7 @@ namespace GulagRunners.Sim
             s.Dropped = ItemId.None;
             s.StaminaCharges = config.StaminaMax;
             s.Health = 100;
+            s.KilledBy = DeathCause.None;
             s.Noise = NoiseLevel.Silent;
             // In the carry pose, which is the pose a fighter who is not asking for
             // anything is in. Straight out was the OLD rest pose, and docs/31 took it

@@ -86,7 +86,7 @@ namespace GulagRunners.Sim
                 if (fighters[i].Dead) continue;
                 if (!world.InPoison(fighters[i].Position, fighters[i].Depth, halfDepth)) continue;
 
-                CombatMotor.Wound(ref fighters[i], cfg.Bite);
+                CombatMotor.Wound(ref fighters[i], cfg.Bite, DeathCause.Poison);
                 fighters[i].DamageTaken = (short)cfg.Bite;
 
                 // NOT WasHit. That flag means a blow landed: it drives the flinch, the hit

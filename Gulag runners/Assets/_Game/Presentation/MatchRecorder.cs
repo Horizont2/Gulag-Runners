@@ -322,13 +322,15 @@ namespace GulagRunners.Game
         }
 
         /// <summary>
-        /// How it finished, from what is honestly knowable here: a fighter at zero health is
-        /// a knockout, and anything else is the clock running out.
+        /// How it finished, in the simulation's own words.
         ///
-        /// Whether that zero came from a blow or from the gas is NOT knowable -- the
-        /// simulation does not carry what last hurt a fighter -- and a guess inside a file of
-        /// measurements is worse than a gap in one. If that distinction turns out to matter,
-        /// it wants a field on PlayerSimState, not an inference out here.
+        /// This used to say only "knockout" or "time", because nothing recorded what took a
+        /// fighter's last point of health -- and the note that shipped with this file said
+        /// so, that a guess inside a file of measurements is worse than a gap in one, and
+        /// that closing it wanted a field on PlayerSimState rather than an inference out
+        /// here. <see cref="DeathCause"/> is that field. A blow, a fall and the gas are now
+        /// three different endings in the file, which is what they are in the match:
+        /// losing to the other man and losing to the arena are not the same round.
         /// </summary>
         string Ending()
         {
@@ -336,7 +338,18 @@ namespace GulagRunners.Game
             for (int i = 0; i < matchState.fighters.Count; i++)
             {
                 PlayerController f = matchState.fighters[i];
-                if (f != null && f.State.Health <= 0) return "knockout";
+                if (f == null || f.State.Health > 0) continue;
+                switch (f.State.KilledBy)
+                {
+                    case DeathCause.Poison: return "poison";
+                    case DeathCause.Fall: return "fall";
+                    case DeathCause.Blow: return "blow";
+
+                    // On zero and killed by nothing. Not expected, and reported rather than
+                    // rounded off to the nearest plausible ending: a file that hides a
+                    // contradiction is a file that argues for the wrong fix later.
+                    default: return "zero-no-cause";
+                }
             }
             return "time";
         }

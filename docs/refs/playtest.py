@@ -94,7 +94,14 @@ def measure(rows):
     chests = sum(int(number(r.get("chests"), 0)) for r in rounds)
     wrong = sum(int(number(r.get("wrongTouches"), 0)) for r in rounds)
 
-    knockouts = [r for r in rounds if r.get("ended") == "knockout"]
+    # The file now says WHAT killed them, not just that somebody died: a blow, a
+    # fall or the gas. Losing to the other man and losing to the arena are different
+    # rounds, and the split is worth printing on its own.
+    endings = {}
+    for r in rounds:
+        how = r.get("ended") or "?"
+        endings[how] = endings.get(how, 0) + 1
+    knockouts = [r for r in rounds if r.get("ended") in ("blow", "fall", "poison")]
     bots = [r for r in series if r.get("substituted") == "1"]
 
     # docs/07's second criterion reads "win rate vs the LOOT BUDGET within 50 +- 6%", which
@@ -145,11 +152,16 @@ def measure(rows):
         "knockouts": len(knockouts),
         "bots": len(bots),
         "arenas": arenas,
+        "endings": endings,
         "better_weapon": better_weapon,
         "better_weapon_won": better_weapon_won,
         "better_armour": better_armour,
         "better_armour_won": better_armour_won,
     }
+
+
+def endings_of(m, how):
+    return m["endings"].get(how, 0)
 
 
 def clock(seconds):
@@ -304,8 +316,23 @@ def report(rows, out=sys.stdout):
 
     say("Also in the file")
     if m["rounds"]:
-        say("   %s of rounds ended in a knockout, the rest on the clock"
+        say("   %s of rounds ended in a death, the rest on the clock"
             % percent(share(m["knockouts"], m["rounds"])))
+        for how in ("blow", "fall", "poison", "time", "zero-no-cause"):
+            if endings_of(m, how):
+                say("       %-14s %d" % (how, endings_of(m, how)))
+        odd = [k for k in m["endings"] if k not in
+               ("blow", "fall", "poison", "time", "zero-no-cause", "knockout", "?", "")]
+        for k in sorted(odd):
+            say("       %-14s %d  (not an ending this reader knows)" % (k, m["endings"][k]))
+        if endings_of(m, "zero-no-cause"):
+            say("   ! a fighter on zero health that nothing claims to have killed. That is")
+            say("     a contradiction in the simulation, not a rounding error — see")
+            say("     docs/refs/death_cause_check.py")
+        if endings_of(m, "knockout"):
+            say("   note: %d row(s) say plain \"knockout\", so they were recorded before the"
+                % endings_of(m, "knockout"))
+            say("     game knew what killed anybody. Older rows, not broken ones.")
     if m["series"]:
         say("   a bot played part of %d of %d series" % (m["bots"], m["series"]))
     say()
@@ -332,13 +359,13 @@ def report(rows, out=sys.stdout):
 # comparison backwards. A test that cannot fail is not a test. The fifth round breaks the
 # symmetry, and the flip is now caught.
 SAMPLE = """kind,when,arena,round,seconds,winner,local,ended,chests,pickedLocks,forcedLocks,wrongTouches,substituted,weaponTier0,armour0,weaponTier1,armour1
-round,2026-11-15T10:00:00,Arena_Mine,0,118.4,1,0,knockout,3,1,2,2,0,1,0,2,120
+round,2026-11-15T10:00:00,Arena_Mine,0,118.4,1,0,blow,3,1,2,2,0,1,0,2,120
 round,2026-11-15T10:03:00,Arena_Mine,1,142.0,0,0,time,4,2,1,1,0,2,200,2,60
 series,2026-11-15T10:05:30,Arena_Mine,,,0,0,,,,,,0,,,,
 again,2026-11-15T10:05:40,Arena_Mine,,,,,,,,,,,,,,
-round,2026-11-15T10:08:00,Arena_Forest,0,96.5,1,1,knockout,2,0,2,5,0,3,0,1,0
-round,2026-11-15T10:11:00,Arena_Forest,1,131.0,1,1,knockout,5,3,0,0,0,0,0,0,150
-round,2026-11-15T10:14:00,Arena_Forest,2,120.0,0,1,knockout,1,1,0,0,0,2,0,1,0
+round,2026-11-15T10:08:00,Arena_Forest,0,96.5,1,1,poison,2,0,2,5,0,3,0,1,0
+round,2026-11-15T10:11:00,Arena_Forest,1,131.0,1,1,blow,5,3,0,0,0,0,0,0,150
+round,2026-11-15T10:14:00,Arena_Forest,2,120.0,0,1,fall,1,1,0,0,0,2,0,1,0
 series,2026-11-15T10:16:00,Arena_Forest,,,1,1,,,,,,1,,,,
 """
 
@@ -357,7 +384,10 @@ EXPECTED = {
     "locked": 12,
     "chests": 15,
     "wrong": 8,
-    "knockouts": 4,             # every round but the mine's second, which ran out of time
+    # One of each kind of death, plus the mine's second round which ran out of time, so
+    # every branch of the ending split is exercised rather than just counted.
+    "knockouts": 4,
+    "endings": {"blow": 2, "poison": 1, "fall": 1, "time": 1},
     "bots": 1,
 
     # The loot question, worked out by hand from the five round rows. "better" is whichever

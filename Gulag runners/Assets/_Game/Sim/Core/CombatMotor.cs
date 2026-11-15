@@ -182,7 +182,7 @@ namespace GulagRunners.Sim
             int damage = over.ToMilli() * cfg.FallDamagePerSpeed / 1000;
             if (damage < 1) return;
 
-            Wound(ref s, damage);
+            Wound(ref s, damage, DeathCause.Fall);
             s.WasHit = true;
             s.DamageTaken = (short)damage;
             s.Noise = NoiseLevel.Loud;
@@ -231,7 +231,7 @@ namespace GulagRunners.Sim
 
             Freeze(ref attacker, ref victim, cfg.HitStopFrames);
 
-            Wound(ref victim, damage);
+            Wound(ref victim, damage, DeathCause.Blow);
             victim.WasHit = true;
             victim.DamageTaken = (short)damage;
             victim.Noise = NoiseLevel.Loud;
@@ -381,7 +381,12 @@ namespace GulagRunners.Sim
         /// It does NOT touch WasHit or DamageTaken: those say a blow landed, and whether
         /// one did is the caller's business, not this method's.
         /// </summary>
-        public static void Wound(ref PlayerSimState victim, int damage)
+        /// <param name="cause">
+        /// What is doing it. Required rather than defaulted on purpose: a default would be a
+        /// label the next caller gets for free and silently gets wrong, and the whole value
+        /// of the field is that nothing can hurt a fighter without saying what it was.
+        /// </param>
+        public static void Wound(ref PlayerSimState victim, int damage, DeathCause cause)
         {
             victim.Health -= (short)damage;
             if (victim.Health > 0) return;
@@ -389,6 +394,10 @@ namespace GulagRunners.Sim
             victim.Health = 0;
             victim.Dead = true;
             victim.JustDied = true;
+
+            // On the tick it dies and not before. Health that is merely falling has no
+            // cause -- the gas biting a fighter who then gets up the ladder killed nobody.
+            victim.KilledBy = cause;
             victim.TipSpeed = Fix.Zero;
             victim.SwingShare = 0;
             victim.Noise = NoiseLevel.Loud;
