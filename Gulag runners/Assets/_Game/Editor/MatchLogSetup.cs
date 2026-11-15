@@ -22,7 +22,7 @@ namespace GulagRunners.GameEditor
     /// measuring instrument, not a part of the game, and an arena without one is a
     /// perfectly good arena -- just one you learn nothing from.
     /// </summary>
-    public static class MatchRecorderSetup
+    public static class MatchLogSetup
     {
         [MenuItem("Tools/Gulag Runners/Record the matches")]
         public static void Run()
@@ -35,23 +35,34 @@ namespace GulagRunners.GameEditor
                 return;
             }
 
-            MatchRecorder recorder = match.GetComponent<MatchRecorder>();
-            bool fresh = recorder == null;
-            if (fresh) recorder = Undo.AddComponent<MatchRecorder>(match.gameObject);
-            Undo.RecordObject(recorder, "Record the matches");
+            MatchLog log = match.GetComponent<MatchLog>();
+            bool fresh = log == null;
+            if (fresh) log = Undo.AddComponent<MatchLog>(match.gameObject);
+            Undo.RecordObject(log, "Record the matches");
 
-            recorder.matchState = match;
+            log.matchState = match;
+
+            // The counter the file reads. One MatchTally per arena serves both this and
+            // MatchRecorder -- the thing that pays the player -- because a second counter
+            // would be a second rule for what "picked" means, and the two would disagree
+            // about the one number docs/03 rests the whole game on.
+            MatchTally tally = Object.FindFirstObjectByType<MatchTally>();
+            if (tally == null) tally = Undo.AddComponent<MatchTally>(match.gameObject);
+            Undo.RecordObject(tally, "Record the matches");
+            tally.matchState = match;
+            log.tally = tally;
+            EditorUtility.SetDirty(tally);
 
             // The result screen, for the one criterion that has a behavioural proxy: docs/07
             // wants 60% of players to want another, and the press of AGAIN is the only
             // honest version of that a file can hold.
             MatchResultView result = Object.FindFirstObjectByType<MatchResultView>();
-            recorder.result = result;
+            log.result = result;
 
-            EditorUtility.SetDirty(recorder);
+            EditorUtility.SetDirty(log);
             Selection.activeGameObject = match.gameObject;
 
-            string path = Path.Combine(Application.persistentDataPath, recorder.fileName);
+            string path = Path.Combine(Application.persistentDataPath, log.fileName);
 
             Debug.Log(
                 (fresh ? "Recording this arena's matches. " : "Recorder already here, rewired. ")

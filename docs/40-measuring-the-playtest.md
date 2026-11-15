@@ -14,8 +14,9 @@
 
 | | |
 |---|---|
-| `Presentation/MatchRecorder.cs` | компонент на арені: рядок на раунд, рядок на серію, рядок на натиснуте «ЩЕ» |
-| `Editor/MatchRecorderSetup.cs` | **Tools ▸ Gulag Runners ▸ Record the matches** — ставить і зв'язує |
+| `Presentation/MatchTally.cs` | рахує матч **один раз** — для файлу і для гаманця водночас |
+| `Presentation/MatchLog.cs` | компонент на арені: рядок на раунд, рядок на серію, рядок на натиснуте «ЩЕ» |
+| `Editor/MatchLogSetup.cs` | **Tools ▸ Gulag Runners ▸ Record the matches** — ставить і зв'язує |
 | `docs/refs/playtest.py` | читає файл і друкує числа 07 |
 
 Файл пишеться в `Application.persistentDataPath`, у CSV із заголовком. У компонента є

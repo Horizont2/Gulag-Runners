@@ -269,6 +269,19 @@ namespace GulagRunners.GameEditor
             Undo.RecordObject(recorder, "Build the result screen");
             recorder.match = match;
             recorder.localPlayer = view.localPlayer;
+
+            // And the thing that counts what the match CONTAINED, without which the three
+            // daily tasks docs/09 prices at 40 gold each cannot be earned: nothing would
+            // know how many locks were picked, what the player fought with, or who drowned.
+            // It goes on the same object as the record it feeds, so somebody wondering where
+            // a daily came from finds both in one place.
+            MatchTally tally = Object.FindFirstObjectByType<MatchTally>();
+            if (tally == null) tally = Undo.AddComponent<MatchTally>(recorder.gameObject);
+            Undo.RecordObject(tally, "Build the result screen");
+            tally.matchState = match;
+            recorder.tally = tally;
+            PrefabUtility.RecordPrefabInstancePropertyModifications(tally);
+
             PrefabUtility.RecordPrefabInstancePropertyModifications(recorder);
 
             // NetMatch holds the result screen for the same reason it holds the HUD: both

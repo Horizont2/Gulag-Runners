@@ -168,6 +168,10 @@ namespace GulagRunners.Game
         /// Who this device was paired with, and the number the arena is dealt from.
         /// Read it after Paired fires: the arena needs the seed, and the result screen
         /// needs to know whether that was a person.
+        ///
+        /// This copy dies with the menu. What the ARENA reads is
+        /// <see cref="MatchHandover.Current"/>, handed over in Found() in the same breath
+        /// as the call that asks for the arena.
         /// </summary>
         public MatchFound Opponent => _opponent;
         float _held;
@@ -211,6 +215,14 @@ namespace GulagRunners.Game
             if (_running) return;
 
             _running = true;
+
+            // Whoever the last search found is not in this one. A pairing left behind by
+            // the match before is one the next arena would be handed as its opponent, and
+            // the ladder would settle a second result against somebody who is no longer in
+            // it -- the same person beaten twice, out of one evening, with nothing on any
+            // screen looking wrong. MatchHandover's own summary has the rest of it.
+            MatchHandover.Forget();
+
             _queue.Begin(progress != null ? progress.rating : 1500.0,
                          progress != null ? progress.matchesPlayed : 0);
             elapsed = 0f;
@@ -236,6 +248,15 @@ namespace GulagRunners.Game
 
             _running = false;
             _queue.Cancel();
+
+            // The cross puts the load back (Rewind, below) and the pairing goes back with
+            // it. Nothing is waiting this early as the code stands -- the handover is made
+            // in Found(), after the beat, and the cross is dead from that moment on -- but
+            // the SEED is already written at the moment of pairing, a beat earlier, because
+            // the director needed it sooner. A handover that one day follows it there would
+            // leave a cancelled opponent sitting in a static with nothing to clear them.
+            MatchHandover.Forget();
+
             Enter(SearchPhase.Cancelled);
             shownChanged?.Invoke(false);
             if (director != null) director.Rewind();
@@ -303,6 +324,18 @@ namespace GulagRunners.Game
             Enter(SearchPhase.Loading);
             if (director != null)
             {
+                // The pairing crosses the scene load HERE, in the same breath as the load
+                // that loses it. Play() below is the only thing in the menu that asks for
+                // the arena, and every object in this scene -- this one included, holding
+                // the only copy of _opponent -- is gone by the time it arrives.
+                //
+                // Not at the moment the opponent was found, a beat earlier, although the
+                // seed is set there and the temptation is to keep the two together: the
+                // cross is still live through that beat, and a pairing handed over before
+                // the player can refuse it would be sitting here waiting to be played by
+                // whatever loads an arena next.
+                MatchHandover.Hand(_opponent);
+
                 director.waitForRelease = true;
                 director.Play();
             }

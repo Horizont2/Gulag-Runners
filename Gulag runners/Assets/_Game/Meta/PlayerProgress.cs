@@ -65,8 +65,37 @@ namespace GulagRunners.Meta
         public int matchesPlayed;
         public int matchesWon;
 
-        [Tooltip("Rounds of the day's three that are done. Reset by the day rolling over.")]
-        [Range(0, 3)] public int dailiesDone;
+        [Tooltip("WHICH of the day's three tasks are done: one bit per DailyTask. Reset by " +
+                 "the day rolling over.\n\n" +
+                 "A mask and not a count, and that is the whole of it. A count cannot say " +
+                 "which, so a player who completed the same task three times was paid for " +
+                 "three tasks -- 120 gold for one lesson, where docs/09 says 40 each. With " +
+                 "a mask, doing it again is a bit that is already set.")]
+        public int dailiesMask;
+
+        [Tooltip("Locks picked today, across every match of it. docs/09's first task is five " +
+                 "safes opened with the puzzle, and five is more than one match's worth of " +
+                 "chests, so the count has to outlive the match -- and die with the day.")]
+        public int picksToday;
+
+        /// <summary>
+        /// How many of the day's three are done, for the menu's "2/3".
+        ///
+        /// Counted back off the mask every time it is asked, and never saved. A second
+        /// stored number would be a second answer to one question, and on the day the two
+        /// disagree the player is paid by whichever of them the purse happened to read.
+        /// </summary>
+        public int DailiesDone => Dailies.Bits(dailiesMask);
+
+        /// <summary>
+        /// The same number under its old name, because Menu/MenuUI.cs reads it and C# is
+        /// case sensitive, so the property above does not answer to it.
+        ///
+        /// A bridge and nothing else: it is read-only, so the count can no longer be
+        /// written from outside, which is where the 120 gold came from. Delete it the day
+        /// MenuUI asks for DailiesDone instead -- it is one word in one line there.
+        /// </summary>
+        public int dailiesDone => DailiesDone;
 
         [Tooltip("The day the last match was played, as a day number. -1 means never.")]
         public int lastPlayedDay = -1;
@@ -111,8 +140,18 @@ namespace GulagRunners.Meta
         /// built a corner at a time rather than worn whole (Cosmetic.LockPart), so it
         /// saves as its own list. A v4 save has no such list, which reads correctly as a
         /// lock with nothing fitted to it yet — every piece its free default.
+        ///
+        /// 6 changes what the DAY'S TASKS are saved as. Up to 5 they were a count from
+        /// nought to three, and a count cannot say WHICH three -- so one task completed
+        /// three times paid out three times, 120 gold for one lesson where docs/09 says 40
+        /// each. What is saved now is a MASK of which tasks are done, plus the day's running
+        /// count of picked locks, because docs/09's first task is five of them across a day
+        /// rather than within one match. The old count is not converted and its key is not
+        /// read: read as a mask, a saved 3 claims the first two tasks are finished, and they
+        /// are the wrong two. Today's progress starts again instead, which is what it does
+        /// every morning in any case.
         /// </summary>
-        const int Version = 5;
+        const int Version = 6;
 
         /// <summary>Days of play in a row that earn docs/09's weekly streak.</summary>
         public const int DaysInAStreak = 7;
@@ -181,29 +220,72 @@ namespace GulagRunners.Meta
         /// The order matters: the ladder is settled against who the opponent WAS at the
         /// start of the match, and the gold is counted from the same result. Doing it the
         /// other way round pays out against a rating the match has already moved.
+        ///
+        /// It takes FACTS and not conclusions. There is no won flag beside facts.Won and no
+        /// count of dailies to pay for, because every conclusion drawn in here is drawn from
+        /// the same four facts and from the save -- so nothing outside can pay itself, and a
+        /// match cannot be a win for the gold and a loss for the rating. The dailies in
+        /// particular were a number the caller passed, no caller ever passed one, and three
+        /// tasks worth 120 gold a day paid nobody anything for as long as that was true.
         /// </summary>
-        public Reward RecordMatch(bool won, Rating opponent, int today, int dailiesJustDone = 0)
+        public Reward RecordMatch(Rating opponent, int today, in MatchFacts facts)
         {
             bool firstToday = today != lastPlayedDay;
 
-            Rating next = Glicko2.Update(AsRating, opponent, won ? 1.0 : 0.0);
-            rating = next.Value;
-            deviation = next.Deviation;
-            volatility = next.Volatility;
+            // docs/09 keeps bots out of the ladder, and not only the first five of them.
+            // Matches 1-5 are bots "чесно підписані «ТРЕНУВАННЯ»", and a match labelled
+            // TRAINING that quietly moved the player's rank would be the label lying; and
+            // matchmaking rule 2 makes a bot the FALLBACK whenever no suitable human is
+            // queued -- "краще бот, ніж «професіонал проти новачка»" -- which can happen at
+            // match 500 as easily as at match 5. So a bot match leaves the three ladder
+            // numbers exactly where they were, at either end of the ladder.
+            //
+            // Everything else about it is a real match: it is played, it is won or lost, it
+            // pays, it counts towards the day's tasks and towards the streak. matchesPlayed
+            // most of all -- docs/09's protection of the newcomer counts matches 1-5, 6-20
+            // and 21+ off it, so a training match that did not count would leave the player
+            // in training for ever.
+            if (!facts.AgainstBot)
+            {
+                Rating next = Glicko2.Update(AsRating, opponent, facts.Won ? 1.0 : 0.0);
+                rating = next.Value;
+                deviation = next.Deviation;
+                volatility = next.Volatility;
+            }
 
-            if (firstToday) dailiesDone = 0;
-            dailiesDone = Mathf.Clamp(dailiesDone + dailiesJustDone, 0, Purse.DailiesPerDay);
+            if (firstToday) NewDay();
+
+            // Judged first, then written down, and the order is the whole of it.
+            //
+            // Dailies.Earned works out the day's pick total for ITSELF -- picksToday plus
+            // this match's -- and changes nothing. It is a question, not a step. So the two
+            // lines under it are the only place the day's counters move, and they must run
+            // after the question and not before: asked the other way round, the match's
+            // picks would already be in picksToday, Earned would add them a second time,
+            // and three picked locks would pay out for docs/09's five.
+            //
+            // Which also means neither line below is redundant with anything inside Earned.
+            // Deleting them because "Earned already counts the picks" would leave picksToday
+            // at nought for ever, and the five-safe task could then never be finished at all.
+            int earnedNow = Dailies.Earned(in facts, this);
+            if (facts.LocksPicked > 0) picksToday += facts.LocksPicked;
+            dailiesMask |= earnedNow;
 
             // The streak is this class's to keep, not the caller's to supply. Nothing
             // outside here knows what day the last match was on, which is why the weekly
             // bonus was a parameter nobody ever passed and 150 gold nobody ever earned.
             bool streakHit = firstToday && AdvanceStreak(today);
 
-            Reward paid = Purse.ForMatch(won, firstToday, dailiesJustDone, streakHit);
+            // Paid for what this match JUST finished, never for DailiesDone. The day's
+            // total includes tasks that were paid for in an earlier match, and paying by it
+            // would hand over 40 gold a match for the rest of the day for a task that was
+            // done once.
+            Reward paid = Purse.ForMatch(facts.Won, firstToday, Dailies.Bits(earnedNow),
+                                         streakHit);
             gold += paid.Total;
 
             matchesPlayed++;
-            if (won) matchesWon++;
+            if (facts.Won) matchesWon++;
 
             // Forward only. Writing a day that is EARLIER than the last one -- a device
             // whose date was wrong and has just been corrected -- would leave a gap
@@ -213,6 +295,26 @@ namespace GulagRunners.Meta
 
             if (persist) Save();
             return paid;
+        }
+
+        /// <summary>
+        /// Starts the day's three tasks over. The ONE place that does, so that the two
+        /// halves of the day cannot be reset apart.
+        ///
+        /// Both of them, always. The mask says which tasks are finished and picksToday says
+        /// how far the first of them has got, and a reset that drops one and keeps the other
+        /// either hands the player a finished task they have not done today or counts four
+        /// locks picked yesterday towards the five wanted today.
+        ///
+        /// It touches nothing else. lastPlayedDay and the streak are the day's OTHER
+        /// business, they have their own rules about clocks that have gone backwards
+        /// (see <see cref="AdvanceStreak"/>), and folding them in here would put those rules
+        /// in two places.
+        /// </summary>
+        void NewDay()
+        {
+            dailiesMask = 0;
+            picksToday = 0;
         }
 
         /// <summary>
