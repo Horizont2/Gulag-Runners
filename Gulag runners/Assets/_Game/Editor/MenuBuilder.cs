@@ -449,6 +449,7 @@ namespace GulagRunners.GameEditor
             BuildPlate(root, sprites, view, wired, dead);
             BuildPlay(root, sprites, view, wired, dead);
             BuildCorner(root, sprites, view, wired, dead);
+            BuildContracts(root, view, wired, dead);
 
             EnsureEventSystem();
 
@@ -584,6 +585,115 @@ namespace GulagRunners.GameEditor
 
             MenuLabel daily = LabelIn(dailyRow, "Contracts", "1 / 3", 26, false);
             Wire(view.dailiesChanged, daily.Set, "contracts", wired, dead);
+        }
+
+        /// <summary>
+        /// The contracts panel: docs/09's three daily tasks, written out.
+        ///
+        /// The menu has shown "1 / 3" since it was built and the button beside it opened
+        /// MenuUI.dailiesPanel -- a field nothing ever assigned, so the button opened
+        /// nothing at all. A player was told they had finished one of three and given no
+        /// way to find out what the other two were.
+        ///
+        /// That is worse than not mentioning them. docs/09's entire argument for the tasks
+        /// is that they teach the mechanics -- «завдання вчать механікам» -- and the three
+        /// it names are each a lesson: pick five locks rather than breaking them, win
+        /// without the best weapon in the game, let the arena kill for you. None of those
+        /// is a thing a player discovers by being shown a number.
+        ///
+        /// The rows are EMPTY of text here. Every word comes from Dailies at run time
+        /// through DailyPanel, because two lists of three task names -- one in the code that
+        /// awards them, one in the screen that shows them -- is two lists that drift, and
+        /// the one that drifts is always the screen. A player would then be reading a task
+        /// the game is not paying for.
+        /// </summary>
+        void BuildContracts(Transform root, MenuUI view, List<string> wired,
+                            List<string> dead)
+        {
+            RectTransform block = Panel("Contracts", root);
+
+            // A scrim that eats the click. Without a raycast target the buttons underneath
+            // stay live behind the panel, so a player reading their contracts can start a
+            // match by tapping where PLAY happens to be.
+            RectTransform dim = Make("Dimmer", block, 0, 0, DesignW, DesignH, 0f, 0f,
+                                     _readoutScale);
+            Image scrim = Undo.AddComponent<Image>(dim.gameObject);
+            scrim.color = UiPalette.Scrim;
+            scrim.raycastTarget = true;
+
+            // 760 x 420, centred in the 1920 x 864 sheet. Three rows of 96 plus a heading
+            // and a way out, which is as much as fits without the rows getting tighter than
+            // the 116-unit thumb target the rest of this menu is built to.
+            const float SheetW = 760f;
+            const float SheetH = 420f;
+            const float SheetX = (DesignW - SheetW) * 0.5f;
+            const float SheetY = (DesignH - SheetH) * 0.5f;
+            const float Pad = 40f;
+            const float RowH = 96f;
+
+            RectTransform sheet = Make("Sheet", block, SheetX, SheetY, SheetW, SheetH,
+                                       0f, 0f, _readoutScale);
+            Image plate = Undo.AddComponent<Image>(sheet.gameObject);
+            plate.color = UiPalette.Plate;
+            plate.raycastTarget = true;
+
+            RectTransform heading = Make("Heading", sheet, Pad, 28, SheetW - Pad * 2f, 44,
+                                         0f, 0f, _readoutScale);
+            TextOn(heading, "CONTRACTS", "Bold", 30, TextAnchor.MiddleLeft)
+                .color = UiPalette.Amber;
+
+            DailyPanel panel = block.gameObject.GetComponent<DailyPanel>();
+            if (panel == null) panel = Undo.AddComponent<DailyPanel>(block.gameObject);
+            Undo.RecordObject(panel, "Build the menu");
+            panel.rows = new DailyPanel.Row[GulagRunners.Meta.Dailies.Count];
+
+            for (int i = 0; i < panel.rows.Length; i++)
+            {
+                float y = 96f + i * RowH;
+
+                // The task on the left, how far it has got on the right, on one line. Two
+                // labels and not one: the progress is the part that changes, and a single
+                // formatted string would redraw the name every time a lock was picked.
+                RectTransform name = Make($"Task {i + 1}", sheet, Pad, y,
+                                          SheetW - Pad * 2f - 160f, 40f, 0f, 0f,
+                                          _readoutScale);
+                MenuLabel task = Undo.AddComponent<MenuLabel>(name.gameObject);
+                task.target = TextOn(name, "", "Regular", 26, TextAnchor.MiddleLeft);
+
+                RectTransform got = Make($"Progress {i + 1}", sheet,
+                                         SheetW - Pad - 160f, y, 160f, 40f, 0f, 0f,
+                                         _readoutScale);
+                MenuLabel progress = Undo.AddComponent<MenuLabel>(got.gameObject);
+                progress.target = TextOn(got, "", "Bold", 26, TextAnchor.MiddleRight);
+                progress.target.color = UiPalette.InkSoft;
+
+                DailyPanel.Row row = new DailyPanel.Row();
+                panel.rows[i] = row;
+                Wire(row.titleChanged, task.Set, $"contract {i + 1} name", wired, dead);
+                Wire(row.progressChanged, progress.Set, $"contract {i + 1} progress",
+                     wired, dead);
+            }
+
+            // A way out. docs/26 wants every panel closable by something a thumb can find,
+            // and MenuUI.Back already closes whatever is open.
+            RectTransform back = Make("Close", sheet, Pad, SheetH - 104f,
+                                      SheetW - Pad * 2f, 72f, 0f, 0f, _readoutScale);
+            Image backPlate = Undo.AddComponent<Image>(back.gameObject);
+            backPlate.color = UiPalette.Plate;
+            Button button = Undo.AddComponent<Button>(back.gameObject);
+            button.targetGraphic = backPlate;
+            UnityEventTools.AddVoidPersistentListener(button.onClick,
+                                                      new UnityAction(view.Back));
+            wired.Add("contracts close");
+
+            RectTransform word = Make("CLOSE", back, 0, 0, SheetW - Pad * 2f, 72f, 0f, 0f,
+                                      _readoutScale);
+            TextOn(word, "CLOSE", "Bold", 26, TextAnchor.MiddleCenter);
+
+            Undo.RecordObject(view, "Build the menu");
+            view.dailiesPanel = block.gameObject;
+            block.gameObject.SetActive(false);
+            EditorUtility.SetDirty(panel);
         }
 
         /// <summary>The one coloured thing on the screen besides PLAY.</summary>
