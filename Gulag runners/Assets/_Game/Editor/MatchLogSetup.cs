@@ -77,7 +77,7 @@ namespace GulagRunners.GameEditor
                 + "\n\nRead the file with: python3 docs/refs/playtest.py <the path above>\n"
                 + "Run it with no file first — it checks itself against a woven sample and "
                 + "prints what a report looks like.",
-                recorder);
+                log);
         }
     }
 }
