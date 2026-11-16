@@ -378,8 +378,7 @@ namespace GulagRunners.GameEditor
         {
             ParticleSystemRenderer r = ps.GetComponent<ParticleSystemRenderer>();
             UnityEngine.Material mat = new UnityEngine.Material(r.sharedMaterial);
-            mat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
-            mat.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
+            Blend(mat, Alpha);
             string path = $"{MaterialsDir}/vfx_puff_Soft.mat";
             UnityEngine.Material existing =
                 AssetDatabase.LoadAssetAtPath<UnityEngine.Material>(path);
@@ -699,14 +698,35 @@ namespace GulagRunners.GameEditor
             return ps;
         }
 
-        /// <summary>
-        /// An additive unlit material for one texture, made once and reused.
-        ///
-        /// The blend states are set explicitly rather than through the shader's inspector
-        /// keywords. Those keywords are bookkeeping the GUI does, and a material built from
-        /// a script that only sets _Surface and _Blend comes out opaque often enough that
-        /// it is not worth finding out which Unity version does which.
-        /// </summary>
+        // URP's Particles/Unlit blend enum. These numbers are the whole reason the first
+        // version of every effect in this file was invisible in game.
+        //
+        // The code said SetFloat("_Blend", 1f) and meant additive. In this enum 1 is
+        // PREMULTIPLY; additive is 2. And the explicit _SrcBlend/_DstBlend set underneath
+        // it -- with a comment claiming that setting them by hand was safer than trusting
+        // the shader's bookkeeping -- did nothing at all, because URP re-derives both FROM
+        // _Blend when the material is validated. The file on disk came out
+        // One/OneMinusSrcAlpha: premultiplied, which is exactly what _Blend 1 asks for.
+        //
+        // So the lesson is the opposite of the one the old comment drew. Setting the blend
+        // states by hand is not belt and braces; it is writing values that something else
+        // owns and will overwrite. Set the property the pipeline reads, and get the number
+        // right.
+        const float Alpha = 0f;
+        const float Premultiply = 1f;
+        const float Additive = 2f;
+        const float Multiply = 3f;
+
+        static void Blend(UnityEngine.Material mat, float mode)
+        {
+            mat.SetOverrideTag("RenderType", "Transparent");
+            if (mat.HasProperty("_Surface")) mat.SetFloat("_Surface", 1f);   // transparent
+            if (mat.HasProperty("_Blend")) mat.SetFloat("_Blend", mode);
+            if (mat.HasProperty("_ZWrite")) mat.SetFloat("_ZWrite", 0f);
+            mat.renderQueue = (int)RenderQueue.Transparent;
+        }
+
+        /// <summary>An unlit particle material for one texture, made once and reused.</summary>
         static UnityEngine.Material Material(string texture)
         {
             string path = $"{MaterialsDir}/{texture}_Additive.mat";
@@ -728,15 +748,7 @@ namespace GulagRunners.GameEditor
                 if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", tex);
             }
 
-            mat.SetOverrideTag("RenderType", "Transparent");
-            if (mat.HasProperty("_Surface")) mat.SetFloat("_Surface", 1f);
-            if (mat.HasProperty("_Blend")) mat.SetFloat("_Blend", 1f);
-            mat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
-            mat.SetInt("_DstBlend", (int)BlendMode.One);
-            mat.SetInt("_ZWrite", 0);
-            mat.DisableKeyword("_ALPHATEST_ON");
-            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            mat.renderQueue = (int)RenderQueue.Transparent;
+            Blend(mat, Additive);
 
             AssetDatabase.CreateAsset(mat, path);
             return mat;

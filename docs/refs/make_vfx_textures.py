@@ -37,7 +37,8 @@ OUT = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game",
                    "Effects", "Textures")
 
 # A texture that is imported wrong is a texture that looks wrong for reasons nobody can see
-# in the file. These are sprites in an unlit additive material: no mips (they are drawn at
+# in the file. These came in as textureType 8 -- SPRITE -- which is for 2D art in a Canvas,
+# not for a particle. Default (0) is what a particle material samples. These are sprites in an unlit additive material: no mips (they are drawn at
 # a consistent size and mips only soften them), clamped (a wrapped spark bleeds across its
 # own edge), and compressed low -- they are tiny and a gradient is what DXT is worst at.
 META = """fileFormatVersion: 2
@@ -84,7 +85,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 0
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -95,7 +96,7 @@ TextureImporter:
   alphaUsage: 1
   alphaIsTransparency: 1
   spriteTessellationDetail: -1
-  textureType: 8
+  textureType: 0
   textureShape: 1
   singleChannelComponent: 0
   flipbookRows: 1
