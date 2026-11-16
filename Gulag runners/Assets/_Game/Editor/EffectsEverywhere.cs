@@ -47,7 +47,8 @@ namespace GulagRunners.GameEditor
                     $"This opens and SAVES {arenas.Count} scene(s):\n\n  "
                     + string.Join("\n  ", arenas)
                     + "\n\nEach one gets the impact, parry, clash, pickup and dust effects "
-                    + "built and wired to its fighters. Scenes with no fighters are skipped "
+                    + "built and wired to its fighters, and the gas announcement wired to "
+                    + "its poison pool. Scenes with no fighters are skipped "
                     + "and left untouched.",
                     "Build them", "Cancel"))
                 return;
@@ -61,6 +62,7 @@ namespace GulagRunners.GameEditor
 
             List<string> did = new List<string>();
             List<string> skipped = new List<string>();
+            List<string> gassed = new List<string>();
 
             try
             {
@@ -79,6 +81,18 @@ namespace GulagRunners.GameEditor
                     }
 
                     HitEffectBuilder.Run();
+
+                    // And the gas announcement, which is a whole feature that was written
+                    // and then stood in no arena at all: the lamps dipping three seconds
+                    // out, the jets, the collar quickening as the surface nears your feet.
+                    // PoisonWarningSetup needs GR_GasVent to exist, which the line above
+                    // has just made, so the order here is not arbitrary.
+                    if (Object.FindFirstObjectByType<PoisonPool>() != null)
+                    {
+                        PoisonWarningSetup.Run();
+                        gassed.Add(scene.name);
+                    }
+
                     EditorSceneManager.MarkSceneDirty(scene);
                     EditorSceneManager.SaveScene(scene);
                     did.Add(scene.name);
@@ -97,6 +111,9 @@ namespace GulagRunners.GameEditor
             string said = did.Count > 0
                 ? $"Effects built and saved in {did.Count} scene(s): {string.Join(", ", did)}."
                 : "Nothing was built: no scene in the build has fighters in it.";
+
+            if (gassed.Count > 0)
+                said += $"\n\nThe gas announcement was wired in {gassed.Count} of them.";
 
             if (skipped.Count > 0)
                 said += "\n\nSkipped: " + string.Join(", ", skipped);

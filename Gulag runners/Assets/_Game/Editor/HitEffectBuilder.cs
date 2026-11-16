@@ -73,13 +73,14 @@ namespace GulagRunners.GameEditor
             GameObject clash = Clash();
             GameObject pickup = Pickup();
             GameObject scuff = Dust("GR_Dust_Scuff", 0.55f, 5, 3);
+            Vent();     // saved as a prefab; PoisonWarningSetup hangs it on the pool
 
             int wired = Wire(hit, death, parry, clash, pickup, scuff);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Built 7 effects in {EffectsDir} and wired {wired} fighter(s).\n"
+            Debug.Log($"Built 8 effects in {EffectsDir} and wired {wired} fighter(s).\n"
                       + "Flesh, armour and death are the same five layers in "
                       + "different colours and sizes — one recipe, so they cannot drift "
                       + "apart, and the armour hit is pale and metallic because a player "
@@ -388,6 +389,94 @@ namespace GulagRunners.GameEditor
                 existing = mat;
             }
             r.material = existing;
+        }
+
+        /// <summary>
+        /// One vent: the gas arriving, from under the floor.
+        ///
+        /// docs/33 is explicit that it ARRIVES and does not fade in -- "the green arrives at
+        /// the bottom of the arena over about a third of a second, not faded in over three,
+        /// which reads as a bug rather than a release". So this is a valve letting go: a
+        /// jet out of the floor, a thin push of air along it, and then the gas losing its
+        /// shove and spreading into a cloud.
+        ///
+        /// Three things it is NOT, each of which the filmstrip caught:
+        ///
+        ///   Not a lamp. The first version flashed a round blob at each mouth and it read
+        ///   as a glowing egg sitting on the ground. A jet leaving the floor is tall, thin,
+        ///   and grows upward.
+        ///
+        ///   Not a puddle. The shell along the floor was a fat ellipse and read as light
+        ///   lying on the stone rather than as air being pushed sideways. Thin and quick.
+        ///
+        ///   Not smoke. It is PoisonPool's own green at the top of its climb, so the burst
+        ///   and the flood that follows are the same substance. A grey puff followed by a
+        ///   green pool is two events.
+        /// </summary>
+        static GameObject Vent()
+        {
+            GameObject root = Conductor("GR_GasVent");
+
+            // The jet: nine puffs up a narrow cone, losing their push as they go.
+            ParticleSystem jet = Layer(root, "Jet", "vfx_puff", 9);
+            ParticleSystem.MainModule jm = jet.main;
+            jm.startLifetime = new ParticleSystem.MinMaxCurve(0.30f, 0.58f);
+            jm.startSize = new ParticleSystem.MinMaxCurve(0.16f * Px, 0.34f * Px);
+            jm.startSpeed = new ParticleSystem.MinMaxCurve(3.6f, 6.2f);
+            jm.startColor = new Color(0.72f, 0.96f, 0.68f, 0.5f);
+            jm.startRotation = new ParticleSystem.MinMaxCurve(-3.14f, 3.14f);
+            jm.gravityModifier = -0.05f;
+
+            ParticleSystem.ShapeModule js = jet.shape;
+            js.enabled = true;
+            js.shapeType = ParticleSystemShapeType.Cone;
+            js.angle = 14f;                      // narrow going up, it spreads by drag
+            js.radius = 0.08f;
+            js.rotation = new Vector3(-90f, 0f, 0f);
+
+            ParticleSystem.LimitVelocityOverLifetimeModule drag =
+                jet.limitVelocityOverLifetime;
+            drag.enabled = true;
+            drag.dampen = 0.3f;
+            drag.limit = new ParticleSystem.MinMaxCurve(0.9f);
+
+            ParticleSystem.RotationOverLifetimeModule spin = jet.rotationOverLifetime;
+            spin.enabled = true;
+            spin.z = new ParticleSystem.MinMaxCurve(-0.8f, 0.8f);
+
+            Over(jet, Ramp(new Color(0.88f, 1f, 0.84f), new Color(0.47f, 0.86f, 0.45f), 0.45f),
+                 Rise(1.2f));
+            Size(jet, Grow(1.0f, 2.6f, 0.5f));
+            Soft(jet);
+
+            // The mouth: one hard vertical flash as the valve opens.
+            ParticleSystem mouth = Layer(root, "Mouth", "vfx_core", 1);
+            ParticleSystem.MainModule mm = mouth.main;
+            mm.startLifetime = 0.075f;
+            mm.startSize = 0.2f * Px;
+            mm.startSpeed = 0f;
+            mm.startColor = new Color(0.80f, 1f, 0.75f);
+            Over(mouth, Ramp(new Color(0.88f, 1f, 0.84f), new Color(0.6f, 0.95f, 0.55f), 0.5f),
+                 Fade(1.5f));
+            Size(mouth, Grow(1.0f, 3.4f, 0.45f));
+            ParticleSystemRenderer mr = mouth.GetComponent<ParticleSystemRenderer>();
+            mr.renderMode = ParticleSystemRenderMode.Stretch;
+            mr.lengthScale = 4.5f;               // tall and thin: a jet, not a lamp
+            mr.velocityScale = 0f;
+
+            // The push along the floor.
+            ParticleSystem shell = Layer(root, "Shell", "vfx_ring", 1);
+            ParticleSystem.MainModule sm = shell.main;
+            sm.startLifetime = 0.13f;
+            sm.startSize = 0.3f * Px;
+            sm.startSpeed = 0f;
+            sm.startRotation = Mathf.Deg2Rad * 90f;
+            sm.startColor = new Color(0.67f, 0.94f, 0.63f, 0.3f);
+            Size(shell, Grow(1.0f, 7f, 0.45f));
+            Over(shell, Ramp(new Color(0.67f, 0.94f, 0.63f),
+                             new Color(0.5f, 0.85f, 0.48f), 0.5f), Fade(1.8f));
+
+            return Save(root, "GR_GasVent");
         }
 
         // ----------------------------------------------------------------- the effect

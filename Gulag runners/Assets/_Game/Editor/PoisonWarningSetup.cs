@@ -70,6 +70,47 @@ namespace GulagRunners.GameEditor
                 if (warn.collar == null) { warn.collar = siren.collar; collars++; }
             }
 
+            // The vents. The file used to say "an empty vent list is a working announcement
+            // that leans on the pool's own smoke instead", and that was honest while there
+            // was nothing to put there. There is now: GR_GasVent, built by
+            // Tools > Gulag Runners > Build the hit effects.
+            //
+            // Three of them, spread across the pool's width at its floor, because docs/33
+            // wants the player to learn WHERE it comes out -- one jet in the middle is a
+            // special effect, three along the room is a room filling up.
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/_Game/Effects/GR_GasVent.prefab");
+            int vents = 0;
+            if (prefab != null)
+            {
+                Bounds box = pool.Flooded;
+                List<ParticleSystem> made = new List<ParticleSystem>();
+
+                Transform old_ = pool.transform.Find("Vents");
+                if (old_ != null) Undo.DestroyObjectImmediate(old_.gameObject);
+
+                GameObject holder = new GameObject("Vents");
+                Undo.RegisterCreatedObjectUndo(holder, "Announce the gas");
+                holder.transform.SetParent(pool.transform, false);
+
+                for (int i = 0; i < 3; i++)
+                {
+                    float t = (i + 1) / 4f;          // 1/4, 1/2, 3/4 of the way across
+                    GameObject vent =
+                        (GameObject)PrefabUtility.InstantiatePrefab(prefab, holder.transform);
+                    Undo.RegisterCreatedObjectUndo(vent, "Announce the gas");
+                    vent.name = $"Vent {i + 1}";
+                    vent.transform.position = new Vector3(
+                        Mathf.Lerp(box.min.x, box.max.x, t), box.min.y, box.center.z);
+
+                    ParticleSystem ps = vent.GetComponent<ParticleSystem>();
+                    if (ps != null) made.Add(ps);
+                }
+
+                warn.vents = made.ToArray();
+                vents = made.Count;
+            }
+
             EditorUtility.SetDirty(warn);
             Selection.activeGameObject = pool.gameObject;
 
@@ -79,11 +120,13 @@ namespace GulagRunners.GameEditor
                                      : "and no collar was found, so the third beat is "
                                        + "silent — run Tools > Gulag Runners > Set up the "
                                        + "siren first, which is what puts one on a fighter. ")
-                      + (warn.vents.Length == 0
-                          ? "No vents are wired: the burst leans on the pool's own source "
-                            + "smoke. Drop emitters into Vents for a jet that says WHERE it "
+                      + (vents == 0
+                          ? "NO vents: Assets/_Game/Effects/GR_GasVent.prefab does not "
+                            + "exist yet. Run Tools > Gulag Runners > Build the hit effects "
+                            + "first, then this again — without it the burst leans on the "
+                            + "pool's own source smoke and nothing says WHERE the gas "
                             + "comes out."
-                          : $"{warn.vents.Length} vent(s) burst."),
+                          : $"{vents} vent(s) burst out of the floor."),
                       warn);
         }
     }
