@@ -236,6 +236,127 @@ namespace GulagRunners.GameEditor
                 "is a question about which character ships, not about the wiring.", view);
         }
 
+
+        /// <summary>What the pack calls its head category, as the Categories table spells it.</summary>
+        const string HeadPrefix = "Head Armor";
+
+        /// <summary>
+        /// Puts a correction bone between the head and a helmet, and sizes it from the head
+        /// it is actually going on.
+        ///
+        /// The starting numbers are MEASURED and not guessed, because they can be: this
+        /// character is right here. The head's height is the distance from the head bone up
+        /// to the top of the body's bounds, which is the top of the skull; the helmet's is
+        /// the height of its own bounds. The ratio between them is the scale, and the
+        /// helmet is then lifted so its middle sits at the middle of the head rather than
+        /// at the bone, which is down at the base of the skull and is why it was inside.
+        ///
+        /// It is a starting point and says so. A helmet is a thing you judge by looking at
+        /// it, and the whole point of the bone is that looking is now followed by dragging
+        /// rather than by editing a tool.
+        /// </summary>
+        static void Fit(GameObject piece, Animator target, List<string> report)
+        {
+            Transform head = target.GetBoneTransform(HumanBodyBones.Head);
+            if (head == null)
+            {
+                report.Add("Head Armor: this rig has no head bone, so the helmet is left "
+                           + "where the donor's bind pose put it");
+                return;
+            }
+
+            SkinnedMeshRenderer[] worn =
+                piece.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            if (worn.Length == 0) return;
+
+            // How tall is this character's head? From the bone up to the top of the body,
+            // which is the top of the skull. Measured BEFORE the helmet is re-pointed,
+            // because the helmet must not be in the reading.
+            float top = head.position.y;
+            foreach (SkinnedMeshRenderer body in
+                     target.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (System.Array.IndexOf(worn, body) >= 0) continue;
+                top = Mathf.Max(top, body.bounds.max.y);
+            }
+            float headHigh = top - head.position.y;
+
+            // The correction bone, at the head, square with it.
+            GameObject fitGo = new GameObject("Head Fit");
+            Undo.RegisterCreatedObjectUndo(fitGo, "Wire armour");
+            Transform fit = fitGo.transform;
+            fit.SetParent(head, false);
+            fit.localPosition = Vector3.zero;
+            fit.localRotation = Quaternion.identity;
+            fit.localScale = Vector3.one;
+
+            // Re-point FIRST, measure after.
+            //
+            // The first version of this measured the helmet before moving it, and the
+            // reading was worthless: a skinned mesh sits wherever its bones put it, and
+            // collapsing it from a skeleton onto one bone moves every vertex. Whatever it
+            // looked like a moment ago says nothing about where it will be.
+            foreach (SkinnedMeshRenderer smr in worn)
+            {
+                Transform[] all = new Transform[smr.bones.Length];
+                for (int i = 0; i < all.Length; i++) all[i] = fit;
+                smr.bones = all;
+                smr.rootBone = fit;
+            }
+
+            if (headHigh <= 0.01f)
+            {
+                report.Add("Head Armor: could not read a skull height off this character, "
+                           + "so \"Head Fit\" is left at 1:1 — set it by hand");
+                return;
+            }
+
+            // Where it is NOW, baked. BakeMesh gives the mesh as it currently stands, which
+            // is the only honest way to ask a skinned renderer where it actually is.
+            Bounds? posed = Posed(worn);
+            if (posed == null) return;
+
+            float hatHigh = posed.Value.size.y;
+            if (hatHigh > 0.001f)
+            {
+                float scale = Mathf.Clamp(headHigh / hatHigh, 0.2f, 5f);
+                fit.localScale = Vector3.one * scale;
+            }
+
+            // Measured again, because the scale just moved it, and then lifted so its
+            // middle lands on the middle of the head instead of on the bone -- which sits
+            // at the base of the skull, and is why the helmet was inside it.
+            posed = Posed(worn);
+            if (posed == null) return;
+
+            Vector3 want = head.position + Vector3.up * (headHigh * 0.5f);
+            fit.position += want - posed.Value.center;
+
+            report.Add($"Head Armor: fitted to a {headHigh:0.00} m head, x{fit.localScale.x:0.00}. "
+                       + "Drag \"Head Fit\" under the head bone to taste — it is a starting "
+                       + "point, not an answer, and a helmet is a thing you judge by looking");
+        }
+
+        /// <summary>Where a set of skinned meshes actually is, right now, in world space.</summary>
+        static Bounds? Posed(SkinnedMeshRenderer[] worn)
+        {
+            Bounds? all = null;
+            foreach (SkinnedMeshRenderer smr in worn)
+            {
+                if (smr.sharedMesh == null) continue;
+                Mesh baked = new Mesh();
+                smr.BakeMesh(baked, true);
+                Bounds b = baked.bounds;
+                // BakeMesh returns the mesh in the renderer's own space.
+                b.center = smr.transform.TransformPoint(b.center);
+                Object.DestroyImmediate(baked);
+                all = all == null ? b : Grow(all.Value, b);
+            }
+            return all;
+        }
+
+        static Bounds Grow(Bounds a, Bounds b) { a.Encapsulate(b); return a; }
+
         /// <summary>Lifts one garment out of the donor and re-binds it to the fighter.</summary>
         static GameObject Take(Transform armourRoot, string folder, string prefix,
                                int type, int colour, Transform holder,
@@ -298,6 +419,27 @@ namespace GulagRunners.GameEditor
                 smr.updateWhenOffscreen = true;     // the bounds are the donor's otherwise
                 smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             }
+
+            // The head is not like the other slots, and the difference is worth stating.
+            //
+            // Re-binding works for sleeves and chest plates because the donor and this
+            // character have limbs in roughly the same places. A HELMET does not: it was
+            // modelled around the donor's skull, it keeps that bind pose, and on a head of
+            // another size it sits wherever the donor's was -- which here is inside this
+            // one.
+            //
+            // It cannot be nudged, either, and this is the part that makes the fix look
+            // harder than it is: a SkinnedMeshRenderer ignores its own transform entirely.
+            // Moving the GameObject the helmet is on does nothing at all. The skeleton is
+            // the only thing that moves a skinned mesh.
+            //
+            // So a bone is what it gets. Fit() puts one between the head and the helmet,
+            // re-points the helmet at it, and now the offset and the scale on THAT are what
+            // the mesh obeys. The helmet still follows the head, still animates, and is
+            // finally adjustable -- by dragging one transform in the Hierarchy, with the
+            // scene view showing the result, which is the only way a fit like this can
+            // honestly be judged.
+            if (prefix == HeadPrefix) Fit(piece, target, report);
 
             report.Add($"{prefix} Type {type}: {rebound} bone(s) re-bound" +
                        (guessed > 0 ? $", {guessed} of them to an ancestor (fingers and such)"
