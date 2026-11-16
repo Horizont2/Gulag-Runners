@@ -145,7 +145,7 @@ namespace GulagRunners.Game
             { sound = SoundId.Parry, level = NoiseLevel.Loud };
 
         [Tooltip("The guard breaking under pressure.")]
-        public ActionEffect guardBroken = new ActionEffect
+        public ActionEffect clashed = new ActionEffect
             { sound = SoundId.Stagger, level = NoiseLevel.Loud };
 
         public ActionEffect death = new ActionEffect
@@ -276,7 +276,7 @@ namespace GulagRunners.Game
                 swingTrail.emitting = swinging && s.HitStopTimer == 0;
 
             // A clash: two blades met. The old guard-break sound is the right one for it.
-            if (s.WasParried) Fire(guardBroken, "weapons clashed");
+            if (s.WasParried) Fire(clashed, "weapons clashed");
 
             // Held, not fired: the point of this one is that it lasts as long as the work does.
             bool prying = s.OpeningChest >= 0;

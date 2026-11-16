@@ -255,11 +255,49 @@ def slash(s=128):
     return s, s, out
 
 
+def puff(s=128):
+    """
+    Dust: a soft blob with a bitten edge.
+
+    Every other texture here is clean, because a spark and a blade arc are clean things.
+    Dust is not. A perfect circle reads as a bubble or a smoke ring, so the radius is
+    wobbled by three smooth harmonics -- cheap, deterministic, and enough that five of these
+    overlapping look like a cloud rather than like five circles.
+
+    Much softer than `core`, too. The hot centre of an impact has to read as a SHAPE; dust
+    has to read as air with something in it, and a hard edge on dust is the most obvious
+    tell of a cheap effect there is.
+    """
+    out = bytearray(s * s)
+    for y in range(s):
+        for x in range(s):
+            nx, ny = (x - s / 2 + 0.5) / (s / 2), (y - s / 2 + 0.5) / (s / 2)
+            d = math.hypot(nx, ny)
+            if d > 1:
+                continue
+            ang = math.atan2(ny, nx)
+            wobble = (0.06 * math.sin(ang * 3 + 0.7)
+                      + 0.04 * math.sin(ang * 5 - 1.3)
+                      + 0.03 * math.sin(ang * 8 + 2.1))
+            edge = 0.78 + wobble
+            inner = edge * 0.35
+            a = 1.0 if d < inner else max(0.0, 1 - (d - inner)
+                                          / max(1e-5, edge - inner)) ** 1.9
+            out[y * s + x] = int(255 * min(1.0, a))
+
+    peak = max(out)
+    if 0 < peak < 255:
+        gain = 255.0 / peak
+        out = bytearray(min(255, int(v * gain)) for v in out)
+    return s, s, out
+
+
 SHAPES = [
     ("vfx_core", core, "the hot centre of an impact"),
     ("vfx_spark", spark, "a streak that reads as a direction"),
     ("vfx_ring", ring, "the thin shell that says force"),
     ("vfx_slash", slash, "the blade's arc"),
+    ("vfx_puff", puff, "dust: soft, with an edge that is not a circle"),
 ]
 
 

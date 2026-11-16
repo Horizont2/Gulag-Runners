@@ -70,13 +70,16 @@ namespace GulagRunners.GameEditor
             GameObject armour = Build("GR_Hit_Armour", new Color(1f, 0.86f, 0.55f), 0.85f);
             GameObject death = Build("GR_Death", UiPalette.Attack, 1.7f);
             GameObject parry = Parry();
+            GameObject clash = Clash();
+            GameObject pickup = Pickup();
+            GameObject scuff = Dust("GR_Dust_Scuff", 0.55f, 5, 3);
 
-            int wired = Wire(hit, death, parry);
+            int wired = Wire(hit, death, parry, clash, pickup, scuff);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Built 4 impact effects in {EffectsDir} and wired {wired} fighter(s).\n"
+            Debug.Log($"Built 7 effects in {EffectsDir} and wired {wired} fighter(s).\n"
                       + "Flesh, armour and death are the same five layers in "
                       + "different colours and sizes — one recipe, so they cannot drift "
                       + "apart, and the armour hit is pale and metallic because a player "
@@ -185,6 +188,206 @@ namespace GulagRunners.GameEditor
             r.renderMode = ParticleSystemRenderMode.Stretch;
             r.velocityScale = 0.05f;
             r.lengthScale = 2.8f;
+        }
+
+        /// <summary>
+        /// Dust. The most Worms-like thing in this file and the cheapest.
+        ///
+        /// In that game everything puffs: a landing, a scuff, a thing dropped on the floor.
+        /// It is not an effect anybody notices, which is the point -- what gets noticed is
+        /// its absence, as a character who moves through the world without disturbing any
+        /// of it. A fighter hauling himself over a ledge in silence and stillness reads as
+        /// a sprite sliding on a track.
+        ///
+        /// Not additive, unlike everything else here. Dust OCCLUDES: it is air with
+        /// something in it, and an additive puff glows like steam lit from inside.
+        ///
+        /// The spread is continuous rather than alternating sides. A first version pushed
+        /// every puff hard left or hard right and left a hole in the middle where the
+        /// fighter stands, which read as two separate puffs instead of one cloud opening
+        /// out from under him.
+        /// </summary>
+        static GameObject Dust(string name, float scale, int puffs, int grit)
+        {
+            GameObject root = Conductor(name);
+
+            ParticleSystem cloud = Layer(root, "Cloud", "vfx_puff", puffs);
+            ParticleSystem.MainModule main = cloud.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.34f, 0.60f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.26f * Px * scale,
+                                                            0.56f * Px * scale);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f * scale, 2.2f * scale);
+            main.startColor = new Color(0.77f, 0.70f, 0.60f, 0.62f);
+            main.startRotation = new ParticleSystem.MinMaxCurve(-3.14f, 3.14f);
+            main.gravityModifier = -0.04f;              // dust rises, barely
+
+            ParticleSystem.ShapeModule shape = cloud.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 82f;                          // wide and flat: it runs along the ground
+            shape.radius = 0.12f * scale;
+            shape.rotation = new Vector3(-90f, 0f, 0f);
+
+            ParticleSystem.LimitVelocityOverLifetimeModule drag =
+                cloud.limitVelocityOverLifetime;
+            drag.enabled = true;
+            drag.dampen = 0.22f;
+            drag.limit = new ParticleSystem.MinMaxCurve(0.6f);
+
+            ParticleSystem.RotationOverLifetimeModule spin = cloud.rotationOverLifetime;
+            spin.enabled = true;
+            spin.z = new ParticleSystem.MinMaxCurve(-1.1f, 1.1f);
+
+            Over(cloud, Ramp(new Color(0.77f, 0.70f, 0.60f),
+                             new Color(0.66f, 0.60f, 0.52f), 0.6f), Rise(1.25f));
+            Size(cloud, Grow(1.0f, 1.9f, 0.45f));
+            Soft(cloud);
+
+            if (grit > 0)
+            {
+                // A few hard bits. This is what says WEIGHT rather than air, and five of
+                // them do it -- the dust is the picture, the grit is the punctuation.
+                ParticleSystem bits = Layer(root, "Grit", "vfx_spark", grit);
+                ParticleSystem.MainModule gm = bits.main;
+                gm.startLifetime = new ParticleSystem.MinMaxCurve(0.17f, 0.29f);
+                gm.startSize = new ParticleSystem.MinMaxCurve(0.04f * Px * scale,
+                                                              0.08f * Px * scale);
+                gm.startSpeed = new ParticleSystem.MinMaxCurve(2.4f * scale, 4.6f * scale);
+                gm.startColor = new Color(0.84f, 0.77f, 0.64f);
+                gm.gravityModifier = 1.5f;
+
+                ParticleSystem.ShapeModule gs = bits.shape;
+                gs.enabled = true;
+                gs.shapeType = ParticleSystemShapeType.Cone;
+                gs.angle = 62f;
+                gs.radius = 0.06f * scale;
+                gs.rotation = new Vector3(-90f, 0f, 0f);
+
+                Over(bits, Ramp(new Color(0.84f, 0.77f, 0.64f),
+                                new Color(0.62f, 0.56f, 0.46f), 0.6f), Fade(0.8f));
+                Size(bits, Shrink(1.0f, 0.4f));
+
+                ParticleSystemRenderer r = bits.GetComponent<ParticleSystemRenderer>();
+                r.renderMode = ParticleSystemRenderMode.Stretch;
+                r.velocityScale = 0.03f;
+                r.lengthScale = 2.0f;
+            }
+
+            return Save(root, name);
+        }
+
+        /// <summary>
+        /// A clash: your swing was turned aside. The parry seen from the losing end.
+        ///
+        /// Deliberately the parry's sparks with nothing else -- no held core, no shell. The
+        /// man who parried gets the moment; the man who was parried gets told, and told in
+        /// the same colour so he knows WHAT happened to him rather than just that something
+        /// did.
+        /// </summary>
+        static GameObject Clash()
+        {
+            Color gold = new Color(1f, 0.84f, 0.47f);
+            GameObject root = Conductor("GR_Clash");
+            Fan(root, "Sparks", 0f, gold);
+            Fan(root, "Sparks Back", 180f, gold);
+            return Save(root, "GR_Clash");
+        }
+
+        /// <summary>
+        /// Something picked up. docs/03 makes the loot the payoff for the time and the noise
+        /// a chest costs, and a payoff you cannot see is a payoff nobody feels.
+        ///
+        /// Upward, which nothing else here is. Every impact in this file throws outward from
+        /// a point; this gathers and lifts, because that is the shape of a thing being
+        /// taken rather than a thing being done to somebody.
+        /// </summary>
+        static GameObject Pickup()
+        {
+            Color gold = UiPalette.Amber;
+            GameObject root = Conductor("GR_Pickup");
+
+            ParticleSystem core = Layer(root, "Flash", "vfx_core", 1);
+            ParticleSystem.MainModule cm = core.main;
+            cm.startLifetime = 0.16f;
+            cm.startSize = 0.14f * Px;
+            cm.startSpeed = 0f;
+            cm.startColor = new Color(1f, 0.95f, 0.82f);
+            Over(core, Ramp(new Color(1f, 0.95f, 0.82f), gold, 0.5f), Fade(1.1f));
+            Size(core, Grow(1.0f, 2.2f, 0.4f));
+
+            ParticleSystem motes = Layer(root, "Motes", "vfx_core", 6);
+            ParticleSystem.MainModule mm = motes.main;
+            mm.startLifetime = new ParticleSystem.MinMaxCurve(0.26f, 0.44f);
+            mm.startSize = new ParticleSystem.MinMaxCurve(0.03f * Px, 0.06f * Px);
+            mm.startSpeed = new ParticleSystem.MinMaxCurve(0.8f, 1.9f);
+            mm.startColor = gold;
+            mm.gravityModifier = -0.22f;                // they LIFT
+
+            ParticleSystem.ShapeModule shape = motes.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 26f;
+            shape.radius = 0.1f;
+            shape.rotation = new Vector3(-90f, 0f, 0f);  // up, not out
+
+            Over(motes, Ramp(gold, new Color(1f, 0.74f, 0.33f), 0.5f), Fade(0.9f));
+            Size(motes, Shrink(1.0f, 0.25f));
+
+            return Save(root, "GR_Pickup");
+        }
+
+        /// <summary>The silent emitter on a prefab's root; Play() on it plays the layers.</summary>
+        static GameObject Conductor(string name)
+        {
+            GameObject root = new GameObject(name);
+            ParticleSystem lead = root.AddComponent<ParticleSystem>();
+            ParticleSystem.MainModule main = lead.main;
+            main.duration = 0.8f;
+            main.loop = false;
+            main.playOnAwake = false;
+            main.maxParticles = 1;
+            ParticleSystem.EmissionModule silent = lead.emission;
+            silent.enabled = false;
+            lead.GetComponent<ParticleSystemRenderer>().enabled = false;
+            return root;
+        }
+
+        static GameObject Save(GameObject root, string name)
+        {
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, $"{EffectsDir}/{name}.prefab");
+            Object.DestroyImmediate(root);
+            return saved;
+        }
+
+        /// <summary>Alpha that comes UP and then goes, for something that billows.</summary>
+        static AnimationCurve Rise(float power)
+        {
+            Keyframe[] keys = new Keyframe[7];
+            for (int i = 0; i < keys.Length; i++)
+            {
+                float t = i / (float)(keys.Length - 1);
+                float up = Mathf.Min(1f, t / 0.18f);
+                keys[i] = new Keyframe(t, up * Mathf.Pow(1f - t, power));
+            }
+            return Smooth(keys);
+        }
+
+        /// <summary>Alpha-blended instead of additive. Dust occludes; it does not glow.</summary>
+        static void Soft(ParticleSystem ps)
+        {
+            ParticleSystemRenderer r = ps.GetComponent<ParticleSystemRenderer>();
+            UnityEngine.Material mat = new UnityEngine.Material(r.sharedMaterial);
+            mat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
+            string path = $"{MaterialsDir}/vfx_puff_Soft.mat";
+            UnityEngine.Material existing =
+                AssetDatabase.LoadAssetAtPath<UnityEngine.Material>(path);
+            if (existing == null)
+            {
+                AssetDatabase.CreateAsset(mat, path);
+                existing = mat;
+            }
+            r.material = existing;
         }
 
         // ----------------------------------------------------------------- the effect
@@ -528,7 +731,8 @@ namespace GulagRunners.GameEditor
         /// from, so the flash, the particles and the noise all agree about where the player
         /// was struck.
         /// </summary>
-        static int Wire(GameObject hit, GameObject death, GameObject parry)
+        static int Wire(GameObject hit, GameObject death, GameObject parry,
+                        GameObject clash, GameObject pickup, GameObject scuff)
         {
             int wired = 0;
 
@@ -553,8 +757,36 @@ namespace GulagRunners.GameEditor
                 if (effects != null)
                 {
                     Undo.RecordObject(effects, "Build the hit effects");
+
                     effects.parried.particles = Hang(parry, at, "Parry");
                     if (effects.parried.at == null) effects.parried.at = at;
+
+                    // Your swing was turned aside: the parry seen from the losing end.
+                    effects.clashed.particles = Hang(clash, at, "Clash");
+                    if (effects.clashed.at == null) effects.clashed.at = at;
+
+                    // The payoff. docs/03 spends the whole scavenge phase earning this.
+                    effects.pickUp.particles = Hang(pickup, at, "Pickup");
+                    if (effects.pickUp.at == null) effects.pickUp.at = at;
+
+                    // Dust, at the FEET, for the three things that scuff the floor. One
+                    // prefab each rather than one shared: a ParticleSystem can only be
+                    // playing once, and a fighter who grabs a ladder while the dust of his
+                    // landing is still in the air would cut it off mid-cloud.
+                    Transform feet = effects.feet != null ? effects.feet : at;
+                    effects.mantle.particles = Hang(scuff, feet, "Dust Mantle");
+                    if (effects.mantle.at == null) effects.mantle.at = feet;
+
+                    effects.ladderGrab.particles = Hang(scuff, feet, "Dust Ladder");
+                    if (effects.ladderGrab.at == null) effects.ladderGrab.at = feet;
+
+                    effects.drop.particles = Hang(scuff, feet, "Dust Drop");
+                    if (effects.drop.at == null) effects.drop.at = feet;
+
+                    // `swing` is left empty on purpose: PlayerEffects already drives a
+                    // TrailRenderer off the blade, and a puff of air behind a weapon that
+                    // is already drawing its own arc is two answers to one question.
+
                     EditorUtility.SetDirty(effects);
                 }
 
