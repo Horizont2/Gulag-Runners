@@ -206,10 +206,6 @@ namespace GulagRunners.Game
                  "stops reading as weight and starts reading as a dropped frame.")]
         [Range(0f, 0.25f)] public float hitStop = 0.05f;
 
-        [Tooltip("Seconds both freeze for when the guard eats it. Shorter than a clean hit: " +
-                 "a block is supposed to feel like less than being hit.")]
-        [Range(0f, 0.25f)] public float blockStop = 0.033f;
-
         [Tooltip("Seconds both freeze for on a parry. The longest by a wide margin — docs/02 " +
                  "makes the parry the skill ceiling, and the reward for finding one is that " +
                  "the world stops while everybody sees it.")]
@@ -286,50 +282,20 @@ namespace GulagRunners.Game
                  "reach before any follow-up could land.")]
         public float knockbackLift = 2.2f;
 
-        [Header("Guard")]
-        [Tooltip("Damage that still gets through a block.")]
-        [Range(0f, 0.5f)] public float chip = 0.3f;
-
-        [Tooltip("Stamina spent for every LIGHT hit absorbed. Zero, and deliberately.\n\n" +
-                 "At one charge a blow it was four blows and out: measured against bare hands " +
-                 "mashing, a swordsman's guard broke after 1.2 SECONDS and left him open for " +
-                 "another 0.7, so the only answer the game offers to being rushed was also the " +
-                 "fastest way to lose. Holding the guard still runs a fighter down by the " +
-                 "second; a flurry of jabs no longer does.")]
-        public int blockStaminaCost = 0;
-
-        [Tooltip("What the heavy finisher costs the man behind the guard. This is what a guard " +
-                 "is broken BY: one committed blow, read and answered, not four jabs.")]
-        public int heavyBlockStaminaCost = 2;
-
-        [Tooltip("What the attacker is thrown back by when the guard eats it, against the " +
-                 "victim's knockback. Larger than off a body: meeting a braced shield is the " +
-                 "one thing that should put the man swinging back on his heels, and it is what " +
-                 "stops a rush standing in your face.")]
-        [Range(0f, 2f)] public float blockRecoil = 0.9f;
-
-
-        public float guardBreakTime = 0.7f;
-        [Tooltip("Walking speed with the guard up, as a share of the run speed.")]
-        [Range(0.1f, 1f)] public float blockSpeed = 0.42f;
-
         [Header("Parry")]
-        [Tooltip("Seconds after raising the guard in which a hit is parried instead of blocked: " +
-                 "no damage at all, and the attacker is staggered. The one window in the game " +
-                 "that rewards reading the other player rather than reacting to them.")]
+        [Tooltip("Seconds in which two blades meeting is a parry rather than a clash: no damage " +
+                 "at all, and the attacker is staggered. docs/31 made the weapon the " +
+                 "defence, so this is settled by where the blade IS — it is the one " +
+                 "window in the game that rewards reading the other player rather than " +
+                 "reacting to them.")]
         public float parryWindow = 0.2f;
 
-        [Tooltip("Seconds of holding the guard that cost one stamina charge. docs/02 spends " +
-                 "stamina on holding the block. Without it a raised guard is free, and since " +
-                 "a braced fighter walks at Block Speed, the only thing the player notices is " +
-                 "that they have mysteriously become slow. 0 turns it off.")]
-        public float guardDrainTime = 0.8f;
         public float staggerTime = 0.8f;
 
         [Header("Worn kit")]
         [Tooltip("The most helmet, chest armour and belt together may remove from a blow. " +
                  "A full set of one rarity comes to docs/02's own 15/30/45%, so the table " +
-                 "tops out at 45% and this never fires — it is the guard rail for the day " +
+                 "tops out at 45% and this never fires — it is the backstop for the day " +
                  "a fourth worn piece is added.")]
         [Range(0f, 1f)] public float maxArmour = 0.5f;
 
@@ -398,7 +364,6 @@ namespace GulagRunners.Game
             HeavyDamagePermille = P(heavyDamageMultiplier),
             HeavyTimingPermille = P(heavyTimingMultiplier),
             HitStopFrames = F(hitStop),
-            BlockStopFrames = F(blockStop),
             ParryStopFrames = F(parryStop),
             HitstunPerDamage = Mathf.Max(0, Mathf.RoundToInt(hitstunPerDamage)),
             MaxHitstunFrames = F(maxHitstun),
@@ -418,14 +383,7 @@ namespace GulagRunners.Game
             KnockbackLift = M(knockbackLift),
             MaxArmourPermille = P(maxArmour),
             MaxStunResistPermille = P(maxStunResist),
-            ChipPermille = P(chip),
-            BlockStaminaCost = Mathf.Max(0, blockStaminaCost),
-            HeavyBlockStaminaCost = Mathf.Max(0, heavyBlockStaminaCost),
-            BlockRecoilPermille = P(blockRecoil),
-            GuardBreakFrames = F(guardBreakTime),
-            BlockSpeedPermille = P(blockSpeed),
             ParryFrames = F(parryWindow),
-            GuardDrainFrames = F(guardDrainTime),
             StaggerFrames = F(staggerTime),
             DeathFrames = F(deathTime),
             DesperationHealthPermille = P(desperationHealth),

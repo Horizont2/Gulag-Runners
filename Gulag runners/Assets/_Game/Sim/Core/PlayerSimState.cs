@@ -232,7 +232,7 @@ namespace GulagRunners.Sim
 
         public bool Dead;
         public int DeathTimer;
-        public bool GuardHeld;
+        public bool DodgeHeldLastTick;
 
         /// <summary>
         /// Ground speed cap as a fraction of the run speed, in thousandths. Zero means no cap —

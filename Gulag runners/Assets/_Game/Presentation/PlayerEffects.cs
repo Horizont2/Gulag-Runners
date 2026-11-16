@@ -139,11 +139,6 @@ namespace GulagRunners.Game
         public ActionEffect hurt = new ActionEffect
             { sound = SoundId.AttackHit, level = NoiseLevel.Loud };
 
-        [Tooltip("A hit the guard ate. Must not look like Hurt — docs/02 wants the difference " +
-                 "readable across the arena, because it is the reason to hold a guard at all.")]
-        public ActionEffect blocked = new ActionEffect
-            { sound = SoundId.BlockImpact, level = NoiseLevel.Loud };
-
         [Tooltip("A hit turned back on its owner. The loudest thing a defender can do, so the " +
                  "biggest effect in this list.")]
         public ActionEffect parried = new ActionEffect
@@ -214,7 +209,6 @@ namespace GulagRunners.Game
             player.Noise += OnNoise;
             player.Landed += OnLanded;
             player.Hurt += OnHurt;
-            player.Blocked += OnBlocked;
             player.Parried += OnParried;
             player.Died += OnDied;
             player.PickedUp += OnPickedUp;
@@ -229,7 +223,6 @@ namespace GulagRunners.Game
             player.Noise -= OnNoise;
             player.Landed -= OnLanded;
             player.Hurt -= OnHurt;
-            player.Blocked -= OnBlocked;
             player.Parried -= OnParried;
             player.Died -= OnDied;
             player.PickedUp -= OnPickedUp;
@@ -323,7 +316,6 @@ namespace GulagRunners.Game
         }
 
         void OnHurt(int damage) => Fire(hurt, $"hurt {damage}");
-        void OnBlocked(int through) => Fire(blocked, $"blocked, {through} through");
         void OnParried() => Fire(parried, "parried");
         void OnDied() { chestWorking.Hold(false); Fire(death, "death"); }
         void OnPickedUp(ItemId item) => Fire(pickUp, $"picked up {item}");

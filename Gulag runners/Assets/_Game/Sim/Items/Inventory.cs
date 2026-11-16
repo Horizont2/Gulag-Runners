@@ -54,39 +54,10 @@ namespace GulagRunners.Sim
                                          ArmourDef.StunResistPermille +
                                          BeltDef.StunResistPermille;
 
-        /// <summary>Extra time a raised guard holds, in thousandths, from everything worn.</summary>
-        public int GuardHoldPermille => HelmetDef.GuardHoldPermille +
-                                        ArmourDef.GuardHoldPermille +
-                                        BeltDef.GuardHoldPermille;
-
         /// <summary>Extra frames on the parry window, from everything worn.</summary>
         public int ParryBonusFrames => HelmetDef.ParryBonusFrames +
                                        ArmourDef.ParryBonusFrames +
                                        BeltDef.ParryBonusFrames;
-
-        /// <summary>
-        /// What a raised guard lets through, in thousandths. Zero is "the ordinary chip",
-        /// which is what every piece that is not a shield wants and what an unset field
-        /// already is — so the best piece wins rather than the pieces multiplying. Three
-        /// shields' worth of chip reduction stacking would make a guard free.
-        /// </summary>
-        public int BlockChipPermille
-        {
-            get
-            {
-                int best = 0;
-                Best(HelmetDef.BlockChipPermille, ref best);
-                Best(ArmourDef.BlockChipPermille, ref best);
-                Best(BeltDef.BlockChipPermille, ref best);
-                return best;
-            }
-        }
-
-        static void Best(int chip, ref int best)
-        {
-            if (chip <= 0) return;                   // this piece has no opinion
-            if (best == 0 || chip < best) best = chip;
-        }
 
         public ItemId SlotContents(ItemKind kind) => kind switch
         {

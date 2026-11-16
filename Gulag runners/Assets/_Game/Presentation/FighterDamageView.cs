@@ -69,7 +69,6 @@ namespace GulagRunners.Game
 
         [Header("The moment it lands")]
         public Color hitFlash = new Color(1f, 0.15f, 0.1f);
-        public Color blockFlash = new Color(0.85f, 0.9f, 1f);
         public Color parryFlash = new Color(1f, 0.92f, 0.5f);
 
         [Tooltip("How long a flash lasts. Short: it is punctuation, not a light show.")]
@@ -88,10 +87,6 @@ namespace GulagRunners.Game
         [Tooltip("Burst when a hit gets through. Optional — the drain and the flash work " +
                  "without it.")]
         public ParticleSystem bloodOnHit;
-
-        [Tooltip("Burst when the guard eats one. Sparks off a shield, not blood. Optional, " +
-                 "like the rest of the particles here: the flash carries the hit without it.")]
-        public ParticleSystem sparksOnBlock;
 
         [Tooltip("Particles emitted per point of damage, so a big hit sprays and a chip does not.")]
         [Range(0, 20)] public int particlesPerDamage = 3;
@@ -134,7 +129,6 @@ namespace GulagRunners.Game
         {
             if (player == null) return;
             player.Hurt += OnHurt;
-            player.Blocked += OnBlocked;
             player.Parried += OnParried;
             player.Died += OnDied;
         }
@@ -143,7 +137,6 @@ namespace GulagRunners.Game
         {
             if (player == null) return;
             player.Hurt -= OnHurt;
-            player.Blocked -= OnBlocked;
             player.Parried -= OnParried;
             player.Died -= OnDied;
         }
@@ -276,12 +269,6 @@ namespace GulagRunners.Game
         {
             Flash(hitFlash, damage);
             Spray(bloodOnHit, damage);
-        }
-
-        void OnBlocked(int chip)
-        {
-            Flash(blockFlash, chip);
-            Spray(sparksOnBlock, chip);
         }
 
         void OnParried() => Flash(parryFlash, 6);

@@ -98,13 +98,10 @@ namespace GulagRunners.GameEditor
             {
                 ParticleSystem blood = Instance(body, "blood", scale,
                                                 "blood directional", "blood");
-                ParticleSystem guard = Instance(body, "block sparks", scale,
-                                                "sword hit plain", "hit misc a");
-                if (blood != null || guard != null)
+                if (blood != null)
                 {
                     Undo.RecordObject(wounds, "Wire effects pack");
                     if (blood != null) { wounds.bloodOnHit = blood; took.Add("blood"); }
-                    if (guard != null) { wounds.sparksOnBlock = guard; took.Add("block sparks"); }
                     PrefabUtility.RecordPrefabInstancePropertyModifications(wounds);
                 }
             }

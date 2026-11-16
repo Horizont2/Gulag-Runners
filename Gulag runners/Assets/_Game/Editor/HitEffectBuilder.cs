@@ -64,18 +64,19 @@ namespace GulagRunners.GameEditor
 
             Directory.CreateDirectory(MaterialsDir);
 
+            // No block effect. docs/31 took the guard out and made the weapon the
+            // defence; a blocked hit is not an event the fight raises any more.
             GameObject hit = Build("GR_Hit_Flesh", UiPalette.Attack, 1f);
             GameObject armour = Build("GR_Hit_Armour", new Color(1f, 0.86f, 0.55f), 0.85f);
-            GameObject block = Build("GR_Block", new Color(0.72f, 0.82f, 1f), 0.6f);
             GameObject death = Build("GR_Death", UiPalette.Attack, 1.7f);
 
-            int wired = Wire(hit, block, death);
+            int wired = Wire(hit, death);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Built 4 impact effects in {EffectsDir} and wired {wired} fighter(s).\n"
-                      + "Flesh, armour, block and death are the same five layers in "
+            Debug.Log($"Built 3 impact effects in {EffectsDir} and wired {wired} fighter(s).\n"
+                      + "Flesh, armour and death are the same five layers in "
                       + "different colours and sizes — one recipe, so they cannot drift "
                       + "apart, and the armour hit is pale and metallic because a player "
                       + "has to be able to tell at a glance that the other man found a "
@@ -425,7 +426,7 @@ namespace GulagRunners.GameEditor
         /// from, so the flash, the particles and the noise all agree about where the player
         /// was struck.
         /// </summary>
-        static int Wire(GameObject hit, GameObject block, GameObject death)
+        static int Wire(GameObject hit, GameObject death)
         {
             int wired = 0;
 
@@ -440,7 +441,6 @@ namespace GulagRunners.GameEditor
 
                 Undo.RecordObject(view, "Build the hit effects");
                 view.bloodOnHit = Hang(hit, at, "Hit");
-                view.sparksOnBlock = Hang(block, at, "Block");
                 view.deathBurst = Hang(death, at, "Death");
                 EditorUtility.SetDirty(view);
                 wired++;

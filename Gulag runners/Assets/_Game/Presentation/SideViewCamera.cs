@@ -184,10 +184,6 @@ namespace GulagRunners.Game
                  "swing through air.")]
         [Range(0f, 1f)] public float landedTrauma = 0.22f;
 
-        [Tooltip("Trauma when the guard eats a hit. Small — a block is supposed to feel like " +
-                 "less than being hit.")]
-        [Range(0f, 1f)] public float blockTrauma = 0.15f;
-
         [Tooltip("Trauma on a parry. The biggest in the list: docs/02 makes the parry the " +
                  "skill ceiling, and it is the one moment the game should feel like it " +
                  "stopped to look.")]
@@ -353,7 +349,6 @@ namespace GulagRunners.Game
             _subscribed.Landed += OnLanded;
             _subscribed.Teleported += SnapToTarget;
             _subscribed.Hurt += OnHurt;
-            _subscribed.Blocked += OnBlocked;
             _subscribed.Parried += OnParried;
 
             _hitting = opponent != null ? opponent : OtherFighter();
@@ -366,7 +361,6 @@ namespace GulagRunners.Game
             _subscribed.Landed -= OnLanded;
             _subscribed.Teleported -= SnapToTarget;
             _subscribed.Hurt -= OnHurt;
-            _subscribed.Blocked -= OnBlocked;
             _subscribed.Parried -= OnParried;
             _subscribed = null;
 
@@ -403,7 +397,6 @@ namespace GulagRunners.Game
         }
 
         void OnHurt(int damage) => AddTrauma(hitTrauma * Mathf.Sqrt(Share(damage)));
-        void OnBlocked(int through) => AddTrauma(blockTrauma * Mathf.Sqrt(Share(through)));
         void OnParried() => AddTrauma(parryTrauma);
         void OnOpponentHurt(int damage) => AddTrauma(landedTrauma * Mathf.Sqrt(Share(damage)));
 

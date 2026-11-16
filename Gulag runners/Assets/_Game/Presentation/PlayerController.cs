@@ -202,13 +202,21 @@ namespace GulagRunners.Game
         public event Action<int> Hurt;
 
         /// <summary>
-        /// A hit the guard ate, with what got through it. Separate from Hurt because the two
-        /// have to look nothing alike: docs/02 wants the difference between taking a hit and
-        /// meeting one readable from across the arena, since it is the whole reason to hold
-        /// the guard up.
+        /// <summary>
+        /// There is no block.
+        ///
+        /// docs/31 took the guard button out and made the WEAPON the defence: "зброя
+        /// зупиняє зброю" -- two segments meeting, settled in ArmMotor before any damage
+        /// is. CombatMotor's own note says it plainly: TryHitbox, Resolve, Land, Parry and
+        /// Block used to live there and all five are gone.
+        ///
+        /// What survived the removal was the scaffolding: this event, three subscribers to
+        /// it, a flash colour, a particle slot, a camera shake, eight config numbers, three
+        /// item stats and a sound. None of it could ever fire, because nothing raised the
+        /// event. A reader finding `blockFlash` beside `hitFlash` would reasonably conclude
+        /// the game has a block in it, and would be wrong -- which is the real cost of
+        /// leaving a removed mechanic's furniture standing.
         /// </summary>
-        public event Action<int> Blocked;
-
         /// <summary>A hit turned on its owner. The loudest thing a defender can do.</summary>
         public event Action Parried;
 

@@ -39,7 +39,7 @@ namespace GulagRunners.Sim
         /// reward for finding one is that the world stops while everybody sees it happen.
         /// </summary>
         public int HitStopFrames;
-        public int BlockStopFrames;
+
         public int ParryStopFrames;
 
         /// <summary>Hitstun per point of damage, in frames, and its ceiling.</summary>
@@ -173,44 +173,6 @@ namespace GulagRunners.Sim
         /// </summary>
         public int MaxStunResistPermille;
 
-        // ---- blocking (docs/02: the medieval mode's answer to pressure)
-        /// <summary>Damage that still gets through a block, in thousandths.</summary>
-        public int ChipPermille;
-
-        /// <summary>
-        /// Stamina spent for every hit absorbed. It has to outrun the stamina regen or holding
-        /// the guard is free, which is the one thing a guard must never be.
-        /// </summary>
-        /// <summary>
-        /// Stamina spent for every LIGHT hit absorbed. Zero, and deliberately.
-        ///
-        /// At one charge a blow it was four blows and out: measured against a bare-handed
-        /// fighter mashing, a swordsman's guard broke after 1.2 SECONDS and left him wide
-        /// open for another 0.7. The only answer the game offers to being rushed was
-        /// therefore the fastest way to lose, which is why a player with a weapon felt he
-        /// had no move at all. Holding the guard still costs -- GuardDrainFrames charges it
-        /// by the second, so a braced fighter still runs down -- but absorbing a jab no
-        /// longer does. What breaks a guard is a committed blow, not a flurry.
-        /// </summary>
-        public int BlockStaminaCost;
-
-        /// <summary>What the heavy finisher costs the man behind the guard. This is what a
-        /// guard is broken BY: one committed swing, read and answered, not four jabs.</summary>
-        public int HeavyBlockStaminaCost;
-
-        /// <summary>
-        /// What the attacker is thrown back by when the guard eats it, against the victim's
-        /// own knockback. Larger than on a clean hit: meeting a braced shield is the one
-        /// thing in a fight that should put the man swinging back on his heels, and it is
-        /// what stops a rush simply standing in your face.
-        /// </summary>
-        public int BlockRecoilPermille;
-
-        /// <summary>Frames the guard is down for after it is broken.</summary>
-        public int GuardBreakFrames;
-        /// <summary>Movement speed while holding a block, in thousandths of the run speed.</summary>
-        public int BlockSpeedPermille;
-
         /// <summary>
         /// Movement speed through the three phases of a swing, in thousandths of the run
         /// speed. 1000 is full speed; 0 is rooted.
@@ -244,13 +206,6 @@ namespace GulagRunners.Sim
         /// reading the other player rather than reacting to them.
         /// </summary>
         public int ParryFrames;
-
-        /// <summary>
-        /// Frames of holding the guard that cost one charge. docs/02 spends stamina on holding
-        /// the block, and without that a raised guard is free: a fighter can walk the whole
-        /// arena braced at 42% speed and never find out why they are slow. 0 turns it off.
-        /// </summary>
-        public int GuardDrainFrames;
 
         /// <summary>
         /// Below this share of full health, bare hands hit for DesperationDamagePermille.
@@ -311,7 +266,6 @@ namespace GulagRunners.Sim
             // felt rather than seen, and past about a tenth of a second on an ordinary hit it
             // stops reading as weight and starts reading as a dropped frame.
             c.HitStopFrames = 3;
-            c.BlockStopFrames = 2;
             c.ParryStopFrames = 7;
 
             // And the part that was missing: hit stop that knows what hit. Three flat
@@ -353,19 +307,12 @@ namespace GulagRunners.Sim
             c.MaxArmourPermille = 500;     // the full legendary kit is 450; this never fires
             c.MaxStunResistPermille = 400; // a great helm is 380 of it
 
-            c.ChipPermille = 300;          // docs/02: a block absorbs 70%, not 85%
-            c.BlockStaminaCost = 0;        // a jab does not break a guard; holding it still drains
-            c.HeavyBlockStaminaCost = 2;   // a committed blow does
-            c.BlockRecoilPermille = 900;
-            c.GuardBreakFrames = 42;       // 0.7 s wide open
-            c.BlockSpeedPermille = 420;
 
             c.WindupSpeedPermille = 480;   // gathering: you may still close or back off
             c.ActiveSpeedPermille = 180;   // the blow itself; a crawl, not a stop
             c.RecoverySpeedPermille = 400; // heavy on your feet again
 
             c.ParryFrames = 12;            // 0.20 s, straight from docs/02
-            c.GuardDrainFrames = 48;       // a charge every 0.8 s, so a full pool holds 3.2 s
             c.StaggerFrames = 48;          // 0.80 s, likewise: the parry is the skill ceiling
 
             c.DesperationHealthPermille = 300;   // docs/02: bare hands below 30% HP

@@ -55,15 +55,10 @@ namespace GulagRunners.Game
 
         [Tooltip("Share of the damage that goes through a raised guard, when that is more " +
                  "than the ordinary chip. 0 uses the ordinary chip.")]
-        [Range(0f, 1f)] public float blockPierce;
 
         [Header("Armour")]
         [Tooltip("Share of incoming damage removed. docs/02: T1/T2/T3 = 15/30/45%.")]
         [Range(0f, 1f)] public float damageReduction;
-
-        [Tooltip("What a raised guard lets through for whoever carries this. 0 is the " +
-                 "ordinary chip, which is what everything that is not a shield wants.")]
-        [Range(0f, 1f)] public float blockChip;
 
         [Tooltip("Extra frames on the parry window. The shield's reason to exist.")]
         public int parryBonusFrames;
@@ -77,7 +72,6 @@ namespace GulagRunners.Game
         [Header("Belt")]
         [Tooltip("How much longer a raised guard holds before it costs a charge. 0.5 turns " +
                  "0.8 s a charge into 1.2 s.")]
-        [Range(0f, 2f)] public float guardHold;
 
         [Header("Utility")]
         public int heal;
@@ -98,12 +92,9 @@ namespace GulagRunners.Game
             Reach = M(reach),
             Durability = Mathf.Max(0, durability),
             PrySpeed = M(prySpeed),
-            BlockPierce = Permille(blockPierce),
             DamageReductionPermille = Permille(damageReduction),
-            BlockChipPermille = Permille(blockChip),
             ParryBonusFrames = Mathf.Max(0, parryBonusFrames),
             StunResistPermille = Permille(stunResist),
-            GuardHoldPermille = Thousandths(guardHold),
             Heal = Mathf.Max(0, heal)
         };
 
@@ -119,12 +110,9 @@ namespace GulagRunners.Game
             reach = d.Reach.ToMilli() / 1000f;
             durability = d.Durability;
             prySpeed = d.PrySpeed.ToMilli() / 1000f;
-            blockPierce = d.BlockPierce / 1000f;
             damageReduction = d.DamageReductionPermille / 1000f;
-            blockChip = d.BlockChipPermille / 1000f;
             parryBonusFrames = d.ParryBonusFrames;
             stunResist = d.StunResistPermille / 1000f;
-            guardHold = d.GuardHoldPermille / 1000f;
             heal = d.Heal;
         }
     }

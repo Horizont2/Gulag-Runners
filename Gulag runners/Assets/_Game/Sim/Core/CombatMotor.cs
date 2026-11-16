@@ -47,8 +47,8 @@ namespace GulagRunners.Sim
             if (s.Dead) return InputFlags.None;
 
             bool dodgeHeld = input.Has(InputFlags.Dodge);
-            bool dodgePressed = dodgeHeld && !s.GuardHeld;
-            s.GuardHeld = dodgeHeld;
+            bool dodgePressed = dodgeHeld && !s.DodgeHeldLastTick;
+            s.DodgeHeldLastTick = dodgeHeld;
 
             if (s.Reeling)
             {

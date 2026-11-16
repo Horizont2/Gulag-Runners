@@ -161,7 +161,6 @@ namespace GulagRunners.Sim
                 AttackFrames = 23,                  // 0.38 s
                 Reach = Fix.FromMilli(1050),
                 Durability = 10,
-                BlockPierce = 350,                  // it is what you reach for against a turtle
                 PrySpeed = Fix.FromMilli(2400)      // the best lever in the game
             };
 
@@ -194,7 +193,6 @@ namespace GulagRunners.Sim
                 AttackFrames = 18,                  // 0.30 s
                 Reach = Fix.FromMilli(850),
                 Durability = 12,
-                BlockPierce = 200,
                 PrySpeed = Fix.FromMilli(1100)      // a mace is not a lever
             };
 
@@ -226,7 +224,6 @@ namespace GulagRunners.Sim
                 AttackFrames = 29,                  // 0.48 s
                 Reach = Fix.FromMilli(1850),
                 Durability = 8,
-                BlockPierce = 500,
                 PrySpeed = Fix.FromMilli(1200)
             };
 
@@ -241,7 +238,6 @@ namespace GulagRunners.Sim
                 Reach = Fix.FromMilli(1300),
                 Durability = 9,
                 PrySpeed = Fix.FromMilli(1400),
-                BlockPierce = 700                   // a shield is most of no use against it
             };
 
             t[(int)ItemId.Warhammer] = new ItemDef
@@ -254,7 +250,6 @@ namespace GulagRunners.Sim
                 AttackFrames = 34,                  // 0.57 s: everyone can see it coming
                 Reach = Fix.FromMilli(1400),        // a hammer, not a polearm: it has to close
                 Durability = 6,
-                BlockPierce = 450,
                 PrySpeed = Fix.FromMilli(2600)
             };
 
@@ -344,7 +339,6 @@ namespace GulagRunners.Sim
                 Kind = ItemKind.Belt,
                 Tier = 1,
                 DamageReductionPermille = 20,
-                GuardHoldPermille = 150
             };
 
             t[(int)ItemId.ToolBelt] = new ItemDef
@@ -354,7 +348,6 @@ namespace GulagRunners.Sim
                 Kind = ItemKind.Belt,
                 Tier = 2,
                 DamageReductionPermille = 40,
-                GuardHoldPermille = 300
             };
 
             t[(int)ItemId.WarBelt] = new ItemDef
@@ -364,7 +357,6 @@ namespace GulagRunners.Sim
                 Kind = ItemKind.Belt,
                 Tier = 3,
                 DamageReductionPermille = 60,
-                GuardHoldPermille = 500
             };
 
             for (int i = 0; i < t.Length; i++) t[i].Id = (ItemId)i;

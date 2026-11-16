@@ -56,7 +56,7 @@ namespace GulagRunners.Game
                  "nothing else. The glyph inside is not interface, it is the verb — and a " +
                  "verb is found faster by colour than by shape, especially under a thumb.")]
         public Color attackGlyph = UiPalette.Attack;
-        public Color blockGlyph = UiPalette.Block;
+        public Color dodgeGlyph = UiPalette.Dodge;
         public Color actionGlyph = UiPalette.Action;
         public Color jumpGlyph = UiPalette.Jump;
 
@@ -193,7 +193,14 @@ namespace GulagRunners.Game
     }
 
     /// <summary>Which palette colour a button's glyph takes.</summary>
-    public enum GlyphInk { Attack, Block, Action, Jump }
+    /// <summary>
+    /// Which palette colour a button's glyph takes.
+    ///
+    /// Dodge and not Block. The member was called Block from when there was a guard button,
+    /// and it has painted the DODGE button since docs/31 took the guard out -- so the one
+    /// place in the HUD that named the mechanic was naming it on the wrong control.
+    /// </summary>
+    public enum GlyphInk { Attack, Dodge, Action, Jump }
 
     /// <summary>The ring and knob of a thumb stick, for painting.</summary>
     [System.Serializable]
@@ -688,7 +695,7 @@ namespace GulagRunners.Game
             PlayerController me = Mine();
             InputFlags held = Held(me);
 
-            PaintButton(dodge, GlyphInk.Block,
+            PaintButton(dodge, GlyphInk.Dodge,
                         (held & InputFlags.Dodge) != 0, CanDodge(me));
             PaintButton(action, GlyphInk.Action,
                         (held & InputFlags.Action) != 0, CanAct(me));
@@ -855,7 +862,7 @@ namespace GulagRunners.Game
 
         Color Ink(GlyphInk ink) => ink switch
         {
-            GlyphInk.Block => palette.blockGlyph,
+            GlyphInk.Dodge => palette.dodgeGlyph,
             GlyphInk.Action => palette.actionGlyph,
             GlyphInk.Jump => palette.jumpGlyph,
             _ => palette.attackGlyph
@@ -899,7 +906,7 @@ namespace GulagRunners.Game
             // Literals are right HERE and nowhere else -- there is no simulation yet to ask,
             // and a button greyed out on the start screen would promise the player a
             // restriction that does not exist.
-            PaintButton(dodge, GlyphInk.Block, false, true);
+            PaintButton(dodge, GlyphInk.Dodge, false, true);
             PaintButton(action, GlyphInk.Action, false, true);
             PaintButton(jump, GlyphInk.Jump, false, true);
 

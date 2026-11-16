@@ -78,8 +78,7 @@ namespace GulagRunners.GameEditor
                 // What the three worn pieces actually come to, since no one square says it.
                 EditorGUILayout.TextField("Worn kit",
                     $"-{s.Inventory.ArmourPermille / 10f:0.#}% damage, " +
-                    $"-{s.Inventory.StunResistPermille / 10f:0.#}% hitstun, " +
-                    $"+{s.Inventory.GuardHoldPermille / 10f:0.#}% guard");
+                    $"-{s.Inventory.StunResistPermille / 10f:0.#}% hitstun");
 
                 EditorGUILayout.IntField("Opening chest", s.OpeningChest);
             }

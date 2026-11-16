@@ -97,9 +97,6 @@ namespace GulagRunners.Game
         ///   desperation  DesperationHealthPermille 300, DesperationDamagePermille 1400,
         ///                and CombatMotor applies it to the ATTACKER, whatever is in hand
         ///   parry        ParryFrames 12, and Parry() sets StaggerTimer to StaggerFrames 48
-        ///   guard break  GuardBreakFrames 42
-        ///   chip         ChipPermille 300 -- a block eats 70%, not all of it
-        ///   guard drain  GuardDrainFrames 48, four charges
         ///   combo        MaxCombo 3, ComboWindowFrames 20
         ///   the rooms    180+1320+90+2010 = 3600 frames, so Closing opens at 1:00 and
         ///                ShutterFrames takes the rooms to 2:00. The ceiling is a

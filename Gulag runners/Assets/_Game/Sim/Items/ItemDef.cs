@@ -44,13 +44,6 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix PrySpeed;
 
-        /// <summary>
-        /// How much of the damage goes through a raised guard, in thousandths, when that is more
-        /// than the ordinary chip. docs/03 asks that every item have a counter-item; this is the
-        /// flail's, and the thing it counters is a player who never lowers their shield.
-        /// </summary>
-        public int BlockPierce;
-
         // ---- armour
         /// <summary>
         /// Incoming damage removed, in thousandths. docs/02: T1/T2/T3 = 15/30/45%, which is
@@ -64,17 +57,6 @@ namespace GulagRunners.Sim
         /// nothing to show which was right.
         /// </summary>
         public int DamageReductionPermille;
-
-        /// <summary>
-        /// What a raised guard lets through, in thousandths, for someone carrying this.
-        /// 0 means the ordinary chip — which is what every item that is not a shield wants,
-        /// and conveniently what an unset struct field already is.
-        ///
-        /// This is the shield's whole reason to exist. Plate removes nearly half of every hit
-        /// and does nothing for your guard; a shield barely softens a hit you take standing
-        /// and makes the hits you MEET almost free. One armour slot, two opposite plans.
-        /// </summary>
-        public int BlockChipPermille;
 
         /// <summary>
         /// Extra frames on the parry window. docs/02 makes the parry the skill ceiling of the
@@ -94,16 +76,6 @@ namespace GulagRunners.Sim
         /// one.
         /// </summary>
         public int StunResistPermille;
-
-        /// <summary>
-        /// How much longer a raised guard holds before it costs a charge, in thousandths.
-        /// The belt's stat.
-        ///
-        /// Blocking drains a charge every GuardDrainFrames, so a full pool is 3.2 s of
-        /// standing braced; +500 makes it 4.8 s. That is the belt's whole plan — not
-        /// surviving the blow, but being allowed to wait for it.
-        /// </summary>
-        public int GuardHoldPermille;
 
         // ---- utility
         public int Heal;
