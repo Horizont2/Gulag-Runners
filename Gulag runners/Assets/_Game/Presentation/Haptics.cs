@@ -96,7 +96,6 @@ namespace GulagRunners.Game
             Hit = 2,
             Crusher = 3,
             Parry = 4,
-            Guard = 5,
             Vent = 6,
             Throb = 7,
             Chest = 8,
@@ -190,13 +189,6 @@ namespace GulagRunners.Game
             ms = 14, strength = 255, gap = 26, thenMs = 26, thenStrength = 200,
         };
 
-        [Tooltip("A block that held. Deliberately small: it stopped, and that is all it did.\n\n"
-                 + "The simulation does not currently raise this -- PlayerController.Blocked "
-                 + "is declared and never invoked, because a block and a parry became the "
-                 + "same event when the guard became geometry. It is subscribed anyway, as "
-                 + "three other views in this folder already do, so the day the fight tells "
-                 + "a held guard from a clash again this needs no edit.")]
-        public Buzz guard = new Buzz { ms = 22, strength = 110 };
 
         [Header("The gas (docs/33)")]
         [Tooltip("The vent, on the tick the flood begins. Long, and NOT at full strength: it "
@@ -359,7 +351,6 @@ namespace GulagRunners.Game
             t[(int)Feel.Hit] = hit;
             t[(int)Feel.Crusher] = crusher;
             t[(int)Feel.Parry] = parry;
-            t[(int)Feel.Guard] = guard;
             t[(int)Feel.Vent] = vent;
             t[(int)Feel.Throb] = throb;
             t[(int)Feel.Chest] = chest;
@@ -423,7 +414,6 @@ namespace GulagRunners.Game
             if (_bound != null)
             {
                 _bound.Hurt -= OnHurt;
-                _bound.Blocked -= OnBlocked;
                 _bound.Died -= OnDied;
             }
 
@@ -432,7 +422,6 @@ namespace GulagRunners.Game
             if (_bound != null)
             {
                 _bound.Hurt += OnHurt;
-                _bound.Blocked += OnBlocked;
                 _bound.Died += OnDied;
             }
 
@@ -611,15 +600,6 @@ namespace GulagRunners.Game
                 : share >= hitRungs.x ? Feel.Hit
                 : Feel.Graze);
         }
-
-        /// <summary>
-        /// A hit the guard ate. Dormant; see the tooltip on <see cref="guard"/>.
-        ///
-        /// The chip that got through is deliberately not used to scale this. A guard that
-        /// held is one fact and the damage it let through is another, and the second one has
-        /// its own rung on <see cref="OnHurt"/> for the day the fight raises both.
-        /// </summary>
-        void OnBlocked(int chip) => Say(Feel.Guard);
 
         void OnDied() => Say(Feel.Death);
 
