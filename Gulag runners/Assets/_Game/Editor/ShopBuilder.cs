@@ -299,6 +299,31 @@ namespace GulagRunners.GameEditor
 
         // ---------------------------------------------------------------- the screen
 
+        /// <summary>
+        /// Build the screen without anybody opening the window.
+        ///
+        /// The window is the normal way in -- it shows every sprite row and says which are
+        /// still empty -- but a scene that is being assembled by a tool needs the building
+        /// part on its own. An EditorWindow is a ScriptableObject, so one can be made,
+        /// used and thrown away without ever being shown, and that is cheaper and far less
+        /// fragile than lifting two hundred and forty lines out into a static method whose
+        /// only caller would be this one.
+        /// </summary>
+        public static void BuildInto(UiSpriteSet set, CosmeticCatalogue catalogue)
+        {
+            ShopBuilder window = CreateInstance<ShopBuilder>();
+            try
+            {
+                window._set = set;
+                window._catalogue = catalogue;
+                window.Build();
+            }
+            finally
+            {
+                DestroyImmediate(window);
+            }
+        }
+
         void Build()
         {
             Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
