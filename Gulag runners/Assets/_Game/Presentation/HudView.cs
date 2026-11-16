@@ -820,7 +820,8 @@ namespace GulagRunners.Game
             if (held && !button.wasHeld) button.refused = disabled;
             button.wasHeld = held;
 
-            float push = button.press * (button.refused ? refusedPress : pressDepth);
+            float push = button.press
+                         * (button.refused ? palette.refusedPress : palette.pressDepth);
 
             // The ring is interface and stays white; the glyph is the verb and is coloured.
             Color ring = disabled ? Fade(palette.line, palette.disabledAlpha) : palette.line;
@@ -830,8 +831,8 @@ namespace GulagRunners.Game
             // Only an available button brightens. See the summary: the lift IS the promise.
             if (!button.refused && button.press > 0f)
             {
-                ring = Lift(ring, button.press * pressLift);
-                glyph = Lift(glyph, button.press * pressLift);
+                ring = Lift(ring, button.press * palette.pressLift);
+                glyph = Lift(glyph, button.press * palette.pressLift);
             }
 
             Tint(button.ring, ring);

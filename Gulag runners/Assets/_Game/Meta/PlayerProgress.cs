@@ -377,7 +377,8 @@ namespace GulagRunners.Meta
         {
             gold = 0;
             rating = 1500; deviation = 350; volatility = 0.06;
-            matchesPlayed = matchesWon = dailiesDone = daysInARow = 0;
+            matchesPlayed = matchesWon = daysInARow = 0;
+            dailiesMask = picksToday = 0;
             lastPlayedDay = -1;
             owned = new List<string>();
             equipped = new List<string>();
@@ -403,7 +404,13 @@ namespace GulagRunners.Meta
 
             PlayerPrefs.SetInt(Key + "played", matchesPlayed);
             PlayerPrefs.SetInt(Key + "won", matchesWon);
-            PlayerPrefs.SetInt(Key + "dailies", dailiesDone);
+            // The MASK and the day's pick count, which are what the day actually is.
+            // Version 5 saved a COUNT here and version 6 does not, because a count cannot
+            // say WHICH tasks are done -- see the version note above. Saving DailiesDone
+            // would be saving the popcount of the mask and losing the mask, which is the
+            // same bug wearing the new field's name.
+            PlayerPrefs.SetInt(Key + "mask", dailiesMask);
+            PlayerPrefs.SetInt(Key + "picks", picksToday);
             PlayerPrefs.SetInt(Key + "day", lastPlayedDay);
             PlayerPrefs.SetInt(Key + "inarow", daysInARow);
 
@@ -435,8 +442,13 @@ namespace GulagRunners.Meta
             gold = PlayerPrefs.GetInt(Key + "gold", gold);
             matchesPlayed = PlayerPrefs.GetInt(Key + "played", matchesPlayed);
             matchesWon = PlayerPrefs.GetInt(Key + "won", matchesWon);
-            dailiesDone = Mathf.Clamp(PlayerPrefs.GetInt(Key + "dailies", dailiesDone),
-                                      0, Purse.DailiesPerDay);
+            // The old "dailies" key is deliberately not read. It held a count, and there
+            // is no honest way to turn "two of them are done" into WHICH two -- any guess
+            // would hand the player a finished task they have not done, or re-charge them
+            // for one they have. The day's progress is lost on the upgrade, once, and the
+            // day resets anyway.
+            dailiesMask = PlayerPrefs.GetInt(Key + "mask", dailiesMask) & Dailies.AllBits;
+            picksToday = Mathf.Max(0, PlayerPrefs.GetInt(Key + "picks", picksToday));
 
             if (old)
             {

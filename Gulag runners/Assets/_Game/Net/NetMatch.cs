@@ -577,13 +577,17 @@ namespace GulagRunners.Net
 
             recorder.localPlayer = player;
 
-            // The opponent is a person now, not the practice bot, so the ladder stops
-            // scoring against the stand-in rating. What it does NOT do is ask the other
+            // The opponent is a person now, not the practice bot -- and this match still
+            // must not move the ladder. What the recorder does NOT do is ask the other
             // phone what its rating is: on a LAN that is a number the other device can
-            // simply make up, and a ladder that believes it is not a ladder. An even
-            // match against this player's own rating is the honest reading until there
-            // is a server to ask (docs/09).
-            recorder.rateAgainstBots = false;
+            // simply make up, and a ladder that believes it is not a ladder. Until there
+            // is a server to ask, a LAN match is played for its own sake (docs/09).
+            //
+            // Off means an unranked match, which is what this is. A LAN game is paired
+            // here rather than through MatchSearch, so nothing was handed over and this
+            // switch is what decides -- see MatchRecorder, where a handover would take
+            // precedence if one ever arrived on this path.
+            recorder.practiceCountsOnTheLadder = false;
             recorder.Rearm();
         }
 
