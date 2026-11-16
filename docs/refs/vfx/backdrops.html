@@ -1,0 +1,97 @@
+<!doctype html>
+<meta charset=utf-8>
+<title>working</title>
+<!--
+  The parallax stack as the game camera sees it, so it can be judged before it is authored.
+
+  The numbers are not invented. The arena cameras are perspective at fov 30, about seven
+  metres from the fight plane, so the view is 2*7*tan(15) = 3.75 m tall and 8.3 m wide at
+  20:9. A layer D metres out drifts at 7/D of the fighters' speed, and the camera has about
+  24 m of travel inside a 32 m arena, which is 2.9 screen widths at the fight plane. So each
+  layer needs to be one screen plus its own share of that 2.9:
+
+      near   22 m   32%   1.93 screens wide
+      mid    50 m   14%   1.41
+      far   110 m    6%   1.17
+
+  The HEIGHT is set by coverage, not by the texture's 4:1 aspect. Taking it from the aspect
+  left the mid and far quads 0.78 and 0.65 of a screen tall, so they stopped above the
+  bottom of the frame and the sky showed through wherever a nearer ridge dipped. Below a
+  ridge line everything is flat fill, so a vertical stretch is free.
+
+  Four camera positions per row: the left wall, a third in, two thirds, the right wall.
+-->
+<style>
+  body { background:#07080a; margin:0; padding:10px;
+         font:11px ui-monospace,SFMono-Regular,monospace; color:#7d848c }
+  h2 { font:11px inherit; color:#c8ced6; margin:12px 0 5px; letter-spacing:.09em;
+       text-transform:uppercase }
+  .row { display:flex; gap:6px }
+  .f { position:relative; flex:1; aspect-ratio:20/9; overflow:hidden; background:#000 }
+  .f img { position:absolute; image-rendering:auto }
+  .f b { position:absolute; left:3px; bottom:2px; font:9px inherit; color:#fff8;
+         font-weight:400 }
+  .sky { position:absolute; inset:0 }
+  /* Roughly where the arena itself sits. Not art -- a mask, so the backdrop is judged by
+     the part of the frame the player can actually see it in. Judging it without this says
+     a flat band across the bottom is a fault, when in the game it is behind the floor. */
+  /* 25%, not a third: the view is 3.75 m tall at the fight plane and the camera rides on
+     the fighters, so the floor lands about three quarters of the way down. */
+  .arena { position:absolute; left:0; right:0; bottom:0; height:25%; background:#05060a }
+  .arena::before, .arena::after { content:''; position:absolute; height:14px;
+         background:#05060a; bottom:100% }
+  .arena::before { left:8%;  width:22% }
+  .arena::after  { right:12%; width:26% }
+</style>
+<div id=out></div>
+<script src="backdrop_layers.js"></script>
+<script>
+const DIR = '../../../Gulag runners/Assets/_Game/Effects/Backdrops/';
+
+// LAYERS comes from backdrop_layers.js, which make_backdrops.py writes. It is not copied
+// here on purpose: when these figures lived in two files they disagreed within the hour,
+// and the art came out stretched to nearly three times its height as a result.
+
+// Each arena's sky, so the far layer is judged against what it will actually sit on.
+const SKY = {
+  mine:   'linear-gradient(#14161c,#0b0c10)',
+  forest: 'linear-gradient(#5c7480,#9fb3ad)',
+  nordic: 'linear-gradient(#6e8296,#aebdcb)',
+  temple: 'linear-gradient(#171527,#2d2436)',
+};
+
+const out = document.getElementById('out');
+let pending = 0;
+
+for (const theme of Object.keys(SKY)) {
+  out.insertAdjacentHTML('beforeend', `<h2>${theme}</h2>`);
+  const row = document.createElement('div');
+  row.className = 'row';
+
+  for (const t of [0, 0.34, 0.67, 1]) {
+    const f = document.createElement('div');
+    f.className = 'f';
+    f.innerHTML = `<div class=sky style="background:${SKY[theme]}"></div>`;
+
+    // Furthest first, so nearer layers draw over them.
+    for (const layer of [...LAYERS].reverse()) {
+      const span = layer.screens_wide - 1;             // screens of slack in this layer
+      const img = new Image();
+      pending++;
+      img.onload = img.onerror = () => { if (--pending === 0) document.title = 'ready'; };
+      img.src = DIR + `bg_${theme}_${layer.name}.png`;
+      img.style.width  = (layer.screens_wide * 100) + '%';
+      img.style.height = (layer.screens_high * 100) + '%';
+      img.style.left   = (-span * 100 * t) + '%';
+      img.style.top    = (layer.screens_top * 100) + '%';
+      f.appendChild(img);
+    }
+
+    f.insertAdjacentHTML('beforeend',
+      `<div class=arena></div><b>cam ${Math.round(t * 100)}%</b>`);
+    row.appendChild(f);
+  }
+  out.appendChild(row);
+}
+if (pending === 0) document.title = 'ready';
+</script>

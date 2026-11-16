@@ -47,9 +47,9 @@ namespace GulagRunners.GameEditor
                     $"This opens and SAVES {arenas.Count} scene(s):\n\n  "
                     + string.Join("\n  ", arenas)
                     + "\n\nEach one gets the impact, parry, clash, pickup and dust effects "
-                    + "built and wired to its fighters, and the gas announcement wired to "
-                    + "its poison pool. Scenes with no fighters are skipped "
-                    + "and left untouched.",
+                    + "built and wired to its fighters, the gas announcement wired to "
+                    + "its poison pool, and its parallax backdrop rebuilt. Scenes with no "
+                    + "fighters are skipped and left untouched.",
                     "Build them", "Cancel"))
                 return;
 
@@ -92,6 +92,11 @@ namespace GulagRunners.GameEditor
                         PoisonWarningSetup.Run();
                         gassed.Add(scene.name);
                     }
+
+                    // And the parallax layers behind the arena. This one knows which scenes
+                    // it has a palette for and says so when it does not, so it is safe to
+                    // call in all of them.
+                    BackdropBuilder.Run();
 
                     EditorSceneManager.MarkSceneDirty(scene);
                     EditorSceneManager.SaveScene(scene);
