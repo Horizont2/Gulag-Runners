@@ -197,7 +197,7 @@ namespace GulagRunners.Game
             // The waterline from the pool itself, not worked out again here: RiseAt gives
             // how FULL the pool is, nought to one, and turning that into a height needs
             // the box it is filling. Two places doing that is two places that can disagree.
-            float gap = mine.transform.position.y - pool.SurfaceY;
+            float gap = mine.transform.position.y - pool.SurfaceY();
 
             if (gap > worryFrom || gap < -8f)
             {

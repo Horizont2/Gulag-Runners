@@ -53,9 +53,6 @@ namespace GulagRunners.Game
         [Tooltip("How many times faster than bare hands this opens a chest.")]
         public float prySpeed = 2f;
 
-        [Tooltip("Share of the damage that goes through a raised guard, when that is more " +
-                 "than the ordinary chip. 0 uses the ordinary chip.")]
-
         [Header("Armour")]
         [Tooltip("Share of incoming damage removed. docs/02: T1/T2/T3 = 15/30/45%.")]
         [Range(0f, 1f)] public float damageReduction;
@@ -69,10 +66,9 @@ namespace GulagRunners.Game
                  "of a string rather than refusing the first.")]
         [Range(0f, 1f)] public float stunResist;
 
-        [Header("Belt")]
-        [Tooltip("How much longer a raised guard holds before it costs a charge. 0.5 turns " +
-                 "0.8 s a charge into 1.2 s.")]
-
+        // There is no Belt section any more. Its only stat was how much longer a raised
+        // guard held, and docs/31 took the guard out -- a belt is worn for its armour and
+        // its hitstun now, both of which are above.
         [Header("Utility")]
         public int heal;
 

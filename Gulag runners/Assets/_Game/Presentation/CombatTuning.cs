@@ -197,8 +197,7 @@ namespace GulagRunners.Game
         public float heavyDamageMultiplier = 1.7f;
         public float heavyTimingMultiplier = 1.5f;
 
-        [Header("Being hit")]
-        [Header("Hit stop — the weight of a blow")]
+        [Header("Being hit — the weight of a blow")]
         [Tooltip("Seconds both fighters freeze for when a blow lands.\n\n" +
                  "The one thing in a fight that nothing else can stand in for: a swing that " +
                  "only changes a number has nothing in it for the hands. Felt rather than " +

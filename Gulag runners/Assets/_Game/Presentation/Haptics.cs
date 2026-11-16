@@ -551,7 +551,7 @@ namespace GulagRunners.Game
                 return;
             }
 
-            float gap = mine.transform.position.y - pool.SurfaceY;
+            float gap = mine.transform.position.y - pool.SurfaceY();
 
             // Well under it there is nothing left to warn about, and a throb from the bottom
             // of a flooded arena is a buzz with no information in it.

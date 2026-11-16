@@ -554,6 +554,150 @@ def duplicate_types(sources, asmdef_dirs):
     return out
 
 
+
+MEMBER = re.compile(
+    r'^\s*(?:\[[^\]]*\]\s*)*'
+    r'(?:public|private|protected|internal)\s+'
+    r'(?:static\s+|readonly\s+|const\s+|sealed\s+|override\s+|virtual\s+|abstract\s+|'
+    r'new\s+|extern\s+|partial\s+|unsafe\s+|async\s+)*'
+    r'(?:[A-Za-z_][\w<>,\[\]\.\?]*)\s+'
+    r'([A-Za-z_]\w*)\s*(\(|=>|[;={])')
+
+
+def duplicate_members(path, src):
+    """One type declaring the same member name twice. CS0102.
+
+    It has happened, in PoisonPool, and the shape is worth remembering because it is what a
+    long session looks like from the compiler's side: `SurfaceY()` already existed as a
+    method, somebody wanted the same number, did not see it, and added `SurfaceY` as a
+    property. C# does not care that one has brackets -- a type may not hold two members of
+    one name unless they are overloads with different parameters, and a property is never an
+    overload of anything.
+
+    Depth 2 is a type body, so that is where this looks. Overloads are allowed for, by
+    counting a method name once however many signatures it has: two methods of one name are
+    normal and two SPELLINGS of one name are not, which is the whole distinction here.
+    """
+    out = []
+    depth = 0
+    seen = {}            # depth -> {name: (line, kind)}
+
+    for n, raw in enumerate(src.split("\n"), 1):
+        line = re.sub(r'//.*', '', raw)
+
+        if depth == 2:
+            m = MEMBER.match(line)
+            if m:
+                name, tail = m.group(1), m.group(2)
+                kind = "method" if tail == "(" else "property or field"
+                here = seen.setdefault(depth, {})
+                if name in here and not (kind == "method" and here[name][1] == "method"):
+                    out.append(f"{path}:{n}: '{name}' is declared twice in this type "
+                               f"(also line {here[name][0]}) — a {here[name][1]} and a "
+                               f"{kind} cannot share a name")
+                else:
+                    here.setdefault(name, (n, kind))
+
+        for _ in range(line.count("{")):
+            depth += 1
+        for _ in range(line.count("}")):
+            if depth in seen and depth > 2:
+                seen.pop(depth, None)
+            depth -= 1
+            if depth < 2:
+                seen.clear()
+    return out
+
+
+ONCE = ("Tooltip", "Header", "Range", "Space", "TextArea", "Multiline", "ContextMenu",
+        "SerializeField", "HideInInspector", "MenuItem")
+
+
+def stacked_attributes(path, src):
+    """The same single-use attribute twice on one member, and attributes attached to nothing.
+
+    Both are what REMOVING a field looks like when the tooltip above it is left behind. It
+    has happened twice in one afternoon, in ItemDefAsset and CombatTuning, while taking the
+    block mechanic out: the field went, its `[Tooltip]` stayed, and the next field down
+    inherited it -- which the compiler reports as CS0579 on a line nobody edited.
+
+    Only the duplicate is checked, not the orphan. A first version also flagged an attribute
+    block that reached a blank line with no member under it, which sounds like the same
+    mistake caught earlier and is not: C# attaches attributes across blank lines AND across
+    comments, so `[Header("Size")]`, four lines of comment, a blank line, then the field is
+    both legal and the house style here. The rule could not tell that from a real orphan, and
+    the duplicate catches the same bug at the point where it actually breaks the build.
+
+    Attributes are consumed by BRACKET DEPTH, not by how the line looks. The first version
+    matched any line starting with `[` and called it an attribute line, which flagged 261
+    perfectly good members -- because `[Range(0f, 1f)] public float x;` is an attribute and
+    its member on ONE line, and the rule never saw the member. Counting brackets also carries
+    a Tooltip whose string runs over four lines, which the first version handled with a guess
+    about trailing characters.
+    """
+    out = []
+    pending, start_line, depth, buf = [], 0, 0, ""
+
+    for n, raw in enumerate(src.split("\n") + [""], 1):
+        line = re.sub(r"//.*", "", raw)
+
+        if depth > 0:
+            buf += " " + line
+            depth += line.count("[") - line.count("]")
+            if depth > 0:
+                continue
+            m = re.match(r"\s*\[\s*([A-Za-z_]\w*)", buf)
+            if m:
+                pending.append(m.group(1))
+            line = buf[buf.rindex("]") + 1:] if "]" in buf else ""
+            buf = ""
+
+        # Peel attribute groups off the front of the line, however many there are.
+        while True:
+            stripped = line.lstrip()
+            if not stripped.startswith("["):
+                break
+            d = 0
+            for i, ch in enumerate(stripped):
+                if ch == "[":
+                    d += 1
+                elif ch == "]":
+                    d -= 1
+                    if d == 0:
+                        m = re.match(r"\[\s*([A-Za-z_]\w*)", stripped)
+                        if m:
+                            if not pending:
+                                start_line = n
+                            pending.append(m.group(1))
+                        line = stripped[i + 1:]
+                        break
+            else:
+                # Unbalanced: the attribute runs on to the next line.
+                buf, depth = stripped, d
+                if not pending:
+                    start_line = n
+                line = ""
+                break
+            if d != 0:
+                break
+
+        if depth > 0:
+            continue
+
+        rest = line.strip()
+        if not pending:
+            continue
+
+        if rest:
+            # The member arrived. Judge the block and clear it.
+            for one in ONCE:
+                if pending.count(one) > 1:
+                    out.append(f"{path}:{start_line}: [{one}] appears {pending.count(one)} "
+                               f"times on one member — CS0579")
+            pending = []
+    return out
+
+
 def main():
     # Two sets, on purpose. `sources` is the code this project is answerable for, and the
     # per-file rules speak only about it. `every` is EVERY .cs under Assets, vendor code
@@ -585,6 +729,8 @@ def main():
         problems += brackets(path, src)
         problems += duplicate_locals(path, strip(src))
         problems += unassigned_struct_fields(path, strip(src), fields)
+        problems += duplicate_members(path, strip(src))
+        problems += stacked_attributes(path, src)
         problems += missing_calls(path, without_attributes(strip(src)))
 
     for p in problems:
