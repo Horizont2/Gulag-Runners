@@ -69,13 +69,14 @@ namespace GulagRunners.GameEditor
             GameObject hit = Build("GR_Hit_Flesh", UiPalette.Attack, 1f);
             GameObject armour = Build("GR_Hit_Armour", new Color(1f, 0.86f, 0.55f), 0.85f);
             GameObject death = Build("GR_Death", UiPalette.Attack, 1.7f);
+            GameObject parry = Parry();
 
-            int wired = Wire(hit, death);
+            int wired = Wire(hit, death, parry);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Built 3 impact effects in {EffectsDir} and wired {wired} fighter(s).\n"
+            Debug.Log($"Built 4 impact effects in {EffectsDir} and wired {wired} fighter(s).\n"
                       + "Flesh, armour and death are the same five layers in "
                       + "different colours and sizes — one recipe, so they cannot drift "
                       + "apart, and the armour hit is pale and metallic because a player "
@@ -83,6 +84,107 @@ namespace GulagRunners.GameEditor
                       + "breastplate.\n\n"
                       + "Nothing is lit, nothing writes depth, and each layer is one draw "
                       + "call.");
+        }
+
+        /// <summary>
+        /// The parry: the best moment in the game, and the only one built differently.
+        ///
+        /// docs/02 makes the parry the skill ceiling and the camera already agrees -- 0.8
+        /// trauma against 0.22 for landing an ordinary blow, the biggest shake in the list.
+        /// This is the picture that goes with it.
+        ///
+        /// Three things make it not a hit in another colour:
+        ///
+        ///   NO SLASH. Nothing was cut. The arc is the signature of a blade going THROUGH
+        ///   something, and a parry is the opposite event.
+        ///
+        ///   TWO FANS. Sparks go the way the blade was travelling AND back the other way,
+        ///   because two weapons refused each other. One fan would read as an ordinary hit
+        ///   that happened to be yellow, which is exactly what this must not look like.
+        ///
+        ///   THE CORE HOLDS. Every other impact here is gone inside 70 ms. This one sits
+        ///   for 115, because the hit stop behind it is the longest in the game and the
+        ///   point of that pause is that everybody gets to see what just happened.
+        ///
+        /// Gold, not red, for the same reason: no damage was done. Red would say somebody
+        /// was hurt, and the whole reward of a parry is that nobody was.
+        /// </summary>
+        static GameObject Parry()
+        {
+            Color gold = new Color(1f, 0.84f, 0.47f);
+            GameObject root = new GameObject("GR_Parry");
+
+            ParticleSystem conductor = root.AddComponent<ParticleSystem>();
+            ParticleSystem.MainModule lead = conductor.main;
+            lead.duration = 0.5f; lead.loop = false; lead.playOnAwake = false;
+            lead.maxParticles = 1;
+            ParticleSystem.EmissionModule silent = conductor.emission;
+            silent.enabled = false;
+            conductor.GetComponent<ParticleSystemRenderer>().enabled = false;
+
+            // The core, held.
+            ParticleSystem core = Layer(root, "Core", "vfx_core", 1);
+            ParticleSystem.MainModule cm = core.main;
+            cm.startLifetime = 0.115f;
+            cm.startSize = 0.21f * Px;
+            cm.startSpeed = 0f;
+            cm.startColor = new Color(1f, 0.99f, 0.93f);
+            Over(core, Ramp(new Color(1f, 0.99f, 0.93f), gold, 0.6f), Fade(0.9f));
+            Size(core, Grow(1.0f, 3.5f, 0.35f));
+
+            // The shell: faster and harder than a hit's, because two edges stopped dead.
+            ParticleSystem ring = Layer(root, "Ring", "vfx_ring", 1);
+            ParticleSystem.MainModule rm = ring.main;
+            rm.startLifetime = 0.085f;
+            rm.startSize = 0.18f * Px;
+            rm.startSpeed = 0f;
+            rm.startDelay = 0.006f;
+            rm.startColor = new Color(1f, 0.93f, 0.77f, 0.9f);
+            Size(ring, Grow(1.0f, 8f, 0.42f));
+            Over(ring, Ramp(new Color(1f, 0.93f, 0.77f), gold, 0.5f), Fade(1.2f));
+
+            // Two fans, one each way. Seven sparks a side: enough to read as a spray, few
+            // enough that each one is a streak rather than a cloud.
+            Fan(root, "Sparks Out", 0f, gold);
+            Fan(root, "Sparks Back", 180f, gold);
+
+            string path = $"{EffectsDir}/GR_Parry.prefab";
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, path);
+            Object.DestroyImmediate(root);
+            return saved;
+        }
+
+        /// <summary>One side of the parry's spray, turned to face where it goes.</summary>
+        static void Fan(GameObject parent, string name, float yaw, Color gold)
+        {
+            ParticleSystem ps = Layer(parent, name, "vfx_spark", 7);
+            ps.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+
+            ParticleSystem.MainModule main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.10f, 0.19f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.06f * Px, 0.12f * Px);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(8f, 12f);
+            main.startColor = new Color(1f, 0.96f, 0.84f);
+            main.gravityModifier = 0.5f;
+
+            ParticleSystem.ShapeModule shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 24f;
+            shape.radius = 0.03f;
+
+            ParticleSystem.LimitVelocityOverLifetimeModule drag = ps.limitVelocityOverLifetime;
+            drag.enabled = true;
+            drag.dampen = 0.12f;
+            drag.limit = new ParticleSystem.MinMaxCurve(1.4f);
+
+            Over(ps, Ramp(new Color(1f, 0.96f, 0.84f), gold, 0.5f), Fade(0.7f));
+            Size(ps, Shrink(1.0f, 0.2f));
+
+            ParticleSystemRenderer r = ps.GetComponent<ParticleSystemRenderer>();
+            r.renderMode = ParticleSystemRenderMode.Stretch;
+            r.velocityScale = 0.05f;
+            r.lengthScale = 2.8f;
         }
 
         // ----------------------------------------------------------------- the effect
@@ -426,7 +528,7 @@ namespace GulagRunners.GameEditor
         /// from, so the flash, the particles and the noise all agree about where the player
         /// was struck.
         /// </summary>
-        static int Wire(GameObject hit, GameObject death)
+        static int Wire(GameObject hit, GameObject death, GameObject parry)
         {
             int wired = 0;
 
@@ -443,6 +545,19 @@ namespace GulagRunners.GameEditor
                 view.bloodOnHit = Hang(hit, at, "Hit");
                 view.deathBurst = Hang(death, at, "Death");
                 EditorUtility.SetDirty(view);
+
+                // The parry goes on PlayerEffects, not here. FighterDamageView answers
+                // DAMAGE, and a parry does none -- that is its whole point. PlayerEffects
+                // already has a `parried` slot waiting, with the loudest noise level in
+                // its table, and nothing has ever filled it.
+                if (effects != null)
+                {
+                    Undo.RecordObject(effects, "Build the hit effects");
+                    effects.parried.particles = Hang(parry, at, "Parry");
+                    if (effects.parried.at == null) effects.parried.at = at;
+                    EditorUtility.SetDirty(effects);
+                }
+
                 wired++;
             }
 
