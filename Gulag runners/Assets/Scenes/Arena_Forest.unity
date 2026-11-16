@@ -93,7 +93,7 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 20201, guid: 0000000000000000f000000000000000, type: 0}
+  m_LightingDataAsset: {fileID: 112000000, guid: 457a07a8391f8714aba72c28c9d15ebd, type: 2}
   m_LightingSettings: {fileID: 0}
 --- !u!196 &4
 NavMeshSettings:
@@ -24580,9 +24580,12 @@ MonoBehaviour:
     legendary: {r: 0.72, g: 0.3, b: 1, a: 1}
     empty: {r: 0.4, g: 0.42, b: 0.45, a: 1}
     attackGlyph: {r: 0.95, g: 0.35, b: 0.26, a: 1}
-    blockGlyph: {r: 0.4, g: 0.68, b: 1, a: 1}
+    dodgeGlyph: {r: 0.4, g: 0.68, b: 1, a: 1}
     actionGlyph: {r: 0.93, g: 0.84, b: 0.62, a: 1}
     jumpGlyph: {r: 0.55, g: 0.86, b: 0.96, a: 1}
+    pressDepth: 0.07
+    refusedPress: 0.03
+    pressLift: 0.18
     danger: {r: 1, g: 0.27, b: 0.22, a: 1}
   bar1:
     frame: {fileID: 440005630}
@@ -83517,7 +83520,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a5a0c398900cbf41b1531370b6cca78, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuLabel
-  target: {fileID: 1303634782}
+  target: {fileID: 0}
   placeholder: VICTORY
 --- !u!114 &1303634782
 MonoBehaviour:
@@ -83545,7 +83548,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 96
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -84652,7 +84655,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 44
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -94869,7 +94872,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a5a0c398900cbf41b1531370b6cca78, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuLabel
-  target: {fileID: 1407765305}
+  target: {fileID: 0}
   placeholder: SILVER III
 --- !u!114 &1407765305
 MonoBehaviour:
@@ -100564,7 +100567,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a5a0c398900cbf41b1531370b6cca78, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuLabel
-  target: {fileID: 1486301708}
+  target: {fileID: 0}
   placeholder: "2 \u2014 1"
 --- !u!114 &1486301708
 MonoBehaviour:
@@ -100592,7 +100595,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 56
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -116058,7 +116061,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 44
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -126682,7 +126685,6 @@ MonoBehaviour:
   landingTrauma: 0.25
   hitTrauma: 0.55
   landedTrauma: 0.22
-  blockTrauma: 0.15
   parryTrauma: 0.8
   opponent: {fileID: 0}
   shakeAmplitude: 0.25
@@ -126861,7 +126863,6 @@ MonoBehaviour:
   landingTrauma: 0.25
   hitTrauma: 0.55
   landedTrauma: 0.22
-  blockTrauma: 0.15
   parryTrauma: 0.8
   opponent: {fileID: 0}
   shakeAmplitude: 0.25
@@ -127013,7 +127014,6 @@ MonoBehaviour:
     heavyDamageMultiplier: 1.7
     heavyTimingMultiplier: 1.5
     hitStop: 0.05
-    blockStop: 0.033
     parryStop: 0.117
     hitstunPerDamage: 1
     maxHitstun: 0.43
@@ -127032,14 +127032,7 @@ MonoBehaviour:
     knockbackSpeed: 2.8
     heavyKnockbackSpeed: 4.8
     knockbackLift: 2.2
-    chip: 0.3
-    blockStaminaCost: 1
-    heavyBlockStaminaCost: 2
-    blockRecoil: 0.9
-    guardBreakTime: 0.7
-    blockSpeed: 0.42
     parryWindow: 0.2
-    guardDrainTime: 0.8
     staggerTime: 0.8
     maxArmour: 0.5
     maxStunResist: 0.4
@@ -128657,12 +128650,6 @@ MonoBehaviour:
     at: {fileID: 0}
     minInterval: 0
     sound: 52
-    level: 3
-  blocked:
-    particles: {fileID: 0}
-    at: {fileID: 0}
-    minInterval: 0
-    sound: 56
     level: 3
   parried:
     particles: {fileID: 1833828951}
@@ -132671,12 +132658,6 @@ MonoBehaviour:
     minInterval: 0
     sound: 52
     level: 3
-  blocked:
-    particles: {fileID: 0}
-    at: {fileID: 0}
-    minInterval: 0
-    sound: 56
-    level: 3
   parried:
     particles: {fileID: 718547183}
     at: {fileID: 0}
@@ -133370,9 +133351,10 @@ MonoBehaviour:
   match: {fileID: 1900000400}
   progress: {fileID: 0}
   localPlayer: 0
+  tally: {fileID: 0}
   opponentRating: 1500
   opponentDeviation: 80
-  rateAgainstBots: 1
+  practiceCountsOnTheLadder: 0
   GoldChanged:
     m_PersistentCalls:
       m_Calls:
@@ -145196,7 +145178,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a5a0c398900cbf41b1531370b6cca78, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuLabel
-  target: {fileID: 2104790304}
+  target: {fileID: 0}
   placeholder: +40
 --- !u!1001 &2105907576
 PrefabInstance:
@@ -145944,6 +145926,8 @@ MonoBehaviour:
   socket: {fileID: 3585453818357731688}
   faceTheCamera: 1
   drawGizmo: 1
+  recoilKick: 0.12
+  recoilTipShare: 0.45
 --- !u!1001 &5789700700997916214
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -146284,6 +146268,8 @@ MonoBehaviour:
   socket: {fileID: 7772177323803372881}
   faceTheCamera: 1
   drawGizmo: 1
+  recoilKick: 0.12
+  recoilTipShare: 0.45
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

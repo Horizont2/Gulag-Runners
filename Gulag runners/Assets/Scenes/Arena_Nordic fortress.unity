@@ -93,7 +93,7 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 20201, guid: 0000000000000000f000000000000000, type: 0}
+  m_LightingDataAsset: {fileID: 112000000, guid: 9de264a785dda3e4d8817f646cbb11f9, type: 2}
   m_LightingSettings: {fileID: 0}
 --- !u!196 &4
 NavMeshSettings:
@@ -4197,9 +4197,12 @@ MonoBehaviour:
     legendary: {r: 0.72, g: 0.3, b: 1, a: 1}
     empty: {r: 0.4, g: 0.42, b: 0.45, a: 1}
     attackGlyph: {r: 0.95, g: 0.35, b: 0.26, a: 1}
-    blockGlyph: {r: 0.4, g: 0.68, b: 1, a: 1}
+    dodgeGlyph: {r: 0.4, g: 0.68, b: 1, a: 1}
     actionGlyph: {r: 0.93, g: 0.84, b: 0.62, a: 1}
     jumpGlyph: {r: 0.55, g: 0.86, b: 0.96, a: 1}
+    pressDepth: 0.07
+    refusedPress: 0.03
+    pressLift: 0.18
     danger: {r: 1, g: 0.27, b: 0.22, a: 1}
   bar1:
     frame: {fileID: 267849961}
@@ -68718,12 +68721,6 @@ MonoBehaviour:
     minInterval: 0
     sound: 52
     level: 3
-  blocked:
-    particles: {fileID: 0}
-    at: {fileID: 0}
-    minInterval: 0
-    sound: 56
-    level: 3
   parried:
     particles: {fileID: 940100052}
     at: {fileID: 0}
@@ -68917,6 +68914,8 @@ MonoBehaviour:
   socket: {fileID: 940100071}
   faceTheCamera: 1
   drawGizmo: 1
+  recoilKick: 0.12
+  recoilTipShare: 0.45
 --- !u!1 &940100069 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6009296746703928373, guid: b3006e46c965d6d43b96f032285cfa67, type: 3}
@@ -113635,12 +113634,6 @@ MonoBehaviour:
     minInterval: 0
     sound: 52
     level: 3
-  blocked:
-    particles: {fileID: 0}
-    at: {fileID: 0}
-    minInterval: 0
-    sound: 56
-    level: 3
   parried:
     particles: {fileID: 940200027}
     at: {fileID: 0}
@@ -123615,6 +123608,8 @@ MonoBehaviour:
   socket: {fileID: 940200071}
   faceTheCamera: 1
   drawGizmo: 1
+  recoilKick: 0.12
+  recoilTipShare: 0.45
 --- !u!1 &940200069 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4708675116766100728, guid: 1e9af09b57c7e4c40b90bc6498d0b3f2, type: 3}
@@ -125477,7 +125472,6 @@ MonoBehaviour:
   landingTrauma: 0.25
   hitTrauma: 0.55
   landedTrauma: 0.22
-  blockTrauma: 0.15
   parryTrauma: 0.8
   opponent: {fileID: 0}
   shakeAmplitude: 0.25
@@ -132668,9 +132662,10 @@ MonoBehaviour:
   match: {fileID: 2012403445}
   progress: {fileID: 0}
   localPlayer: 0
+  tally: {fileID: 0}
   opponentRating: 1500
   opponentDeviation: 80
-  rateAgainstBots: 1
+  practiceCountsOnTheLadder: 0
   GoldChanged:
     m_PersistentCalls:
       m_Calls:
@@ -137847,7 +137842,6 @@ MonoBehaviour:
     heavyDamageMultiplier: 1.7
     heavyTimingMultiplier: 1.5
     hitStop: 0.05
-    blockStop: 0.033
     parryStop: 0.117
     hitstunPerDamage: 1
     maxHitstun: 0.43
@@ -137866,14 +137860,7 @@ MonoBehaviour:
     knockbackSpeed: 2.8
     heavyKnockbackSpeed: 4.8
     knockbackLift: 2.2
-    chip: 0.3
-    blockStaminaCost: 1
-    heavyBlockStaminaCost: 2
-    blockRecoil: 0.9
-    guardBreakTime: 0.7
-    blockSpeed: 0.42
     parryWindow: 0.2
-    guardDrainTime: 0.8
     staggerTime: 0.8
     maxArmour: 0.5
     maxStunResist: 0.4
@@ -139815,7 +139802,6 @@ MonoBehaviour:
   landingTrauma: 0.25
   hitTrauma: 0.55
   landedTrauma: 0.22
-  blockTrauma: 0.15
   parryTrauma: 0.8
   opponent: {fileID: 0}
   shakeAmplitude: 0.25
