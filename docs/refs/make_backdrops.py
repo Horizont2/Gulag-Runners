@@ -106,6 +106,7 @@ ZOOM = (0.6, 1.1)    # minZoom..maxZoom; coverage is solved across the whole ran
 SHAKE = 0.25         # shakeAmplitude, metres, plus the look-ahead and air slack
 MARGIN = 1.06        # so a rounding error cannot park an edge inside the frame
 
+TEX_FORE = 1536    # the foreground is a soft silhouette and sits closer, so it needs fewer
 TEX_W = 2048       # one tile; docs/06 caps textures at 120 MB and twelve of these is about 8 MB
 
 # Distance from the camera, at zoom 1. These ARE chosen -- the art direction, and the only
@@ -114,6 +115,28 @@ TEX_W = 2048       # one tile; docs/06 caps textures at 120 MB and twelve of the
 # nothing in apparent size, because the quads grow with the depth by construction. Only the
 # drift changes, and it is now 23%, 9% and 3.5% of the fighters' own apparent speed.
 DEPTHS = (("near", 34.0), ("mid", 85.0), ("far", 220.0))
+
+# AND ONE IN FRONT. The three above are the distance; this is the thing the camera passes
+# BEHIND -- the branch, the beam, the lip of rock at the bottom of the frame. In Worms it is
+# half of why the arena feels like a place rather than a stage: something is always between
+# you and the fight, and it moves faster than anything else because it is nearest.
+#
+# 5 metres from the camera, which is 2.7 in front of the fight. The constraint is measured,
+# not chosen: Arena_Forest's own geometry reaches 4.15 m towards the camera -- the near wall
+# of its pit -- so anything closer than 3.55 m would be in front of the entire level, and
+# anything much further would be lost inside it. At 5 m it clears every arena except that
+# one wall, and being occluded by a wall nearer than itself is exactly what a thing at a
+# depth should do.
+#
+# It drifts at 154% of the fighters, because it is nearer than they are. That is the point:
+# the eye reads "in front" from the speed before it reads it from the overlap.
+FORE = ("fore", 5.0)
+
+# A foreground is mostly NOT THERE. It frames the fight from the edges and leaves the middle
+# alone, so this is the share of the image it is allowed to cover -- against 40-65% for the
+# layers behind, which are landscapes. Over this and it stops being a frame and starts being
+# a wall the player is fighting behind.
+FORE_COVER = 0.26
 
 # HOW MUCH OF A LAYER MAY BE ON SCREEN AT ONCE, and the number this file was missing.
 #
@@ -167,8 +190,42 @@ def layers():
     rest = camera_distance()
     out = []
 
-    for name, depth in DEPTHS:
+    for name, depth in DEPTHS + (FORE,):
         world_w, world_h = view(depth)
+
+        # THE FOREGROUND IS NOT SOLVED FOR COVERAGE, and it must not be. The solver sizes a
+        # quad so that no edge of it can enter the frame, which is right for a backdrop --
+        # every pixel below its ridge is opaque fill, so an edge in shot is a hole in the
+        # world. A foreground is the opposite: it is mostly NOT THERE, and the art stops
+        # well before the quad does, so its edges are transparent and cannot be seen.
+        #
+        # Run through the solver anyway it asks for the impossible. At minimum zoom the
+        # camera moves three metres closer, which at five metres out is a sixty per cent
+        # change: the frame at the foreground shrinks to about a metre tall, the arena's
+        # vertical travel becomes ten frames of it, and the first attempt came out 39 m tall
+        # with a 2048 x 5600 texture. So it is given its size instead, in frames.
+        if name == FORE[0]:
+            wide, high = 3.6, 2.2
+            tiles = 3
+            tile_w = wide / tiles
+            px_h = int(round(TEX_FORE * high / (tile_w * ASPECT) / 16.0)) * 16
+            out.append({
+                "name": name,
+                "depth": round(depth, 3),
+                "drift": round(rest / depth, 4),
+                "screens_wide": round(wide, 4),
+                "screens_high": round(high, 4),
+                "screens_top": round(-(high - 1.0) * 0.5, 4),
+                "fore": True,
+                "tiles": tiles,
+                "tile_screens": round(tile_w, 4),
+                "visible_share": round(1.0 / wide, 4),
+                "metres_wide": round(wide * world_w, 3),
+                "metres_high": round(high * world_h, 3),
+                "pixels": [TEX_FORE, px_h],
+            })
+            continue
+
         need_w = need_h = 1.0
 
         for step in range(21):
@@ -218,6 +275,7 @@ def layers():
             "screens_top": round(-(high - 1.0) * 0.5, 4),   # centred on the frame
             # One tile, in frames. Everything drawn is composed against this and not
             # against the whole quad, which is now several tiles of it.
+            "fore": name == FORE[0],
             "tiles": tiles,
             "tile_screens": round(tile_w, 4),
             "visible_share": round(1.0 / wide, 4),   # how much of it is in shot at once
@@ -363,6 +421,11 @@ class Rng:
 
     def between(self, a, b):
         return a + (b - a) * self.next()
+
+    def pick(self, *options):
+        """One of these, evenly. Used where a count has to be a WHOLE number of cycles
+        across a tile, because a fractional one does not join up with itself."""
+        return options[min(len(options) - 1, int(self.next() * len(options)))]
 
 
 def png(path, w, h, px):
@@ -620,6 +683,105 @@ def frame(layer, w, h):
             lambda p: max(1, int(p / (span * ASPECT) * w)))
 
 
+def canopy(px, w, h, hang, deep, colour, rng, drips=5):
+    """
+    A fringe of mass along the top of the frame: foliage, rock, whatever is overhead.
+
+    IT RUNS THE WHOLE TILE, and that is the second thing I got wrong about it. The version
+    before tapered to nothing at both ends, which is the right shape for a single object --
+    and in Arena_Nordic it produced one dark lobe floating in an empty sky with nothing
+    joining it to anything, because the only part deep enough to enter the frame was the
+    middle. A canopy is not an object you can see all of. It is the underside of something
+    too big to be in shot, so it reaches the top edge everywhere and only its DEPTH varies.
+
+    Two lobe counts beating against each other, both whole numbers of cycles across the
+    tile, so the tile still joins up with itself -- the layers are repeated now, and a
+    fringe that does not wrap puts the same notch across the screen three times.
+    """
+    r, g, b = colour
+    slow = rng.pick(2, 3)
+    fast = rng.pick(5, 7, 9)
+    p1 = rng.between(0, 6.28)
+    p2 = rng.between(0, 6.28)
+
+    low = [0] * w
+    for x in range(w):
+        u = x / float(w)
+        a = 0.5 + 0.5 * math.sin(u * slow * 6.2831853 + p1)
+        b2 = 0.5 + 0.5 * math.sin(u * fast * 6.2831853 + p2)
+        # Never less than a third: the fringe has to reach the frame everywhere, or it
+        # reads as a stain rather than as something overhead.
+        low[x] = int(hang + deep * (0.34 + 0.66 * (0.65 * a + 0.35 * b2)))
+        for y in range(0, min(h, low[x])):
+            i = (y * w + x) * 4
+            px[i:i + 4] = bytes((r, g, b, 255))
+
+    for d in range(drips):
+        dx = int(w * (d + rng.between(0.25, 0.75)) / drips) % w
+        start = low[dx]
+        length = int(deep * rng.between(0.18, 0.5))
+        width = max(2, int(deep * rng.between(0.04, 0.09)))
+        for y in range(max(0, start), min(h, start + length)):
+            down = (y - start) / float(max(1, length))
+            now = max(1, int(width * (1.0 - down * down)))
+            for x in across(dx - now // 2, dx - now // 2 + now, w):
+                i = (y * w + x) * 4
+                px[i:i + 4] = bytes((r, g, b, 255))
+
+
+def timber(px, w, h, x0, span, y, thick, colour):
+    """A straight beam. Right underground, where something IS holding the roof up."""
+    r, g, b = colour
+    for x in across(x0, x0 + span, w):
+        for y2 in range(max(0, y), min(h, y + thick)):
+            i = (y2 * w + x) * 4
+            px[i:i + 4] = bytes((r, g, b, 255))
+
+
+def draw_fore(theme, w, h):
+    """
+    The thing the camera passes behind.
+
+    Composed against the FRAME, like everything else here, and the frame is the middle of
+    this image: the quad is 2.2 frames tall, so the top of what the player sees is 27% down
+    the texture and the bottom is 73%. Anything drawn outside that band is for the moments
+    the camera is looking up or down.
+
+    It is a SILHOUETTE, and nearly black, because of where it is standing. At five metres
+    the only light on it is whatever comes past it from the arena behind, which is none:
+    a thing between you and the light is dark, and painting it in the theme's own colours
+    would make it read as another backdrop layer that had somehow got in front.
+    """
+    ink, haze, lumps, sky = THEMES[theme]
+    ink = tuple(int(c * 255) for c in ink)
+    haze = tuple(int(c * 255) for c in haze)
+
+    # A hair of the arena's own air in it, so it is not a hole cut in the screen.
+    colour = lerp3(ink, haze, 0.10)
+
+    rng = Rng(hash((theme, "fore")) & 0x7fffffff)
+    px = bytearray(w * h * 4)
+    row, high, wide = frame(LAYERS[3], w, h)
+
+    # ---- above: something hangs into the top of the frame
+    hang = int(row(-0.55))          # off the top of the image, where the tree is
+    if theme == "forest":
+        canopy(px, w, h, hang, high(0.90), colour, rng, 7)
+    elif theme == "mine":
+        canopy(px, w, h, hang, high(0.80), colour, rng, 4)
+        timber(px, w, h, int(w * 0.12), wide(0.62), int(row(0.10)), high(0.030), colour)
+    elif theme == "nordic":
+        canopy(px, w, h, hang, high(0.78), colour, rng, 4)
+    else:
+        canopy(px, w, h, hang, high(0.86), colour, rng, 6)
+
+    # ---- below: a lip the fight happens over the top of
+    lip = ridge(rng, high(0.050), row(0.94), lumps * 1.3)
+    fill_below(px, w, h, lip, colour)
+
+    return px
+
+
 def draw(theme, index, w, h):
     """One layer of one arena. Index 0 is nearest, 2 is furthest."""
     name = DEPTHS[index][0]
@@ -745,10 +907,27 @@ def main(argv):
         for i, layer in enumerate(LAYERS):
             w, h = layer["pixels"]
             name = "bg_%s_%s" % (theme, layer["name"])
-            px = draw(theme, i, w, h)
+            px = draw_fore(theme, w, h) if layer["fore"] else draw(theme, i, w, h)
 
             lit = sum(1 for k in range(3, len(px), 4) if px[k] > 8) / float(w * h)
-            if not 0.05 < lit < 0.95:
+            if layer["fore"]:
+                # A foreground is judged on what it covers OF THE FRAME, not of its image.
+                # The lip along the bottom fills everything under it, as ground does, and
+                # most of that is below what the player ever sees -- counting it made the
+                # mine's foreground read as 27% when a quarter of the image is off screen
+                # under the arena floor. The rule is about what is in the way of the fight.
+                lo = max(0, int((0.0 - layer["screens_top"]) / layer["screens_high"] * h))
+                hi = min(h, int((1.0 - layer["screens_top"]) / layer["screens_high"] * h))
+                seen = sum(1 for y in range(lo, hi) for x in range(w)
+                           if px[(y * w + x) * 4 + 3] > 8)
+                share = seen / float(max(1, (hi - lo) * w))
+                if not 0.02 < share < FORE_COVER:
+                    print("make_backdrops: %s covers %.0f%% of the FRAME; a foreground has "
+                          "to stay under %.0f%% or it stops framing the fight and starts "
+                          "hiding it" % (name, share * 100, FORE_COVER * 100))
+                    return 1
+                lit = share
+            elif not 0.05 < lit < 0.95:
                 print("make_backdrops: %s covers %.0f%% of its image, which is a blank or "
                       "a solid rectangle rather than a horizon" % (name, lit * 100))
                 return 1

@@ -74,7 +74,10 @@ for (const theme of Object.keys(SKY)) {
     f.innerHTML = `<div class=sky style="background:${SKY[theme]}"></div>`;
 
     // Furthest first, so nearer layers draw over them.
-    for (const layer of [...LAYERS].reverse()) {
+    // Sorted by DEPTH, not by the order they happen to sit in the table. The foreground
+    // layer is nearest of all, so a plain reverse would have drawn it first and buried it
+    // behind the distance it is supposed to be standing in front of.
+    for (const layer of [...LAYERS].sort((a, b) => b.depth - a.depth)) {
       const span = layer.screens_wide - 1;             // screens of slack in this layer
 
       // A REPEATING BACKGROUND, not one stretched image, because that is what Unity does.

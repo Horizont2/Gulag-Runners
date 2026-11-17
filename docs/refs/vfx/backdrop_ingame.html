@@ -63,14 +63,16 @@ function draw(c, img, anchorY, focusX, focusY) {
 
   g.fillStyle = '#10151c'; g.fillRect(0, 0, W, H);
 
-  for (let i = LAYERS.length - 1; i >= 0; i--) {         // far first
-    const L = LAYERS[i], d = L.depth - REST;
+  const order = [...LAYERS].sort((a, b) => b.depth - a.depth);   // far first, fore last
+  for (let i = 0; i < order.length; i++) {
+    const L = order[i], d = L.depth - REST;
+    const slot = LAYERS.indexOf(L);
     const C = [0, anchorY + F[1]*d, 0 + F[2]*d];
     const hw = L.metres_wide / 2, hh = L.metres_high / 2;
     const tl = project([C[0] - hw, C[1] + hh*U[1], C[2] + hh*U[2]], cam, W, H);
     const br = project([C[0] + hw, C[1] - hh*U[1], C[2] - hh*U[2]], cam, W, H);
     if (!tl || !br) continue;
-    const t = img[i];
+    const t = img[slot];
     if (!(t && t.complete && t.naturalWidth)) continue;
     // Tiled, because the material tiles. Drawing one image across the whole quad would
     // show the art L.tiles times wider than the game does.
