@@ -48,7 +48,7 @@ namespace GulagRunners.GameEditor
             { "Arena_Mine", "mine" },
             { "Arena_Forest", "forest" },
             { "Arena_Nordic fortress", "nordic" },
-            { "loc3_new", "temple" },
+            { "Arena_Egypt", "temple" },
         };
 
         [Serializable]
