@@ -51,7 +51,8 @@ namespace GulagRunners.GameEditor
         {
             Scene scene = SceneManager.GetActiveScene();
 
-            SideViewCamera rig = Object.FindFirstObjectByType<SideViewCamera>();
+            SideViewCamera rig = Object.FindFirstObjectByType<SideViewCamera>(
+                FindObjectsInactive.Include);
             if (rig == null)
             {
                 Debug.LogWarning($"{scene.name} has no SideViewCamera, so there is no way to "
@@ -144,7 +145,12 @@ namespace GulagRunners.GameEditor
             int baked = 0, mixed = 0;
             Light key = null;
 
-            Light[] lights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+            // INCLUDING the inactive ones. A light on a switched-off object is still a light
+            // the moment anything switches it on, and the default search skips them --
+            // which left two point lights in Arena_Forest realtime through a whole bake,
+            // paying per-pixel for a scene that is otherwise entirely baked.
+            Light[] lights = Object.FindObjectsByType<Light>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
 
             // The brightest directional light is the key, if there is one at all.
             foreach (Light l in lights)

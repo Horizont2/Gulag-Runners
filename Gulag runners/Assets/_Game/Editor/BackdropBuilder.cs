@@ -94,7 +94,8 @@ namespace GulagRunners.GameEditor
             Table table = ReadTable();
             if (table == null) return;
 
-            SideViewCamera rig = UnityEngine.Object.FindFirstObjectByType<SideViewCamera>();
+            SideViewCamera rig = UnityEngine.Object.FindFirstObjectByType<SideViewCamera>(
+                FindObjectsInactive.Include);
             if (rig == null)
             {
                 Debug.LogWarning($"{scene.name} has no SideViewCamera, so there is nothing to "

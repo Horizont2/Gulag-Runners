@@ -37,7 +37,8 @@ namespace GulagRunners.GameEditor
             Scene scene = SceneManager.GetActiveScene();
 
             PlayerController[] fighters =
-                Object.FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+                Object.FindObjectsByType<PlayerController>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None);
             if (fighters.Length == 0)
             {
                 Debug.LogWarning($"{scene.name} has no fighters in it, so there is nothing "

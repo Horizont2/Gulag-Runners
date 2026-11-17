@@ -95,7 +95,8 @@ namespace GulagRunners.GameEditor
                 return;
             }
 
-            SideViewCamera rig = Object.FindFirstObjectByType<SideViewCamera>();
+            SideViewCamera rig = Object.FindFirstObjectByType<SideViewCamera>(
+                FindObjectsInactive.Include);
             if (rig == null)
             {
                 Debug.LogWarning($"{scene.name} has no SideViewCamera, so there is no way to "
@@ -190,7 +191,8 @@ namespace GulagRunners.GameEditor
         static ParticleSystem ExistingAmbient()
         {
             foreach (ParticleSystem ps in
-                     Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+                     Object.FindObjectsByType<ParticleSystem>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 if (ps.transform.root.name == HolderName) continue;   // something we built
                 ParticleSystem.MainModule main = ps.main;
