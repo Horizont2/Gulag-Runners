@@ -1,0 +1,102 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>loading</title>
+<!--
+  The death fall, frame by frame, with the numbers DeathFall.cs actually uses.
+
+  A fall is a thing you can only judge by watching: the arithmetic for a toppling rod is
+  three lines and tells you nothing about whether it reads as a body going over or as an
+  object being rotated. So the same integration runs here and the result is drawn as a
+  filmstrip at 60 fps, which is what the game draws it at.
+
+  If this and DeathFall.cs ever disagree, this one is wrong: the component is the game.
+-->
+<style>
+  body { background:#0b0d10; color:#c8ccd2; margin:0; padding:14px;
+         font:12px/1.5 ui-monospace, Menlo, Consolas, monospace }
+  h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+       color:#8d949c; margin:14px 0 6px }
+  .strip { display:flex; gap:2px; align-items:flex-end; flex-wrap:wrap }
+  figure { margin:0 }
+  canvas { display:block; background:#13171c; border-radius:2px }
+  figcaption { color:#6d747c; font-size:10px; text-align:center; margin-top:2px }
+</style>
+<div id=out></div>
+<script>
+// ---- the component's own numbers, copied from DeathFall.cs
+const GRAVITY = 34, NUDGE = 7, OVERSHOOT = 9, SETTLE = 0.22, BOUNCE = 0.35, SLIDE = 0.18;
+const FLAT = Math.PI / 2;
+const BODY = 0.91;                 // the fighter, in metres
+
+// The same integration, substeps and all.
+function fall(dt, frames) {
+  let angle = NUDGE * Math.PI / 180, rate = 0, landed = false, settle = 0;
+  const out = [];
+  for (let f = 0; f < frames; f++) {
+    if (!landed) {
+      const steps = 4, bit = dt / steps;
+      for (let i = 0; i < steps; i++) {
+        rate += GRAVITY * Math.sin(angle) * bit;
+        angle += rate * bit;
+        if (angle >= FLAT) { angle = FLAT; landed = true; break; }
+      }
+    } else if (settle < SETTLE) {
+      settle += dt;
+      const t = Math.min(1, settle / SETTLE);
+      const swing = Math.cos(t * Math.PI * 4) * (1 - t) * (1 - t);
+      angle = FLAT + OVERSHOOT * Math.PI / 180 * BOUNCE * swing;
+    } else angle = FLAT;
+
+    const past = Math.max(0, Math.min(1, (angle - FLAT * 0.5) / (FLAT * 0.5)));
+    out.push({ angle, slide: -SLIDE * past * past, landed });
+  }
+  return out;
+}
+
+function draw(c, s) {
+  const g = c.getContext('2d'), W = c.width, H = c.height;
+  const px = H / 1.45;                        // metres to pixels
+  const footX = W * 0.62, footY = H * 0.88;
+
+  g.fillStyle = '#13171c'; g.fillRect(0, 0, W, H);
+  
+  g.fillStyle = '#1d2228'; g.fillRect(0, footY, W, H - footY);
+
+  const fx = footX + s.slide * px;
+  g.save();
+  g.translate(fx, footY);
+  g.rotate(-s.angle);                          // screen y is down, so the sign flips
+  g.fillStyle = s.landed ? '#8d6f58' : '#c3cbd4';
+  g.fillRect(-4, -BODY * px, 8, BODY * px);    // the body
+  g.fillStyle = s.landed ? '#a0806a' : '#e6ecf2';
+  g.beginPath(); g.arc(0, -BODY * px - 5, 6, 0, 6.3); g.fill();   // the head
+  g.restore();
+}
+
+const out = document.getElementById('out');
+for (const [label, dt] of [['60 кадрів/с', 1 / 60], ['30 кадрів/с', 1 / 30]]) {
+  const frames = fall(dt, Math.round(0.95 / dt));
+  out.insertAdjacentHTML('beforeend', `<h2>${label}</h2>`);
+  const strip = document.createElement('div');
+  strip.className = 'strip';
+  const every = Math.max(1, Math.round(frames.length / 22));
+  frames.forEach((s, i) => {
+    if (i % every) return;
+    const fig = document.createElement('figure');
+    const c = document.createElement('canvas');
+    c.width = 76; c.height = 96;
+    draw(c, s);
+    fig.appendChild(c);
+    fig.insertAdjacentHTML('beforeend',
+      `<figcaption>${(i * dt).toFixed(2)}s<br>${(s.angle * 180 / Math.PI).toFixed(0)}°</figcaption>`);
+    strip.appendChild(fig);
+  });
+  out.appendChild(strip);
+
+  const flatAt = frames.findIndex(s => s.landed);
+  out.insertAdjacentHTML('beforeend',
+    `<p style="color:#6d747c">лягає на ${(flatAt * dt).toFixed(2)} с, ` +
+    `найбільший кут ${Math.max(...frames.map(s => s.angle * 180 / Math.PI)).toFixed(1)}°</p>`);
+}
+document.title = 'ready';
+</script>

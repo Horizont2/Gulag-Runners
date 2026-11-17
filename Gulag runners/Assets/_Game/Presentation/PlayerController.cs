@@ -47,6 +47,11 @@ namespace GulagRunners.Game
         [Tooltip("Transform that carries the mesh. Leave empty to move this object directly.")]
         public Transform visualRoot;
 
+        [Tooltip("Takes the body over when this fighter dies. Leave empty and it is looked " +
+                 "for on this object; with none at all the fighter simply stops, which is " +
+                 "what every round did before it existed.")]
+        public DeathFall deathFall;
+
         [Tooltip("Distance from the visual root's own origin DOWN to the model's soles, in " +
                  "metres of the model's own scale.\n\n" +
                  "0 for an imported character, which hangs from its root by the feet. Only a " +
@@ -283,6 +288,9 @@ namespace GulagRunners.Game
         TickInput _held;              // what is held right now, and where the arm is asked to point
         TickInput _pending;           // held, plus anything tapped since the last tick
         Vector3 _baseVisualScale = Vector3.one;
+
+        /// <summary>Where the model rests when it is alive, in the visual root's own space.</summary>
+        Vector3 _baseVisualPos;
         Vector2 _spawnPoint;
         bool _warnedEmptyWorld;
         float _yaw;
@@ -351,6 +359,14 @@ namespace GulagRunners.Game
             // two numbers that have to cancel are two numbers that eventually will not.
             PlaceVisualRoot();
 
+            // AFTER PlaceVisualRoot, not before: that is what decides where the model hangs,
+            // and the death fall needs the resting place to lay the body back from. Taken
+            // once, because nothing else in this file moves the visual root again -- and
+            // because a base sampled every frame would be the previous frame's fall, so the
+            // body would keep toppling past the floor and out of the arena.
+            if (visualRoot != null) _baseVisualPos = visualRoot.localPosition;
+            if (deathFall == null) deathFall = GetComponent<DeathFall>();
+
             Vector3 p = SpawnFeet();
             if (depthFromScene) planeZ = p.z;
 
@@ -374,6 +390,16 @@ namespace GulagRunners.Game
         /// </summary>
         void SpawnAt(Vector2 feet, int facing, bool keepLoadout = false)
         {
+            // Stand him back up. Without this the next round opens with a fighter lying
+            // flat where the last one fell -- the fall is a visual that outlives the state
+            // it was started from, so the thing that puts the state back has to end it.
+            if (deathFall != null)
+            {
+                deathFall.Clear();
+                Transform v = visualRoot != null ? visualRoot : transform;
+                if (v != transform) v.localPosition = _baseVisualPos;
+            }
+
             Inventory carried = _state.Inventory;
             short health = _state.Health;
 
@@ -635,7 +661,22 @@ namespace GulagRunners.Game
             // them or lose them.
             if (_state.WasHit) Hurt?.Invoke(_state.DamageTaken);
             if (_state.WasParried) Parried?.Invoke();
-            if (_state.JustDied) Died?.Invoke();
+            if (_state.JustDied)
+            {
+                // Which way the body goes over. The blow that killed him has already been
+                // spent on his velocity, so the shove decides it and the head goes the way
+                // he is being pushed; killed standing still -- poison, the closing wall --
+                // there is nothing to go on, so he falls backwards, away from where he was
+                // looking. Taken here rather than in Draw because by the next frame the
+                // velocity has been bled away and the reason for the direction is gone.
+                Fix push = _state.Velocity.X;
+                int away = push > Fix.FromMilli(400) ? 1
+                         : push < -Fix.FromMilli(400) ? -1
+                         : -_state.Facing;
+                if (deathFall != null) deathFall.Begin(away);
+
+                Died?.Invoke();
+            }
 
             // Loot after movement: where the body ended up this tick decides which chest it is
             // standing at. Movement never depends on the inventory, so the order is not a choice
@@ -704,6 +745,29 @@ namespace GulagRunners.Game
                 : Mathf.SmoothDampAngle(_yaw, target, ref _yawVelocity, turnSmoothTime,
                                         Mathf.Infinity, Time.deltaTime);
             v.localRotation = LadderTilt() * Quaternion.Euler(0f, _yaw, 0f);
+
+            // THE DEAD GO OVER, and they go over about their FEET.
+            //
+            // Rotating the visual root about its own origin would hinge the body at roughly
+            // the hip -- transform.position is the feet plus visualYOffset -- and swing the
+            // legs up while the head stayed put, which is a cartwheel and not a death. So
+            // the tilt is applied about a pivot visualYOffset below, which is where the
+            // soles are, and the root's position is moved to match.
+            //
+            // Pre-multiplied, so the yaw and any ladder lean underneath survive: a man
+            // killed on a ladder keeps facing the rungs as he comes off it.
+            if (deathFall != null && deathFall.Falling && v != transform)
+            {
+                deathFall.Step(Time.deltaTime, out Quaternion over, out Vector3 slide);
+
+                float scaleY = Mathf.Abs(transform.localScale.y) < 0.0001f
+                    ? 1f : transform.localScale.y;
+                Vector3 pivot = new Vector3(0f, -visualYOffset / scaleY, 0f);
+                Vector3 arm = _baseVisualPos - pivot;
+
+                v.localPosition = pivot + over * arm + slide;
+                v.localRotation = over * v.localRotation;
+            }
 
             if (squashOnCrouch)
             {

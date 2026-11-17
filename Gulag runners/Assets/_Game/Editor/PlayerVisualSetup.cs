@@ -130,8 +130,17 @@ namespace GulagRunners.GameEditor
             pa.animator = animator;
             EditorUtility.SetDirty(pa);
 
+            // The body has to be able to go over. There is no death clip among the project's
+            // 74 animations and the animator's deathState is empty, so a dead fighter used
+            // to stand where he was, frozen on a frame of the Hit clip, for the rest of the
+            // round. DeathFall topples him about his own feet instead, which also means it
+            // works from wherever he was standing -- a ledge, a ladder, mid-air.
+            DeathFall fall = player.GetComponent<DeathFall>();
+            if (fall == null) fall = Undo.AddComponent<DeathFall>(player.gameObject);
+
             Undo.RecordObject(player, "Attach character model");
             player.visualRoot = visual.transform;
+            player.deathFall = fall;
             player.squashOnCrouch = false;      // squashing a rigged character looks wrong
             EditorUtility.SetDirty(player);
 
