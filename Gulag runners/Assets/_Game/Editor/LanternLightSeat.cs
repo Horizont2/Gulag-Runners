@@ -30,7 +30,21 @@ namespace GulagRunners.GameEditor
         // From LampSway.shader: "the flame sits 0.21 m above the foot and the hook 0.575".
         const float FlameAboveFoot = 0.21f;
 
-        // How close a light has to be to a lamp, horizontally, to be that lamp's light.
+        /// <summary>
+        /// How close a light has to be to a lamp to be that lamp's light. In THREE
+        /// dimensions, and that is the whole of the bug this constant used to carry.
+        ///
+        /// It was a horizontal distance, measured across x and z with the height thrown
+        /// away, and in Arena_Mine three pairs of lanterns hang on the same pillar one
+        /// storey above the other -- same x, same z, two metres apart in y. Each lower lamp
+        /// was therefore exactly as close to the upper lamp's light as to its own, and the
+        /// run collapsed both of them onto itself: six lights became three, each pair in
+        /// one spot, and every upper lantern went dark. It is visible in the scene diff as
+        /// two different heights replaced by one identical number.
+        ///
+        /// Two thirds of a metre is comfortably more than the 30 cm a light was ever found
+        /// away from its flame, and comfortably less than the 2 m between stacked lamps.
+        /// </summary>
         const float Claim = 0.6f;
 
         [MenuItem("Tools/Gulag Runners/Setup/Seat the lantern lights in their flames")]
@@ -56,50 +70,84 @@ namespace GulagRunners.GameEditor
                 return;
             }
 
-            int moved = 0, already = 0, orphan = 0;
-
+            List<Light> points = new List<Light>();
             foreach (Light light in Object.FindObjectsByType<Light>(
                          FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (light.type == LightType.Point) points.Add(light);
+
+            int moved = 0, already = 0, dark = 0;
+
+            // EACH LAMP TAKES ONE LIGHT, rather than each light looking for a lamp, and the
+            // direction matters. Asked the other way about, two lamps can settle on the same
+            // light and both move it -- which is exactly what happened in Arena_Mine, where
+            // the lower lantern of each stacked pair swallowed the upper one's light and
+            // left it dark. A light can only be taken once if the taking is done by the
+            // thing there is one of.
+            HashSet<Light> taken = new HashSet<Light>();
+
+            foreach (Transform lamp in lamps)
             {
-                if (light.type != LightType.Point) continue;
-
-                // The lamp this light stands at: nearest in the horizontal plane, and only
-                // if it is close enough to be plausibly its own. A poison glow or a key
-                // light somewhere else in the arena is not claimed by a lantern.
-                Transform lamp = null;
-                float best = Claim;
-                foreach (Transform t in lamps)
-                {
-                    Vector3 d = t.position - light.transform.position;
-                    float flat = new Vector2(d.x, d.z).magnitude;
-                    if (flat < best) { best = flat; lamp = t; }
-                }
-                if (lamp == null) { orphan++; continue; }
-
                 // The foot is the lamp's own origin; the flame is a fixed height above it,
                 // in the lamp's own space, so a lantern that is scaled or turned still gets
                 // its light in the right place.
                 Vector3 want = lamp.TransformPoint(Vector3.up * FlameAboveFoot);
-                if ((light.transform.position - want).sqrMagnitude < 0.0004f)
+
+                Light mine = null;
+                float best = Claim;
+                foreach (Light light in points)
+                {
+                    if (taken.Contains(light)) continue;
+                    float gap = Vector3.Distance(light.transform.position, lamp.position);
+                    if (gap < best) { best = gap; mine = light; }
+                }
+
+                if (mine == null)
+                {
+                    // A lantern with no light within reach. Said out loud rather than passed
+                    // over: it is either a lamp nobody lit, or a light this run has already
+                    // given to its neighbour, and both are worth seeing.
+                    dark++;
+                    continue;
+                }
+
+                taken.Add(mine);
+
+                if ((mine.transform.position - want).sqrMagnitude < 0.0004f)
                 {
                     already++;
                     continue;
                 }
 
-                Undo.RecordObject(light.transform, "Seat the lantern lights");
-                light.transform.position = want;
-                EditorUtility.SetDirty(light.transform);
+                Undo.RecordObject(mine.transform, "Seat the lantern lights");
+                mine.transform.position = want;
+                EditorUtility.SetDirty(mine.transform);
                 moved++;
             }
 
+            int orphan = points.Count - taken.Count;
+
             EditorSceneManager.MarkSceneDirty(scene);
 
-            Debug.Log(
+            string report =
                 $"{scene.name}: {lamps.Count} lantern(s) found.\n"
                 + $"  {moved} light(s) moved into their flame, {already} already there, "
                 + $"{orphan} point light(s) belong to no lantern and were left alone.\n"
                 + "  The lamps are lit by probes, not the lightmap, so they also carry an "
-                + "emissive glass now -- see LampSway. Re-bake for the light itself.");
+                + "emissive glass now -- see LampSway. Re-bake for the light itself.";
+
+            if (dark > 0)
+            {
+                Debug.LogWarning(
+                    report + $"\n  {dark} lantern(s) have no point light within "
+                    + $"{Claim:0.00} m of them and are unlit. If this scene was run through "
+                    + "an older version of this tool, its lights may have been stacked on "
+                    + "top of each other -- that version measured only across the ground, "
+                    + "so a lantern claimed the light of the one hanging above it. Restore "
+                    + "the scene's light positions from git and run this again.");
+                return;
+            }
+
+            Debug.Log(report);
         }
     }
 }
