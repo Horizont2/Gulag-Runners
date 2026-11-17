@@ -52,3 +52,11 @@ const LAYERS = [
     ]
   }
 ];
+const LAYERS_CAMERA = {
+  "fov": 30.0,
+  "pitch": 4.0,
+  "view_height": 4.136363636363637,
+  "rest_distance": 7.6998,
+  "aspect": 4.5
+};
+const LAYERS_ASPECT = 4.5;

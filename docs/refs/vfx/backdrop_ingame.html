@@ -27,7 +27,12 @@
 <script src="backdrop_layers.js"></script>
 <script>
 const DIR = '../../../Gulag runners/Assets/_Game/Effects/Backdrops/';
-const FOV = 30, PITCH = 4, ASPECT = 19.5 / 9;
+// ASPECT is the shape a camera RENDERS INTO, not the shape of the phone. Every arena
+// gives each camera a viewport of full width by HALF height -- two players, one screen --
+// so each half is twice as wide as the screen is. At 19.5/9 this said 2.17 and drew a
+// frame half as wide as the game's, which is the one measurement that would hide an edge
+// rather than show it. It comes off the table now, like everything else here.
+const FOV = 30, PITCH = 4, ASPECT = LAYERS_ASPECT;
 const REST = 7.70;
 const HALF = 4.136 / 2;                       // layers.json camera.rest_distance
 const r = d => d * Math.PI / 180;
@@ -37,7 +42,9 @@ const U = [0,  Math.cos(r(PITCH)), Math.sin(r(PITCH))];   // camera up
 const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
 
 // Arena_Mine: borders x -15.4..15.4, y -1.5..7
-const ARENA = { minX:-15.4, maxX:15.4, minY:-1.5, maxY:7 };
+// Arena_Mine's CameraRig, read out of the scene: these are the camera's world bounds and
+// the rig holds the focus half a view inside them.
+const ARENA = { minX:-15.92, maxX:15.92, minY:0.82, maxY:8.00 };
 const ARENA_CY = (ARENA.minY + ARENA.maxY) / 2;
 
 function project(p, cam, W, H) {
@@ -64,7 +71,11 @@ function draw(c, img, anchorY, focusX, focusY) {
     const br = project([C[0] + hw, C[1] - hh*U[1], C[2] - hh*U[2]], cam, W, H);
     if (!tl || !br) continue;
     const t = img[i];
-    if (t && t.complete && t.naturalWidth) g.drawImage(t, tl[0], tl[1], br[0]-tl[0], br[1]-tl[1]);
+    if (!(t && t.complete && t.naturalWidth)) continue;
+    // Tiled, because the material tiles. Drawing one image across the whole quad would
+    // show the art L.tiles times wider than the game does.
+    const w = (br[0]-tl[0]) / L.tiles, h = br[1]-tl[1];
+    for (let k = 0; k < L.tiles; k++) g.drawImage(t, tl[0] + k*w, tl[1], w, h);
   }
 
   // the arena itself, as a flat silhouette, so the backdrop is judged behind something
@@ -93,10 +104,17 @@ function draw(c, img, anchorY, focusX, focusY) {
   }
 }
 
-const SHOTS = [
-  ['якір = центр арени (було)', ARENA_CY],
-  ['якір = низ ходу камери (стало)', ARENA.minY + HALF],
-];
+// The camera's real range: the rig holds the focus half a view inside the borders, so at
+// zoom 1 it runs between these. The TOP of that range is the shot that would expose the
+// bottom edge of a backdrop, and it was never drawn before.
+const CAM_LOW  = ARENA.minY + HALF;
+const CAM_HIGH = ARENA.maxY - HALF;
+const ANCHOR = Math.min(CAM_LOW, ARENA_CY);          // BackdropBuilder's own rule
+
+// One anchor -- the one BackdropBuilder uses. The row below already walks the camera
+// through its own range, which is where a bottom edge would show if there is one.
+const SHOTS = [['якір ' + ANCHOR.toFixed(2) + ', камера ходить ' +
+                CAM_LOW.toFixed(2) + '..' + CAM_HIGH.toFixed(2), ANCHOR]];
 const out = document.getElementById('out');
 let pending = 0;
 const imgs = LAYERS.map(L => {
@@ -124,7 +142,7 @@ function paint() {
     ]) {
       const fig = document.createElement('figure');
       const c = document.createElement('canvas');
-      c.width = 900; c.height = 415;
+      c.width = 900; c.height = Math.round(900 / ASPECT);   // the frame's own shape
       fig.appendChild(c);
       fig.insertAdjacentHTML('beforeend', `<figcaption>${cap}</figcaption>`);
       row.appendChild(fig);

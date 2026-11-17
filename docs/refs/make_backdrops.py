@@ -777,19 +777,30 @@ def main(argv):
 
     # The table the browser preview and the Unity tool both read, so that none of the three
     # can hold a figure the other two have moved on from.
+    camera = {"fov": FOV, "pitch": PITCH, "view_height": VIEW_H,
+              "rest_distance": round(camera_distance(), 4),
+              "aspect": round(ASPECT, 4)}
     with open(os.path.join(OUT, "layers.json"), "w") as handle:
-        json.dump({"camera": {"fov": FOV, "pitch": PITCH, "view_height": VIEW_H,
-                              "rest_distance": round(camera_distance(), 4),
-                              "aspect": round(ASPECT, 4)},
-                   "layers": LAYERS}, handle, indent=2)
+        json.dump({"camera": camera, "layers": LAYERS}, handle, indent=2)
     if not os.path.exists(os.path.join(OUT, "layers.json.meta")):
         with open(os.path.join(OUT, "layers.json.meta"), "w") as handle:
             handle.write("fileFormatVersion: 2\nguid: %s\nTextAssetImporter:\n"
                          "  externalObjects: {}\n  userData:\n  assetBundleName:\n"
                          "  assetBundleVariant:\n" % uuid.uuid4().hex)
     with open(os.path.join(HERE, "vfx", "backdrop_layers.js"), "w") as handle:
+        # The camera block goes out too. Both previews had been carrying their own copies of
+        # fov, pitch and aspect, and backdrop_ingame.html's copy said the screen was 19.5/9
+        # when a split-screen half is twice that -- so it drew a frame half as wide as the
+        # game's, which is the one error that hides an edge instead of showing one. Two
+        # copies of a measurement is one copy too many; this page has said so since it was
+        # written and then kept a third.
         handle.write("// Written by docs/refs/make_backdrops.py -- do not edit by hand.\n"
-                     "const LAYERS = %s;\n" % json.dumps(LAYERS, indent=2))
+                     "const LAYERS = %s;\n"
+                     "const LAYERS_CAMERA = %s;\n"
+                     "const LAYERS_ASPECT = %s;\n"
+                     % (json.dumps(LAYERS, indent=2),
+                        json.dumps(camera, indent=2),
+                        json.dumps(ASPECT)))
 
     for name, w, h, size, lit in made:
         print("  %-22s %4dx%-4d %7d bytes  %3.0f%% of the frame"

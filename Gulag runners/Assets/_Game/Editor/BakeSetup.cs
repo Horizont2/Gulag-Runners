@@ -136,6 +136,25 @@ namespace GulagRunners.GameEditor
         /// has to tag its SubShader with "VertexAnimation" = "True" and every tool that
         /// needs to leave it alone already does.
         /// </summary>
+        /// <summary>
+        /// Sets a GameObject's static flags so the change actually survives the save.
+        ///
+        /// Nearly every renderer in these arenas is part of a PREFAB INSTANCE, and a value
+        /// changed on an instance is stored as an override on that instance -- but only if
+        /// Unity is told the instance changed. The old code marked the RENDERER dirty,
+        /// which is a different object: the flags live on the GameObject. It happened to
+        /// stick when flags were being added and is not worth relying on when they are
+        /// being taken away, which is the direction that stops a lamp flying.
+        /// </summary>
+        static void Flags(GameObject go, StaticEditorFlags flags)
+        {
+            GameObjectUtility.SetStaticEditorFlags(go, flags);
+            EditorUtility.SetDirty(go);
+            // Unconditional: on anything that is not part of an instance this does nothing,
+            // and a guard would be one more thing to get wrong than the call itself.
+            PrefabUtility.RecordPrefabInstancePropertyModifications(go);
+        }
+
         static bool Animated(Renderer r)
         {
             foreach (Material m in r.sharedMaterials)
@@ -195,7 +214,7 @@ namespace GulagRunners.GameEditor
                                                       & ~StaticEditorFlags.BatchingStatic;
                         if (freed != had)
                         {
-                            GameObjectUtility.SetStaticEditorFlags(r.gameObject, freed);
+                            Flags(r.gameObject, freed);
                             r.lightProbeUsage = LightProbeUsage.BlendProbes;
                             EditorUtility.SetDirty(r);
                             freedUp++;
@@ -207,7 +226,7 @@ namespace GulagRunners.GameEditor
                                                  | StaticEditorFlags.BatchingStatic;
                     if (had == want) continue;
 
-                    GameObjectUtility.SetStaticEditorFlags(r.gameObject, want);
+                    Flags(r.gameObject, want);
                     touched++;
                 }
             }
