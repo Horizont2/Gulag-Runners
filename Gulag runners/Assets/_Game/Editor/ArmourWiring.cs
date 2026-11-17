@@ -33,6 +33,15 @@ namespace GulagRunners.GameEditor
     /// </summary>
     public static class ArmourWiring
     {
+        /// <summary>
+        /// How much bigger than the skull a helmet is built.
+        ///
+        /// 1.0 means "the same height as the head", which is the ratio that put every
+        /// helmet inside one. A thing worn OVER something has to be larger than it by the
+        /// shell and the padding, all the way round.
+        /// </summary>
+        const float OverHead = 2f;
+
         const string CharacterPath =
             "Assets/ThirdParty/URP GanzSe Free Modular Character Pack/Prefabs/Modular Character/" +
             "GanzSe Free Modular Character Update 1_1.prefab";
@@ -319,7 +328,18 @@ namespace GulagRunners.GameEditor
             float hatHigh = posed.Value.size.y;
             if (hatHigh > 0.001f)
             {
-                float scale = Mathf.Clamp(headHigh / hatHigh, 0.2f, 5f);
+                // OVER the head, not the same size as it.
+                //
+                // This divided one height by the other, which makes the helmet exactly as
+                // tall as the skull -- and a shell the same size as the thing it covers is
+                // guaranteed to be inside it, not on it. Every helmet in the game hung in
+                // the middle of the fighter's head for that reason, and it was not a
+                // tuning miss: matching the heights is the one ratio that cannot work.
+                //
+                // A helmet has to clear the skull by its own thickness all the way round,
+                // and the padding under it. Twice is what reads right on these characters
+                // and what the fit was reported as needing.
+                float scale = Mathf.Clamp(headHigh / hatHigh * OverHead, 0.2f, 6f);
                 fit.localScale = Vector3.one * scale;
             }
 
@@ -329,7 +349,13 @@ namespace GulagRunners.GameEditor
             posed = Posed(worn);
             if (posed == null) return;
 
-            Vector3 want = head.position + Vector3.up * (headHigh * 0.5f);
+            // Centred on the middle of the skull, not on the bone -- the head bone sits
+            // at the BASE of the skull, which is the other half of why the helmet was
+            // inside the head. The extra lift is the clearance the enlargement added: a
+            // shell twice the skull's height centred on the skull's middle would hang
+            // half a head below the chin, so it rides up by what it gained.
+            float lift = headHigh * (0.5f + (OverHead - 1f) * 0.35f);
+            Vector3 want = head.position + Vector3.up * lift;
             fit.position += want - posed.Value.center;
 
             report.Add($"Head Armor: fitted to a {headHigh:0.00} m head, x{fit.localScale.x:0.00}. "
