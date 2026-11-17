@@ -530,11 +530,10 @@ def step_flat(s, inp, w):
         return climb(s, wx, wy, w)
 
     g = s.mode == "ground"
-    want_crouch = g and wy < 0
-    if s.crouch and not want_crouch:
-        stand = (s.x - C["W"]//2, s.y, s.x + C["W"]//2, s.y + C["H"])
-        if any_solid(w, stand, s.depth): want_crouch = True
-    s.crouch = want_crouch
+    # Crouching is gone from the motor, so it is gone here. PlayerMotor.StepWalk has the
+    # reasoning; the field stays and stays false because the rest of both files still asks
+    # it how tall the body is.
+    s.crouch = False
 
     if g and wy < 0 and s.buf > 0 and on_oneway_only(s, w):
         s.buf = 0; s.fallthru = C["FALLTHRU"]; s.mode = "air"; g = False

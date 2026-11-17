@@ -475,12 +475,22 @@ namespace GulagRunners.Sim
         {
             bool grounded = s.Mode == MoveMode.Grounded;
 
-            // Crouching: slower, shorter, and silent. The quiet option is the whole point —
-            // running is Loud and tells the other player exactly where you are (docs/03).
-            bool wantsCrouch = grounded && wishY < 0;
-            if (s.Crouching && !wantsCrouch && !HasHeadroom(ref s, world, cfg))
-                wantsCrouch = true;                       // cannot stand up under a low ceiling
-            s.Crouching = wantsCrouch;
+            // CROUCHING IS GONE. Asked for directly, and this is the one place that ever
+            // turned it on: holding down while grounded. Down still means what else it has
+            // always meant — climbing down a ladder, and dropping through a one-way platform
+            // with jump — so the stick loses a state, not a direction.
+            //
+            // The field stays, and stays false. ArmMotor, MatchClock and PlayerController all
+            // ask it how tall the body is, and a body that is never crouched answers the same
+            // way every time; taking the field out would be a change to the shape of the
+            // simulation state for no gain, and rollback compares that state frame by frame.
+            //
+            // Nothing in the arenas needed it. Every floor and beam in all four scenes was
+            // measured for a gap between crouch height (0.68 m) and standing height (0.91 m)
+            // — the only kind of passage crouching opens — and there is not one, so no route
+            // anywhere closes with it. The quiet-movement idea it carried (docs/03: crouching
+            // is Silent, running is Loud) goes with it; walking is still quieter than running.
+            s.Crouching = false;
 
             // Drop through a one-way platform: hold down and press jump.
             if (grounded && wishY < 0 && s.JumpBufferTimer > 0 && StandingOnOneWayOnly(ref s, world, cfg))

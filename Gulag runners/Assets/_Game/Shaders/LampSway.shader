@@ -50,6 +50,31 @@ Shader "Gulag Runners / Lamp Sway"
         _Smoothness("Smoothness", Range(0,1)) = 0.5
         _Metallic("Metallic", Range(0,1)) = 0
 
+        [Header(The flame inside)][Space(4)]
+        // A hung lamp is excluded from the lightmap, because a thing that moves cannot
+        // carry a baked shadow that does not -- so it is lit by LIGHT PROBES, and a probe
+        // in a dark mine is a dark average. The lantern came out a black silhouette with
+        // its own light pooling on the beam above it, which is exactly what probe-lit
+        // geometry does: it never sees the lamp it IS.
+        //
+        // So it lights itself, and the glass is picked out by COLOUR rather than by
+        // brightness. The lamp is one mesh with one material wrapped onto a shared palette
+        // atlas, and its UVs were read to find out which swatches it actually lands on.
+        // There are exactly two:
+        //
+        //     iron   rgb(72, 72, 72)    saturation 0.00    1121 of 1137 UVs
+        //     flame  rgb(254, 231, 0)   saturation 1.00      16 of 1137 UVs
+        //
+        // Nothing in between. Brightness would also have separated them here (0.28 against
+        // 0.83) and the first version of this used it, with a threshold picked out of the
+        // air -- but the atlas it reads is shared with every other prop in the pack and its
+        // greys run from 0.00 all the way to 1.00, so a brightness threshold is one
+        // re-wrapped UV away from making the iron glow and the flame not. Saturation has
+        // the whole gap between 0 and 1 to sit in.
+        _EmissionColor("Flame colour", Color) = (1, 0.72, 0.36, 1)
+        _Emission("How much the glass glows", Range(0, 6)) = 2.2
+        _EmissionSat("How coloured a texel has to be to be flame", Range(0, 1)) = 0.5
+
         [Header(Where it hangs)][Space(4)]
         _Pivot("The hook, object space", Vector) = (0, 0.575, 0)
 
@@ -88,6 +113,9 @@ Shader "Gulag Runners / Lamp Sway"
             half4  _BaseColor;
             half   _Smoothness;
             half   _Metallic;
+            half4  _EmissionColor;
+            half   _Emission;
+            half   _EmissionSat;
             float4 _Pivot;
             float  _Period;
             float  _StillDegrees;
@@ -258,6 +286,18 @@ Shader "Gulag Runners / Lamp Sway"
                 surface.alpha = 1.0;
 
                 half4 colour = UniversalFragmentPBR(lighting, surface);
+
+                // The glass glows, the iron does not, told apart by how COLOURED the texel
+                // is. The lamp's own UVs land on two swatches and only two: neutral grey
+                // iron at saturation 0, and the flame's yellow at saturation 1 (the reading
+                // is written out in full up by _EmissionSat). So the mask is already drawn
+                // in the albedo and needs no second map, and the threshold sits in the
+                // middle of a gap that runs the whole range.
+                half top = max(albedo.r, max(albedo.g, albedo.b));
+                half bot = min(albedo.r, min(albedo.g, albedo.b));
+                half sat = top > 0.0001h ? (top - bot) / top : 0.0h;
+                half glass = smoothstep(_EmissionSat - 0.2h, _EmissionSat + 0.2h, sat);
+                colour.rgb += _EmissionColor.rgb * (_Emission * glass);
                 colour.rgb = MixFog(colour.rgb, input.fogCoord);
                 return colour;
             }

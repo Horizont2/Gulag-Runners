@@ -116,26 +116,53 @@ def egypt():
 
 
 def egypt_case():
+    """The ceiling is a ceiling everywhere there is no ladder.
+
+    This case used to assert the opposite of what it says now, and the change is worth
+    writing down. It used to stand under each of Arena_Egypt's upper ladders and check
+    that holding up never got onto the rungs -- which was true, and which I read as the
+    arena being fixed. It was the arena being BROKEN: those ladders were 0.62 m stubs
+    straddling the slab they land on, nothing joined the storey at 1.12 to the one at
+    3.27, and the seven-centimetre graze this motor now refuses had been the only way up.
+    Taking the graze away left no way up at all, and the test said PASS to that.
+
+    So the question moved. Whether a ladder carries you upstairs is ladder_reach_check's
+    (it plays the climb, in every arena, and fails Egypt and Mine until their markers are
+    grown down onto the floor below with Tools > Setup > "Make the ladders reach the floor
+    below"). What belongs HERE is the part that must be true however the level is
+    authored: where there is no ladder, a jump does not get you through the floor above.
+    That holds before those markers are fixed and after.
+    """
     try:
         w = egypt()
-    except Exception as e:
+    except (Exception, SystemExit) as e:
         check("Arena_Egypt could be read", False, str(e)[:70])
         return
 
-    upper = [L for L in w["ladder"] if L[1] / ONE > 1.17]
-    check("Arena_Egypt still has upper-storey ladders to test",
-          len(upper) > 0, "%d found" % len(upper))
+    SLAB = 3.03                             # the underside of the upper storey
+    clear = []
+    x = -13.0
+    while x <= 13.0:
+        if all(not (L[0] / ONE - 0.9 < x < L[2] / ONE + 0.9) for L in w["ladder"]):
+            clear.append(x)
+        x += 1.0
 
-    for i, L in enumerate(upper):
-        x = (L[0] + L[2]) / 2 / ONE
+    check("Arena_Egypt has open floor away from its ladders to test",
+          len(clear) > 0, "%d spot(s)" % len(clear))
+
+    worst = None
+    for x in clear:
         s = S(x, 1.12)                      # the storey below
-        modes = set()
+        top = s.y
         for f in range(200):
             step(s, UP | JMP if f < 4 else UP, w)
-            modes.add(s.mode)
-        check("jumping at the upper ladder above x %+.1f does not reach its rungs" % x,
-              "ladder" not in modes,
-              "ended y %.2f, modes %s" % (s.y / ONE, sorted(modes)))
+            top = max(top, s.y)
+        if worst is None or top > worst[1]:
+            worst = (x, top)
+
+    check("jumping anywhere Arena_Egypt has no ladder stays under the slab at 3.03",
+          worst is not None and worst[1] / ONE < SLAB,
+          "highest was y %.2f at x %+.1f" % (worst[1] / ONE, worst[0]) if worst else "")
 
 
 def main():
