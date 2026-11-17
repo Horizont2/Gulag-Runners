@@ -71,7 +71,7 @@ namespace GulagRunners.GameEditor
                 if (box.kind != SimColliderKind.Solid
                     && box.kind != SimColliderKind.OneWay) continue;
 
-                Bounds b = box.WorldBox;
+                Bounds b = box.WorldBounds;
                 if (b.size.z <= 0.001f) continue;
 
                 float near = b.min.z, far = b.max.z;
@@ -149,7 +149,7 @@ namespace GulagRunners.GameEditor
                 if (box.kind != SimColliderKind.Solid
                     && box.kind != SimColliderKind.OneWay) continue;
 
-                Bounds b = box.WorldBox;
+                Bounds b = box.WorldBounds;
                 if (b.size.z < 1f) continue;              // a prop, not a storey
                 if (b.size.x < 2f) continue;              // nor a post
 

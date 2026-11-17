@@ -25,7 +25,7 @@ MonoBehaviour:
     shown: THE MINE
     enabled: 1
     weight: 3
-  - scene: loc3_new
+  - scene: Arena_Egypt
     shown: THE TEMPLE
     enabled: 1
     weight: 3

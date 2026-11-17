@@ -312,7 +312,16 @@ namespace GulagRunners.Game
             // starts loading and without either telling the other. Set here rather than
             // in Found(), because Play() is one frame away and a director that loaded
             // on seed 0 would load the wrong arena perfectly reliably.
+            // Find it if nobody wired it. There was no fallback here at all, only this
+            // null test, and the field is empty in Menu.unity -- so mapSeed stayed 0, the
+            // pool was dealt the same number every time, and every match ran in the arena
+            // with the heaviest weight. That is the whole of "pressing PLAY just starts
+            // the forest": the pool was working exactly as told, from a seed nobody set.
+            if (director == null) director = FindFirstObjectByType<MenuDirector>();
             if (director != null) director.mapSeed = _opponent.Seed;
+            else
+                Debug.LogWarning("MatchSearch found no MenuDirector, so the arena seed goes "
+                                 + "nowhere and every match will be dealt the same map.");
 
             Paired?.Invoke(_opponent.AgainstBot);
         }

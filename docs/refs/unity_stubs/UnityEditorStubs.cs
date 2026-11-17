@@ -64,6 +64,9 @@ namespace UnityEditor
 
     public static class EditorGUILayout
     {
+        public static bool Foldout(bool v, string label, bool toggleOnLabelClick = false) => v;
+        public static UnityEngine.Rect GetControlRect(params UnityEngine.GUILayoutOption[] o)
+            => default;
         public static void LabelField(string label) { }
         public static void LabelField(string label, GUIStyle style) { }
         public static void LabelField(string label, string value) { }
@@ -119,12 +122,15 @@ namespace UnityEditor
 
     public static class EditorGUIUtility
     {
+        public static float labelWidth;
+        public static float currentViewWidth;
         public static void PingObject(UnityEngine.Object obj) { }
         public static void PingObject(int instanceID) { }
     }
 
     public static class EditorStyles
     {
+        public static UnityEngine.GUIStyle miniButton;
         public static GUIStyle boldLabel => null;
         public static GUIStyle miniLabel => null;
         public static GUIStyle miniBoldLabel => null;
@@ -136,6 +142,8 @@ namespace UnityEditor
 
     public static class EditorUtility
     {
+        public static void DisplayProgressBar(string t, string i, float p) { }
+        public static void ClearProgressBar() { }
         public static void SetDirty(UnityEngine.Object target) { }
         public static bool DisplayDialog(string title, string message, string ok) => true;
         public static bool DisplayDialog(string title, string message, string ok, string cancel) => true;
@@ -143,6 +151,9 @@ namespace UnityEditor
 
     public static class AssetDatabase
     {
+        public static string GenerateUniqueAssetPath(string path) => path;
+        public static void StartAssetEditing() { }
+        public static void StopAssetEditing() { }
         // Every asset path in the project, packages included. Unlike FindAssets it takes
         // no filter string to get wrong -- FindAssets("t:Model") is Project-window search
         // syntax and came back empty from script in this project.
@@ -196,6 +207,12 @@ namespace UnityEditor
 
     public static class PrefabUtility
     {
+        public static UnityEngine.GameObject SaveAsPrefabAsset(
+            UnityEngine.GameObject go, string path) => go;
+        public static UnityEngine.GameObject SaveAsPrefabAsset(
+            UnityEngine.GameObject go, string path, out bool success)
+        { success = true; return go; }
+
         public static UnityEngine.Object InstantiatePrefab(UnityEngine.Object asset) => null;
         public static UnityEngine.Object InstantiatePrefab(UnityEngine.Object asset,
                                                            Transform parent) => null;
@@ -249,6 +266,7 @@ namespace UnityEditor
     // whatever the FBX's UnitScaleFactor claims.
     public class ModelImporter : AssetImporter
     {
+        public bool generateSecondaryUV;
         public bool useFileScale;
         public float globalScale;
         public bool importCameras;
@@ -325,6 +343,53 @@ namespace UnityEditor
         public static void SetChecked(string path, bool on) { }
         public static bool GetChecked(string path) => false;
     }
+    // Static flags and the helper that sets them. BakeSetup and the effect builders live
+    // on these, and without them the declaration phase never ends clean -- which is the
+    // whole reason compile_check could not see a method body. See TMProStubs.
+    [System.Flags]
+    public enum StaticEditorFlags
+    {
+        ContributeGI = 1,
+        OccluderStatic = 2,
+        BatchingStatic = 4,
+        NavigationStatic = 8,
+        OccludeeStatic = 16,
+        OffMeshLinkGeneration = 32,
+        ReflectionProbeStatic = 64,
+    }
+
+    public static class GameObjectUtility
+    {
+        public static StaticEditorFlags GetStaticEditorFlags(UnityEngine.GameObject go)
+            => default;
+        public static void SetStaticEditorFlags(UnityEngine.GameObject go,
+                                                StaticEditorFlags flags) { }
+    }
+
+
+    // Build settings and the lightmapper. EffectsEverywhere walks the build scene list and
+    // BakeSetup drives the bake, and neither could be type-checked until these existed.
+    public class EditorBuildSettingsScene
+    {
+        public string path;
+        public bool enabled;
+    }
+
+    public static class EditorBuildSettings
+    {
+        public static EditorBuildSettingsScene[] scenes
+            = new EditorBuildSettingsScene[0];
+    }
+
+    public static class Lightmapping
+    {
+        public static UnityEngine.LightingSettings lightingSettings;
+        public static bool realtimeGI;
+        public static bool bakedGI;
+        public static void SetLightingSettingsForScene(
+            UnityEngine.SceneManagement.Scene s, UnityEngine.LightingSettings v) { }
+    }
+
 }
 
 namespace UnityEditor.SceneManagement
@@ -333,6 +398,9 @@ namespace UnityEditor.SceneManagement
 
     public static class EditorSceneManager
     {
+        public static UnityEngine.SceneManagement.Scene GetActiveScene() => default;
+        public static bool SaveScene(UnityEngine.SceneManagement.Scene s) => true;
+        public static bool SaveCurrentModifiedScenesIfUserWantsTo() => true;
         public static void MarkSceneDirty(UnityEngine.SceneManagement.Scene scene) { }
         public static void MarkAllScenesDirty() { }
         public static bool SaveOpenScenes() => true;
@@ -362,6 +430,9 @@ namespace UnityEditor.Events
     /// </summary>
     public static class UnityEventTools
     {
+        public static void AddIntPersistentListener(
+            UnityEngine.Events.UnityEventBase e,
+            UnityEngine.Events.UnityAction<int> a, int v) { }
         public static void AddPersistentListener(UnityEvent ev, UnityAction call) { }
         public static void AddPersistentListener<T0>(UnityEvent<T0> ev, UnityAction<T0> call) { }
         public static void AddVoidPersistentListener(UnityEventBase ev, UnityAction call) { }
@@ -413,5 +484,6 @@ namespace UnityEditor.Animations
     {
         public AnimatorState state;
         public Vector3 position;
-    }
+    
+}
 }

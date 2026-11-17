@@ -231,3 +231,30 @@ namespace UnityEngine.InputSystem.UI
     /// </summary>
     public class InputSystemUIInputModule : BaseInputModule { }
 }
+
+namespace UnityEngine
+{
+    public enum LightmapCompression { None, LowQuality, NormalQuality, HighQuality }
+    public enum LightmapsMode { NonDirectional, CombinedDirectional }
+    public enum MixedLightingMode { IndirectOnly, Subtractive, Shadowmask }
+    public enum LightmapBakeType { Mixed = 1, Baked = 2, Realtime = 4 }
+
+    public class LightingSettings : Object
+    {
+        public new string name;
+        public float lightmapResolution;
+        public int lightmapPadding;
+        public int lightmapMaxSize;
+        public LightmapCompression lightmapCompression;
+        public LightmapsMode directionalityMode;
+        public bool ao;
+        public float aoMaxDistance;
+        public float aoExponentDirect;
+        public float aoExponentIndirect;
+        public int maxBounces;
+        public float indirectResolution;
+        public MixedLightingMode mixedBakeMode;
+        public bool bakedGI;
+        public bool realtimeGI;
+    }
+}
