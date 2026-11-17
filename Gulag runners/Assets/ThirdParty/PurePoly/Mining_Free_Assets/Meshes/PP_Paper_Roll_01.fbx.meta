@@ -1,7 +1,14 @@
 fileFormatVersion: 2
 guid: e84cd0aa897d65a4eaf611ba2857f85c
+AssetOrigin:
+  serializedVersion: 1
+  productId: 189962
+  packageName: Free Mining Pack - Low Poly Ores, Gems, Tools & Props
+  packageVersion: 2.0
+  assetPath: Assets/PurePoly/Mining_Free_Assets/Meshes/PP_Paper_Roll_01.fbx
+  uploadId: 791208
 ModelImporter:
-  serializedVersion: 24200
+  serializedVersion: 24300
   internalIDToNameTable:
   - first:
       1: 100000
@@ -27,6 +34,7 @@ ModelImporter:
     materialName: 1
     materialSearch: 1
     materialLocation: 0
+    searchTexturesGlobally: 1
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
@@ -64,7 +72,7 @@ ModelImporter:
     nodeNameCollisionStrategy: 0
     fileIdsGeneration: 1
     swapUVChannels: 0
-    generateSecondaryUV: 0
+    generateSecondaryUV: 1
     useFileUnits: 1
     keepQuads: 0
     weldVertices: 1
@@ -126,10 +134,3 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 189962
-  packageName: Free Mining Pack - Low Poly Ores, Gems, Tools & Props
-  packageVersion: 2.0
-  assetPath: Assets/PurePoly/Mining_Free_Assets/Meshes/PP_Paper_Roll_01.fbx
-  uploadId: 791208

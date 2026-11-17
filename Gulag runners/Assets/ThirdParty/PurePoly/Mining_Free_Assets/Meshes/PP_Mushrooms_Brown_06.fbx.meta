@@ -1,7 +1,14 @@
 fileFormatVersion: 2
 guid: c740a077e3b8da14592d7987b64c9b65
+AssetOrigin:
+  serializedVersion: 1
+  productId: 189962
+  packageName: Free Mining Pack - Low Poly Ores, Gems, Tools & Props
+  packageVersion: 2.0
+  assetPath: Assets/PurePoly/Mining_Free_Assets/Meshes/PP_Mushrooms_Brown_06.fbx
+  uploadId: 791208
 ModelImporter:
-  serializedVersion: 24200
+  serializedVersion: 24300
   internalIDToNameTable: []
   externalObjects: {}
   materials:
@@ -9,6 +16,7 @@ ModelImporter:
     materialName: 0
     materialSearch: 1
     materialLocation: 1
+    searchTexturesGlobally: 1
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
@@ -46,7 +54,7 @@ ModelImporter:
     nodeNameCollisionStrategy: 1
     fileIdsGeneration: 2
     swapUVChannels: 0
-    generateSecondaryUV: 0
+    generateSecondaryUV: 1
     useFileUnits: 1
     keepQuads: 0
     weldVertices: 1
@@ -108,10 +116,3 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 189962
-  packageName: Free Mining Pack - Low Poly Ores, Gems, Tools & Props
-  packageVersion: 2.0
-  assetPath: Assets/PurePoly/Mining_Free_Assets/Meshes/PP_Mushrooms_Brown_06.fbx
-  uploadId: 791208

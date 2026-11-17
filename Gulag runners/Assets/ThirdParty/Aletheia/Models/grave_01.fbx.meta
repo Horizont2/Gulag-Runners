@@ -1,7 +1,14 @@
 fileFormatVersion: 2
 guid: 0d6a6b7d9a4ab844a938f4c85893fe55
+AssetOrigin:
+  serializedVersion: 1
+  productId: 385474
+  packageName: Wild West Low Poly Pack
+  packageVersion: 1.0
+  assetPath: Assets/Aletheia/Models/grave_01.fbx
+  uploadId: 929872
 ModelImporter:
-  serializedVersion: 24200
+  serializedVersion: 24300
   internalIDToNameTable: []
   externalObjects: {}
   materials:
@@ -9,6 +16,7 @@ ModelImporter:
     materialName: 0
     materialSearch: 1
     materialLocation: 1
+    searchTexturesGlobally: 1
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
@@ -46,7 +54,7 @@ ModelImporter:
     nodeNameCollisionStrategy: 1
     fileIdsGeneration: 2
     swapUVChannels: 0
-    generateSecondaryUV: 0
+    generateSecondaryUV: 1
     useFileUnits: 1
     keepQuads: 0
     weldVertices: 1
@@ -108,10 +116,3 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 385474
-  packageName: Wild West Low Poly Pack
-  packageVersion: 1.0
-  assetPath: Assets/Aletheia/Models/grave_01.fbx
-  uploadId: 929872

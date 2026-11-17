@@ -1,7 +1,14 @@
 fileFormatVersion: 2
 guid: 094ba9be64cba455baa2ac91a2ee401f
+AssetOrigin:
+  serializedVersion: 1
+  productId: 313704
+  packageName: 3D Medieval Fantasy Weapon Collection
+  packageVersion: 1.0
+  assetPath: Assets/FlexUnit/MedievalWeaponPack/FBX/Axe.fbx
+  uploadId: 742406
 ModelImporter:
-  serializedVersion: 22200
+  serializedVersion: 24300
   internalIDToNameTable: []
   externalObjects:
   - first:
@@ -34,6 +41,7 @@ ModelImporter:
     materialName: 0
     materialSearch: 1
     materialLocation: 1
+    searchTexturesGlobally: 1
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
@@ -71,7 +79,7 @@ ModelImporter:
     nodeNameCollisionStrategy: 1
     fileIdsGeneration: 2
     swapUVChannels: 0
-    generateSecondaryUV: 0
+    generateSecondaryUV: 1
     useFileUnits: 1
     keepQuads: 0
     weldVertices: 1
@@ -81,6 +89,9 @@ ModelImporter:
     maxBonesPerVertex: 4
     minBoneWeight: 0.001
     optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
     meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
@@ -130,10 +141,3 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 313704
-  packageName: 3D Medieval Fantasy Weapon Collection
-  packageVersion: 1.0
-  assetPath: Assets/FlexUnit/MedievalWeaponPack/FBX/Axe.fbx
-  uploadId: 742406
