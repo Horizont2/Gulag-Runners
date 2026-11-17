@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 18ba60d87fc80a14b8a05f88fe0bccf3
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  preprocessorOverride: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 372150
+  packageName: STYLIZED Deep Sea Hunter's Station - Low Poly 3D Art
+  packageVersion: 1.03
+  assetPath: Assets/Daniel Mistage/STYLIZED Fantasy Deep Sea Hunter's Station/Shaders/DoubleSided
+    Shader.shader
+  uploadId: 1045540
