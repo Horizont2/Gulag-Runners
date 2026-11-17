@@ -137,6 +137,39 @@ def distance(cam, body):
             / math.tan(math.radians(cam["fov"] * 0.5)))
 
 
+def viewport_aspect(text):
+    """
+    The widest shape a camera in this scene actually renders into.
+
+    This is the number that broke the backdrop and that no single-camera measurement could
+    have shown. Every arena gives each of its two cameras a viewportRect of full width by
+    HALF height -- two players on one phone -- so each half is 4.33:1 on a 19.5:9 screen,
+    not the 2.33:1 of the whole screen. The framing does not shrink to match: a half still
+    frames 4.14 m of height, and therefore nearly eighteen metres of WIDTH.
+
+    Sized for the full screen, the layers stood a third narrower than the frame and their
+    edges were in shot at the start of every round.
+    """
+    widest = 0.0
+    for blk in text.split("--- !u!"):
+        if "viewportRect" not in blk:
+            continue
+        m = re.search(r"viewportRect:\n(?:\s+serializedVersion: \d+\n)?"
+                      r"\s+x: [-\d.e]+\n\s+y: [-\d.e]+\n"
+                      r"\s+width: ([-\d.e]+)\n\s+height: ([-\d.e]+)", blk)
+        if not m:
+            continue
+        w, h = float(m.group(1)), float(m.group(2))
+        if w <= 0 or h <= 0:
+            continue
+        widest = max(widest, PHONE * w / h)
+    return widest
+
+
+# The shape of the screen the game is built for, before it is cut into viewports.
+PHONE = 19.5 / 9.0
+
+
 def main():
     table_path = os.path.join(BACKDROPS, "layers.json")
     if not os.path.exists(table_path):
@@ -241,6 +274,23 @@ def main():
             problems.append("BackdropBuilder no longer asks for the \"Gulag Runners / "
                             "Backdrop\" shader. Whatever it builds on instead will take the "
                             "scene's fog, which is solid long before the far layer")
+
+    # 4. The art has to be sized for the shape a camera RENDERS INTO, not for the screen.
+    for scene_name in sorted(themes):
+        path = os.path.join(SCENES, scene_name + ".unity")
+        if not os.path.exists(path):
+            continue
+        shape = viewport_aspect(read(path))
+        if shape <= 0:
+            continue
+        if shape > table["camera"]["aspect"] + 0.05:
+            problems.append(
+                "%s renders each camera into a %.2f:1 viewport -- the screen is cut in two, "
+                "so a half is that much wider than it is tall -- but the backdrop art is "
+                "built for %.2f:1. The layers will be too narrow and their edges will be in "
+                "shot. Raise ASPECT in make_backdrops.py and re-run it"
+                % (scene_name, shape, table["camera"]["aspect"]))
+
 
     if problems:
         for line in problems:

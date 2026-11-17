@@ -35,7 +35,8 @@ which would make this test pass again while the motor stayed wrong.
 import sys
 
 import sim_motor_mirror as M
-from sim_motor_mirror import S, step, C, UP, X, ONE
+from sim_motor_mirror import S, step, C, UP, JMP, X, ONE
+import arena_demo_geometry as G
 
 ok = True
 
@@ -95,6 +96,48 @@ CEILING = {
 }
 
 
+
+# --------------------------------------------------------- the arena it was reported in
+#
+# Arena_Egypt, measured rather than built. Its three upper ladders start at y 2.95, the
+# slab under them runs 3.03 to 3.27, and the storey below is at 1.12. A jump from there
+# tops out with the head against 3.03 and the body overlapping those rungs by EIGHT
+# CENTIMETRES -- and that used to be a grab, after which the climb was legitimate, because
+# the ladder really does run through that slab.
+#
+# Run against the scene file, so the day somebody moves a ladder this test is measuring the
+# ladder they moved.
+
+def egypt():
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    return G.bake(G.Scene(os.path.join(
+        here, "..", "..", "Gulag runners", "Assets", "Scenes", "Arena_Egypt.unity")))
+
+
+def egypt_case():
+    try:
+        w = egypt()
+    except Exception as e:
+        check("Arena_Egypt could be read", False, str(e)[:70])
+        return
+
+    upper = [L for L in w["ladder"] if L[1] / ONE > 1.17]
+    check("Arena_Egypt still has upper-storey ladders to test",
+          len(upper) > 0, "%d found" % len(upper))
+
+    for i, L in enumerate(upper):
+        x = (L[0] + L[2]) / 2 / ONE
+        s = S(x, 1.12)                      # the storey below
+        modes = set()
+        for f in range(200):
+            step(s, UP | JMP if f < 4 else UP, w)
+            modes.add(s.mode)
+        check("jumping at the upper ladder above x %+.1f does not reach its rungs" % x,
+              "ladder" not in modes,
+              "ended y %.2f, modes %s" % (s.y / ONE, sorted(modes)))
+
+
 def main():
     print("ladder_ceiling_test: a ladder is a hole only where it goes all the way through")
 
@@ -114,6 +157,8 @@ def main():
 
     # Started already pinned against the underside of the slab, overlapping the ladder by
     # the two centimetres that used to be a grip.
+    egypt_case()
+
     top, modes = climb(CEILING, 1.29)
     check("nor when the body starts pressed against the ceiling, touching the rungs",
           top < 2.25, "reached y %.2f" % top)

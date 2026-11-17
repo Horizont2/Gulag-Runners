@@ -84,8 +84,21 @@ PITCH = 4.0          # pitchDegrees in the scenes; the script's default of 12 is
 BODY = 0.91          # Player 1 / Player 2 prefabs, MovementTuning.bodyHeight
 BODY_FRACTION = 0.22  # bodyScreenFraction in the arena scenes
 VIEW_H = BODY / BODY_FRACTION
-ASPECT = 21.0 / 9.0  # size for the widest phone shape; framing is driven by HEIGHT, so a
-                     # narrower screen simply sees less of a layer that already covers it
+# SPLIT SCREEN, and this is the number that was wrong.
+#
+# Every arena gives each camera a viewportRect of full width by HALF height -- two players,
+# one phone, stacked. On a 19.5:9 screen each half is therefore 4.33:1, not the 2.33:1 of
+# the whole screen, and the framing does NOT shrink with it: EffectiveViewHeight only
+# applies scaleFramingToViewport under manualFraming, which is off, so each half still
+# frames 4.14 m of height and 4.14 * 4.33 = 17.9 m of WIDTH.
+#
+# Sized for 21:9 the layers were 9.6 m of view wide against 17.9 m of frame, and their left
+# and right edges stood in shot at the start of every round. Nothing in a single-camera
+# measurement could show it: the fault is only there when the screen is cut in two.
+#
+# 4.5 rather than 4.33 so a taller phone -- where each half is wider still -- has somewhere
+# to go.
+ASPECT = 4.5
 ARENA_W = 32.46      # Forest and Nordic, x -18.12..14.34 -- the widest of the four
 ARENA_H = 8.80       # and the tallest, y -2.6..6.2
 ZOOM = (0.6, 1.1)    # minZoom..maxZoom; coverage is solved across the whole range
