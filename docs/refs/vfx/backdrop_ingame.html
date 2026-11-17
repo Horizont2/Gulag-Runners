@@ -63,7 +63,7 @@ function draw(c, img, anchorY, focusX, focusY) {
 
   g.fillStyle = '#10151c'; g.fillRect(0, 0, W, H);
 
-  const order = [...LAYERS].sort((a, b) => b.depth - a.depth);   // far first, fore last
+  const order = [...LAYERS].sort((a, b) => b.depth - a.depth);   // furthest first
   for (let i = 0; i < order.length; i++) {
     const L = order[i], d = L.depth - REST;
     const slot = LAYERS.indexOf(L);
