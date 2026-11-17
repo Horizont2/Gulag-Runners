@@ -98,6 +98,10 @@ namespace GulagRunners.GameEditor
                     // call in all of them.
                     BackdropBuilder.Run();
 
+                    // And the blob under each fighter. Only reached in scenes that have
+                    // fighters, which is the test above.
+                    GroundShadowSetup.Run();
+
                     EditorSceneManager.MarkSceneDirty(scene);
                     EditorSceneManager.SaveScene(scene);
                     did.Add(scene.name);

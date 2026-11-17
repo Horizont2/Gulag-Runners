@@ -1,0 +1,126 @@
+<!doctype html>
+<meta charset=utf-8>
+<title>working</title>
+<!--
+  Does a blob shadow read at all through the arena camera?
+
+  The worry is real: the camera is pitched FOUR degrees, so anything lying flat on the floor
+  is seen nearly edge on and squashed to sin(4) = 7% of its size. A circle 0.6 m across comes
+  to about 1% of the frame height -- eleven pixels on a 1080-tall phone, under a fighter who
+  is two hundred and thirty. That is not a shadow, it is a scratch.
+
+  Depth is the way out, and this page exists to check it rather than assume it. The Z axis
+  projects onto the same screen vertical the pitch is squashing, so stretching the pool into
+  the screen buys the height back. The question is how much stretch is enough before it
+  starts to look like a puddle, and whether anyone can tell from here that it is stretched.
+
+  So: the real projection, not an approximation. Camera 7.70 m back (4.136 m of framing at
+  fov 30, which is bodyHeight 0.91 over bodyScreenFraction 0.22), pitched 4, aimed at chest
+  height. Each column is a jump height; each row a different stretch.
+-->
+<style>
+  body { background:#0b0d10; margin:0; padding:12px;
+         font:11px ui-monospace,SFMono-Regular,monospace; color:#7d848c }
+  h2 { font:11px inherit; color:#c9d0d8; margin:14px 0 6px; letter-spacing:.09em;
+       text-transform:uppercase }
+  .row { display:flex; gap:6px; margin-bottom:4px }
+  figure { margin:0; flex:1 }
+  canvas { width:100%; display:block; background:#2a2f36 }
+  figcaption { padding:3px 1px; color:#6b727a }
+</style>
+<div id=out></div>
+<script>
+// ---- the camera, out of the scene files and SideViewCamera.Place -------------------
+const FOV = 30, PITCH = 4, ASPECT = 19.5 / 9;
+const BODY = 0.91, FRACTION = 0.22;
+const FRAMING = BODY / FRACTION;                       // 4.136 m
+const rad = d => d * Math.PI / 180;
+const DIST = FRAMING * 0.5 * Math.cos(rad(PITCH)) / Math.tan(rad(FOV / 2));   // 7.70 m
+const AIM = BODY * 0.6;                                // aimHeightBodies
+
+const f = [0, -Math.sin(rad(PITCH)), Math.cos(rad(PITCH))];
+const u = [0,  Math.cos(rad(PITCH)), Math.sin(rad(PITCH))];
+const r = [1, 0, 0];
+const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+
+function project(p, cam, W, H) {
+  const v = [p[0]-cam[0], p[1]-cam[1], p[2]-cam[2]];
+  const z = dot(v, f);
+  if (z <= 0.01) return null;
+  const ndcY = (dot(v, u) / z) / Math.tan(rad(FOV / 2));
+  const ndcX = (dot(v, r) / z) / (Math.tan(rad(FOV / 2)) * ASPECT);
+  return [W/2 + ndcX * W/2, H/2 - ndcY * H/2];
+}
+
+// ---- the defaults the component ships with ------------------------------------------
+const SPREAD = 1.6, OPACITY = 0.5, FADE = 2.4, SHRINK = 0.5, FADE_TO = 0.35;
+const WIDTH = BODY * 0.33 * SPREAD;   // bodyWidth 0.3 * spread -- near enough for the look
+
+function draw(c, height, stretch) {
+  const W = c.width, H = c.height, g = c.getContext('2d');
+  const cam = [0, AIM, 0].map((v, i) => v - f[i] * DIST);
+
+  g.fillStyle = '#39404a'; g.fillRect(0, 0, W, H);
+
+  // the floor, as a big quad, so the shadow is judged against a surface and not a void
+  const floor = [[-6,0,-6],[6,0,-6],[6,0,6],[-6,0,6]].map(p => project(p, cam, W, H));
+  if (floor.every(Boolean)) {
+    g.beginPath(); g.moveTo(...floor[0]);
+    floor.slice(1).forEach(p => g.lineTo(...p));
+    g.closePath(); g.fillStyle = '#4a525d'; g.fill();
+  }
+
+  // the pool: an ellipse on the floor, a across X and a*stretch along Z
+  const t = Math.min(1, height / FADE);
+  const a = WIDTH * (1 + (SHRINK - 1) * t) / 2;
+  const b = a * stretch;
+  const pts = [];
+  for (let i = 0; i < 72; i++) {
+    const th = i / 72 * Math.PI * 2;
+    pts.push(project([Math.cos(th) * a, 0.012, Math.sin(th) * b], cam, W, H));
+  }
+  if (pts.every(Boolean)) {
+    g.beginPath(); g.moveTo(...pts[0]);
+    pts.slice(1).forEach(p => g.lineTo(...p));
+    g.closePath();
+    g.fillStyle = `rgba(18,20,31,${(OPACITY * (1 + (FADE_TO - 1) * t)).toFixed(3)})`;
+    g.fill();
+  }
+
+  // the fighter: a plain box at the right height, only so the shadow has an owner
+  const hw = 0.15, y0 = height, y1 = height + BODY;
+  const box = [[-hw,y0,0],[hw,y0,0],[hw,y1,0],[-hw,y1,0]].map(p => project(p, cam, W, H));
+  if (box.every(Boolean)) {
+    g.beginPath(); g.moveTo(...box[0]);
+    box.slice(1).forEach(p => g.lineTo(...p));
+    g.closePath(); g.fillStyle = '#c8ccd2'; g.fill();
+  }
+}
+
+// Real heights, not round ones: the apex of a jump is jumpSpeed^2/(2*gravity)
+// = 9.5^2/56 = 1.61 m. Anything above that is a fall off a ledge, where a
+// shadow coming back as you near the floor is exactly what you want.
+const APEX = 9.5 * 9.5 / (2 * 28);
+const HEIGHTS = [0, 0.5, APEX * 0.6, APEX];
+const STRETCH = [2.5];
+const out = document.getElementById('out');
+
+for (const s of STRETCH) {
+  out.insertAdjacentHTML('beforeend',
+    `<h2>stretch in depth &times;${s}${s === 2.5 ? '  (the default)' : ''}</h2>`);
+  const row = document.createElement('div');
+  row.className = 'row';
+  for (const h of HEIGHTS) {
+    const fig = document.createElement('figure');
+    const c = document.createElement('canvas');
+    c.width = 780; c.height = 360;
+    fig.appendChild(c);
+    fig.insertAdjacentHTML('beforeend',
+      `<figcaption>${h === 0 ? 'on the floor' : h.toFixed(2) + ' m up' + (Math.abs(h - APEX) < 0.01 ? '  — jump apex' : '')}</figcaption>`);
+    row.appendChild(fig);
+    draw(c, h, s);
+  }
+  out.appendChild(row);
+}
+document.title = 'ready';
+</script>

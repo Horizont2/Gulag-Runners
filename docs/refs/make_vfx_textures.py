@@ -293,12 +293,40 @@ def puff(s=128):
     return s, s, out
 
 
+def shadow(s=128):
+    """
+    The pool under a fighter's feet.
+
+    Softer than any of the impact shapes above, and for the opposite reason. Those have to
+    read as a SHAPE at a glance; this one must never be noticed as a shape at all -- the
+    moment a blob shadow has a visible edge it stops being contact and becomes a sticker on
+    the floor. So the core is small and nearly all of the radius is falloff.
+
+    It stops at 0.86 of the half-width rather than filling the square, which leaves the
+    texture's own edge clear of the gradient. A blob that runs to the border gets a hard
+    line from clamped sampling at exactly the place the softness was for.
+    """
+    out = bytearray(s * s)
+    edge = 0.86
+    for y in range(s):
+        for x in range(s):
+            d = math.hypot(x - s / 2 + 0.5, y - s / 2 + 0.5) / (s / 2)
+            if d >= edge:
+                a = 0.0
+            else:
+                t = d / edge
+                a = 1.0 if t < 0.22 else (1 - (t - 0.22) / 0.78) ** 1.35
+            out[y * s + x] = int(255 * a)
+    return s, s, out
+
+
 SHAPES = [
     ("vfx_core", core, "the hot centre of an impact"),
     ("vfx_spark", spark, "a streak that reads as a direction"),
     ("vfx_ring", ring, "the thin shell that says force"),
     ("vfx_slash", slash, "the blade's arc"),
     ("vfx_puff", puff, "dust: soft, with an edge that is not a circle"),
+    ("vfx_shadow", shadow, "the contact pool under a fighter"),
 ]
 
 
