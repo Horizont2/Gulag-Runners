@@ -158,7 +158,7 @@ MonoBehaviour:
   - key: menu/icon/skins
     sprite: {fileID: 21300000, guid: 2260aa8f2c2ef8840b6ce89d29bc1306, type: 3}
   - key: result/dim
-    sprite: {fileID: 0}
+    sprite: {fileID: 21300000, guid: 08815c579a5932a4e8e6e48239be876b, type: 3}
   - key: result/panel
     sprite: {fileID: 21300000, guid: ccfd10ed64e6a804983f51301bea9740, type: 3}
   - key: result/banner
@@ -166,9 +166,9 @@ MonoBehaviour:
   - key: result/divider
     sprite: {fileID: 21300000, guid: 2d495a82650083a488d5c83456a9795b, type: 3}
   - key: result/button/primary
-    sprite: {fileID: 21300000, guid: 8aba4fb2671613b45af61fe42c12ad07, type: 3}
+    sprite: {fileID: 21300000, guid: a7bd136559e729f419772635e8104f93, type: 3}
   - key: result/button/secondary
-    sprite: {fileID: 21300000, guid: 8aba4fb2671613b45af61fe42c12ad07, type: 3}
+    sprite: {fileID: 21300000, guid: a7bd136559e729f419772635e8104f93, type: 3}
   - key: result/icon/gold
     sprite: {fileID: 21300000, guid: b53a204fb358a24438b065d341471fb9, type: 3}
   - key: result/icon/league
