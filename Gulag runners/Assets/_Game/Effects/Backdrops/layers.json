@@ -9,44 +9,53 @@
   "layers": [
     {
       "name": "near",
-      "depth": 28.0,
-      "drift": 0.275,
-      "screens_wide": 1.436,
-      "screens_high": 2.1036,
-      "screens_top": -0.5518,
-      "metres_wide": 96.966,
-      "metres_high": 31.565,
+      "depth": 34.0,
+      "drift": 0.2265,
+      "screens_wide": 3.2121,
+      "screens_high": 1.9011,
+      "screens_top": -0.4506,
+      "tiles": 2,
+      "tile_screens": 1.6061,
+      "visible_share": 0.3113,
+      "metres_wide": 263.37,
+      "metres_high": 34.639,
       "pixels": [
-        1536,
-        496
+        2048,
+        544
       ]
     },
     {
       "name": "mid",
-      "depth": 64.0,
-      "drift": 0.1203,
-      "screens_wide": 1.2138,
-      "screens_high": 1.4869,
-      "screens_top": -0.2435,
-      "metres_wide": 187.34,
-      "metres_high": 50.997,
+      "depth": 85.0,
+      "drift": 0.0906,
+      "screens_wide": 3.2121,
+      "screens_high": 1.3775,
+      "screens_top": -0.1887,
+      "tiles": 2,
+      "tile_screens": 1.6061,
+      "visible_share": 0.3113,
+      "metres_wide": 658.424,
+      "metres_high": 62.746,
       "pixels": [
-        1536,
-        416
+        2048,
+        384
       ]
     },
     {
       "name": "far",
-      "depth": 150.0,
-      "drift": 0.0513,
-      "screens_wide": 1.1238,
-      "screens_high": 1.237,
-      "screens_top": -0.1185,
-      "metres_wide": 406.507,
-      "metres_high": 99.437,
+      "depth": 220.0,
+      "drift": 0.035,
+      "screens_wide": 3.2121,
+      "screens_high": 1.1799,
+      "screens_top": -0.0899,
+      "tiles": 2,
+      "tile_screens": 1.6061,
+      "visible_share": 0.3113,
+      "metres_wide": 1704.157,
+      "metres_high": 139.107,
       "pixels": [
-        1536,
-        368
+        2048,
+        336
       ]
     }
   ]

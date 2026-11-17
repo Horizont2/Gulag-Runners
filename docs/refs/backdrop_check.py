@@ -53,6 +53,70 @@ def png_size(path):
     return struct.unpack(">II", head[16:24])
 
 
+def seam(path):
+    """
+    How far a layer's right-hand edge is from its left-hand one, in levels per channel.
+
+    Zero means it joins up with itself and can be repeated without a visible step. This
+    only became a requirement when the layers started tiling: before, each layer was one
+    image and its ends were off screen, so bg_mine_near ending 7.8 levels away from where
+    it started cost nothing. Drawn three times across a quad it costs three identical steps
+    at the same height, which is the most obviously artificial thing a horizon can do.
+
+    Decoded by hand because the whole of docs/refs runs on the standard library.
+    """
+    try:
+        raw = open(path, "rb").read()
+        wide, high = struct.unpack(">II", raw[16:24])
+        kind = raw[25]
+        data = b""
+        at = 8
+        while at < len(raw):
+            size = struct.unpack(">I", raw[at:at + 4])[0]
+            if raw[at + 4:at + 8] == b"IDAT":
+                data += raw[at + 8:at + 8 + size]
+            at += 12 + size
+
+        import zlib
+        flat = zlib.decompress(data)
+        chans = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[kind]
+        stride = wide * chans
+        out = bytearray()
+        prev = bytearray(stride)
+        pos = 0
+        for _ in range(high):
+            how = flat[pos]
+            pos += 1
+            row = bytearray(flat[pos:pos + stride])
+            pos += stride
+            for x in range(stride):
+                a = row[x - chans] if x >= chans else 0
+                b = prev[x]
+                c = prev[x - chans] if x >= chans else 0
+                if how == 1:
+                    row[x] = (row[x] + a) & 255
+                elif how == 2:
+                    row[x] = (row[x] + b) & 255
+                elif how == 3:
+                    row[x] = (row[x] + (a + b) // 2) & 255
+                elif how == 4:
+                    guess = a + b - c
+                    da, db, dc = abs(guess - a), abs(guess - b), abs(guess - c)
+                    row[x] = (row[x] + (a if da <= db and da <= dc
+                                        else (b if db <= dc else c))) & 255
+            out += row
+            prev = row
+
+        total = 0
+        for y in range(high):
+            left = (y * wide) * chans
+            right = (y * wide + wide - 1) * chans
+            total += sum(abs(out[left + c] - out[right + c]) for c in range(chans))
+        return total / float(high * chans)
+    except Exception:
+        return None
+
+
 def themes_in_builder():
     """The scene-to-palette table BackdropBuilder holds, so the two lists cannot drift."""
     if not os.path.exists(BUILDER):
@@ -291,6 +355,58 @@ def main():
                 "shot. Raise ASPECT in make_backdrops.py and re-run it"
                 % (scene_name, shape, table["camera"]["aspect"]))
 
+
+    # 5. A LAYER MUST NOT SHOW ALL OF ITSELF AT ONCE, which is the whole reason the layers
+    # are tiled. Reported as "the parallax is too narrow, you can see its edges, you can see
+    # it is just a picture behind" -- and the widths turned out to be fine, running 16 to 42
+    # metres wider than any arena needs. What was wrong was that one frame held 70%, 82% and
+    # 89% of the three layers. Both ends of the picture in shot, and the far one drifting at
+    # 5%, is a painting pinned to the back wall whatever its dimensions are.
+    for layer in table["layers"]:
+        see = 2.0 * layer["depth"] * math.tan(math.radians(table["camera"]["fov"] / 2.0)) \
+            * table["camera"]["aspect"]
+        share = see / layer["metres_wide"]
+        if share > 0.45:
+            problems.append(
+                "the %s layer puts %.0f%% of itself in one frame (%.0f m of %.0f m). Over "
+                "about 45%% a layer reads as one picture hung behind the arena rather than "
+                "as distance. Lower VISIBLE in make_backdrops.py and re-run it"
+                % (layer["name"], share * 100.0, see, layer["metres_wide"]))
+
+    # 6. AND IT MUST ACTUALLY TILE, in the art, in the table and in the import. Three things
+    # have to agree or the repeat is a defect instead of a feature: the table has to ask for
+    # more than one tile, the image has to join up with itself, and the importer has to be
+    # set to Repeat. Clamped, a "tiled" layer is one tile and then its last column of pixels
+    # smeared across the rest of the quad.
+    for layer in table["layers"]:
+        if layer.get("tiles", 1) < 2:
+            problems.append(
+                "the %s layer is a single tile, so its width has to be bought in pixels "
+                "rather than in repeats. Check TILE_SCREENS in make_backdrops.py"
+                % layer["name"])
+
+    for theme in sorted(set(themes.values())):
+        for layer in table["layers"]:
+            art = os.path.join(BACKDROPS, "bg_%s_%s.png" % (theme, layer["name"]))
+            if not os.path.exists(art):
+                continue
+
+            meta = read(art + ".meta")
+            if meta and re.search(r"wrapU: [^0]", meta):
+                problems.append(
+                    "bg_%s_%s.png is not imported with Wrap Mode Repeat across, so the "
+                    "repeat that gives it its width would come out as one tile and a smear"
+                    % (theme, layer["name"]))
+
+            step = seam(art)
+            if step is not None and step > 2.0:
+                problems.append(
+                    "bg_%s_%s.png does not join up with itself: its left and right edges "
+                    "differ by %.1f levels per channel. It is drawn %d times across the "
+                    "quad, so that step appears %d times in shot. Every frequency in "
+                    "ridge() has to be a whole number of waves across the tile"
+                    % (theme, layer["name"], step, layer.get("tiles", 1),
+                       layer.get("tiles", 1)))
 
     if problems:
         for line in problems:

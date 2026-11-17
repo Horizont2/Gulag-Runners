@@ -76,15 +76,33 @@ for (const theme of Object.keys(SKY)) {
     // Furthest first, so nearer layers draw over them.
     for (const layer of [...LAYERS].reverse()) {
       const span = layer.screens_wide - 1;             // screens of slack in this layer
-      const img = new Image();
+
+      // A REPEATING BACKGROUND, not one stretched image, because that is what Unity does.
+      // The quad is layer.tiles tiles wide and the material repeats the texture across it;
+      // an <img> sized to the whole quad would stretch one tile over three screens, so the
+      // preview would show art two or three times wider than the game draws it and would
+      // approve a layer that is wrong. The preview's job is to be checkable against the
+      // thing it previews.
+      const el = document.createElement('div');
+      el.style.position = 'absolute';
+      el.style.width  = (layer.screens_wide * 100) + '%';
+      el.style.height = (layer.screens_high * 100) + '%';
+      el.style.left   = (-span * 100 * t) + '%';
+      el.style.top    = (layer.screens_top * 100) + '%';
+      // QUOTED. The folder is "Gulag runners", with a space in it, and an unquoted space
+      // inside url() is not valid CSS -- the whole declaration is dropped and the page
+      // comes back as four empty skies with no error in the console to say why. An <img>
+      // src, which this used to be, does not care.
+      el.style.backgroundImage  = `url("${DIR}bg_${theme}_${layer.name}.png")`;
+      el.style.backgroundRepeat = 'repeat-x';
+      el.style.backgroundSize   = (100 / layer.tiles) + '% 100%';
+      f.appendChild(el);
+
+      // Still load it as an image, only to know when every layer has arrived.
+      const probe = new Image();
       pending++;
-      img.onload = img.onerror = () => { if (--pending === 0) document.title = 'ready'; };
-      img.src = DIR + `bg_${theme}_${layer.name}.png`;
-      img.style.width  = (layer.screens_wide * 100) + '%';
-      img.style.height = (layer.screens_high * 100) + '%';
-      img.style.left   = (-span * 100 * t) + '%';
-      img.style.top    = (layer.screens_top * 100) + '%';
-      f.appendChild(img);
+      probe.onload = probe.onerror = () => { if (--pending === 0) document.title = 'ready'; };
+      probe.src = DIR + `bg_${theme}_${layer.name}.png`;
     }
 
     f.insertAdjacentHTML('beforeend',

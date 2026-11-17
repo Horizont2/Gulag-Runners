@@ -106,14 +106,38 @@ ZOOM = (0.6, 1.1)    # minZoom..maxZoom; coverage is solved across the whole ran
 SHAKE = 0.25         # shakeAmplitude, metres, plus the look-ahead and air slack
 MARGIN = 1.06        # so a rounding error cannot park an edge inside the frame
 
-TEX_W = 1536         # docs/06 caps textures at 120 MB; twelve of these is about 7 MB packed
+TEX_W = 2048       # one tile; docs/06 caps textures at 120 MB and twelve of these is about 8 MB
 
 # Distance from the camera, at zoom 1. These ARE chosen -- the art direction, and the only
-# free parameter on this page. They give drifts of 32%, 14% and 6%.
-# Pushed back from 20/46/105. Further away is a bigger world and a calmer
-# drift -- the Worms look -- and it costs nothing in apparent size, because the
-# quads grow with the depth by construction. Only the drift changes: 27%, 12%, 5%.
-DEPTHS = (("near", 28.0), ("mid", 64.0), ("far", 150.0))
+# free parameter on this page. Pushed back twice now: 20/46/105, then 28/64/150, now this.
+# Further away is a bigger world and a calmer drift -- the Worms look -- and it costs
+# nothing in apparent size, because the quads grow with the depth by construction. Only the
+# drift changes, and it is now 23%, 9% and 3.5% of the fighters' own apparent speed.
+DEPTHS = (("near", 34.0), ("mid", 85.0), ("far", 220.0))
+
+# HOW MUCH OF A LAYER MAY BE ON SCREEN AT ONCE, and the number this file was missing.
+#
+# Reported as "the parallax is far too narrow, you can see its edges, you can see it is just
+# a picture behind". The first thing I did was check the widths, and they were not the
+# fault: measured against every arena's real camera borders the quads already ran 16 to 42
+# metres WIDER than they need to, and they hold up to a 22:9 screen, which no phone is.
+#
+# The fault was that you could see the WHOLE PICTURE. At the old depths one frame held 70%
+# of the near layer, 82% of the middle and 89% of the far one -- and the far one drifts by
+# 5%, so it was a painting pinned behind the arena, both ends of it in shot, not moving.
+# Nothing about that reads as distance however wide the quad is.
+#
+# So a layer now has to be at least three frames wide, which puts a third of it on screen,
+# and the way it is paid for is TILING: the quad is widened and the texture repeats across
+# it. Pixels per metre stay exactly where they were, memory does not move, and an edge
+# cannot exist because there is no edge -- which also makes seamlessness a requirement
+# rather than a nicety, and ridge() is built to wrap for that reason.
+VISIBLE = 0.33       # at most this much of a layer in one frame
+
+# One tile is about this many frames wide. It is a resolution choice, not a look: TEX_W
+# pixels spread over this much frame is what sets how soft the art is on a phone, and 1.3
+# keeps it exactly where the old single-tile layers had it.
+TILE_SCREENS = 1.3
 
 
 def camera_distance(zoom=1.0):
@@ -171,10 +195,19 @@ def layers():
             need_w = max(need_w, see_w / world_w)
             need_h = max(need_h, see_h / world_h)
 
-        wide, high = need_w * MARGIN, need_h * MARGIN
+        # Coverage is the floor, not the answer. A quad wide enough to keep its edges out
+        # of shot can still show nearly all of itself at once, which is the thing that read
+        # as a painted sheet, so the width is taken up to whatever VISIBLE asks for.
+        wide = max(need_w, 1.0 / VISIBLE) * MARGIN
+        high = need_h * MARGIN
 
-        # The texture must have the quad's shape, or the art is stretched on screen.
-        px_h = int(round(TEX_W * high / (wide * ASPECT) / 16.0)) * 16
+        # And then it is paid for by repeating one tile rather than by one enormous image.
+        tiles = max(1, int(round(wide / TILE_SCREENS)))
+        tile_w = wide / tiles
+
+        # The texture must have ONE TILE's shape, or the art is stretched on screen. This
+        # used to be the whole quad's shape, which was right while there was one tile.
+        px_h = int(round(TEX_W * high / (tile_w * ASPECT) / 16.0)) * 16
 
         out.append({
             "name": name,
@@ -183,6 +216,11 @@ def layers():
             "screens_wide": round(wide, 4),
             "screens_high": round(high, 4),
             "screens_top": round(-(high - 1.0) * 0.5, 4),   # centred on the frame
+            # One tile, in frames. Everything drawn is composed against this and not
+            # against the whole quad, which is now several tiles of it.
+            "tiles": tiles,
+            "tile_screens": round(tile_w, 4),
+            "visible_share": round(1.0 / wide, 4),   # how much of it is in shot at once
             # what the Unity tool needs, in metres
             "metres_wide": round(wide * world_w, 3),
             "metres_high": round(high * world_h, 3),
@@ -193,6 +231,22 @@ def layers():
 
 LAYERS = layers()
 
+# The import settings these textures are written with. Two of its numbers carry the tiling
+# and are worth knowing before anybody edits this block: wrapU 0 is REPEAT and wrapV 1 is
+# CLAMP.
+#
+# Across: the quad is several tiles wide and the material repeats the texture over it. This
+# said CLAMP until the tiling went in, and clamped horizontally a layer is one tile followed
+# by its last column of pixels smeared over the rest of the quad -- a worse artefact than
+# the stretched single image it replaces, and one that looks like a mistake in the drawing
+# rather than in the import, which is the hardest kind to find. ridge() wraps for the same
+# reason, and backdrop_check fails if either stops being true.
+#
+# Up and down: nothing repeats vertically, and clamping there keeps the top row of sky from
+# bleeding into the bottom row of ground through the mip chain.
+#
+# The comment lives here and not in the template because Unity rewrites a .meta in place and
+# anything it does not recognise is lost at best.
 META = """fileFormatVersion: 2
 guid: {guid}
 TextureImporter:
@@ -231,7 +285,7 @@ TextureImporter:
     filterMode: 1
     aniso: 1
     mipBias: 0
-    wrapU: 1
+    wrapU: 0
     wrapV: 1
     wrapW: 1
   nPOTScale: 0
@@ -334,16 +388,44 @@ def ridge(rng, amp, base, lumps):
 
     Four octaves, not twenty: docs/00 wants hard edges and flat colour, and a ridge with
     fine noise on it reads as a photograph of a hill rather than as a drawing of one.
+
+    EVERY FREQUENCY IS A WHOLE NUMBER OF WAVES ACROSS THE TILE, which is what makes the
+    left edge meet the right one exactly. It used to be whatever the random draw gave,
+    multiplied by the theme's lumpiness, and the ridge then arrived at x=1 part way through
+    a wave: measured, bg_mine_near and bg_nordic_far ended 7.8 and 7.6 levels away from
+    where they started. That was survivable while each layer was one tile wide and the ends
+    were off screen. It is not survivable now -- the tile repeats, so the step at the seam
+    appears two or three times across the backdrop, at the same height, which is the most
+    obviously artificial thing a drawing of a horizon can do.
+
+    Rounding up rather than to nearest, so the lowest octave can never round to zero and
+    flatten the whole ridge into a straight line.
     """
-    waves = [(rng.between(0.6, 1.6) * k, rng.between(0, 6.28), amp / (k ** 0.85))
-             for k in (1, 2, 3.5, 6)]
+    waves = []
+    for k in (1, 2, 3.5, 6):
+        cycles = max(1, int(math.ceil(rng.between(0.6, 1.6) * k * lumps)))
+        waves.append((cycles, rng.between(0, 6.28), amp / (k ** 0.85)))
 
     def at(x):
         y = base
-        for freq, phase, a in waves:
-            y += math.sin(x * freq * 6.2831 * lumps + phase) * a
+        for cycles, phase, a in waves:
+            y += math.sin(x * cycles * 6.2831853 + phase) * a
         return y
     return at
+
+
+def across(x0, x1, w):
+    """
+    The columns from x0 to x1, WRAPPED round the edge of the tile.
+
+    Every shape here used to be clipped to the image instead -- max(0, ..), min(w, ..) --
+    which was right when a layer was one tile wide and its ends were off screen. Now the
+    tile repeats, so a tree clipped in half at the right edge is a tree sawn in half in the
+    middle of the backdrop, two or three times over. Wrapping costs one modulo and means a
+    shape that runs off one side arrives on the other, which is what a repeating world does.
+    """
+    for x in range(x0, x1):
+        yield x % w
 
 
 def fill_below(px, w, h, line, colour, alpha=255):
@@ -358,12 +440,12 @@ def fill_below(px, w, h, line, colour, alpha=255):
 def column(px, w, h, x0, wide, top, colour, cap=0):
     """A vertical shape: an obelisk, a pit prop, a tower."""
     r, g, b = colour
-    for x in range(max(0, x0), min(w, x0 + wide)):
+    for x in across(x0, x0 + wide, w):
         for y in range(max(0, top), h):
             i = (y * w + x) * 4
             px[i:i + 4] = bytes((r, g, b, 255))
     if cap:
-        for x in range(max(0, x0 - cap), min(w, x0 + wide + cap)):
+        for x in across(x0 - cap, x0 + wide + cap, w):
             for y in range(max(0, top - cap), max(0, top)):
                 i = (y * w + x) * 4
                 px[i:i + 4] = bytes((r, g, b, 255))
@@ -381,7 +463,7 @@ def prop(px, w, h, x0, span, top, thick, colour):
     beam = max(2, thick)
     column(px, w, h, x0, leg, top + beam, colour)
     column(px, w, h, x0 + span - leg, leg, top + beam, colour)
-    for x in range(max(0, x0 - leg), min(w, x0 + span + leg)):
+    for x in across(x0 - leg, x0 + span + leg, w):
         for y in range(max(0, top), min(h, top + beam)):
             i = (y * w + x) * 4
             px[i:i + 4] = bytes(tuple(colour) + (255,))
@@ -402,7 +484,7 @@ def shaft(px, w, h, x0, narrow, broad, top, bottom, colour):
     for y in range(max(0, top), min(h, bottom)):
         t = (y - top) / float(max(1, bottom - top))
         half = int((narrow + (broad - narrow) * t) * 0.5)
-        for x in range(max(0, x0 - half), min(w, x0 + half)):
+        for x in across(x0 - half, x0 + half, w):
             i = (y * w + x) * 4
             px[i:i + 4] = bytes(tuple(colour) + (255,))
 
@@ -414,7 +496,7 @@ def tree(px, w, h, x0, wide, top, colour):
     for y in range(max(0, top), h):
         t = (y - top) / max(1, h - top)
         half_now = int(half * min(1.0, t * 2.4))
-        for x in range(max(0, x0 - half_now), min(w, x0 + half_now + 1)):
+        for x in across(x0 - half_now, x0 + half_now + 1, w):
             i = (y * w + x) * 4
             px[i:i + 4] = bytes((r, g, b, 255))
 
@@ -438,7 +520,7 @@ def pyramid(px, w, h, x0, wide, top, colour):
     for y in range(max(0, top), h):
         t = (y - top) / max(1, h - top)
         half_now = int(half * t)
-        for x in range(max(0, x0 - half_now), min(w, x0 + half_now + 1)):
+        for x in across(x0 - half_now, x0 + half_now + 1, w):
             i = (y * w + x) * 4
             px[i:i + 4] = bytes((r, g, b, 255))
 
@@ -449,18 +531,65 @@ def lerp3(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
-# (name, silhouette colour, the haze each layer is lifted towards, how lumpy the land is)
+def near_bands(px, w, h, rng, row, high, colour, toward, lumps, index, on_band=None):
+    """
+    Two more horizons below the layer's own, each a step closer and a step different in
+    tone. Drawn LAST, so each one covers the feet of whatever stands behind it.
+
+    This is what the layers were missing. Measured across the twelve images, seven of them
+    had a value range of exactly zero -- the whole mine, the near and far of the nordic, the
+    near and middle of the temple. One flat tone spread over four hundred metres is a sheet
+    of paper whatever shape its top edge is, and no amount of parallax makes a sheet of paper
+    look like a valley. Three bands of nearly the same colour do, because that is what
+    distance actually does to a landscape: it sorts it into steps.
+
+    Nearly the same colour, and flat, and hard edged. Not a gradient -- docs/00 is explicit,
+    and a gradient here would also put partial values into an image that has to stay cutout.
+
+    Which way the tone steps is the same question as the layer order: with a sky, closer is
+    less hazed and therefore darker; underground, closer is nearer the lamps and brighter.
+    The caller passes the target, so this never has to know which arena it is drawing.
+    """
+    for k, (drop, scale, mix) in enumerate(((0.085, 0.70, 0.24), (0.185, 0.50, 0.44))):
+        base = row(0.66 - 0.155 * index + drop)
+        amp = high((0.125, 0.088, 0.056)[index] * scale)
+        line = ridge(rng, amp, base, lumps * (1.0, 0.7, 0.45)[index] * (1.6 + k))
+        tone = lerp3(colour, toward, mix)
+        fill_below(px, w, h, line, tone)
+
+        # And whatever grows on this band, planted after it is filled so it stands on it
+        # rather than behind it. Without this the forest was a single row of conifers with
+        # two bare hills in front, which from the arena read as a serrated fence: trees
+        # cut off at the ankles by the hill they are supposed to be standing on.
+        if on_band is not None:
+            on_band(k, line, tone)
+
+
+# (name, silhouette colour, the haze each layer is lifted towards, lumpiness, has a sky)
 #
 # The gap between the two is the ONLY thing separating the three layers, so a dark arena
 # needs a wider gap than a bright one, not a narrower one. The first pass gave the mine and
 # the temple hazes barely lighter than their ink, reasoning that a night scene is dark --
 # and all three layers came out the same value, which is a flat wall with no parallax in it
 # whatever the depths say. Dark means the whole range sits low, not that there is no range.
+#
+# THE LAST FLAG IS WHICH WAY THE RANGE RUNS, and the mine had it backwards. Aerial
+# perspective lifts distance towards the sky because the air between you and it is lit by
+# the sky. Underground there is no sky to light it, so distance does the opposite: it falls
+# away into black, and the only far thing you can see is a thing that is itself lit. The
+# mine was measured going 25.9 -> 38.9 -> 52.2 with depth, getting steadily brighter the
+# deeper in it went, which is why it read as a painted wall rather than as a tunnel.
+#
+# So the mine keeps the same range and runs it the other way: the near band is the brightest
+# thing (it is in the lamps' reach, like the arena), and the far one is nearly out. Its two
+# lit shafts then stop being a detail and become the only light in the deepest layer, which
+# is what they were always described as. The night desert keeps a sky -- a moon is a sky --
+# and still lifts.
 THEMES = {
-    "mine":    ((0.07, 0.07, 0.09), (0.27, 0.24, 0.22), 1.0),   # lamp-lit dust
-    "forest":  ((0.05, 0.09, 0.08), (0.36, 0.45, 0.47), 1.4),   # morning mist
-    "nordic":  ((0.10, 0.12, 0.17), (0.44, 0.51, 0.61), 2.2),   # cold daylight
-    "temple":  ((0.05, 0.04, 0.08), (0.44, 0.36, 0.52), 0.7),   # moonlit air
+    "mine":    ((0.07, 0.07, 0.09), (0.27, 0.24, 0.22), 1.0, False),  # lamp-lit dust
+    "forest":  ((0.05, 0.09, 0.08), (0.36, 0.45, 0.47), 1.4, True),   # morning mist
+    "nordic":  ((0.10, 0.12, 0.17), (0.44, 0.51, 0.61), 2.2, True),   # cold daylight
+    "temple":  ((0.05, 0.04, 0.08), (0.44, 0.36, 0.52), 0.7, True),   # moonlit air
 }
 
 def frame(layer, w, h):
@@ -481,7 +610,11 @@ def frame(layer, w, h):
     Written as a fraction of the texture instead, the same number is a different shape on
     each one, which is how the mine first came out with pit props wider than they were tall.
     """
-    cover, top, span = layer["screens_high"], layer["screens_top"], layer["screens_wide"]
+    # The TILE's span, not the quad's. The image being drawn is one tile; the quad is two
+    # or three of them side by side. Measuring against the quad would draw every tree at a
+    # third of its proper width and then repeat it, so the layer would read as a hedge.
+    cover, top = layer["screens_high"], layer["screens_top"]
+    span = layer["tile_screens"]
     return (lambda d: (d - top) / cover * h,
             lambda p: int(p / cover * h),
             lambda p: max(1, int(p / (span * ASPECT) * w)))
@@ -490,17 +623,23 @@ def frame(layer, w, h):
 def draw(theme, index, w, h):
     """One layer of one arena. Index 0 is nearest, 2 is furthest."""
     name = DEPTHS[index][0]
-    ink, haze, lumps = THEMES[theme]
+    ink, haze, lumps, sky = THEMES[theme]
     ink = tuple(int(c * 255) for c in ink)
     haze = tuple(int(c * 255) for c in haze)
 
     # Further is more washed out: the near band keeps its ink, the far one is most of
-    # the way to the sky. This is the whole depth cue and it costs nothing.
-    colour = lerp3(ink, haze, (0.20, 0.48, 0.78)[index])
+    # the way to the sky. This is the whole depth cue and it costs nothing. With no sky to
+    # do the washing out, the same range runs the other way and distance goes dark.
+    steps = (0.20, 0.48, 0.78) if sky else (0.78, 0.46, 0.14)
+    colour = lerp3(ink, haze, steps[index])
 
     rng = Rng(hash((theme, name)) & 0x7fffffff)
     px = bytearray(w * h * 4)
     row, high, wide = frame(LAYERS[index], w, h)
+
+    # What, if anything, grows on the nearer bands. Only the forest wants it so far; a
+    # fortress stands on one hill and a pyramid on one horizon, by construction.
+    plant = None
 
     # Further layers sit higher in the frame and are calmer: distance flattens a landscape,
     # and a far ridge has to clear the near one to be seen at all. The arena itself covers
@@ -523,24 +662,38 @@ def draw(theme, index, w, h):
             shaft(px, w, h, int(w * 0.24), wide(0.040), wide(0.125),
                   int(row(-0.05)), int(row(0.44)), dim)
         else:
-            props = (5, 3)[index]
-            for i in range(props):
-                x = int(w * (i + 0.5) / props + rng.between(-60, 60))
-                top = int(line(x / w) - high(rng.between(0.23, 0.33)))
-                prop(px, w, h, x, wide(0.115), top, high(0.016),
-                     lerp3(colour, ink, 0.55))
+            def props(on, tone, count, mix):
+                for i in range(count):
+                    x = int(w * (i + 0.5) / count + rng.between(-90, 90))
+                    top = int(on(x / w) - high(rng.between(0.23, 0.33)))
+                    prop(px, w, h, x, wide(0.115), top, high(0.016),
+                         lerp3(tone, ink, mix))
+
+            props(line, colour, (5, 3)[index], 0.55)
+            # Timbering carries on over the nearer rises too. One row of it against two
+            # bare humps is a photograph of a mine; three rows of it is a mine.
+            plant = lambda k, on, tone: props(on, tone, (3, 2)[index] - k, 0.5 - 0.1 * k)
 
     elif theme == "forest":
         fill_below(px, w, h, line, colour)
-        count = (26, 18, 11)[index]
-        for i in range(count):
-            x = int(w * (i + rng.between(0.2, 0.8)) / count)
-            # Conifers are not a picket fence: the spread has to be wide enough that the
-            # tops make a line of their own, or the layer reads as one serrated block.
-            up = rng.between(0.18, 0.56) ** 1.3 + 0.19
-            top = int(line(x / w) - high(up * (1, 0.75, 0.5)[index]))
-            tree(px, w, h, x, wide((0.110, 0.092, 0.074)[index]), top,
-                 lerp3(colour, ink, 0.55))
+
+        def conifers(on, tone, count, scale, mix):
+            """A stand of trees along one horizon."""
+            for i in range(count):
+                x = int(w * (i + rng.between(0.15, 0.85)) / count)
+                # Conifers are not a picket fence: the spread has to be wide enough that
+                # the tops make a line of their own, or the layer reads as one serrated
+                # block. Cubed rather than raised to 1.3, so most of a stand is short and
+                # a few run away above it -- that difference is the whole silhouette.
+                up = rng.between(0.10, 1.0) ** 3 * 0.72 + 0.16
+                top = int(on(x / w) - high(up * scale))
+                tree(px, w, h, x, wide((0.145, 0.120, 0.098)[index]), top,
+                     lerp3(tone, ink, mix))
+
+        conifers(line, colour, (16, 12, 8)[index], (1, 0.75, 0.5)[index], 0.55)
+        plant = lambda k, on, tone: conifers(
+            on, tone, (11, 8, 5)[index] - k * 2,
+            (1.15, 0.85, 0.58)[index] * (1.0 + 0.2 * k), 0.5 - 0.1 * k)
 
     elif theme == "nordic":
         fill_below(px, w, h, line, colour)
@@ -550,7 +703,7 @@ def draw(theme, index, w, h):
             span = wide(0.60)
             x0 = int(w * 0.46)
             wall = int(line((x0 + span * 0.5) / w) - high(0.082))
-            for x in range(x0, min(w, x0 + span)):
+            for x in across(x0, x0 + span, w):
                 for y in range(wall, h):
                     i = (y * w + x) * 4
                     px[i:i + 4] = bytes(keep + (255,))
@@ -565,11 +718,21 @@ def draw(theme, index, w, h):
             pyramid(px, w, h, int(w * 0.34), wide(1.70), int(row(0.09)),
                     lerp3(colour, ink, 0.60))
         else:
-            count = (5, 3)[index]
-            for i in range(count):
-                x = int(w * (i + 0.5) / count + rng.between(-60, 60))
-                top = int(line(x / w) - high(rng.between(0.20, 0.30)))
-                obelisk(px, w, h, x, wide(0.028), top, lerp3(colour, ink, 0.55))
+            # Wide enough to be a stone. At 0.028 of a frame these were two pixels across
+            # on the far layer and read as scratches on the image rather than as anything
+            # standing in the desert -- the same fault the mine's pit props are written up
+            # for. An obelisk is a narrow thing, but it is a narrow BUILDING.
+            def stones(on, tone, count, mix):
+                for i in range(count):
+                    x = int(w * (i + 0.5) / count + rng.between(-90, 90))
+                    top = int(on(x / w) - high(rng.between(0.20, 0.32)))
+                    obelisk(px, w, h, x, wide(0.055), top, lerp3(tone, ink, mix))
+
+            stones(line, colour, (5, 3)[index], 0.55)
+            plant = lambda k, on, tone: stones(on, tone, (3, 2)[index] - k, 0.45 - 0.1 * k)
+
+    # Last, so the near bands occlude the feet of everything standing behind them.
+    near_bands(px, w, h, rng, row, high, colour, ink if sky else haze, lumps, index, plant)
 
     return px
 

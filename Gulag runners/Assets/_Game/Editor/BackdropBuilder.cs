@@ -60,6 +60,7 @@ namespace GulagRunners.GameEditor
             public string name;
             public float depth;
             public float drift;
+            public int tiles;
             public float metres_wide;
             public float metres_high;
         }
@@ -185,7 +186,7 @@ namespace GulagRunners.GameEditor
                     continue;
                 }
 
-                Material skin = MaterialFor(theme, layer.name, art);
+                Material skin = MaterialFor(theme, layer.name, art, layer.tiles);
                 if (skin == null) return;   // it has already said why
 
                 GameObject go = new GameObject($"Backdrop_{layer.name}");
@@ -256,7 +257,7 @@ namespace GulagRunners.GameEditor
         /// One unlit cutout material per layer, made once and reused by every scene that
         /// shares the theme.
         /// </summary>
-        static Material MaterialFor(string theme, string layer, Texture2D art)
+        static Material MaterialFor(string theme, string layer, Texture2D art, int tiles)
         {
             string path = $"{MaterialsDir}/GR_Backdrop_{theme}_{layer}.mat";
             Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -292,6 +293,45 @@ namespace GulagRunners.GameEditor
             if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", art);
             if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", art);
             if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", Color.white);
+
+            // THE QUAD IS SEVERAL TILES WIDE AND THE TEXTURE IS ONE OF THEM.
+            //
+            // The layers used to be one image stretched over the whole quad, and that is
+            // what made the backdrop read as a painted sheet: at the old depths a single
+            // frame held 70% of the near layer, 82% of the middle and 89% of the far one,
+            // both ends of the picture in shot at once. The widths were never the problem --
+            // measured against every arena's real camera borders the quads already ran 16 to
+            // 42 metres wider than they need to. Seeing all of the picture was.
+            //
+            // So make_backdrops widens each quad to about three frames and says how many
+            // times its tile repeats across it. Resolution per metre is unchanged, the
+            // memory is unchanged, and there is no edge to find.
+            int repeat = Mathf.Max(1, tiles);
+            Vector2 scale = new Vector2(repeat, 1f);
+            if (mat.HasProperty("_BaseMap")) mat.SetTextureScale("_BaseMap", scale);
+            if (mat.HasProperty("_MainTex")) mat.SetTextureScale("_MainTex", scale);
+
+            // Repeat, or the "tiling" is one tile followed by its last column smeared across
+            // the rest of the quad -- which would be worse than the stretched single image
+            // it replaces, and would look like a bug in the art rather than in the import.
+            if (repeat > 1 && art.wrapMode != TextureWrapMode.Repeat)
+            {
+                string artPath = AssetDatabase.GetAssetPath(art);
+                TextureImporter importer =
+                    AssetImporter.GetAtPath(artPath) as TextureImporter;
+                if (importer != null)
+                {
+                    importer.wrapMode = TextureWrapMode.Repeat;
+                    importer.SaveAndReimport();
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"{artPath} is not set to Repeat and its importer could not be "
+                        + $"reached, so the {layer} layer will show one tile and a smear "
+                        + "instead of a repeat. Set Wrap Mode to Repeat by hand.");
+                }
+            }
 
             // Opaque with alpha clipping -- NOT transparent. See the note at the top: a
             // transparent backdrop draws after the opaque pass and lands in front of the

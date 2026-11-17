@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 44ab32424953411b808d4f484f5ae257
+guid: d1311837f84e4124a8e81722a4d6e62a
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -31,12 +31,23 @@ TextureImporter:
   seamlessCubemap: 0
   textureFormat: 1
   maxTextureSize: 2048
+  # wrapU 0 is REPEAT and wrapV 1 is CLAMP, and both matter.
+  #
+  # Across: the quad is several tiles wide and the material repeats the texture over it, so
+  # clamped horizontally -- which is what this said until the tiling went in -- the layer
+  # would be one tile followed by its last column of pixels smeared over the rest of the
+  # quad. That is a worse artefact than the stretched single image it replaces, and it looks
+  # like a mistake in the drawing rather than in the import, which is the hardest kind to
+  # find. ridge() is built to wrap for the same reason.
+  #
+  # Up and down: nothing repeats vertically and clamping there keeps the top row of sky from
+  # bleeding into the bottom row of ground through the mip chain.
   textureSettings:
     serializedVersion: 2
     filterMode: 1
     aniso: 1
     mipBias: 0
-    wrapU: 1
+    wrapU: 0
     wrapV: 1
     wrapW: 1
   nPOTScale: 0
