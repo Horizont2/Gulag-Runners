@@ -51,13 +51,37 @@ namespace GulagRunners.GameEditor
         {
             Scene scene = SceneManager.GetActiveScene();
 
+            // The arenas say how big they are through SideViewCamera's borders, which is the
+            // same volume the camera is clamped to and therefore exactly the volume a
+            // fighter can be in. The MENU has no such rig and is the scene the player looks
+            // at longest, so falling back to what the scene actually draws is the difference
+            // between this tool working there and refusing. Both give a box; only the
+            // arenas get one that means "where the fight happens" rather than "where the
+            // geometry is".
             SideViewCamera rig = Object.FindFirstObjectByType<SideViewCamera>(
                 FindObjectsInactive.Include);
-            if (rig == null)
+
+            Bounds volume;
+            float planeZ;
+            if (rig != null)
             {
-                Debug.LogWarning($"{scene.name} has no SideViewCamera, so there is no way to "
-                                 + "tell where the arena is to put probes in it.");
+                volume = new Bounds(
+                    new Vector3((rig.bordersMin.x + rig.bordersMax.x) * 0.5f,
+                                (rig.bordersMin.y + rig.bordersMax.y) * 0.5f, rig.planeZ),
+                    new Vector3(rig.bordersMax.x - rig.bordersMin.x,
+                                rig.bordersMax.y - rig.bordersMin.y, 0f));
+                planeZ = rig.planeZ;
+            }
+            else if (!DrawnBounds(scene, out volume))
+            {
+                Debug.LogWarning($"{scene.name} has no SideViewCamera to take an arena size "
+                                 + "from, and nothing in it is drawn either, so there is no "
+                                 + "volume to put probes in.");
                 return;
+            }
+            else
+            {
+                planeZ = volume.center.z;
             }
 
             List<string> needUVs = ModelsWithoutLightmapUVs(scene);
@@ -83,7 +107,7 @@ namespace GulagRunners.GameEditor
             int uvs = EnableLightmapUVs(needUVs);
             int statics = MarkStatic(scene);
             (int baked, int mixed) = SettleLights();
-            int probes = BuildProbes(scene, rig);
+            int probes = BuildProbes(scene, volume, planeZ);
             Configure(scene);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -187,7 +211,7 @@ namespace GulagRunners.GameEditor
         /// every moving thing in it -- both fighters, every loot item, every chest lid --
         /// goes flat, because dynamic objects do not read the lightmap. They read probes.
         /// </summary>
-        static int BuildProbes(Scene scene, SideViewCamera rig)
+        static int BuildProbes(Scene scene, Bounds volume, float planeZ)
         {
             foreach (GameObject root in scene.GetRootGameObjects())
                 if (root.name == ProbesName) Undo.DestroyObjectImmediate(root);
@@ -196,7 +220,8 @@ namespace GulagRunners.GameEditor
             Undo.RegisterCreatedObjectUndo(go, "Get this scene ready to bake");
             LightProbeGroup group = go.AddComponent<LightProbeGroup>();
 
-            Vector2 min = rig.bordersMin, max = rig.bordersMax;
+            Vector2 min = new Vector2(volume.min.x, volume.min.y);
+            Vector2 max = new Vector2(volume.max.x, volume.max.y);
             List<Vector3> spots = new List<Vector3>();
 
             int across = Mathf.Max(2, Mathf.CeilToInt((max.x - min.x) / ProbeSpacing) + 1);
@@ -215,13 +240,41 @@ namespace GulagRunners.GameEditor
                         // A little above the floor at the bottom row: a probe buried in the
                         // ground samples the inside of a solid and comes back black.
                         float y = Mathf.Lerp(min.y + 0.4f, max.y, j / (float)(up - 1));
-                        spots.Add(new Vector3(x, y, rig.planeZ + z * 1.2f));
+                        spots.Add(new Vector3(x, y, planeZ + z * 1.2f));
                     }
                 }
             }
 
             group.probePositions = spots.ToArray();
             return spots.Count;
+        }
+
+        /// <summary>
+        /// The box everything this scene draws fits inside, for a scene with no arena rig.
+        ///
+        /// Our own generated objects are left out on purpose: the backdrop's far layer is a
+        /// quad 199 metres wide sitting 128 metres away, and one of those in the bounds
+        /// would stretch the probe grid across the whole county and put every probe a
+        /// hundred metres from anything that needs lighting.
+        /// </summary>
+        static bool DrawnBounds(Scene scene, out Bounds box)
+        {
+            box = new Bounds();
+            bool any = false;
+
+            foreach (GameObject root in scene.GetRootGameObjects())
+            {
+                if (root.name == "Backdrop" || root.name == "Atmosphere"
+                    || root.name == "Ground shadows" || root.name == ProbesName) continue;
+
+                foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (r is ParticleSystemRenderer) continue;
+                    if (!any) { box = r.bounds; any = true; }
+                    else box.Encapsulate(r.bounds);
+                }
+            }
+            return any;
         }
 
         /// <summary>Lightmap settings sized for a phone, not for a screenshot.</summary>

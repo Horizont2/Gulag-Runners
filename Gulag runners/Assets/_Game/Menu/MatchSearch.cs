@@ -116,9 +116,13 @@ namespace GulagRunners.Game
             "A TOOL HALVES THE PRY,\n2.5 S TO 1.25 — AND COSTS\nTWO SWINGS AND THE NOISE.",
             "BELOW 30% HEALTH\nYOUR BLOWS HIT 40% HARDER.\nSO DO HIS.",
             "A PARRY IS TWELVE FRAMES\nWIDE AND STAGGERS HIM\nFOR EIGHT TENTHS.",
-            "A BROKEN GUARD LEAVES\nYOU OPEN FOR 0.7 S.\nLONG ENOUGH FOR TWO.",
-            "A BLOCK EATS 70%\nOF A BLOW, NOT ALL.\nTHE REST STILL LANDS.",
-            "A RAISED GUARD SPENDS\nA CHARGE EVERY 0.8 S.\nFOUR CHARGES IS 3.2.",
+            // These three used to teach the guard. docs/31 took the guard button out --
+            // the weapon is the defence now -- and the tips outlived it, so the search
+            // screen spent weeks explaining a button the player does not have. They are
+            // about the dodge, which is what replaced it.
+            "A DODGE COSTS TWO\nOF FOUR CHARGES. TWO DODGES\nAND YOU HAVE NONE.",
+            "A CHARGE RETURNS EVERY\n1.2 S. A SPENT DODGE\nIS BACK IN 2.4.",
+            "A DODGE IS 0.35 S\nUNTOUCHABLE, THEN 0.15 S\nYOU CANNOT ANSWER.",
             "THREE BLOWS CHAIN.\nTHE WINDOW BETWEEN THEM\nIS A THIRD OF A SECOND.",
             "THE ROOMS START SHUTTING\nAT 1:00. THE CEILING\nCOMES LATER, AND LOWER.",
         };

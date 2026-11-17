@@ -15,11 +15,11 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 1
-  m_FogColor: {r: 0.74, g: 0.79, b: 0.84, a: 1}
+  m_FogColor: {r: 0.06, g: 0.08, b: 0.14, a: 1}
   m_FogMode: 1
   m_FogDensity: 0.01
-  m_LinearFogStart: 9.96
-  m_LinearFogEnd: 34
+  m_LinearFogStart: 14
+  m_LinearFogEnd: 46
   m_AmbientSkyColor: {r: 0.08, g: 0.1, b: 0.16, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
@@ -128709,7 +128709,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7
+  m_Range: 7.0
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -128835,7 +128835,7 @@ Transform:
   m_GameObject: {fileID: 970100007}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.96, y: 2.074, z: 0.238}
+  m_LocalPosition: {x: -9.960, y: 2.074, z: 0.238}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -128997,7 +128997,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7
+  m_Range: 7.0
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -129123,7 +129123,7 @@ Transform:
   m_GameObject: {fileID: 970100017}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.451, y: 2.57, z: 0.332}
+  m_LocalPosition: {x: -2.451, y: 2.570, z: 0.332}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -129141,7 +129141,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7
+  m_Range: 7.0
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -129267,7 +129267,7 @@ Transform:
   m_GameObject: {fileID: 970100022}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.224, y: 6.336, z: 2.89}
+  m_LocalPosition: {x: 2.224, y: 6.336, z: 2.890}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -130306,7 +130306,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 0.64, g: 0.74, b: 1, a: 1}
-  m_Intensity: 1.5
+  m_Intensity: 0.8
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -130368,7 +130368,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1528419289}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.4997392, y: -0.2073675, z: 0.124599, w: 0.8317058}
+  m_LocalRotation: {x: 0.4997392, y: -0.2073675, z: 0.1245990, w: 0.8317058}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -131457,7 +131457,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7
+  m_Range: 7.0
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -131601,7 +131601,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7
+  m_Range: 7.0
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}

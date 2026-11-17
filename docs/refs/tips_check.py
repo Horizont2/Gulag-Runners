@@ -34,11 +34,21 @@ def read(path):
         return fh.read()
 
 
+# Fields a tip quotes that the game no longer has. Collected rather than raised: this
+# check exists to notice a tip that has outlived its mechanic, and the sharpest form of
+# that is the mechanic's field disappearing entirely -- so dying on it was the one input
+# it was guaranteed to be useless for. It happened: the guard was taken out per docs/31,
+# GuardBreakFrames went with it, and this file threw a LookupError for weeks while three
+# tips went on telling the player how to use a button that was gone.
+GONE = []
+
+
 def number(src, field, where):
     """The value assigned to `field` in a Default()-style initialiser."""
     m = re.search(r"\b" + re.escape(field) + r"\s*=\s*(-?\d+)\b", src)
     if m is None:
-        raise LookupError(f"{field} is not assigned anywhere in {where}")
+        GONE.append((field, where))
+        return 0
     return int(m.group(1))
 
 
@@ -78,15 +88,16 @@ def main():
 
     parry = number(combat, "ParryFrames", "CombatConfig")
     stagger = number(combat, "StaggerFrames", "CombatConfig")
-    guard_break = number(combat, "GuardBreakFrames", "CombatConfig")
-    chip = number(combat, "ChipPermille", "CombatConfig")
-    drain = number(combat, "GuardDrainFrames", "CombatConfig")
     combo = number(combat, "MaxCombo", "CombatConfig")
     window = number(combat, "ComboWindowFrames", "CombatConfig")
     desp_hp = number(combat, "DesperationHealthPermille", "CombatConfig")
     desp_dmg = number(combat, "DesperationDamagePermille", "CombatConfig")
 
     charges = number(move, "StaminaMax", "MoveConfig")
+    dodge_cost = number(move, "DodgeStaminaCost", "MoveConfig")
+    dodge_frames = number(move, "DodgeFrames", "MoveConfig")
+    dodge_recover = number(move, "DodgeRecoverFrames", "MoveConfig")
+    recover = number(move, "StaminaRecoverFrames", "MoveConfig")
     bare = number(chest, "BareFrames", "ChestConfig")
     wear = number(chest, "ToolWear", "ChestConfig")
 
@@ -112,15 +123,16 @@ def main():
         ("PARRY", [words[parry] + " FRAMES", seconds(stagger, 1).replace("0.8", "EIGHT TENTHS")],
          "ParryFrames, and Parry() setting StaggerTimer to StaggerFrames"),
 
-        ("BROKEN GUARD", [seconds(guard_break, 1) + " S"],
-         "GuardBreakFrames"),
+        # The guard is gone (docs/31 -- the weapon is the defence), so these three are
+        # about the dodge, which is what the player reaches for instead.
+        ("DODGE COSTS", [words[dodge_cost], words[charges]],
+         "MoveConfig.DodgeStaminaCost out of StaminaMax"),
 
-        ("BLOCK EATS", [f"{100 - chip // 10}%"],
-         "ChipPermille -- what gets through is the rest"),
+        ("CHARGE RETURNS", [seconds(recover) + " S", seconds(recover * dodge_cost)],
+         "MoveConfig.StaminaRecoverFrames, times DodgeStaminaCost for a whole dodge"),
 
-        ("RAISED GUARD", [seconds(drain, 1) + " S", words[charges] + " CHARGES",
-                          seconds(drain * charges, 1)],
-         "GuardDrainFrames and MoveConfig.StaminaMax"),
+        ("DODGE IS", [seconds(dodge_frames) + " S", seconds(dodge_recover) + " S"],
+         "MoveConfig.DodgeFrames (invulnerable) and DodgeRecoverFrames"),
 
         ("CHAIN", [words[combo] + " BLOWS"],
          "MaxCombo; ComboWindowFrames is a third of a second at " + seconds(window, 2)),
@@ -131,6 +143,16 @@ def main():
 
     pool = tips()
     problems = []
+
+    # A field that has vanished means the tip quoting it describes a mechanic that is no
+    # longer in the game -- which is worse than a tip with a stale number, because no
+    # number will ever make it right again.
+    for field, where in GONE:
+        problems.append(
+            f"a tip quotes {where}.{field}, which is not in the game any more. The tip is "
+            f"teaching a mechanic that was removed; delete it or rewrite it for whatever "
+            f"replaced that mechanic")
+
 
     for key, musts, why in pins:
         hits = [t for t in pool if key in t]
