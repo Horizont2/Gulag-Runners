@@ -31,8 +31,8 @@ namespace GulagRunners.Sim
             {    5,  45,  50 },      // Safe
         };
 
-        static readonly int[] Scratch = new int[32];
-        static readonly ItemId[] Pool = new ItemId[32];
+        static readonly int[] Scratch = new int[ItemTable.Count];
+        static readonly ItemId[] Pool = new ItemId[ItemTable.Count];
 
         /// <summary>
         /// One item for this chest. <see cref="ItemId.None"/> only if a tier has been emptied
@@ -63,7 +63,7 @@ namespace GulagRunners.Sim
         public static ItemId RollInTier(int tier, ref Rng rng)
         {
             int count = 0;
-            for (int i = 0; i < 32; i++)
+            for (int i = 0; i < ItemTable.Count; i++)
             {
                 ItemDef d = ItemTable.Get((ItemId)i);
                 if (d.Kind == ItemKind.None || d.Tier != tier || d.Weight <= 0) continue;

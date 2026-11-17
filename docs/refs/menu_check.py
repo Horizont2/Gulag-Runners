@@ -10,6 +10,12 @@ And the volume is terrain bounds PLUS horizontalPadding, so the padding has to b
 enough to reach whatever is being fogged. Shrinking it to the size of the room drops the
 room outside its own fog.
 
+It also counts the menu's lights, because URP drops the surplus past
+m_AdditionalLightsPerObjectLimit per object per frame -- silently, and differently as the
+camera moves, so a fifth light in one small room does not look like a fifth light, it
+looks like the other four flickering. The menu is one room where every light reaches
+everything in it, which is why this is checked here and not for the arena.
+
 Run: python3 menu_check.py"""
 import os
 import re
@@ -17,6 +23,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
+SETTINGS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Settings")
+GAME = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game")
 
 
 def read(path):
@@ -112,7 +120,231 @@ def check(path):
         if high is not None and v > high:
             print(f"      note - {key} is {v:g}; the component clamps it to {high:g}")
 
+    # The fog scatters ONE light: the directional in this field. There is no point-light
+    # input anywhere in the component, so an empty or disabled slot leaves the haze lit by
+    # ambientColor alone -- flat, and with no warning that it ever did anything else.
+    sun = re.search(r"^[ \t]*directionalLight: \{fileID: (-?\d+)\}", fog, re.M)
+    lit = None
+    if sun and sun.group(1) != "0":
+        for cls, body in docs:
+            if cls == 108 and field(body, "m_Type", "") == "1":
+                lit = body
+    if sun is None or sun.group(1) == "0":
+        problems += 1
+        print("      PROBLEM - the fog has no directional light assigned. It scatters that "
+              "one light and nothing else, so the haze will be flat ambient colour.")
+    elif lit is not None and field(lit, "m_Enabled", "1") != "1":
+        problems += 1
+        print("      PROBLEM - the fog's directional light is disabled, so the haze is "
+              "flat ambient colour.")
+
+    # And the camera has to be able to see as far as the fog claims to reach.
+    try:
+        reach = float(field(fog, "maximumFogDistance", "0"))
+        for cls, body in docs:
+            if cls != 20:
+                continue
+            far = float(field(body, "far clip plane", "1000"))
+            if far < reach:
+                problems += 1
+                print(f"      PROBLEM - the camera stops at {far:g} m and the fog claims "
+                      f"{reach:g} m. Everything past the far plane is unrendered, so the "
+                      "fog quietly ends early.")
+            else:
+                print(f"      camera far plane {far:g} m covers the fog's {reach:g} m")
+    except ValueError:
+        pass
+
     return problems, True
+
+
+def per_object_limit():
+    """The tightest additional-light cap across the pipeline assets, or URP's default."""
+    best = None
+    if os.path.isdir(SETTINGS):
+        for f in sorted(os.listdir(SETTINGS)):
+            if not f.endswith(".asset"):
+                continue
+            m = re.search(r"m_AdditionalLightsPerObjectLimit: (\d+)",
+                          read(os.path.join(SETTINGS, f)))
+            if m:
+                n = int(m.group(1))
+                best = n if best is None else min(best, n)
+    return best if best is not None else 4
+
+
+def asset_paths():
+    """guid -> asset path, so a prefab instance can be read back to its prefab."""
+    out = {}
+    root = os.path.join(HERE, "..", "..", "Gulag runners", "Assets")
+    for where, _, files in os.walk(root):
+        for f in files:
+            if not f.endswith(".meta"):
+                continue
+            m = re.search(r"^guid: ([0-9a-f]{32})", read(os.path.join(where, f)), re.M)
+            if m:
+                out[m.group(1)] = os.path.join(where, f)[:-5]
+    return out
+
+
+def script_guid(rel):
+    """The guid a scene writes for one of our scripts, or None if it has moved."""
+    meta = os.path.join(GAME, rel) + ".meta"
+    if not os.path.exists(meta):
+        return None
+    m = re.search(r"^guid: ([0-9a-f]{32})", read(meta), re.M)
+    return m.group(1) if m else None
+
+
+def lights_and_torches(path):
+    """The menu's light budget, and whether every torch was treated the same."""
+    text = read(path)
+    docs = documents(text)
+    problems = 0
+
+    # GameObjects by fileID, so a light can be traced back to the object carrying it.
+    by_id, owner = {}, {}
+    for chunk in re.split(r"^--- ", text, flags=re.M)[1:]:
+        m = re.match(r"!u!(\d+) &(-?\d+)( stripped)?", chunk)
+        cls, fid, stripped = int(m.group(1)), m.group(2), bool(m.group(3))
+        if cls == 1 and not stripped:
+            nm = re.search(r"^  m_Name: (.*)$", chunk, re.M)
+            by_id[fid] = (nm.group(1).strip() if nm else "",
+                          field(chunk, "m_IsActive", "1") == "1")
+        else:
+            g = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", chunk)
+            if g:
+                owner.setdefault(g.group(1), []).append((cls, chunk))
+
+    cap = per_object_limit()
+    extra = 0
+    for go, comps in owner.items():
+        on = by_id.get(go, ("", True))[1]
+        for cls, body in comps:
+            if cls != 108 or not on:
+                continue
+            if field(body, "m_Enabled", "1") != "1":
+                continue
+            if field(body, "m_Type", "2") != "1":       # 1 is directional; the rest count
+                extra += 1
+
+    print(f"  {os.path.basename(path)}: {extra} additional light(s), "
+          f"pipeline cap {cap} per object")
+    if extra > cap:
+        problems += 1
+        print(f"      PROBLEM - {extra} additional lights in one room against a cap of "
+              f"{cap}. URP keeps the {cap} it likes best PER OBJECT PER FRAME and drops "
+              "the rest, so they will blink in and out as the camera moves.")
+
+    # Torches: the fire goes on all of them or the unlit ones read as broken props.
+    torches = [b for cls, b in docs
+               if cls == 1001 and re.search(r"value: Torch(?: \(\d+\))?\s*$", b, re.M)]
+    fires = [go for go, (nm, _) in by_id.items() if nm == "Torch Fire"]
+    if torches:
+        print(f"      {len(torches)} torch(es), {len(fires)} with fire")
+        if len(fires) < len(torches):
+            problems += 1
+            print(f"      PROBLEM - {len(torches) - len(fires)} torch(es) carry no fire. "
+                  "Run Tools/Gulag Runners/Light the torches.")
+
+    # Every torch glows, or half of them read as dark sticks.
+    #
+    # Only three of six can carry a Light -- the pipeline caps additional lights at four per
+    # object and the gate fill is one of them -- so the other three had no glow at all, and
+    # a row of torches where half are lit and half are not reads as the effect switching
+    # itself off rather than as a lighting budget. An emissive ball at the flame costs no
+    # light and blooms into a halo, so all six can have one.
+    # The halo is the flame's own additive layer, widened -- not a mesh. An emissive sphere
+    # was tried and it reads as a ball: an opaque mesh has a hard silhouette and occludes
+    # what is behind it, which is the opposite of a glow however its colour is set.
+    glows = len(re.findall(r"propertyPath: m_LocalScale\.x\s*\n\s*value: 2\.6", text))
+    if torches:
+        print(f"      {glows} of {len(torches)} torch(es) carry a glow")
+        if glows < len(torches):
+            problems += 1
+            print(f"      PROBLEM - {len(torches) - glows} torch(es) have no glow on them. "
+                  "Only three of six can afford a Light, so the rest rely on the flame's "
+                  "own additive layer being widened, or they are dark sticks beside lit "
+                  "ones.")
+
+    # A steady lamp on a flame is the thing that made them read as props to begin with.
+    for go in fires:
+        comps = owner.get(go, [])
+        has_light = any(cls == 108 for cls, _ in comps)
+        has_flicker = any(cls == 114 and "baseIntensity:" in b for cls, b in comps)
+        if has_light and not has_flicker:
+            problems += 1
+            print(f"      PROBLEM - a Torch Fire carries a Light with no TorchLight on it, "
+                  "so the flame moves and the light it casts does not.")
+
+    # The fighter. Dragging the match prefab in is the obvious way to put somebody in
+    # the menu, and it half works: he stands there in the editor, and on Play
+    # PlayerController ticks a motor with no MatchState and writes transform.position
+    # from a simulation that never started, so he walks off the spot he was placed on.
+    controller = script_guid("Presentation/PlayerController.cs")
+    fighter = script_guid("Menu/MenuFighter.cs")
+
+    posed = any(
+        fighter and re.search(r"m_Script: \{fileID: -?\d+, guid: " + fighter, body)
+        for comps in owner.values() for cls, body in comps if cls == 114)
+
+    # The controller is almost never a document in this scene: the fighter is a prefab
+    # INSTANCE, so the component lives in the prefab and the scene only holds overrides.
+    # Reading the scene alone finds nothing and passes a scene that is broken.
+    live = []
+    if controller:
+        assets = asset_paths()
+        for chunk in re.split(r"^--- ", text, flags=re.M)[1:]:
+            if not chunk.startswith("!u!1001 "):
+                continue
+            g = re.search(r"m_SourcePrefab: \{fileID: \d+, guid: ([0-9a-f]{32})", chunk)
+            src = assets.get(g.group(1)) if g else None
+            if not src or not src.endswith(".prefab") or not os.path.exists(src):
+                continue
+            inside = read(src)
+            for part in re.split(r"^--- ", inside, flags=re.M)[1:]:
+                m = re.match(r"!u!114 &(-?\d+)", part)
+                if not m or controller not in part:
+                    continue
+                off = re.search(
+                    r"target: \{fileID: " + m.group(1) + r",[^\n]*\n\s*propertyPath: "
+                    r"m_Enabled\s*\n\s*value: 0", chunk)
+                if not off:
+                    live.append(os.path.basename(src))
+
+    if live:
+        problems += 1
+        print(f"      PROBLEM - {', '.join(sorted(set(live)))} brings a live "
+              "PlayerController into the menu. There is "
+              "no match here, so on Play each one ticks a motor with no MatchState and "
+              "moves the fighter off the mark he was placed on.")
+    if not posed:
+        problems += 1
+        print("      PROBLEM - no MenuFighter in the menu, so whoever is standing there "
+              "holds his bind pose: the T-pose. Run Tools/Gulag Runners/Set up the "
+              "menu scene.")
+    elif not live:
+        print("      fighter: MenuFighter present, PlayerController quiet")
+
+    # And his boots are nailed down. The idle breathes and MenuFighter sways him a few
+    # degrees, both applied to the root -- so without this the legs go along and the feet
+    # slide and twist on the stone, which is the one thing a man standing in a cell does
+    # not do. Only checked once there is a fighter to stand: a scene with no MenuFighter
+    # has a louder problem above.
+    plant = script_guid("Menu/MenuFootPlant.cs")
+    planted = plant and any(
+        re.search(r"m_Script: \{fileID: -?\d+, guid: " + plant, body)
+        for comps in owner.values() for cls, body in comps if cls == 114)
+
+    if posed and not planted:
+        problems += 1
+        print("      PROBLEM - no MenuFootPlant, so the idle and the sway move his feet "
+              "with the rest of him and the boots slide. Run Tools/Gulag Runners/Setup/"
+              "Set up the menu scene.")
+    elif planted:
+        print("      fighter: feet planted")
+
+    return problems
 
 
 def main():
@@ -124,6 +356,8 @@ def main():
         bad, had = check(os.path.join(SCENES, f))
         problems += bad
         looked += 1 if had else 0
+        if f.lower().startswith("menu"):
+            problems += lights_and_torches(os.path.join(SCENES, f))
 
     if looked == 0:
         print("menu_check: no scene uses the volumetric fog — nothing to check.")

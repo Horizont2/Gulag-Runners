@@ -108,6 +108,43 @@ def class_body(src, after):
     return src[start:]
 
 
+def without_nested_types(body):
+    """A class body with the bodies of its nested types cut out.
+
+    class_body already scopes to the component and says why: a nested class's fields are
+    not slots on the component. It scopes to the OUTER braces though, so a type declared
+    INSIDE those braces is still in the text -- and MatchOutcomeView declares a private
+    struct holding what each camera was framing, whose fields are called Camera, Player and
+    Target. Read as the component's own, they are three inspector slots that do not exist,
+    and the three arenas were duly reported as missing them.
+
+    Unity serializes a nested type's fields only through a FIELD of that type, which this
+    sees on its own; the type's declaration is never a slot.
+    """
+    out, i = [], 0
+    for m in re.finditer(r"(?m)^\s*(?:\[[^\]]*\]\s*)*"
+                         r"(?:public|private|internal|protected)?\s*(?:readonly\s+)?"
+                         r"(?:static\s+)?(?:sealed\s+|abstract\s+|partial\s+)*"
+                         r"(?:class|struct|interface|enum)\s+\w+[^{;]*\{", body):
+        start = m.end() - 1
+        if start < i:
+            continue
+        out.append(body[i:m.start()])
+        depth = 0
+        for k in range(start, len(body)):
+            if body[k] == "{":
+                depth += 1
+            elif body[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    i = k + 1
+                    break
+        else:
+            i = len(body)
+    out.append(body[i:])
+    return "".join(out)
+
+
 def fields_of(src, whole):
     """The public serialized fields of a script, with their type and whether they are optional.
 
@@ -115,6 +152,7 @@ def fields_of(src, whole):
     the right one here because what matters is the NAME Unity serializes, which is exactly what
     the declaration says.
     """
+    src = without_nested_types(src)
     found = {}
     for m in re.finditer(
             r'(?:\[[^\]]*\]\s*)*public\s+(?!static|const|event|override|readonly)'
@@ -255,12 +293,64 @@ def name_of(body, fid, src):
     return nm.group(1).strip() if nm else f"go {m.group(1)}"
 
 
+def paths_that_exist():
+    """Every "Assets/..." written into our own C#, and whether it is still there.
+
+    A path in a string is a reference Unity cannot follow and nothing can rename. Every
+    other link in this project is a guid, which survives a file being moved; these do not,
+    and they fail in the worst way -- an editor tool that silently finds nothing, reports
+    "0 wired" and leaves the scene alone.
+
+    Tidying Assets into ThirdParty/ and _Game/ broke eleven of them at once, which is what
+    this rule is for. It ignores a path that is plainly being BUILT rather than read (one
+    that ends in a separator, or is a folder the tool creates), and it reads a trailing
+    folder as a folder.
+    """
+    out = []
+    for folder in OURS:
+        for where, _dirs, files in os.walk(folder):
+            if os.sep + "obj" in where or os.sep + "bin" in where:
+                continue
+            for f in files:
+                if not f.endswith(".cs"):
+                    continue
+                src = io.open(os.path.join(where, f), encoding="utf-8", errors="replace").read()
+                for m in re.finditer(r'"(Assets/[^"\n]*)"', src):
+                    path = m.group(1)
+                    if path in ("Assets/", "Assets") or path.endswith("/"):
+                        continue
+                    if "--" in path or " " == path[-1]:
+                        continue              # prose in a log line, not a path
+                    full = os.path.join(ASSETS, "..", path)
+                    if os.path.exists(full):
+                        continue
+                    # a folder a tool CREATES is allowed not to exist yet -- written
+                    # either whole, or as CreateFolder(parent, leaf), which is the way
+                    # Unity's own API takes it
+                    parent, _, leaf = path.rpartition("/")
+                    if re.search(r'CreateFolder\([^)]*"%s"' % re.escape(path), src):
+                        continue
+                    if leaf and re.search(r'CreateFolder\(\s*"%s"\s*,\s*"%s"\s*\)'
+                                          % (re.escape(parent), re.escape(leaf)), src):
+                        continue
+                    line = src[:m.start()].count("\n") + 1
+                    out.append((os.path.relpath(os.path.join(where, f), ASSETS), line, path))
+    return out
+
+
 def main():
     global ENUMS
     ENUMS = enums()
     known = scripts()
     by_guid_meta = {}
     problems, notes = [], []
+
+    gone = paths_that_exist()
+    notes.append(f"{len(gone)} path(s) written into our C# point at nothing")
+    for where, line, path in gone:
+        problems.append(f"{where}:{line} reads \"{path}\", which is not in the project. "
+                        f"A path in a string is the one kind of reference a move does not "
+                        f"carry, and a tool that cannot find its asset says nothing.")
     checked = 0
 
     files = []

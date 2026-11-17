@@ -12,17 +12,6 @@ namespace GulagRunners.Sim
         Mounting = 5
     }
 
-    /// <summary>Where a swing is in its life. docs/02: wind-up, the hit, and the price of missing.</summary>
-    public enum AttackPhase : byte
-    {
-        None = 0,
-        /// <summary>Committed, nothing has happened yet. This is the window the opponent reads.</summary>
-        Windup = 1,
-        /// <summary>The hitbox is live.</summary>
-        Active = 2,
-        /// <summary>What a miss costs.</summary>
-        Recovery = 3
-    }
 
     /// <summary>
     /// Everything the simulation knows about one player's movement.
@@ -55,14 +44,6 @@ namespace GulagRunners.Sim
         /// </summary>
         public sbyte Travel;
 
-        /// <summary>
-        /// Frames left of an aim the player asked for, after the swipe that asked for it.
-        ///
-        /// Without it the aim would last exactly one tick: a swipe is a single frame of
-        /// input and the stick is held for hundreds, so movement would take the facing back
-        /// before the windup finished and the blow would land the way the feet were going.
-        /// </summary>
-        public int AimLockTimer;
         public bool Crouching;
         public bool JumpHeld;
 
@@ -75,6 +56,92 @@ namespace GulagRunners.Sim
 
         public int StaminaCharges;
         public int StaminaTimer;
+
+        // ----------------------------------------------------------------- the arm
+        // Direct-aim combat (docs/31). The arm is not a state machine any more, it is a
+        // DIRECTION, and the weapon is a segment hanging off the end of it.
+
+        /// <summary>Unit vector from the shoulder, where the arm is pointing right now.</summary>
+        public FixVec2 Arm;
+
+        /// <summary>Last tick's weapon tip, so this tick's speed is a subtraction.</summary>
+        public FixVec2 TipPrev;
+
+        /// <summary>
+        /// False until the tip has been recorded once. Without it the first tick of a
+        /// match reads a tip speed of "all the way from the origin", which is a free
+        /// kill on frame one.
+        /// </summary>
+        public bool TipPrimed;
+
+        /// <summary>Metres the tip travelled last tick. This is what damage is made of.</summary>
+        public Fix TipSpeed;
+
+        /// <summary>
+        /// How far this swing has travelled in one direction, in radians, and which
+        /// direction that is. A swing BEGINS where the arm reverses and ENDS at the next
+        /// reversal -- which is the only definition of "a swing" the simulation has, and
+        /// it comes free out of the arm's own motion rather than out of a button.
+        /// </summary>
+        public Fix Swept;
+        public int TurnSign;
+
+        /// <summary>
+        /// Which swing this is, and which one already drew blood. One hit per swing: a
+        /// blade may not bill the same body twice for one stroke, however long the
+        /// stroke lies across it -- and at the distance fighters actually stand, a
+        /// weapon's tip is inside the other one between a third and a half of the time.
+        /// </summary>
+        public int SwingId;
+        public int SpentOn;
+
+        /// <summary>
+        /// The stick reading the aim assist last resolved against, and what it resolved
+        /// to. Held so the assist only re-aims when the THUMB moves.
+        ///
+        /// Without that it re-aims every tick, and the direction to a man you are
+        /// walking into swings faster the closer you get -- so the assist moved the arm
+        /// by itself, that movement is tip speed, and tip speed is damage. Every weapon
+        /// in the game could kill by walking forward with the stick held. The assist is
+        /// there to help a SWING, not to hold a lock.
+        /// </summary>
+        public FixVec2 AimPrev;
+        public FixVec2 AssistDir;
+        public bool AssistHeld;
+
+        /// <summary>Ticks until this weapon may hurt anybody again. One arc, one hit.</summary>
+        public int HitLock;
+
+        /// <summary>Ticks since this arm was beaten aside, during which it cannot land.</summary>
+        public int ClashLock;
+
+        /// <summary>Output: weapons met this tick. For the spark and the sound.</summary>
+        public bool WasClash;
+
+        /// <summary>
+        /// The blades were already touching last tick.
+        ///
+        /// A clash has to be an EDGE, not a state, and this is what remembers which.
+        /// Measured without it: two fighters at close range have their weapons crossed
+        /// on 899 ticks out of 900 -- long weapons are longer than the gap people fight
+        /// at -- so the lock was refreshed every single tick and neither of them could
+        /// ever land a blow again. A permanent stalemate, reachable by walking forwards.
+        /// Blades MEETING is a parry; blades resting against each other is just two
+        /// people standing close.
+        /// </summary>
+        public bool InContact;
+
+        /// <summary>Output: how much of a full blow this fighter landed, in thousandths.</summary>
+        public int DealtPermille;
+
+        /// <summary>
+        /// How dangerous the weapon is RIGHT NOW, in thousandths of a full-power blow.
+        /// Zero means the blade is being carried rather than swung, and nothing it
+        /// touches will be hurt. Everything that used to ask "is this fighter in their
+        /// active frames" asks this instead, and gets a better answer: a number the
+        /// player is directly moving, rather than a window they are waiting out.
+        /// </summary>
+        public int SwingShare;
 
         public int LadderIndex;
 
@@ -110,23 +177,37 @@ namespace GulagRunners.Sim
 
         public short Health;
 
-        public AttackPhase Attack;
-        /// <summary>Frames left in the current phase.</summary>
-        public int AttackTimer;
-        /// <summary>How long the whole current phase lasts, for presentation to scrub a clip by.</summary>
-        public int AttackPhaseFrames;
-        /// <summary>0, 1, 2. The third is the heavy one that ends the string.</summary>
-        public byte ComboIndex;
-        /// <summary>Frames left to continue the combo with another press.</summary>
-        public int ComboTimer;
         /// <summary>This swing has already connected; one swing hits once.</summary>
-        public bool SwingSpent;
+        /// <summary>
+        /// True when the scripted move ends HIGHER than it began, which is the only case
+        /// the haul-yourself-up clip describes. A ladder whose head is flush with its
+        /// platform leaves the body slightly above the floor it is stepping onto, and that
+        /// climb-out goes DOWN -- measured at 6.6 cm down on this arena's top ladder. The
+        /// haul clip played over it is a man pulling himself up while his body sinks.
+        /// </summary>
+        /// <summary>
+        /// Hits taken in the current string, and the clock that ends it. What stops the
+        /// fast weapon looping the slow one for ever.
+        /// </summary>
+        /// <summary>Frames the attacker's own recoil coasts after landing a blow.</summary>
+        public int RecoilTimer;
 
-        public bool Blocking;
-        /// <summary>Frames the guard has been up. Under ParryFrames it parries instead of blocks.</summary>
-        public int GuardTimer;
-        /// <summary>Guard broken: frames until it can be raised again.</summary>
-        public int GuardBreakTimer;
+        public byte StunStack;
+        public int StunStackTimer;
+
+        /// <summary>
+        /// Where the rise ends and the step across begins, as a fraction of the window.
+        ///
+        /// Worked out when the move starts rather than per tick, because it is sized from
+        /// the speed the body is ALREADY travelling at, which only the start knows.
+        /// </summary>
+        public Fix ScriptRiseShare;
+
+        public bool ScriptRises;
+
+
+
+
 
         /// <summary>Hit and unable to act. Knockback is carried by velocity, not by this.</summary>
         /// <summary>
@@ -151,7 +232,7 @@ namespace GulagRunners.Sim
 
         public bool Dead;
         public int DeathTimer;
-        public bool GuardHeld;
+        public bool DodgeHeldLastTick;
 
         /// <summary>
         /// Ground speed cap as a fraction of the run speed, in thousandths. Zero means no cap —
@@ -160,13 +241,41 @@ namespace GulagRunners.Sim
         /// </summary>
         public short SpeedPermille;
 
-        // ---- outputs of the last tick, for presentation and audio
-        public short DamageTaken;
-        public bool WasHit;
-        public bool WasBlocked;
-        public bool WasParried;
-        public bool SwingStarted;
         public bool JustDied;
+
+        /// <summary>
+        /// What took the last point of health, set once by <see cref="CombatMotor.Wound"/>
+        /// on the tick the fighter dies and left alone after.
+        ///
+        /// Only the simulation knows this, which is why it is here rather than worked out by
+        /// a view. The case that makes the difference is the one presentation cannot read: a
+        /// fighter the gas has been biting all the way up who is then finished by a mace, and
+        /// a fighter a mace nearly finished who then drowns. Both end on zero health with the
+        /// gas at their chest, and they are not the same death -- docs/09's "kill with a
+        /// hazard" pays for one of them and not the other.
+        /// </summary>
+        public DeathCause KilledBy;
+
+        /// <summary>Output: damage taken this tick, for the view to react to.</summary>
+        public short DamageTaken;
+
+        /// <summary>Output: a blow landed on this fighter this tick.</summary>
+        public bool WasHit;
+
+        /// <summary>
+        /// Output: a blade met a blade this tick. It keeps the old parry name because
+        /// every spark, sound and camera shake already wired to a parry is exactly what
+        /// this is -- the parry simply stopped being a timing window and became a place
+        /// to hold your weapon.
+        /// </summary>
+        public bool WasParried;
+
+        /// <summary>The dodge's invulnerable frames (docs/02).</summary>
+        public bool Invulnerable => DodgeTimer > 0;
+
+        /// <summary>Hurt, staggered or dead: not steering, not swinging.</summary>
+        public bool Reeling => HitstunTimer > 0 || StaggerTimer > 0 || Dead;
+
         /// <summary>Counts down after letting go of a ladder; no new ladder is grabbed until it
         /// reaches zero.</summary>
         public int LadderCooldownTimer;
@@ -223,13 +332,10 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix Depth;
 
-        public bool Invulnerable => DodgeTimer > 0;
-        /// <summary>Unable to act: hit, parried, or dead.</summary>
-        public bool Reeling => HitstunTimer > 0 || StaggerTimer > 0 || Dead;
-        public bool Swinging => Attack != AttackPhase.None;
         public bool OnGround => Mode == MoveMode.Grounded;
 
-        public static PlayerSimState Spawn(FixVec2 position, sbyte facing, in MoveConfig config)
+        public static PlayerSimState Spawn(FixVec2 position, sbyte facing, in MoveConfig config,
+                                           in ArmConfig arm)
         {
             PlayerSimState s = default;
             s.Position = position;
@@ -245,8 +351,17 @@ namespace GulagRunners.Sim
             s.Dropped = ItemId.None;
             s.StaminaCharges = config.StaminaMax;
             s.Health = 100;
-            s.Attack = AttackPhase.None;
+            s.KilledBy = DeathCause.None;
             s.Noise = NoiseLevel.Silent;
+            // In the carry pose, which is the pose a fighter who is not asking for
+            // anything is in. Straight out was the OLD rest pose, and docs/31 took it
+            // out for a measured reason: an arm held level is a perfect guard, free and
+            // permanent, so two fighters who had not touched a stick clashed for ever.
+            // Spawning into it meant every round opened in the pose the design removed,
+            // and the arm then visibly dropped once the first tick ran.
+            s.Arm = ArmMotor.Carry(in s, in arm);
+            s.SpentOn = -1;
+            s.TipPrimed = false;
             return s;
         }
 

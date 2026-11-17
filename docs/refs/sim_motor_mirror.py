@@ -19,8 +19,9 @@ C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          SSPD=M(2400), SMINF=10, SMAXF=30, LREGRAB=12,
          SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
-         BODYZ=M(600), DEPTHSPD=M(4000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
-         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=26,
+         PUSHKEEP=930,
+         BODYZ=M(600), DEPTHSPD=M(4000), AIRDEPTH=M(3000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
+         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=32, RISEMARGIN=M(120), ALLOW_DODGE=True, MANTLE_RISE=M(450), LADDER_JUMP=False,
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
@@ -36,8 +37,9 @@ class S:
         s.crouch = False; s.jump_held = False
         s.coyote = s.buf = s.dodge = s.dodge_rec = s.fallthru = s.stepn = 0
         s.ladder_cd = 0
-        s.hitstop = 0
-        s.script_t = 0; s.script_frames = 0; s.script_dir = 1
+        s.hitstop = 0; s.recoil_t = 0
+        s.script_t = 0; s.script_frames = 0; s.script_dir = 1; s.script_rises = False
+        s.script_rise_share = ONE//2
         s.script_from = (0,0); s.script_to = (0,0)
         s.script_from_depth = s.script_to_depth = 0
         s.script_forward = False
@@ -196,7 +198,17 @@ def move_x(s, dx, w):
         if not solid_at(w, i, s.depth, halfz): continue
         b = (tx - half, s.y, tx + half, s.y + h)
         if not overlaps(b, sol): continue
-        tx = sol[0] - half - SKIN if dx > 0 else sol[2] + half + SKIN
+        # Only a surface the body moves INTO is a wall. A body that already overlaps a box
+        # would otherwise be snapped to its FAR face, and the far face of the arena floor is
+        # the end of the arena -- which is how a fighter knocked off a ladder left the level:
+        # he climbs through the floor slab (the shaft is exempt while he holds the rungs) and
+        # the hit takes the ladder away mid-slab. move_y has had this guard all along.
+        if dx > 0:
+            if s.x + half > sol[0] + SKIN: continue
+            tx = sol[0] - half - SKIN
+        else:
+            if s.x - half < sol[2] - SKIN: continue
+            tx = sol[2] + half + SKIN
         s.vx = 0
 
     for i in range(len(w.get("walls", ()))):
@@ -332,10 +344,34 @@ def update_depth(s, w):
         # passes through.
         # Off the ladder's NEAR FACE, not its centre line: the stand-off is only ever the
         # character's own thickness, so a thick ladder and a thin one hold it the same way.
-        sp = span(w, "ladder", s.ladder)
+        # Half the RAILS, not half the span: a leaning ladder's span is its thickness plus
+        # the whole lean, and halving that parked the body 0.45 m in front of the rungs on
+        # the mine's ladders, which lean 0.9 m over their height.
         want = (ladder_depth_at(w, s.ladder, s.y, s.depth, inset)
-                - (sp[1] - sp[0]) // 2 - C["LSTANDOFF"])
+                - ladder_half_thickness(w, s.ladder) - C["LSTANDOFF"])
     elif s.mode != "ground":
+        # Falling, the body leans towards the storey it is dropping onto. This used to
+        # keep the slice you left until your feet touched and then slide you forward on
+        # the spot, which is what "he drops to the floor below and stays in the
+        # background" means: the move happened after the landing instead of during the
+        # fall.
+        #
+        # On the way UP as well, once the fighter is over the thing. The guard here was
+        # `if s.vy > 0: return`, against being dragged backwards while jumping at a
+        # ledge -- and landing_lane already skips every box whose top is above the feet,
+        # so the guard only ever delayed the lean onto something ALREADY cleared. That is
+        # the forest's cages, which are parkour and stand on their own slices: leaning
+        # only on the way down left most of that distance to be walked off AFTER landing,
+        # as a slide into the back of the cage. And since a box is only solid to a body
+        # whose slice overlaps it, a cage whose roof is near the top of the arc was passed
+        # straight through -- the body drifting towards the camera INSIDE it.
+        want = landing_lane(s, w)
+        if want is None:
+            return
+        # And faster off the ground: the gentle speed is for walking between slices, and
+        # in the air the move has to finish before the feet touch or the rest of it
+        # happens on the floor.
+        s.depth = move_towards(s.depth, want, mul(mul(C["DEPTHSPD"], C["AIRDEPTH"]), DT))
         return
     else:
         want = lane_ahead(s, w)
@@ -398,18 +434,46 @@ def lane_ahead(s, w):
 
 
 def lane_on(sp, depth):
-    """Which slice of a box to stand on: the gameplay plane whenever the box reaches it, and
-    otherwise the nearest part of the box to where the body already is.
+    """Which slice of a box to stand on: always the part of it NEAREST THE FIGHT.
 
     The plane is where the fight happens. Lanes exist so a fighter can step back onto a ramp
     or a walkway modelled behind it, not so he can live there — and a floor wide enough to
     hold both lanes used to hold him on whichever one he arrived with. Drop off the upper
     walkway and you landed on the ground floor still on the walkway's slice, a metre behind
-    your opponent, and nothing either of you did would connect for the rest of the round."""
-    halfz = C["BODYZ"] // 2
-    home = C["HOME"]
-    return nearest_in(sp, home, halfz) if reaches(sp, home, halfz) \
-        else nearest_in(sp, depth, halfz)
+    your opponent, and nothing either of you did would connect for the rest of the round.
+
+    This used to fall back to "the nearest part to where the body is" whenever the surface
+    did not reach the plane, which is the same bug wearing the clothes of a fix: the forest's
+    terrace is 4.4 m deep and stops 23 cm short of the plane, so a fighter stepping off a
+    hanging cage at z -0.67 was already inside it and stayed there."""
+    # A world with no depths at all is a world where every box is on every slice, which
+    # is what the greybox tests are: C# answers Span.Everywhere there, whose nearest
+    # point to the plane is the plane. Same answer, without the subscript.
+    if sp is None:
+        return C["HOME"]
+    return nearest_in(sp, C["HOME"], C["BODYZ"] // 2)
+
+def landing_lane(s, w):
+    """The slice of the floor this body is falling onto: the highest solid under its feet
+    that it could change lane onto from here.
+
+    No look-down distance, on purpose. Whatever is directly below is what the fall ends
+    on, and with nothing below there is no lane to aim at. The lane reach is the only
+    limit, and it is the same one that governs stepping sideways onto a ramp."""
+    half = C["W"] // 2
+    best = None
+    top = 0
+    for i, sol in enumerate(w["solid"]):
+        if not solid_live(w, i): continue
+        if sol[3] > s.y + SKIN: continue                 # not below the feet
+        if sol[2] <= s.x - half or sol[0] >= s.x + half: continue
+        if best is not None and sol[3] <= top: continue
+        want = lane_on(span(w, "solid", i), s.depth)
+        if abs(want - s.depth) > C["LANEREACH"]: continue
+        top = sol[3]
+        best = want
+    return best
+
 
 def floor_lane(s, w):
     half = C["W"] // 2; halfz = C["BODYZ"] // 2
@@ -478,8 +542,13 @@ def step_flat(s, inp, w):
     tgt = (C["CROUCH"] if s.crouch else C["RUN"]) * wx
     if s.speed_permille > 0:
         tgt = (tgt * s.speed_permille) // 1000
-    if s.stun > 0 or s.stagger > 0:
-        s.vx = move_towards(s.vx, 0, mul(C["GDEC"] // 6, DT))
+    if s.stun > 0 or s.stagger > 0 or getattr(s, "recoil_t", 0) > 0:
+        # The push is SPENT, not braked: a share of itself goes every tick, so it is fast at
+        # first and eases out to nothing. A flat drag -- which is what this was, a sixth of
+        # the ground deceleration -- arrives at zero still travelling and stops dead, and a
+        # knockback with a jolt at both ends is most of "the push is too sharp to play".
+        raw = (s.vx * C["PUSHKEEP"]) // 1000
+        s.vx = 0 if -650 < raw < 650 else raw
     else:
         acc = (C["GACC"] if g else C["AACC"]) if wx else (C["GDEC"] if g else C["ADEC"])
         s.vx = move_towards(s.vx, tgt, mul(acc, DT))
@@ -542,6 +611,21 @@ def ladder_depth_at(w, i, y, fallback, inset):
     leans = w.get("ladderleanz") or []
     if i >= len(leans): return nearest_in(span(w, "ladder", i), fallback, inset)
     return lean_at(leans[i], w["ladder"][i], y)
+
+def ladder_half_thickness(w, i):
+    """Half a ladder's own THICKNESS -- the rails, not the space it leans through.
+
+    The depth span of a leaning ladder is its thickness PLUS the lean, so halving it for a
+    stand-off is the whole of "he climbs the air beside it". The lean is measured per
+    ladder already, so subtracting it is exact, and an upright ladder is unchanged."""
+    sp = span(w, "ladder", i)
+    depth = sp[1] - sp[0]
+    leans = w.get("ladderleanz") or []
+    if 0 <= i < len(leans):
+        walked = abs(leans[i][1] - leans[i][0])     # foot and head, not min and max
+        depth = depth - walked if depth > walked else 0
+    return depth // 2
+
 
 def lean_at(lean, box, y):
     """Where a lean line stands at a height, clamped to the box's own ends."""
@@ -649,6 +733,8 @@ def try_mount(s, wy, w):
     return True
 
 def step_scripted(s, w):
+    if s.mode == "mount" and s.buf > 0 and not C["LADDER_JUMP"]:
+        s.buf = 0
     if s.mode == "mount" and s.buf > 0:
         s.buf = 0; s.script_t = 0; s.ladder = -1; s.ladder_cd = C["LREGRAB"]
         s.mode = "air"; s.vx = 0; s.vy = C["JUMP"]; s.noise = 1
@@ -671,10 +757,18 @@ def step_scripted(s, w):
     t = (ONE*done)//total
     def ss(v):
         v = max(0, min(ONE, v)); return mul(mul(v,v), 3*ONE - 2*v)
+    def eo(v):
+        v = max(0, min(ONE, v)); left = ONE - v; return ONE - mul(left, left)
     if s.mode == "mount":
         xT = ss(t); yT = xT
     else:
-        yT = ss(t*3//2); xT = ss((t - M(300))*10//7)
+        # UP FIRST, ALL THE WAY, THEN ACROSS. The halves may not overlap: a scripted move
+        # writes the position straight out with no collision behind it, so sideways travel
+        # taken before the body has cleared the floor goes THROUGH the slab beside the
+        # hatch -- checked across every ladder, 54 climb-out paths did exactly that.
+        rise = min(max(s.script_rise_share, M(50)), M(950))
+        yT = eo(min(ONE, max(0, (ONE*t)//rise)))          # ease OUT: already moving upward
+        xT = 0 if t <= rise else ss(min(ONE, max(0, (ONE*(t-rise))//(ONE-rise))))
     s.x = s.script_from[0] + mul(s.script_to[0]-s.script_from[0], xT)
     s.y = s.script_from[1] + mul(s.script_to[1]-s.script_from[1], yT)
     # Depth rides with the height: the fighter leans back onto the next floor as they come up
@@ -741,6 +835,12 @@ def step_out(s, ladder, w):
     if top is None: return None
     return (s.x, top+SKIN, lane)
 
+def frames_at(distance, speed):
+    """Frames to cover a distance at a speed."""
+    if speed <= 0: return 1
+    return max(1, ((ONE*distance)//speed * 60) // ONE)
+
+
 def start_scripted(s, landing, side, to_depth=None):
     s.script_from=(s.x,s.y); s.script_to=(landing[0], landing[1])
     s.script_from_depth = s.depth
@@ -754,12 +854,22 @@ def start_scripted(s, landing, side, to_depth=None):
     # flush to it, so a climb-out raises the body ~4 cm and moves it ~45 cm backwards. Timed
     # on x and y alone that is 4 cm of travel, which lands on the ten-frame minimum: a sixth
     # of a second for 0.45 m, faster than a run, with an 0.83 s haul clip crammed into it.
-    span_z = abs(s.script_to_depth - s.script_from_depth)*3//2
-    frames = frames_for(max(span_z, span_x, span_y)) or C["SMINF"]
-    # And a haul is not a step: the minimum it shared with the reach onto a ladder is too
-    # short to read as one.
-    frames = max(frames, C["MANTLE_MINF"])
+    # EACH PHASE IS SIZED BY THE SPEED IT HAS TO MEET. The rise runs straight out of a
+    # climb, which is a CONSTANT 2 m/s; eased in from rest the body went 2.00 m/s on its
+    # last climbing tick and 0.22 on its first hauling one. An ease-OUT opens at twice its
+    # average, so two spans' worth of climb time opens it at exactly the climb's own speed.
+    climb = C["CUP"] if C["CUP"] > 0 else C["RUN"]
+    rise_frames = frames_at(abs(s.script_to[1]-s.script_from[1])*2, climb)
+    across = max(abs(s.script_to[0]-s.script_from[0]),
+                 abs(s.script_to_depth - s.script_from_depth))
+    across_frames = frames_at(across*3//2, C["RUN"])
+    frames = max(rise_frames + across_frames, C["MANTLE_MINF"])
     s.script_frames=frames; s.script_t=frames
+    s.script_rise_share = (ONE*rise_frames)//frames if frames else ONE//2
+    # Does this climb-out actually go UP? A ladder whose head is flush with its platform
+    # leaves the body slightly ABOVE the floor it steps onto, so the move descends, and a
+    # haul clip over a descent is a man pulling himself up while he sinks.
+    s.script_rises = s.script_to[1] > s.script_from[1] + C["RISEMARGIN"]
     s.script_dir = 1 if side>=0 else -1
     s.mode="mantle"; s.ladder=-1
     s.vx=s.vy=0; s.facing = 1 if side>=0 else -1
@@ -776,9 +886,28 @@ def try_mantle(s, prefer, ladder, w):
     elif l is None: side=1
     elif r is None: side=-1
     else: side = 1 if floor_run(r,1,w,s.depth) >= floor_run(l,-1,w,s.depth) else -1
-    # A sideways climb-out stays on its own slice: a step along this floor, not onto the next.
-    start_scripted(s, r if side>0 else l, side, s.depth)
+    # Onto the lane the floor it lands on actually holds a body at. Keeping the body's own
+    # slice -- "a step along this floor, not onto the next" -- is wrong coming off a ladder:
+    # the body is standing on the rungs' stand-off, in front of the floor, so the climb-out
+    # finished and update_depth then pulled it back at the full lane speed.
+    onto = r if side > 0 else l
+    start_scripted(s, onto, side, lane_under(onto, s.depth, w))
     return True
+
+
+def lane_under(at, fallback, w):
+    """The lane a body standing at this landing would be held on."""
+    half = C["W"]//2
+    top, lane = None, fallback
+    for i, sol in enumerate(w["solid"]):
+        if not solid_live(w, i): continue
+        if sol[2] <= at[0]-half or sol[0] >= at[0]+half: continue
+        if sol[3] > at[1] + SKIN: continue
+        if top is not None and sol[3] <= top: continue
+        want = lane_on(span(w, "solid", i), fallback)
+        if abs(want - fallback) > C["LANEREACH"]: continue
+        top, lane = sol[3], want
+    return lane
 
 def ground_below(x, y, maxd, w, depth):
     """The floor under a body on that body's own slice. Depth is not optional: searching every
@@ -796,6 +925,9 @@ def ground_below(x, y, maxd, w, depth):
     return best
 
 def climb(s, wx, wy, w):
+    # Jump does not leave a ladder: see MoveConfig.AllowLadderJump.
+    if s.buf > 0 and not C["LADDER_JUMP"]: s.buf = 0
+
     if s.buf > 0:
         s.buf = 0; s.mode = "air"; s.ladder = -1; s.ladder_cd = C["LREGRAB"]
         s.vx = C["RUN"]*wx; s.vy = C["JUMP"]; s.noise = 1; return
@@ -814,13 +946,22 @@ def climb(s, wx, wy, w):
     s.vy = C["CUP"] if wy > 0 else (-C["CDN"] if wy < 0 else 0)
     move_y(s, mul(s.vy, DT), w, s.ladder)
     ceiling = l[3] - C["LTOP"]
-    at_top = s.y >= ceiling
-    if at_top:
+    if s.y >= ceiling:
         s.y = ceiling
         if s.vy > 0: s.vy = 0
+
+    # The climb-out may begin a little BELOW the top, and has to: the top of a ladder box
+    # stands above the floor it serves, so waiting for it makes the climb-out descend -- 9.8
+    # cm down on this arena's top ladder -- under a clip of a man hauling himself upwards.
+    at_top = s.y >= ceiling
+    # ...but the lower band is for somebody CLIMBING only. Asking to get out sideways is a
+    # thing you do hanging at the very top, and allowing it half a metre down caught the
+    # fighter stepping into the hatch holding left to climb DOWN.
+    finishing = s.y >= ceiling - C["MANTLE_RISE"]
+
     # A direction on its own counts as asking to get out, not only up: edging off the rungs
     # instead walks the body out over the hole it came up through.
-    if at_top and (wy > 0 or wx) and try_mantle(s, wx, s.ladder, w):
+    if ((wy > 0 and finishing) or (wx and at_top)) and try_mantle(s, wx, s.ladder, w):
         return
     if wy < 0 and grounded(s, w, s.ladder):
         s.ladder = -1; s.ladder_cd = C["LREGRAB"]

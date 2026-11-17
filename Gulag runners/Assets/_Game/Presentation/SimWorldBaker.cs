@@ -173,6 +173,15 @@ namespace GulagRunners.Game
 
         /// <summary>Every object belonging to a closing wall, so the static pass skips them.</summary>
         readonly HashSet<int> _wallOwners = new HashSet<int>();
+
+        /// <summary>
+        /// The same for the poison pool, and it matters more: a pool is a box of art, and the
+        /// box somebody drags in to make one is a Unity cube, which arrives with a BoxCollider
+        /// on it. Baked, that collider is a solid block filling the bottom of the arena — the
+        /// fighters stand on the poison, which is the single worst way this could fail,
+        /// because it looks like the pool working.
+        /// </summary>
+        readonly HashSet<int> _poolOwners = new HashSet<int>();
         readonly List<Rect> _gizmoGate = new List<Rect>();
 
         void Awake()
@@ -249,6 +258,41 @@ namespace GulagRunners.Game
                 }
             }
 
+            // The poison, on the same terms and for a stronger reason: it is not collision at
+            // all. A pool is a level and a cost for being under it, so every object belonging
+            // to one is claimed here and never looked at again by the collision passes.
+            //
+            // One pool per arena. Two would be two surfaces, and the simulation holds ONE
+            // level — so a second one is said out loud rather than quietly ignored, which is
+            // how you end up wondering why half the poison does not hurt.
+            Aabb poison = default;
+            Span poisonZ = Span.Everywhere;
+            int pools = 0;
+            _poolOwners.Clear();
+            foreach (GameObject root in RootObjects())
+            {
+                foreach (PoisonPool p in root.GetComponentsInChildren<PoisonPool>(true))
+                {
+                    if (p == null || !p.enabled || !p.gameObject.activeInHierarchy) continue;
+
+                    p.Measure();
+                    pools++;
+                    if (pools == 1)
+                    {
+                        poison = p.ToBox();
+                        poisonZ = p.ToSpan();
+                    }
+                    foreach (Transform t in p.GetComponentsInChildren<Transform>(true))
+                        _poolOwners.Add(t.gameObject.GetInstanceID());
+                }
+            }
+
+            if (pools > 1)
+                Debug.LogWarning(
+                    $"{name}: {pools} PoisonPool(s) in this arena and the simulation holds one " +
+                    "level. The first one found is the poison; the rest are art that will " +
+                    "rise with it and bite nobody. Make one pool big enough instead.", this);
+
             int roots = 0, slopes = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0, markedOffPlane = 0,
                 chestsSeen = 0, chestsSkipped = 0;
             List<string> rootNames = new List<string>();
@@ -282,6 +326,7 @@ namespace GulagRunners.Game
                     // collider pass, on its layer, as a solid wall.
                     handled.Add(c.gameObject.GetInstanceID());
                     if (_wallOwners.Contains(c.gameObject.GetInstanceID())) continue;
+                    if (_poolOwners.Contains(c.gameObject.GetInstanceID())) continue;
 
                     // enabled && activeInHierarchy, NOT isActiveAndEnabled. The two are not
                     // the same here: isActiveAndEnabled is false for a component Unity has
@@ -359,8 +404,9 @@ namespace GulagRunners.Game
                     { skippedAlreadyMarked++; continue; }
 
                     // A closing wall is held separately: it moves, so it cannot be one of
-                    // the immutable boxes.
+                    // the immutable boxes. The poison is not collision at all.
                     if (_wallOwners.Contains(col.gameObject.GetInstanceID())) continue;
+                    if (_poolOwners.Contains(col.gameObject.GetInstanceID())) continue;
 
                     // Never bake a player's own body: it would become a wall it stands inside.
                     if (col.GetComponentInParent<PlayerController>() != null)
@@ -413,13 +459,27 @@ namespace GulagRunners.Game
                 Fill(solidZ, solids.Count, Span.Everywhere);
             }
 
-            int hatches = ladderCutsHatch ? CutHatches(solids, ladders) : 0;
+            // The depths go THROUGH the cut with their own boxes. They are a parallel array
+            // by index, and the cut inserts, removes and reorders -- so padding the list
+            // afterwards, which is what this used to do, left every solid past the first
+            // hole wearing another solid's slice of the level. The walkway came out with
+            // the ground floor's depth and the ground floor with the back wall's, so a
+            // fighter dropping through a hatch met nothing he was on the same slice as and
+            // fell out of the arena. Which is presumably why ladderCutsHatch is switched
+            // off in Arena_Demo, and why there is no way down from the walkway at all.
+            int hatches = ladderCutsHatch ? CutHatches(solids, solidZ, ladders) : 0;
 
-            // CutHatches rewrites the solid list, so the depths have to be rebuilt against
-            // whatever came out of it rather than assumed to still line up.
-            while (solidZ.Count < solids.Count) solidZ.Add(Span.Everywhere);
-            if (solidZ.Count > solids.Count) solidZ.RemoveRange(solids.Count,
-                                                                solidZ.Count - solids.Count);
+            // A safety net now rather than the mechanism: if these two ever disagree again
+            // the bake is wrong, and a silent pad is how that stays hidden for months.
+            if (solidZ.Count != solids.Count)
+            {
+                Debug.LogError($"Bake: {solids.Count} solid(s) but {solidZ.Count} depth(s). " +
+                               "Every box past the shorter list is on the wrong slice of " +
+                               "the level. This is a bug in the bake, not in the scene.");
+                while (solidZ.Count < solids.Count) solidZ.Add(Span.Everywhere);
+                if (solidZ.Count > solids.Count)
+                    solidZ.RemoveRange(solids.Count, solidZ.Count - solids.Count);
+            }
 
             // The shutters go on last, after CutHatches has finished rewriting the solid list,
             // and never through it: a ladder crossing a shutter is a level-authoring mistake,
@@ -476,6 +536,8 @@ namespace GulagRunners.Game
             {
                 Gates = gateDefs,
                 Walls = walls.ToArray(),
+                Poison = poison,
+                PoisonZ = poisonZ,
                 SolidGate = gateOf.ToArray(),
                 Solids = solids.ToArray(),
                 OneWay = oneWay.ToArray(),
@@ -501,6 +563,9 @@ namespace GulagRunners.Game
                 $"({hatches} cut by ladders), " +
                 $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
                 $"{World.Gates.Length} gate ({gated} box(es)), " +
+                (World.HasPoison
+                    ? $"poison from y {World.Poison.MinY} to y {World.Poison.MaxY}, "
+                    : "no poison, ") +
                 $"{slopes} slope(s) cut into steps, " +
                 $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
 
@@ -738,7 +803,7 @@ namespace GulagRunners.Game
         /// it, because hand-built levels have ladder feet a centimetre inside their own platform
         /// and a hole there is a fighter falling out of the arena.
         /// </summary>
-        int CutHatches(List<Aabb> solids, List<Aabb> ladders)
+        int CutHatches(List<Aabb> solids, List<Span> depths, List<Aabb> ladders)
         {
             if (ladders.Count == 0 || solids.Count == 0) return 0;
 
@@ -749,6 +814,7 @@ namespace GulagRunners.Game
             int cut = 0;
 
             List<Aabb> working = new List<Aabb>(solids.Count + ladders.Count);
+            List<Span> workingZ = new List<Span>(solids.Count + ladders.Count);
 
             foreach (Aabb ladder in ladders)
             {
@@ -756,8 +822,15 @@ namespace GulagRunners.Game
                 Fix holeMax = ladder.MaxX + margin;
 
                 working.Clear();
-                foreach (Aabb solid in solids)
+                workingZ.Clear();
+                for (int s = 0; s < solids.Count; s++)
                 {
+                    Aabb solid = solids[s];
+
+                    // The box's own slice, carried across every rewrite below. Both halves
+                    // of a cut floor are the same floor and keep it.
+                    Span z = s < depths.Count ? depths[s] : Span.Everywhere;
+
                     bool crossesX = solid.MinX < holeMax && solid.MaxX > holeMin;
 
                     // How much of the solid's height the ladder actually occupies. A ladder
@@ -766,19 +839,32 @@ namespace GulagRunners.Game
                     Fix overlapY = Fix.Min(solid.MaxY, ladder.MaxY)
                                  - Fix.Max(solid.MinY, ladder.MinY);
 
-                    if (!crossesX || overlapY <= minOverlap) { working.Add(solid); continue; }
+                    if (!crossesX || overlapY <= minOverlap)
+                    {
+                        working.Add(solid);
+                        workingZ.Add(z);
+                        continue;
+                    }
 
                     cut++;
 
                     if (holeMin - solid.MinX > sliver)
+                    {
                         working.Add(new Aabb(solid.MinX, solid.MinY, holeMin, solid.MaxY));
+                        workingZ.Add(z);
+                    }
 
                     if (solid.MaxX - holeMax > sliver)
+                    {
                         working.Add(new Aabb(holeMax, solid.MinY, solid.MaxX, solid.MaxY));
+                        workingZ.Add(z);
+                    }
                 }
 
                 solids.Clear();
                 solids.AddRange(working);
+                depths.Clear();
+                depths.AddRange(workingZ);
             }
 
             return cut;
@@ -824,6 +910,68 @@ namespace GulagRunners.Game
                     ladders.Add(box); _gizmoLadder.Add(r); _ladderDepth.Add(depth); break;
                 default: solids.Add(box); _gizmoSolid.Add(r); break;
             }
+        }
+
+        /// <summary>
+        /// Which object in the scene a baked box came from.
+        ///
+        /// Written because the warning that needed it did not have it. Both fighters in the
+        /// Nordic arena were thrown 21 m into the air at the start of every round, and the
+        /// console said so precisely -- "spawned inside a baked solid (x -27.33..25.91,
+        /// y -1.65..21.72)" -- and then stopped, leaving four numbers and a scene with four
+        /// hundred objects in it. A box with no name is a hunt; a box with a name is a fix.
+        ///
+        /// Deliberately a SEARCH rather than a list kept alongside the boxes. A parallel
+        /// array is exactly what went wrong with the depth spans: CutHatches inserts,
+        /// removes and reorders, so anything kept by index drifts out of step and then lies
+        /// confidently. This re-measures the scene when something has already gone wrong, so
+        /// it costs nothing in a working build and cannot fall out of step with anything.
+        /// </summary>
+        public string Blame(Aabb box)
+        {
+            float x0 = box.MinX.ToMilli() / 1000f, x1 = box.MaxX.ToMilli() / 1000f;
+            float y0 = box.MinY.ToMilli() / 1000f, y1 = box.MaxY.ToMilli() / 1000f;
+
+            string best = null;
+            float bestMiss = float.MaxValue;
+
+            foreach (GameObject root in RootObjects())
+            {
+                root.GetComponentsInChildren(true, _markedBuffer);
+                foreach (SimCollider c in _markedBuffer)
+                {
+                    if (c == null) continue;
+                    Consider(c.name + " (marked " + c.kind + ")", c.WorldBounds,
+                             c.transform, ref best, ref bestMiss, x0, y0, x1, y1);
+                }
+
+                root.GetComponentsInChildren(true, _colliderBuffer);
+                foreach (Collider col in _colliderBuffer)
+                {
+                    if (col == null) continue;
+                    Consider(col.name + " (" + col.GetType().Name + " on the art)",
+                             col.bounds, col.transform, ref best, ref bestMiss, x0, y0, x1, y1);
+                }
+            }
+
+            if (best == null) return "nothing in the scene matches that box";
+            return bestMiss <= 0.02f
+                ? best
+                : best + $" — the nearest match, {bestMiss:0.00} m out, so the bake may have " +
+                  "cut or merged it (slopes become steps, ladders cut hatches)";
+        }
+
+        static void Consider(string what, Bounds b, Transform t,
+                             ref string best, ref float bestMiss,
+                             float x0, float y0, float x1, float y1)
+        {
+            float miss = Mathf.Abs(b.min.x - x0) + Mathf.Abs(b.max.x - x1)
+                       + Mathf.Abs(b.min.y - y0) + Mathf.Abs(b.max.y - y1);
+            if (miss >= bestMiss) return;
+            bestMiss = miss;
+            best = Path(t) + " — " + what +
+                   $", {b.size.x:0.00} x {b.size.y:0.00} x {b.size.z:0.00} m at z " +
+                   $"{b.min.z:0.00}..{b.max.z:0.00}";
         }
 
         /// <summary>Name fragments that mean somebody modelled a ladder. Lower case.</summary>

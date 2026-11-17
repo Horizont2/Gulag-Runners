@@ -14,6 +14,8 @@ namespace GulagRunners.Game
     /// Gold is a NUMBER and not a fraction on purpose. docs/09 gives it no ceiling, and a
     /// bar implies one — the first mockup drew a bar beside the coin, which is the one
     /// place it lied about a mechanic.
+    ///
+    /// The season fields are gone for the same reason: there is no pass to fill them.
     /// </summary>
     [Serializable]
     public class MenuProfile
@@ -31,10 +33,6 @@ namespace GulagRunners.Game
                  "can say so instead of showing a rank nobody has earned yet.")]
         public int protectedMatchesLeft = 20;
 
-        [Header("Season")]
-        public int seasonNumber = 1;
-        [Range(0f, 1f)] public float seasonProgress;
-
         [Header("Dailies")]
         [Tooltip("docs/09 gives three a day at 40 gold each, and they are there to TEACH " +
                  "the mechanics — a counter nobody sees teaches nobody.")]
@@ -46,7 +44,14 @@ namespace GulagRunners.Game
     /// The menu's buttons and readouts.
     ///
     /// Wire a Button's OnClick straight to the public methods here: Play, Profile, Shop,
-    /// Dailies, Season, Settings, Friends, Back. That is the whole contract.
+    /// Dailies, Settings, Friends, Back. That is the whole contract.
+    ///
+    /// No season and no battle pass. docs/09 describes a six-week pass and the menu was
+    /// carrying a slot for it -- a number, a bar, a panel and a button -- none of which
+    /// the game ships. A readout of something that does not exist is worse than a missing
+    /// one: it is a promise, and the first screen is where a player decides what this
+    /// game is. It comes back as seasonNumber, seasonProgress, seasonPanel, Season() and
+    /// two UnityEvents on the day there is a pass behind them.
     ///
     /// It does not reference Button, Text or any other uGUI type, and that is deliberate.
     /// Everything else in this project talks to the interface through
@@ -65,19 +70,42 @@ namespace GulagRunners.Game
         [Tooltip("Runs the gate and loads the match. Found in the scene when empty.")]
         public MenuDirector director;
 
+        [Tooltip("Optional. The search screen.\n\n" +
+                 "Set it and PLAY looks for an opponent first; leave it empty and PLAY " +
+                 "walks straight out of the gate, which is what it did before there was " +
+                 "anybody to look for and is still how to test the transition on its own.")]
+        public MatchSearch search;
+
         [Tooltip("The fighter on show, so the shop can dress him. Optional.")]
         public MenuFighter fighter;
 
         [Header("What the player owns")]
         public MenuProfile profile = new MenuProfile();
 
+        [Tooltip("Optional. The saved ladder and purse (Meta/PlayerProgress). Set it and " +
+                 "the profile above stops being typed-in numbers and becomes a READOUT of " +
+                 "what the player has actually done; leave it empty and the menu is a mock " +
+                 "again, which is what it has to stay for laying the screen out.\n\n" +
+                 "Found through PlayerProgress.Instance when empty.")]
+        public GulagRunners.Meta.PlayerProgress progress;
+
         [Header("Panels — already in the scene, switched off")]
-        [Tooltip("One at a time. Opening any of these closes whatever was open.")]
+        [Tooltip("Optional, every one of them. One at a time: opening any closes whatever " +
+                 "was open, and a panel that does not exist yet simply cannot be opened. " +
+                 "The first screen works on its own and the depth behind it arrives panel " +
+                 "by panel.")]
         public GameObject profilePanel;
+
+        [Tooltip("Optional. Cosmetics, priced in gold. docs/09: it never sells power.")]
         public GameObject shopPanel;
+
+        [Tooltip("Optional. The three a day, and what each is asking for.")]
         public GameObject dailiesPanel;
-        public GameObject seasonPanel;
+
+        [Tooltip("Optional. Sound, language, stick sensitivity, controls, account.")]
         public GameObject settingsPanel;
+
+        [Tooltip("Optional. Friends, and the private match docs/09's saved seed lives in.")]
         public GameObject friendsPanel;
 
         [Tooltip("Optional. Switched off while a panel is open, so the fighter and PLAY " +
@@ -94,13 +122,16 @@ namespace GulagRunners.Game
         [Tooltip("0 to 1. Wire to an Image.fillAmount or a Slider.value.")]
         public UnityEvent<float> leagueFilled;
 
-        public UnityEvent<string> seasonChanged;
-        public UnityEvent<float> seasonFilled;
-
         [Tooltip("\"1/3\". The badge on the dailies icon.")]
         public UnityEvent<string> dailiesChanged;
 
         public UnityEvent<string> playerNameChanged;
+
+        [Tooltip("Which league badge to show: the League enum's value, or -1 while the " +
+                 "player is still in their first five matches and has none.\n\n" +
+                 "An int and not the name, because the name would have to be parsed back " +
+                 "out of \"Platinum II\" and the parse is where the bug would live.")]
+        public UnityEvent<int> leagueBadgeChanged;
 
         [Header("Debug")]
         public string openPanel = "";
@@ -129,6 +160,12 @@ namespace GulagRunners.Game
         public void Play()
         {
             CloseAll();
+
+            // The search owns the walk once it exists: it has to find somebody before
+            // there is any point opening a gate, and it is the thing that holds the loaded
+            // scene back until the other runner is in.
+            if (search != null) { search.Begin(); return; }
+
             if (director != null) director.Play();
             else Debug.LogWarning($"{name}: no MenuDirector, so PLAY has nothing to open.", this);
         }
@@ -141,9 +178,6 @@ namespace GulagRunners.Game
 
         /// <summary>The three a day, and what each one is asking for.</summary>
         public void Dailies() => Open(dailiesPanel, nameof(Dailies));
-
-        /// <summary>The six-week pass and its milestones.</summary>
-        public void Season() => Open(seasonPanel, nameof(Season));
 
         /// <summary>Sound, language, stick sensitivity, controls, account.</summary>
         public void Settings() => Open(settingsPanel, nameof(Settings));
@@ -173,6 +207,21 @@ namespace GulagRunners.Game
         {
             if (profile == null) return;
 
+            // The ladder is the authority when there is one. Copied into the profile rather
+            // than read straight into the events, so the rest of this class has exactly one
+            // thing to read and the screen can still be laid out with the ladder absent.
+            if (progress == null) progress = GulagRunners.Meta.PlayerProgress.Instance;
+            if (progress != null)
+            {
+                profile.playerName = progress.playerName;
+                profile.gold = progress.gold;
+                profile.league = progress.LeagueName;
+                profile.leagueProgress = progress.LeagueProgress;
+                profile.protectedMatchesLeft = progress.PlacementLeft;
+                profile.dailiesDone = progress.dailiesDone;
+                profile.dailiesTotal = GulagRunners.Meta.Purse.DailiesPerDay;
+            }
+
             goldChanged?.Invoke(profile.gold.ToString());
             playerNameChanged?.Invoke(profile.playerName);
 
@@ -182,9 +231,10 @@ namespace GulagRunners.Game
                 ? $"{profile.protectedMatchesLeft} placement matches left"
                 : profile.league);
             leagueFilled?.Invoke(Mathf.Clamp01(profile.leagueProgress));
-
-            seasonChanged?.Invoke($"Season {profile.seasonNumber}");
-            seasonFilled?.Invoke(Mathf.Clamp01(profile.seasonProgress));
+            leagueBadgeChanged?.Invoke(progress != null && progress.matchesPlayed < 5
+                ? -1
+                : (int)GulagRunners.Meta.Ladder.LeagueOf(
+                      progress != null ? progress.rating : 1500.0));
 
             dailiesChanged?.Invoke($"{profile.dailiesDone}/{Mathf.Max(1, profile.dailiesTotal)}");
         }
@@ -232,7 +282,6 @@ namespace GulagRunners.Game
             Shut(profilePanel);
             Shut(shopPanel);
             Shut(dailiesPanel);
-            Shut(seasonPanel);
             Shut(settingsPanel);
             Shut(friendsPanel);
 

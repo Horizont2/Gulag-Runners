@@ -15,7 +15,13 @@ LEATHER, CHAINMAIL, PLATE = 20, 21, 22
 # is what a replay carries, and giving an old one to a new item rewrites a
 # saved round.
 BANDAGE = 30
-WEAPON, ARMOUR, UTILITY = 1, 2, 3
+LEATHER_CAP, MAIL_COIF, GREAT_HELM = 40, 41, 42
+ROPE_BELT, TOOL_BELT, WAR_BELT = 50, 51, 52
+WEAPON, ARMOUR, UTILITY, HELMET, BELT = 1, 2, 3, 4, 5
+
+# Helmet, chest and belt are three slots and one damage reduction: they SUM, and the
+# sum is capped by the combat config rather than in here.
+WORN = (HELMET, ARMOUR, BELT)
 
 
 def _w(name, tier, dmg, frames, reach, dur, pry, pierce=0, weight=0):
@@ -23,10 +29,20 @@ def _w(name, tier, dmg, frames, reach, dur, pry, pierce=0, weight=0):
                 pry=M(pry), dur=dur, pierce=pierce, weight=weight, name=name)
 
 
-def _a(name, tier, reduction, chip=0, parry=0, weight=0):
-    return dict(kind=ARMOUR, tier=tier, dmg=0, frames=0, reach=0, pry=0, dur=0,
+def _a(name, tier, reduction, chip=0, parry=0, weight=0, kind=ARMOUR, stun=0, hold=0):
+    return dict(kind=kind, tier=tier, dmg=0, frames=0, reach=0, pry=0, dur=0,
                 pierce=0, reduction=reduction, chip=chip, parry=parry, weight=weight,
-                name=name)
+                stun=stun, hold=hold, name=name)
+
+
+def _h(name, tier, reduction, stun, weight):
+    """A helmet: a little reduction, and the hitstun of the blows after the first."""
+    return _a(name, tier, reduction, weight=weight, kind=HELMET, stun=stun)
+
+
+def _b(name, tier, reduction, hold, weight):
+    """A belt: the least reduction in the table, and how long a guard holds."""
+    return _a(name, tier, reduction, weight=weight, kind=BELT, hold=hold)
 
 
 ITEMS = {
@@ -43,10 +59,16 @@ ITEMS = {
     SCYTHE:    _w("scythe", 2, 11, 29, 1850, 8, 1200, pierce=500, weight=70),
     FLANGED_MACE: _w("flanged mace", 3, 12, 21, 1300, 9, 1400, pierce=700, weight=100),
     WARHAMMER: _w("warhammer", 3, 21, 34, 1400, 6, 2600, pierce=450, weight=70),
-    LEATHER:   _a("leather vest", 1, 150, weight=100),
-    CHAINMAIL: _a("chainmail", 2, 300, weight=100),
-    PLATE:     _a("plate", 3, 450, weight=90),
+    LEATHER:   _a("leather vest", 1, 90, weight=100),
+    CHAINMAIL: _a("chainmail", 2, 180, weight=100),
+    PLATE:     _a("plate", 3, 270, weight=90),
     BANDAGE:   dict(kind=UTILITY, tier=1, pry=0, dur=0, heal=30, weight=110, name="bandage"),
+    LEATHER_CAP: _h("leather cap", 1, 40, 120, 55),
+    MAIL_COIF:   _h("mail coif", 2, 80, 240, 45),
+    GREAT_HELM:  _h("great helm", 3, 120, 380, 30),
+    ROPE_BELT:   _b("rope belt", 1, 20, 150, 50),
+    TOOL_BELT:   _b("tool belt", 2, 40, 300, 40),
+    WAR_BELT:    _b("war belt", 3, 60, 500, 25),
 }
 
 # ---------------------------------------------------------------- the deal (LootTable)
@@ -102,10 +124,16 @@ def pry_milli(weapon):
 
 # ---------------------------------------------------------------- chests (docs/03)
 CRATE, LOCKER, SAFE = 0, 1, 2
+# ONE PRICE FOR ALL THREE KINDS, which is what ChestConfig.Default actually holds and
+# what every arena's ChestTuning is set to: 150 frames by hand, so 2.5 s bare and 1.25 s
+# with a club. docs/03 priced them apart -- 1.2 s for a crate, 6 s for a safe -- and this
+# table still said so long after the code stopped: the kind decides the LOOT TIER now, and
+# the pricing comes back when the kinds are placed deliberately rather than scattered
+# (ChestTuning says why). A mirror that holds yesterday's numbers tests yesterday's game.
 CHEST_CFG = {
-    CRATE:  dict(bare=72,  bare_noise=1, tool_noise=1, wear=1, name="crate"),
-    LOCKER: dict(bare=300, bare_noise=2, tool_noise=3, wear=2, name="locker"),
-    SAFE:   dict(bare=360, bare_noise=3, tool_noise=3, wear=3, name="safe"),
+    CRATE:  dict(bare=150, bare_noise=2, tool_noise=3, wear=2, name="crate"),
+    LOCKER: dict(bare=150, bare_noise=2, tool_noise=3, wear=2, name="locker"),
+    SAFE:   dict(bare=150, bare_noise=2, tool_noise=3, wear=2, name="safe"),
 }
 # Chance of each tier per chest kind, in percent. Rows sum to 100.
 TIER_ODDS = {
@@ -147,9 +175,25 @@ def deal(chests, seed):
 DECAY_MUL = 2
 NOISE_FRAMES = 20
 
+# How loud a thing is (NoiseLevel). In a game where the other player cannot be seen this is
+# part of the simulation, not a property of an audio clip.
+SILENT, QUIET, MEDIUM, LOUD = 0, 1, 2, 3
+
+# What a lock costs to get wrong, and what it costs to get right (docs/04). One second of
+# the lock taking nothing is the ENTIRE price of a mistake: no attempt counter, because a
+# lock-out would turn an optimisation into a barrier.
+PUZZLE_WRONG_FRAMES = 60
+PUZZLE_WRONG_NOISE = LOUD
+PUZZLE_SOLVE_NOISE = QUIET
+
 # ---------------------------------------------------------------- loot on the floor (DropConfig)
 D = dict(POP_X=M(1400), POP_Y=M(3600), DROP_X=M(1100), DROP_Y=M(2200),
-         GRAV=M(22000), MAXFALL=M(14000), BOUNCE=M(150), RADIUS=M(220),
+         GRAV=M(22000), MAXFALL=M(14000), BOUNCE=M(150),
+         # RADIUS is how big the item IS -- what rests on the floor and what a wall
+         # stops. REACH is how close you have to be to take it. One number did both
+         # until the pickup was asked to be wider, which would have floated every
+         # dropped weapon off the ground.
+         RADIUS=M(220), REACH=M(330),
          POP_LOCK=14, DROP_LOCK=30)
 DT = ONE // 60
 
@@ -265,32 +309,85 @@ def step_ground(ground, w):
 
 
 class Chest:
-    def __init__(s, kind, contents, box):
+    def __init__(s, kind, contents, box, has_puzzle=False):
         s.kind, s.contents, s.box = kind, contents, box
         s.progress, s.opened, s.opener = 0, False, -1
+        # The lock (docs/04). None until a round deals one; `pdone` is which of its touches
+        # have been made and `pstun` is how long it sulks after a wrong one. Neither drains
+        # and neither belongs to the opener: being hit keeps the progress, and a safe
+        # somebody else started can be finished.
+        s.has_puzzle = has_puzzle
+        s.puzzle = None
+        s.pdone, s.pstun = 0, 0
 
 
 def fresh(chests):
     for c in chests:
         c.progress, c.opened, c.opener = 0, False, -1
+        c.pdone, c.pstun = 0, 0
 
 
 class Inv:
+    """Five slots: weapon, helmet, chest armour, belt, utility. docs/02 started at three
+    and three was one idea short -- a silhouette has a head and a waist, and folding both
+    into one armour square made finding a helmet a reason to throw your plate away."""
+
     def __init__(s):
         s.weapon, s.armour, s.utility = NONE, NONE, NONE
+        s.helmet, s.belt = NONE, NONE
         s.durability = 0
 
     @property
     def bare(s):
         return s.weapon == NONE
 
+    def slot(s, kind):
+        return {WEAPON: s.weapon, HELMET: s.helmet, ARMOUR: s.armour,
+                BELT: s.belt, UTILITY: s.utility}.get(kind, NONE)
+
+    # ---- what the three worn pieces come to. Sums, except the guard chip: zero means
+    # "the ordinary chip", so the best piece wins rather than three of them multiplying.
+    def _worn(s, key):
+        return sum(ITEMS[i].get(key, 0) for i in (s.helmet, s.armour, s.belt))
+
+    @property
+    def reduction(s):
+        return s._worn("reduction")
+
+    @property
+    def stun_resist(s):
+        return s._worn("stun")
+
+    @property
+    def guard_hold(s):
+        return s._worn("hold")
+
+    @property
+    def parry_bonus(s):
+        return s._worn("parry")
+
+    @property
+    def chip(s):
+        best = 0
+        for i in (s.helmet, s.armour, s.belt):
+            c = ITEMS[i].get("chip", 0)
+            if c > 0 and (best == 0 or c < best):
+                best = c
+        return best
+
     def equip(s, item):
         kind = ITEMS[item]["kind"]
         if kind == WEAPON:
             old, s.weapon, s.durability = s.weapon, item, ITEMS[item]["dur"]
             return old
+        if kind == HELMET:
+            old, s.helmet = s.helmet, item
+            return old
         if kind == ARMOUR:
             old, s.armour = s.armour, item
+            return old
+        if kind == BELT:
+            old, s.belt = s.belt, item
             return old
         if kind == UTILITY:
             old, s.utility = s.utility, item
@@ -318,7 +415,15 @@ def body(s):
 
 
 def available(chest, player):
-    return not chest.opened and (chest.opener < 0 or chest.opener == player)
+    """May this player work on this chest at all?
+
+    The claim is about FORCING: progress drains, and a thing that drains has to drain for
+    exactly one player on exactly one tick or the two clients disagree. A lock has nothing
+    to drain -- the touches already made stay made and belong to nobody -- so a chest with
+    an unsolved lock is open to both players, which docs/04 asks for by name. What the
+    second player may not do is pry it."""
+    locked = chest.puzzle is not None and chest.puzzle.exists
+    return not chest.opened and (chest.opener < 0 or chest.opener == player or locked)
 
 
 def find(s, player, chests):
@@ -358,11 +463,10 @@ def take_from_ground(s, pressed, ground, button_taken):
     for i, g in enumerate(ground):
         if not g.takeable:
             continue
-        box = (g.x - D["RADIUS"], g.y - D["RADIUS"], g.x + D["RADIUS"], g.y + D["RADIUS"])
+        box = (g.x - D["REACH"], g.y - D["REACH"], g.x + D["REACH"], g.y + D["REACH"])
         if not overlaps(b, box):
             continue
-        slot = {WEAPON: s.inv.weapon, ARMOUR: s.inv.armour, UTILITY: s.inv.utility}.get(
-            ITEMS[g.item]["kind"], NONE)
+        slot = s.inv.slot(ITEMS[g.item]["kind"])
         if slot == NONE:
             if free < 0:
                 free = i
@@ -422,8 +526,15 @@ def loot_step(s, player, inp, chests, ground=None):
 
     chest = chests[target]
     cfg = CHEST_CFG[chest.kind]
-    chest.opener = player
-    s.opening = target
+
+    # The claim, and only for the player who is prying. Somebody who walks up to a lock
+    # another player is forcing may touch the lock -- that is the whole of "finish somebody
+    # else's safe" -- but he does not take the chest off them, and he never adds a
+    # thousandth to their progress.
+    mine = chest.opener < 0 or chest.opener == player
+    if mine:
+        chest.opener = player
+        s.opening = target
 
     # Turn to what you are prying at: the search animation has to have something to face, and
     # the loot step runs last in the tick, so this is the final word on facing for the frame.
@@ -435,19 +546,47 @@ def loot_step(s, player, inp, chests, ground=None):
     elif centre < s.x - dead: s.facing = -1
 
     tool = not s.inv.bare
-    chest.progress += pry_milli(s.inv.weapon)
-
-    if s.stepn == 0:
-        s.noise = cfg["tool_noise"] if tool else cfg["bare_noise"]
-        s.stepn = NOISE_FRAMES
-
     needed = cfg["bare"] * BARE_GAIN
-    if chest.progress < needed:
-        return
+
+    # ---- the quiet way in (docs/04)
+    #
+    # A lock is an OPTIMISATION, never a gate: everything here can be skipped by holding
+    # the button, which is the branch below it. What it buys is three seconds instead of
+    # six and near-silence instead of a noise heard across half the arena.
+    picked = False
+    if chest.puzzle is not None and chest.puzzle.exists:
+        if chest.pstun > 0:
+            chest.pstun -= 1          # sulking after a wrong touch; no lock-out, just time
+            return
+        choice = (inp >> 8) & 7
+        if choice != 0:
+            now = chest.puzzle.press(chest.pdone, choice)
+            if now < 0:
+                chest.pstun = PUZZLE_WRONG_FRAMES
+                s.noise = PUZZLE_WRONG_NOISE
+                s.stepn = NOISE_FRAMES
+                return
+            chest.pdone = now
+            if not chest.puzzle.solved(now):
+                s.noise = SILENT          # a right touch makes no sound at all
+                return
+            picked = True
+
+    if not picked:
+        if not mine:
+            return                    # somebody else is prying this one; their progress
+        chest.progress += pry_milli(s.inv.weapon)
+
+        if s.stepn == 0:
+            s.noise = cfg["tool_noise"] if tool else cfg["bare_noise"]
+            s.stepn = NOISE_FRAMES
+
+        if chest.progress < needed:
+            return
 
     chest.progress, chest.opened, chest.opener = needed, True, -1
     s.opening = -1
-    if tool:
+    if tool and not picked:
         s.inv.spend(cfg["wear"])
     cx = chest.box[0] + (chest.box[2] - chest.box[0]) // 2
     cy = chest.box[1] + (chest.box[3] - chest.box[1]) // 2
@@ -456,7 +595,9 @@ def loot_step(s, player, inp, chests, ground=None):
     away = 1 if offset > meaningful else (-1 if offset < -meaningful else (-1 if s.facing >= 0 else 1))
     pop(ground, chest.contents, cx, cy, away)
     s.opened_chest = target
-    s.noise = 3
+    # A chest FORCED open is heard across the floor. One that was picked is not, and that
+    # difference is the whole argument for learning the locks (docs/04).
+    s.noise = PUZZLE_SOLVE_NOISE if picked else LOUD
 
 
 def frames_to_open(kind, weapon):

@@ -57,6 +57,7 @@ namespace GulagRunners.Game
         IAudioBackend _backend;
         readonly Dictionary<SoundId, float> _lastPlayed = new Dictionary<SoundId, float>();
         readonly List<PlayerController> _subscribed = new List<PlayerController>();
+        bool _landed;
 
         void Awake()
         {
@@ -109,13 +110,43 @@ namespace GulagRunners.Game
 
         // ---------------------------------------------------------------- the simulation talking
 
+        /// <summary>
+        /// The simulation made a noise. Which is a LOUDNESS and not an event, and that
+        /// distinction was being thrown away.
+        ///
+        /// This mapped the level straight to a sound -- Quiet to a quiet footstep, Loud to
+        /// a loud one, and Medium to LandSoft. But the motor raises Medium for a soft
+        /// landing, for a dodge AND for prying a chest bare-handed, and Loud for a hard
+        /// landing, a hit landing, a chest coming open and the round starting. So a dodge
+        /// played a landing, and a hard landing played a footstep while the LandHard clip
+        /// sat in the table unused.
+        ///
+        /// Those events now post their own sounds from PlayerEffects, which knows WHICH of
+        /// them happened. What is left here is the pair only this knows: footfalls, and
+        /// landings -- and a landing announces itself through Landed one line before the
+        /// noise arrives, so the two can be told apart without a flag on the state or a
+        /// threshold repeated from the movement tuning. The level itself says whether it
+        /// was hard: the motor already chose Loud or Medium by the impact speed.
+        /// </summary>
         void OnNoise(NoiseLevel level, Vector2 at)
         {
             if (level == NoiseLevel.Silent) return;
-            Post(SoundFor(level), at, level, at);
+
+            if (_landed)
+            {
+                _landed = false;
+                Post(level >= NoiseLevel.Loud ? SoundId.LandHard : SoundId.LandSoft,
+                     at, level, at);
+                return;
+            }
+
+            Post(level >= NoiseLevel.Medium ? SoundId.FootstepLoud : SoundId.FootstepQuiet,
+                 at, level, at);
         }
 
-        void OnLanded(float impactSpeed) { }      // the landing's own noise arrives through OnNoise
+        // Landed is raised one line before Noise, in the same tick, so this is read before
+        // it could go stale.
+        void OnLanded(float impactSpeed) => _landed = true;
 
         void OnPickedUp(ItemId item) =>
             PostAtListeners(SoundId.ItemPickup, NoiseLevel.Quiet);
@@ -132,13 +163,7 @@ namespace GulagRunners.Game
             Post(sound, at, level, at);
         }
 
-        static SoundId SoundFor(NoiseLevel level) => level switch
-        {
-            NoiseLevel.Quiet => SoundId.FootstepQuiet,
-            NoiseLevel.Medium => SoundId.LandSoft,
-            NoiseLevel.Loud => SoundId.FootstepLoud,
-            _ => SoundId.None
-        };
+
 
         // ---------------------------------------------------------------- the public door
 

@@ -17,7 +17,7 @@ namespace GulagRunners.Game
     {
         [Header("Ground (m/s, m/s^2)")]
         [Tooltip("A room is ~7.2 m wide and docs/03 budgets ~2 s to cross it.")]
-        public float runSpeed = 3.6f;
+        public float runSpeed = 3f;
         public float crouchSpeed = 1.6f;
         public float groundAccel = 40f;
         public float groundDecel = 50f;
@@ -74,8 +74,15 @@ namespace GulagRunners.Game
         public int ladderRegrabFrames = 12;
 
         [Header("Dodge")]
+        [Tooltip("Whether the defensive button can also dash.\n\nOff: this game has one " +
+                 "ground speed on purpose, and a fighter who can suddenly travel faster " +
+                 "than he runs reads as the character accelerating for no reason the " +
+                 "player asked for. With it off the same button raises the guard, and the " +
+                 "guard's own 42% is the only thing that changes anybody's speed.")]
+        public bool allowDodge = false;
+
         [Tooltip("Travel is speed x duration: 4.8 m/s over 0.35 s is 1.68 m — about two body " +
-                 "widths, which is a step out of reach rather than a teleport across the room.")]
+                 "widths. Only used while Allow Dodge is on.")]
         public float dodgeSpeed = 4.8f;
         [Tooltip("0.35 s of invulnerability, from docs/02. This is the window, not the distance.")]
         public int dodgeFrames = 21;
@@ -95,12 +102,12 @@ namespace GulagRunners.Game
         [Header("Body")]
         [Tooltip("Collision width. Match it to the character's silhouette, not to its T-pose " +
                  "bounds: those span both outstretched arms and are useless as a body width.")]
-        public float bodyWidth = 0.45f;
-        public float bodyHeight = 1.8f;
+        public float bodyWidth = 0.3f;
+        public float bodyHeight = 0.91f;
         [Tooltip("Height while crouching. Clamped to 75% of the body height on conversion: a " +
                  "crouch taller than the character makes the hitbox GROW when you duck, which " +
                  "inverts every ceiling check that depends on it.")]
-        public float crouchHeight = 1.1f;
+        public float crouchHeight = 0.682f;
 
         [Header("Depth (docs/02: the arena is 3D, the fight is not)")]
         [Tooltip("How much of the level's DEPTH the body occupies, in metres. Never moved " +
@@ -111,6 +118,28 @@ namespace GulagRunners.Game
         [Tooltip("How fast the body slides between slices, in m/s. 0 snaps, which reads as a " +
                  "teleport sideways whenever a ramp starts at another depth.")]
         public float depthSnapSpeed = 4f;
+
+        [Header("Being hit")]
+        [Tooltip("What is left of a blow's push after one tick.\n\n" +
+                 "0.93 keeps 93% of it every tick: the body is moved hard at first and " +
+                 "eases out to nothing. Lower it and a hit barely moves anybody; raise it " +
+                 "towards 1 and the push carries for the whole stun.\n\n" +
+                 "What this replaced was a flat drag — a constant slowing, which arrives at " +
+                 "zero still travelling and stops dead. Snapped to full speed on one tick " +
+                 "and stopped dead at the end, a knockback jolts at both ends, and that is " +
+                 "most of what makes being hit unpleasant to play against rather than " +
+                 "heavy. Hit stop already holds the body still while the eye reads the " +
+                 "blow, so the only sharp number left is the one the blow itself set.")]
+        [Range(0.6f, 0.99f)] public float pushDecay = 0.93f;
+
+        [Tooltip("How much faster that is while the feet are off the ground.\n\n" +
+                 "The speed above is tuned for walking from one slice to another, where " +
+                 "gentle is right. A JUMP to a prop at another depth has to finish its " +
+                 "move before the landing, or the rest of it happens as a slide across " +
+                 "the floor you just landed on — which is what being slowly pulled into " +
+                 "the forest's hanging cages was. In the air the body is already " +
+                 "travelling, so the same move reads as leaning into the jump.")]
+        [Range(1f, 6f)] public float airDepthSnap = 3f;
 
         [Tooltip("How far ahead to look for the next thing worth standing on, in metres. The " +
                  "body walks onto the slice of whatever it is about to climb, which is what " +
@@ -180,6 +209,7 @@ namespace GulagRunners.Game
             c.ScriptMinFrames = scriptMinFrames;
             c.ScriptMaxFrames = Mathf.Max(scriptMinFrames, scriptMaxFrames);
             c.LadderRegrabFrames = ladderRegrabFrames;
+            c.AllowDodge = allowDodge;
             c.DodgeSpeed = M(dodgeSpeed);
             c.DodgeFrames = dodgeFrames;
             c.DodgeRecoverFrames = dodgeRecoverFrames;
@@ -190,7 +220,9 @@ namespace GulagRunners.Game
             c.BodyHeight = M(bodyHeight);
             c.CrouchHeight = M(Mathf.Min(crouchHeight, bodyHeight * 0.75f));
             c.BodyDepth = M(bodyDepth);
+            c.PushDecayPermille = Mathf.Clamp(Mathf.RoundToInt(pushDecay * 1000f), 1, 1000);
             c.DepthSnapSpeed = M(depthSnapSpeed);
+            c.AirDepthSnap = Fix.FromMilli((int)(airDepthSnap * 1000));
             c.LaneLookahead = M(laneLookahead);
             c.LaneReach = M(laneReach);
             c.LadderStandOff = M(ladderStandOff);

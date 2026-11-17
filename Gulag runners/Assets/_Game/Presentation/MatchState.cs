@@ -50,6 +50,17 @@ namespace GulagRunners.Game
                  "looking at, and both devices dealt from the same number will agree (docs/06).")]
         public uint seed;
 
+        [Tooltip("Deal a different round ONE every time the scene is played.\n\n" +
+                 "Without it the rolling seed starts from a constant in the source, so the " +
+                 "first scavenge of every session is the same six chests -- and only the " +
+                 "first, because every round after it rolls the seed forward, which is why " +
+                 "it reads as \"the loot never changes\" rather than as a seed.\n\n" +
+                 "It gives up no determinism: two phones throw their state away when they " +
+                 "pair and deal from the number the host chose. Switch it off to make a " +
+                 "session repeatable without pinning Seed, which would deal the identical " +
+                 "chests every round rather than the same SEQUENCE of rounds.")]
+        public bool freshEachRun = true;
+
         [Header("The fight (docs/02)")]
         public CombatTuning combat = new CombatTuning();
 
@@ -94,6 +105,24 @@ namespace GulagRunners.Game
                  "left takes it; level pegging is a draw.")]
         public float suddenDeathSeconds = 10f;
 
+        [Header("The poison (docs/33)")]
+        [Tooltip("The green coming up out of the floor across the closing phase, which is " +
+                 "what the last minute does instead of narrowing the arena.\n\n" +
+                 "The pool itself is authored in the arena, as a box with a PoisonPool on " +
+                 "it: that box is where the poison stops. An arena without one never floods, " +
+                 "whatever is set here.")]
+        public PoisonTuning poison = new PoisonTuning();
+
+        [Header("Series")]
+        [Tooltip("Rounds a fighter has to take to win the MATCH. Two is best of three.\n\n" +
+                 "A round is one deal of the arena; the match is the series of them, and " +
+                 "until now nothing counted. Kept here rather than in MatchSimState " +
+                 "because that struct is re-made fresh for every round -- the series is " +
+                 "the thing that outlives it.\n\n" +
+                 "It stays deterministic all the same: both devices see the same JustEnded " +
+                 "on the same tick, so they count the same wins.")]
+        [Range(1, 5)] public int roundsToWin = 2;
+
         [Tooltip("Seconds the result stands before the next round deals. docs/01 puts \"Again\" " +
                  "straight after a loss rather than a lobby, so this is short — long enough to " +
                  "watch the body land. Set it to 0 to hold the result instead, which is what a " +
@@ -120,10 +149,87 @@ namespace GulagRunners.Game
         public ChestConfig Config { get; private set; }
         public DropConfig Drops { get; private set; }
         public CombatConfig Combat { get; private set; }
+
+        /// <summary>
+        /// The arm: how fast it swings, how long it is, and what counts as a blow
+        /// (docs/31). Tuned in the inspector on CombatTuning like everything else.
+        /// </summary>
+        public ArmConfig Arm { get; private set; } = ArmConfig.Default();
         public MatchConfig MatchRules { get; private set; }
+
+        /// <summary>
+        /// The rising poison: how fast and how hard. WHERE it is belongs to the arena and is
+        /// authored as a box (<see cref="PoisonPool"/>); an arena without one never floods.
+        /// </summary>
+        public PoisonConfig Poison { get; private set; } = PoisonConfig.Default();
 
         /// <summary>Where the match has got to. Read it; only the tick moves it.</summary>
         public MatchSimState Match => _match;
+
+        /// <summary>
+        /// Which fighter THIS device is playing. The one place that answers it.
+        ///
+        /// It was answered in three places before, as a number typed into the inspector on
+        /// the HUD, on the results screen and on the recorder, and written to all three by
+        /// NetMatch once the wire said who this device was. Three copies of one fact, set
+        /// once, is a fact that goes stale: a device whose link is adopted a frame late, or
+        /// re-adopted after a drop, keeps the scene's answer -- and the scene's answer is
+        /// always "player one". What that looks like is the health bar, the camera and the
+        /// ladder all belonging to the other fighter, which is a bug nobody can describe
+        /// except as "the bars are wrong".
+        ///
+        /// So it lives here, beside the fighters it indexes, and everything that needs it
+        /// reads it every frame. Set by <see cref="SetLocalFighter"/> when a wire knows
+        /// better; until then it is the fighter nobody's brain is driving, which is the
+        /// human on a phone playing alone, whichever end of the arena they start at.
+        /// </summary>
+        public int LocalFighter { get; private set; }
+
+        /// <summary>
+        /// The wire has said which fighter this device drives. Clamped, because an index
+        /// from outside is an index that can be wrong, and a HUD painted from a bad one is
+        /// harder to explain than a HUD painted from the fallback.
+        ///
+        /// And REMEMBERED, which is the whole of "the bars belong to the wrong fighter" and
+        /// "the armour the other player picked up is the armour on my interface". NetMatch
+        /// says this at the top of a match and deals the round on the NEXT LINE:
+        ///
+        ///     BeMe(link.LocalPlayer);        // -> SetLocalFighter(1) on the guest
+        ///     match.StartFresh(seed);        // -> Deal(0) -> LocalFighter = HumanFighter()
+        ///
+        /// ...and HumanFighter answers "the first fighter no brain is driving", which on a
+        /// networked device is fighter ZERO on both phones -- the brains were switched off
+        /// three lines earlier, precisely because neither fighter is a bot any more. So the
+        /// guest's HUD read the host's fighter for the whole match: his health in the bar
+        /// that is tinted as his own, his gear in the equipment column, and nothing in the
+        /// scene wired wrongly to find.
+        /// </summary>
+        public void SetLocalFighter(int index)
+        {
+            int many = fighters.Count > 0 ? fighters.Count : 1;
+            LocalFighter = Mathf.Clamp(index, 0, many - 1);
+            _wiredLocal = true;
+        }
+
+        /// <summary>A wire has told us which side this device is; stop guessing.</summary>
+        bool _wiredLocal;
+
+        /// <summary>
+        /// The fighter this device's own thumbs are on: the first one a brain is not
+        /// driving. The same question NetMatch asks to find the local controls, so the
+        /// answer cannot differ from the one the input takes.
+        /// </summary>
+        int HumanFighter()
+        {
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                PlayerController f = fighters[i];
+                if (f == null) continue;
+                FighterBrain brain = f.GetComponentInChildren<FighterBrain>(true);
+                if (brain == null || !brain.TakingOver) return i;
+            }
+            return 0;
+        }
 
         MatchSimState _match = MatchSimState.Fresh();
 
@@ -135,6 +241,57 @@ namespace GulagRunners.Game
 
         /// <summary>A round has just been dealt. The argument is which round, from 0.</summary>
         public event System.Action<int> RoundBegan;
+
+        /// <summary>The match is decided. The argument is the winner, or 2 for a draw.</summary>
+        public event System.Action<int> SeriesEnded;
+
+        readonly int[] _wins = new int[2];
+
+        /// <summary>Rounds this fighter has taken in the current match.</summary>
+        public int Wins(int player) =>
+            player >= 0 && player < _wins.Length ? _wins[player] : 0;
+
+        /// <summary>Longest the match can run: best of three is three.</summary>
+        public int RoundsInSeries => Mathf.Max(1, roundsToWin) * 2 - 1;
+
+        /// <summary>Somebody has taken enough rounds.</summary>
+        public bool SeriesOver =>
+            _wins[0] >= Mathf.Max(1, roundsToWin) || _wins[1] >= Mathf.Max(1, roundsToWin);
+
+        /// <summary>Who took the match, or -1 while it is still running.</summary>
+        public int SeriesWinner =>
+            _wins[0] >= Mathf.Max(1, roundsToWin) ? 0 :
+            _wins[1] >= Mathf.Max(1, roundsToWin) ? 1 : -1;
+
+        /// <summary>
+        /// Hands the match to the other fighter and ends it there.
+        ///
+        /// For the one case a round cannot decide on its own: somebody stopped playing.
+        /// A match abandoned has still happened -- it costs the person who stayed their
+        /// time either way -- so it is recorded rather than quietly dropped, which is
+        /// also what stops walking out being a free way not to lose.
+        /// </summary>
+        public void Concede(int loser)
+        {
+            if (loser < 0 || loser > 1) return;
+            if (SeriesOver) return;
+
+            int winner = 1 - loser;
+            _wins[winner] = Mathf.Max(1, roundsToWin);
+            _wins[loser] = Mathf.Min(_wins[loser], Mathf.Max(1, roundsToWin) - 1);
+
+            if (logMatch)
+                Debug.Log($"{name}: player {loser + 1} conceded, so the match goes to "
+                          + $"player {winner + 1} ({_wins[0]}–{_wins[1]})", this);
+
+            SeriesEnded?.Invoke(winner);
+        }
+
+        /// <summary>Back to nil-nil. The next round dealt is round one of a new match.</summary>
+        public void ResetSeries()
+        {
+            _wins[0] = _wins[1] = 0;
+        }
 
         PlayerSimState[] _scratch = System.Array.Empty<PlayerSimState>();
 
@@ -154,6 +311,23 @@ namespace GulagRunners.Game
             }
 
             Config = chests.ToConfig();
+
+            // Round one of the FIRST match was the same round one every time. The rolling
+            // seed starts from a constant written into this file, so the chests a player
+            // opens in their first scavenge are the chests they opened yesterday -- which
+            // is the whole of "the loot is always the same", and it only shows on round
+            // one because every round after it rolls the seed forward.
+            //
+            // Nothing determinism-shaped is given up by this. Two phones throw their
+            // state away the moment they pair: StartFresh sets the rolling seed from the
+            // number the host chose, so from there both devices deal the same rounds from
+            // the same number. This is the seed of a match nobody else is in yet.
+            if (seed == 0 && freshEachRun)
+                _rollingSeed = (uint)System.DateTime.UtcNow.Ticks ^ 0x9E3779B9u;
+
+            // A fresh scene is a fresh match, so the series starts at nil-nil. ResetRound
+            // on its own re-deals the SAME round and deliberately leaves the score alone.
+            ResetSeries();
             ResetRound();
         }
 
@@ -220,12 +394,64 @@ namespace GulagRunners.Game
         [ContextMenu("Reset round")]
         public void ResetRound() => Deal(_match.Round);
 
+        /// <summary>
+        /// Round one of a new match, dealt from a number somebody else chose.
+        ///
+        /// Two devices about to play each other have each been sitting in this scene for a
+        /// while -- bots fighting, rounds turning over, chests opened -- so their states
+        /// are nothing alike by the time anybody taps JOIN. Neither one is wrong; they are
+        /// simply two matches. This throws both away and starts one, which is the only
+        /// moment in a deterministic design where the two devices have to be told anything
+        /// at all beyond each other's thumbs.
+        ///
+        /// What is handed over is the number the loot is dealt from, not the loot. The
+        /// rolling seed is set rather than pinned, so round two is a different arena from
+        /// round one on both devices and still the SAME different arena -- a pinned seed
+        /// would deal the identical chests every round of the match.
+        /// </summary>
+        public void StartFresh(uint dealtFrom)
+        {
+            // A seed pinned in the inspector is already the same number on both devices,
+            // because it is the same build. Leave a deliberate pin alone.
+            if (seed == 0) _rollingSeed = dealtFrom;
+
+            ResetSeries();
+            Deal(0);
+            ResetFighters();
+
+            if (logMatch) Debug.Log($"{name}: new match, dealt from {dealtFrom}", this);
+
+            RoundBegan?.Invoke(_match.Round);
+            PhaseBegan?.Invoke(_match.Phase);
+        }
+
         void Deal(int round)
         {
-            Config = chests.ToConfig();
-            Drops = drops.ToConfig();
-            Combat = combat.ToConfig();
-            MatchRules = BuildRules();
+            // Through the one method that reads the inspector, rather than a second copy of
+            // the same five lines: a tuning class added to one of them and not the other is a
+            // number that works in play mode and not in a fresh round, or the other way
+            // about, and neither reads as a missing line.
+            ApplyTuning();
+
+            // Whose thumbs are on which fighter, re-taken rather than remembered: a round
+            // dealt after a bot substituted for a dropped player is a round where the
+            // answer has changed.
+            //
+            // Unless a wire has already said, in which case it is not a guess to re-take.
+            // This line used to run unconditionally, and NetMatch deals the opening round
+            // on the line AFTER it tells us the side -- so every networked guest threw the
+            // answer away immediately and read the host's fighter instead. See
+            // SetLocalFighter.
+            if (!_wiredLocal) LocalFighter = HumanFighter();
+
+            // And the chest watchdog is re-armed per round, so a stall in the second round
+            // is reported as loudly as one in the first.
+            for (int i = 0; i < _pryingAt.Length; i++)
+            {
+                _pryingAt[i] = -1;
+                _pryingFor[i] = 0;
+                _warnedStall[i] = false;
+            }
 
             if (worldBaker == null) worldBaker = SimWorldBaker.Instance;
             SimWorld world = worldBaker != null ? worldBaker.World : null;
@@ -238,7 +464,16 @@ namespace GulagRunners.Game
             // the arena have the same chests and different things in them, which is what makes
             // the scavenge phase a set of decisions rather than a race down a known list.
             if (world != null)
+            {
                 LootTable.Deal(world.Chests, ChestStates, NextSeed());
+
+                // And the locks (docs/04), from a seed of their own so that adding a puzzle to
+                // a chest does not change what is inside any of them. Both players deal the
+                // same round from the same seed, which is rule 7 -- the same spread of
+                // difficulty on both sides of the arena -- without anybody having to agree
+                // about it over the wire.
+                PuzzleBank.Deal(world.Chests, ChestStates, NextSeed());
+            }
             GroundItems = GroundItem.Pool(groundItemCapacity);
             _tickOwner = null;
         }
@@ -258,6 +493,109 @@ namespace GulagRunners.Game
 
             LootMotor.StepGround(GroundItems, world, Drops);
             ResolveHits();
+            BitePoison(world);
+            WatchChests(world);
+        }
+
+        /// <summary>
+        /// Says so when a fighter has been prying at one chest for longer than that chest
+        /// can possibly take.
+        ///
+        /// A SEARCH ANIMATION THAT NEVER ENDS is the one loot fault that looks like nothing:
+        /// the fighter works, the chest does not open, and every number involved is a
+        /// plausible number somewhere else in the project. The progress is in thousandths of
+        /// a bare-handed frame and the gain is the weapon's pry speed in the same units, so
+        /// a pry speed that arrives as 0.001 instead of 1.0 -- one bad conversion, one data
+        /// file written by hand -- clamps the gain to 1 and makes a 2.5 s chest take
+        /// forty-one minutes. Nothing errors. Nothing logs. The player holds the button.
+        ///
+        /// So the one thing that cannot be read off a running game is printed once: what
+        /// the chest needs, what this weapon adds, and where the progress actually is.
+        /// Which of those three is wrong says which layer to go and look at.
+        /// </summary>
+        void WatchChests(SimWorld world)
+        {
+            if (world == null || ChestStates == null || ChestStates.Length == 0) return;
+
+            int watched = fighters.Count < _pryingAt.Length ? fighters.Count : _pryingAt.Length;
+            for (int i = 0; i < watched; i++)
+            {
+                PlayerController f = fighters[i];
+                if (f == null) continue;
+
+                int chest = f.State.OpeningChest;
+                if (chest < 0 || chest >= world.Chests.Length)
+                {
+                    _pryingAt[i] = -1;
+                    _pryingFor[i] = 0;
+                    continue;
+                }
+
+                if (_pryingAt[i] != chest) { _pryingAt[i] = chest; _pryingFor[i] = 0; }
+                _pryingFor[i]++;
+
+                // Three times what it should take, plus a second: slack for a hand coming
+                // off the button, a drop and a re-claim, and a chest shared with the other
+                // fighter -- none of which should ever add up to this much.
+                int should = LootMotor.FramesToOpen(world.Chests[chest].Kind,
+                                                    f.State.Inventory.Weapon, Config);
+                if (_pryingFor[i] <= should * 3 + 60 || _warnedStall[i]) continue;
+
+                _warnedStall[i] = true;
+                int gain = ItemTable.WeaponOrFists(f.State.Inventory.Weapon).PrySpeed.ToMilli();
+                Debug.LogError(
+                    $"{name}: player {i + 1} has been prying at chest {chest} " +
+                    $"({world.Chests[chest].Kind}) for {_pryingFor[i] / 60f:0.0} s and it has " +
+                    $"not opened. It should take {should / 60f:0.0} s.\n" +
+                    $"  progress {ChestStates[chest].Progress} of " +
+                    $"{Config.For(world.Chests[chest].Kind).BareFrames * 1000} needed, " +
+                    $"+{gain} a tick from {f.State.Inventory.Weapon} (pry speed " +
+                    $"{gain / 1000f:0.###}), claimed by player " +
+                    $"{ChestStates[chest].Opener + 1}.\n" +
+                    "  A gain of 1 means the weapon's pry speed arrived as a thousandth of " +
+                    "what it should be: check that item's data file. A progress that is not " +
+                    "climbing means something else is draining it. A claim held by the OTHER " +
+                    "player means the two fighters are sharing an index they should not.",
+                    this);
+            }
+        }
+
+        readonly int[] _pryingAt = { -1, -1 };
+        readonly int[] _pryingFor = new int[2];
+        readonly bool[] _warnedStall = new bool[2];
+
+        /// <summary>
+        /// The poison takes its bite, once for the whole match.
+        ///
+        /// Here rather than at the front of the tick, next to the clock that raised the level,
+        /// for two reasons that both come down to timing. Where a body ENDED the tick is where
+        /// it is standing, so a fighter who climbed out this tick is out. And the outputs a
+        /// view reads — the damage, the death — are cleared at the front of each fighter's own
+        /// tick, so damage dealt before that is damage nothing ever hears about: no number
+        /// over the head, no death cry, a corpse that simply appears.
+        ///
+        /// Which makes it the hit resolution's neighbour exactly: both decide damage once for
+        /// the whole match, from the state as the tick leaves it.
+        /// </summary>
+        void BitePoison(SimWorld world)
+        {
+            if (world == null || !world.HasPoison || fighters.Count < 2) return;
+
+            PoisonConfig venom = Poison;
+            MatchConfig rules = MatchRules;
+            if (!PoisonMotor.Bites(_match.Frame, in rules, in venom)) return;
+            if (_match.Finished) return;
+
+            if (_scratch.Length != fighters.Count) _scratch = new PlayerSimState[fighters.Count];
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                if (fighters[i] == null) return;
+                _scratch[i] = fighters[i].State;
+            }
+
+            PoisonMotor.Bite(_scratch, world, in venom, fighters[0].Config);
+
+            for (int i = 0; i < fighters.Count; i++) fighters[i].OverwriteState(in _scratch[i]);
         }
 
         /// <summary>
@@ -360,6 +698,13 @@ namespace GulagRunners.Game
                 // the same reason the gate mask is: it is a pure function of the frame, so
                 // the two devices cannot disagree and a rollback needs nothing but the frame.
                 world.WallProgress = _match.ClosingProgress(rules);
+
+                // And how full the pool is. Nothing in the motor collides with it -- poison
+                // is a level, not a box -- but it is written at the same moment and for the
+                // same reason: the number the surface is DRAWN at and the number that decides
+                // who is drowning have to be one number, taken once a tick.
+                PoisonConfig venom = Poison;
+                world.PoisonRise = PoisonMotor.RiseAt(_match.Frame, in rules, in venom);
             }
 
             if (_match.GatesJustShut != 0)
@@ -380,16 +725,26 @@ namespace GulagRunners.Game
 
             if (_match.JustEnded)
             {
+                // The series is counted here and nowhere else, on the one tick the round
+                // is decided -- not on the restart, which may never come, and not in the
+                // interface, which must be able to disappear without changing the game.
+                if (_match.Winner == 0 || _match.Winner == 1) _wins[_match.Winner]++;
+
                 if (logMatch) Debug.Log($"{name}: round {_match.Round} — {Result()} " +
-                                        $"at {Clock(_match.Frame)}", this);
+                                        $"at {Clock(_match.Frame)} " +
+                                        $"({_wins[0]}–{_wins[1]}, first to {roundsToWin})",
+                                        this);
                 Ended?.Invoke(_match.Winner);
+                if (SeriesOver) SeriesEnded?.Invoke(SeriesWinner);
             }
 
             // The result has stood long enough. Done here, from inside the tick, because the
             // alternative is a coroutine on a second clock: the restart would land on a
             // different tick on each device, and the round after it would deal from a chest
             // list the two of them no longer agreed about (docs/06).
-            if (_match.WantsRestart) NextRound();
+            // And no further round is dealt once the match is decided. Without this the
+            // arena simply re-deals for ever and "best of three" is a number on a label.
+            if (_match.WantsRestart && !SeriesOver) NextRound();
         }
 
         /// <summary>
@@ -408,12 +763,27 @@ namespace GulagRunners.Game
                 _scratch[i] = fighters[i].State;
             }
 
-            // docs/01: on the last platform, bare hands hit twice as hard. The fight has to be
-            // told which minute it is in; nothing else about it changes.
-            CombatMotor.Resolve(_scratch, Combat, fighters[0].Config,
-                                _match.Phase == MatchPhase.SuddenDeath);
+            // Weapons against weapons first, then weapons against bodies -- that order
+            // IS the block, and ArmMotor owns it because it owns the geometry.
+            // docs/01: on the last platform, bare hands hit twice as hard.
+            ArmMotor.Resolve(_scratch, fighters[0].Config, Arm, Combat,
+                             _match.Phase == MatchPhase.SuddenDeath);
 
             for (int i = 0; i < fighters.Count; i++) fighters[i].OverwriteState(in _scratch[i]);
+        }
+
+        /// <summary>
+        /// The other fighter, or null. Used by the aim assist, which needs to know where
+        /// the man is before it can help point a blade at him.
+        /// </summary>
+        public PlayerController Opponent(PlayerController mine)
+        {
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                PlayerController p = fighters[i];
+                if (p != null && p != mine && !p.State.Dead) return p;
+            }
+            return null;
         }
 
         /// <summary>Puts every fighter back on their feet at full health. One call is a new round.</summary>
@@ -430,6 +800,8 @@ namespace GulagRunners.Game
             Config = chests.ToConfig();
             Drops = drops.ToConfig();
             Combat = combat.ToConfig();
+            Arm = combat.ToArmConfig();
+            Poison = poison.ToConfig();
             MatchRules = BuildRules();
         }
 
@@ -453,8 +825,20 @@ namespace GulagRunners.Game
             return $"{seconds / 60}:{seconds % 60:00}";
         }
 
+        /// <summary>
+        /// A chest was just forced. The HUD listens so it can point at one opened off
+        /// screen: in a match where both fighters are looting at once, the one thing a
+        /// player cannot see and most wants to know is that the OTHER one just found
+        /// something, and roughly where.
+        /// </summary>
+        public event System.Action<int, int> ChestOpened;
+
         public void ReportOpened(int playerIndex, int chestIndex)
         {
+            // Raised before the log switch, which is a debugging convenience and has no
+            // business deciding whether the interface is told.
+            ChestOpened?.Invoke(playerIndex, chestIndex);
+
             if (!logOpenings) return;
 
             SimWorld world = worldBaker != null ? worldBaker.World : null;

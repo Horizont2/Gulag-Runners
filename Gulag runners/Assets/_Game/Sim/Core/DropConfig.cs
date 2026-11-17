@@ -22,8 +22,23 @@ namespace GulagRunners.Sim
         /// <summary>How much speed a bounce keeps. Zero lands dead, which reads as heavy.</summary>
         public Fix Bounce;
 
-        /// <summary>Half the size of the box you have to walk through to pick it up.</summary>
+        /// <summary>
+        /// Half the size of the item itself: what rests on the floor and what a wall
+        /// stops. Not how close you have to be to take it -- see <see cref="PickupReach"/>.
+        ///
+        /// They were one number, and that is why the pickup box could not be widened
+        /// without the item also sitting higher off the ground and bumping into walls
+        /// sooner. A thing's size and the distance you can reach it from are two
+        /// different facts.
+        /// </summary>
         public Fix PickupRadius;
+
+        /// <summary>
+        /// Half the size of the box you walk through to take it. Measured from the item,
+        /// against the fighter's whole body, so the reach past his skin is this plus
+        /// half his width.
+        /// </summary>
+        public Fix PickupReach;
 
         /// <summary>Frames before an item that just came out of a chest can be taken.</summary>
         public int PopLockFrames;
@@ -45,6 +60,13 @@ namespace GulagRunners.Sim
             c.MaxFallSpeed = Fix.FromMilli(14000);
             c.Bounce = Fix.FromMilli(150);
             c.PickupRadius = Fix.FromMilli(220);
+
+            // Half a body width wider than the item itself. Against a 0.30 m body that
+            // is 0.48 m of reach from the middle of the fighter, where it used to be
+            // 0.37 -- enough that walking past something takes it, rather than walking
+            // exactly over it.
+            c.PickupReach = Fix.FromMilli(330);
+
             c.PopLockFrames = 14;      // 0.23 s: it has to land before it is yours
             c.DropLockFrames = 30;     // 0.50 s
             return c;

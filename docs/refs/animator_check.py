@@ -18,7 +18,7 @@ import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 ASSETS = os.path.join(ROOT, "Gulag runners", "Assets")
-SCENE = os.path.join(ASSETS, "Scenes", "SetupScene.unity")
+SCENES = os.path.join(ASSETS, "Scenes")
 
 # Fields on PlayerAnimator that name a state. Everything else on it is a number or a flag.
 # Read off the component rather than listed by hand: a new state field would otherwise be
@@ -48,6 +48,28 @@ def guid_of(asset_path):
         return None
     m = re.search(r"guid: ([0-9a-f]+)", read(meta))
     return m.group(1) if m else None
+
+
+def holding(guid):
+    """Every scene and prefab under Assets with that component on it.
+
+    One scene used to be named here, and when SetupScene was deleted this stopped with a
+    FileNotFoundError. Naming it was wrong twice over: the fighters had already moved
+    into prefabs, so a scene full of prefab INSTANCES carries no PlayerAnimator document
+    at all and reading it would have checked nothing while reporting a pass. The fighters
+    are found by what they are now, wherever they live.
+    """
+    if guid is None:
+        return []
+    out = []
+    for dirpath, _dirs, files in os.walk(ASSETS):
+        for f in sorted(files):
+            if not (f.endswith(".unity") or f.endswith(".prefab")):
+                continue
+            path = os.path.join(dirpath, f)
+            if f"guid: {guid}" in read(path):
+                out.append(path)
+    return sorted(out)
 
 
 def by_guid():
@@ -121,6 +143,109 @@ def loops(clip_path):
     return m.group(1) == "1" if m else None
 
 
+def ik_passes(path):
+    """How many layers of this controller have IK Pass ticked, and their names."""
+    src = read(path)
+    block = re.search(r"m_AnimatorLayers:\n((?:.|\n)*?)(?=\n  m_[A-Z]|\Z)", src)
+    if not block:
+        return []
+    on = []
+    # The captured block already begins AT the first layer, so there is no header chunk
+    # to drop -- dropping one silently hid the base layer, which is the layer the rule is
+    # about. Chunks without an IK flag are not layers and are skipped by name.
+    for chunk in re.split(r"\n(?=  - serializedVersion)", block.group(1)):
+        ik = re.search(r"m_IKPass: (\d)", chunk)
+        if ik is None:
+            continue
+        name = re.search(r"m_Name: ([^\n]*)", chunk)
+        if ik.group(1) == "1":
+            on.append(name.group(1).strip() if name else "?")
+    return on
+
+
+def strays():
+    """Animators with no controller, anywhere a fighter lives.
+
+    One of these cannot play a thing, but it can still be FOUND: PlayerAnimator's
+    fallback is GetComponentInChildren, which searches the object itself before its
+    children, so a stray on the fighter's root takes the rig's place and every clip in
+    the game stops while the body goes on moving perfectly. Nothing is logged, because
+    from Unity's point of view everything was wired.
+
+    It happened for a reason worth keeping written down: a [RequireComponent(Animator)]
+    on a component dropped by hand in the wrong place. RequireComponent does not check,
+    it CREATES.
+    """
+    found = 0
+    for folder in (os.path.join(ASSETS, "Scenes"), os.path.join(ASSETS, "Prefabs")):
+        if not os.path.isdir(folder):
+            continue
+        for name in sorted(os.listdir(folder)):
+            if not name.endswith((".unity", ".prefab")):
+                continue
+            text = read(os.path.join(folder, name))
+            for fid, (cls, body) in documents(text).items():
+                if cls != 95:                       # Animator
+                    continue
+                m = re.search(r"m_Controller: \{fileID: (-?\d+)", body)
+                if m is None or m.group(1) != "0":
+                    continue
+                print(f"  {name}: an Animator with no controller (fileID {fid}). It "
+                      "cannot play anything, and it can take the rig's place in a "
+                      "GetComponentInChildren -- which stops every clip in the game.")
+                found += 1
+    return found
+
+
+def arms():
+    """Every fighter in a playable scene must have something DRAWING its weapon arm.
+
+    Direct-aim combat (docs/31) replaced the attack clip with an IK goal: the simulation
+    owns the arm as a vector and PlayerArm puts the drawn hand on it. Without PlayerArm
+    nothing reports anything -- the fight runs, the hitbox swings, damage lands -- and
+    the arm on screen just plays whatever the clip says, held up and deaf to the stick.
+    An invisible correct hitbox is the worst shape this can fail in, and it is exactly
+    how it was found: "the arm is still raised and the stick does not match it".
+
+    It got that way because the components are added per SCENE by the setup tool and are
+    not on the fighter prefabs, so Arena_Demo had them and SetupScene -- also in the
+    build, also two fighters and a MatchState -- never did.
+
+    PlayerArm must also sit on the Animator's own object. OnAnimatorIK is only ever
+    called there, so one placed anywhere else is a component that never runs.
+    """
+    scripts = {}
+    for name in ("PlayerController", "PlayerArm", "MatchState"):
+        g = guid_of(os.path.join(ASSETS, "_Game", "Presentation", name + ".cs"))
+        if g:
+            scripts[name] = g
+
+    found = 0
+    folder = os.path.join(ASSETS, "Scenes")
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith(".unity"):
+            continue
+        text = read(os.path.join(folder, name))
+        if f"guid: {scripts['MatchState']}" not in text:
+            continue                                   # not a scene a match runs in
+
+        docs = documents(text)
+        fighters = [fid for fid, (cls, body) in docs.items()
+                    if cls == 114 and f"guid: {scripts['PlayerController']}" in body]
+        armed = [fid for fid, (cls, body) in docs.items()
+                 if cls == 114 and f"guid: {scripts['PlayerArm']}" in body]
+
+        if len(armed) >= len(fighters):
+            continue
+
+        print(f"  {name}: {len(fighters)} fighter(s) but {len(armed)} PlayerArm(s). The "
+              "ones without it swing a hitbox nobody draws -- the arm on screen stays in "
+              "the clip's pose and ignores the attack stick. Tools > Gulag Runners > "
+              "Setup > Set up IK, with this scene open.")
+        found += 1
+    return found
+
+
 def main():
     assets = by_guid()
     animator_cs = os.path.join(ASSETS, "_Game", "Presentation", "PlayerAnimator.cs")
@@ -128,8 +253,10 @@ def main():
     fields = set(STATE_FIELD.findall(source)) | set(ARRAY_FIELD.findall(source))
 
     guid = guid_of(animator_cs)
-    scene = read(SCENE)
-    docs = documents(scene)
+    where = holding(guid)
+    if not where:
+        print("animator_check: nothing under Assets has a PlayerAnimator on it.")
+        return 1
 
     # Every PlayerAnimator in the scene, and the states it asks for. A field absent from the
     # YAML was added to the component after the scene was last saved, so Unity will give it
@@ -140,9 +267,16 @@ def main():
 
     problems, checked = 0, 0
 
-    for fid, (cls, body) in sorted(docs.items()):
-        if cls != 114 or f"guid: {guid}" not in body:
-            continue
+    # Gathered first so the long body below reads the same whether the fighters are in
+    # one prefab or five scenes.
+    fighters = []
+    for source in where:
+        here = documents(read(source))
+        for fid, (cls, body) in sorted(here.items()):
+            if cls == 114 and f"guid: {guid}" in body:
+                fighters.append((source, here, body))
+
+    for source, docs, body in fighters:
         checked += 1
 
         go = re.search(r"m_GameObject: \{fileID: (\d+)\}", body)
@@ -178,6 +312,24 @@ def main():
         missing = sorted(s for s in wanted if s not in have)
         shown = ", ".join(os.path.basename(p) for p in sorted(controllers))
         print(f"  {name}: {len(wanted)} state(s) asked for, {len(have)} in {shown}")
+        # IK Pass on more than one layer calls OnAnimatorIK more than once a frame, and
+        # PlayerIK does a frame's work every call: blends stepped by deltaTime, springs
+        # integrated, goals read back out of the animator and written again. Two ticked
+        # layers halved every blend time and fed each goal into itself, and the symptom --
+        # feet that lag a running body -- looks nothing like a tick box.
+        for ctrl in sorted(controllers):
+            on = ik_passes(ctrl)
+            who = os.path.basename(ctrl)
+            if not on:
+                problems += 1
+                print(f"      PROBLEM - {who} has IK Pass on no layer, so OnAnimatorIK "
+                      f"is never called and PlayerIK runs no code at all")
+            elif len(on) > 1:
+                problems += 1
+                print(f"      PROBLEM - {who} has IK Pass on {len(on)} layers "
+                      f"({', '.join(on)}). PlayerIK does a frame's work every time it is "
+                      f"called, so every blend in it advances {len(on)}x too fast. Base "
+                      f"layer only.")
 
         for state in missing:
             problems += 1
@@ -204,6 +356,9 @@ def main():
     if checked == 0:
         print("animator_check: no PlayerAnimator in the scene — nothing checked.")
         return 1
+
+    problems += strays()
+    problems += arms()
 
     print(f"animator_check: {checked} fighter(s), {problems} problem(s)")
     return 1 if problems else 0

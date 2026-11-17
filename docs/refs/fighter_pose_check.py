@@ -15,15 +15,18 @@ it reads as a dozen different bugs: he hangs in the air on a ladder, his hands m
 the IK is reaching for, his feet are above the floor he is standing on. It cost this project a
 fortnight under three separate headings.
 
-So the sum is checked here rather than trusted. Reads SetupScene.unity the way Unity does.
+So the sum is checked here rather than trusted. Reads the scenes and prefabs the way
+Unity does, finding the fighters by the script on them rather than by a filename -- it
+used to name one scene, and when that scene was deleted this stopped with a
+FileNotFoundError rather than reading the prefabs the fighters had moved into.
 
 Run: python3 fighter_pose_check.py"""
 import os
 import re
 import sys
 
-SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     "..", "..", "Gulag runners", "Assets", "Scenes", "SetupScene.unity")
+ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                      "..", "..", "Gulag runners", "Assets")
 
 # A centimetre. Below this nobody can see it and nobody should be asked to chase it.
 TOLERANCE = 0.01
@@ -69,37 +72,66 @@ def modifications(docs, instance):
     return out
 
 
-def main():
-    text = open(SCENE, encoding="utf-8", errors="replace").read()
-    docs = documents(text)
+def slurp(path):
+    return open(path, encoding="utf-8", errors="replace").read()
 
+
+def holding(guid):
+    """Every scene and prefab under Assets with that script on something."""
+    out = []
+    for dirpath, _dirs, files in os.walk(ASSETS):
+        for f in sorted(files):
+            if (f.endswith(".unity") or f.endswith(".prefab")) and \
+                    f"guid: {guid}" in slurp(os.path.join(dirpath, f)):
+                out.append(os.path.join(dirpath, f))
+    return sorted(out)
+
+
+def main():
     # The PlayerController script's own guid, so the fighters are found by what they ARE and
     # not by being called "Player 1".
-    meta = os.path.join(os.path.dirname(SCENE), "..", "_Game", "Presentation",
-                        "PlayerController.cs.meta")
-    guid = re.search(r"guid: ([0-9a-f]+)",
-                     open(meta, encoding="utf-8", errors="replace").read()).group(1)
+    meta = os.path.join(ASSETS, "_Game", "Presentation", "PlayerController.cs.meta")
+    guid = re.search(r"guid: ([0-9a-f]+)", slurp(meta)).group(1)
 
-    objects = {fid: body for fid, (cls, body) in docs.items() if cls == 1}
-    components = {fid: re.findall(r"- component: \{fileID: (\d+)\}", body)
-                  for fid, body in objects.items()}
+    where = holding(guid)
+    if not where:
+        print("fighter_pose_check: nothing under Assets has a PlayerController on it.")
+        return 1
 
-    def owner(component):
-        """The GameObject a component sits on."""
-        cls, body = docs.get(component, (None, ""))
-        got = field(body, "m_GameObject") or ""
-        m = re.search(r"(\d+)", got)
-        return m.group(1) if m else None
+    # Gathered first, so the measuring below reads the same whether the fighters are in a
+    # scene or in prefabs. A fighter DROPPED INTO a scene is a stripped stub: the script
+    # guid is there and not one of its values, because they all live in the prefab.
+    # Measuring one of those would read zeroes and call it a pass, which is how simply
+    # pointing this at the arena scene would have stopped checking anything.
+    fighters = []
+    for source in where:
+        docs = documents(slurp(source))
+        objects = {fid: b for fid, (cls, b) in docs.items() if cls == 1}
+        components = {fid: re.findall(r"- component: \{fileID: (-?\d+)\}", b)
+                      for fid, b in objects.items()}
+
+        for fid, (cls, body) in sorted(docs.items()):
+            if cls != 114 or f"guid: {guid}" not in body:
+                continue
+            stub = field(body, "m_CorrespondingSourceObject") or ""
+            if stub.strip() and "fileID: 0}" not in stub:
+                continue
+            fighters.append((source, docs, objects, components, fid, body))
 
     problems = 0
     found = 0
 
-    for fid, (cls, body) in sorted(docs.items()):
-        if cls != 114 or f"guid: {guid}" not in body:
-            continue
+    for source, docs, objects, components, fid, body in fighters:
+        def owner(component, _docs=docs):
+            """The GameObject a component sits on."""
+            _cls, b = _docs.get(component, (None, ""))
+            got = field(b, "m_GameObject") or ""
+            m = re.search(r"(-?\d+)", got)
+            return m.group(1) if m else None
 
         go = owner(fid)
-        name = field(objects.get(go, ""), "m_Name", "?")
+        name = f"{field(objects.get(go, ''), 'm_Name', '?')} " \
+               f"({os.path.basename(source)})"
         found += 1
 
         offset = number(body, "visualYOffset")
@@ -150,7 +182,8 @@ def main():
                   f"collides for it, which nothing corrects into something sensible.")
 
     if found == 0:
-        print("fighter_pose_check: no PlayerController in the scene — nothing checked.")
+        print("fighter_pose_check: every PlayerController found is a prefab instance with "
+              "no values of its own — nothing checked.")
         return 1
 
     print(f"fighter_pose_check: {found} fighter(s), {problems} problem(s)")

@@ -53,26 +53,28 @@ namespace GulagRunners.Game
         [Tooltip("How many times faster than bare hands this opens a chest.")]
         public float prySpeed = 2f;
 
-        [Tooltip("Share of the damage that goes through a raised guard, when that is more " +
-                 "than the ordinary chip. 0 uses the ordinary chip.")]
-        [Range(0f, 1f)] public float blockPierce;
-
         [Header("Armour")]
         [Tooltip("Share of incoming damage removed. docs/02: T1/T2/T3 = 15/30/45%.")]
         [Range(0f, 1f)] public float damageReduction;
 
-        [Tooltip("What a raised guard lets through for whoever carries this. 0 is the " +
-                 "ordinary chip, which is what everything that is not a shield wants.")]
-        [Range(0f, 1f)] public float blockChip;
-
         [Tooltip("Extra frames on the parry window. The shield's reason to exist.")]
         public int parryBonusFrames;
 
+        [Header("Helmet")]
+        [Tooltip("Share of the hitstun this takes off. Applied before the floor that " +
+                 "guarantees an attacker his turn, so it shortens the second and third hit " +
+                 "of a string rather than refusing the first.")]
+        [Range(0f, 1f)] public float stunResist;
+
+        // There is no Belt section any more. Its only stat was how much longer a raised
+        // guard held, and docs/31 took the guard out -- a belt is worn for its armour and
+        // its hitstun now, both of which are above.
         [Header("Utility")]
         public int heal;
 
         static Fix M(float v) => Fix.FromMilli(Mathf.RoundToInt(v * 1000f));
         static int Permille(float v) => Mathf.RoundToInt(Mathf.Clamp01(v) * 1000f);
+        static int Thousandths(float v) => Mathf.RoundToInt(Mathf.Max(0f, v) * 1000f);
 
         public ItemDef ToDef() => new ItemDef
         {
@@ -86,10 +88,9 @@ namespace GulagRunners.Game
             Reach = M(reach),
             Durability = Mathf.Max(0, durability),
             PrySpeed = M(prySpeed),
-            BlockPierce = Permille(blockPierce),
-            DamageReduction = M(damageReduction),
-            BlockChipPermille = Permille(blockChip),
+            DamageReductionPermille = Permille(damageReduction),
             ParryBonusFrames = Mathf.Max(0, parryBonusFrames),
+            StunResistPermille = Permille(stunResist),
             Heal = Mathf.Max(0, heal)
         };
 
@@ -105,10 +106,9 @@ namespace GulagRunners.Game
             reach = d.Reach.ToMilli() / 1000f;
             durability = d.Durability;
             prySpeed = d.PrySpeed.ToMilli() / 1000f;
-            blockPierce = d.BlockPierce / 1000f;
-            damageReduction = d.DamageReduction.ToMilli() / 1000f;
-            blockChip = d.BlockChipPermille / 1000f;
+            damageReduction = d.DamageReductionPermille / 1000f;
             parryBonusFrames = d.ParryBonusFrames;
+            stunResist = d.StunResistPermille / 1000f;
             heal = d.Heal;
         }
     }

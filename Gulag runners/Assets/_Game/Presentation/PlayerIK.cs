@@ -127,6 +127,23 @@ namespace GulagRunners.Game
 
         [Range(0f, 1f)] public float groundWeight = 0.8f;
 
+        [Tooltip("How high the clip has to lift a foot before this stops trying to put it " +
+                 "on the floor, as a share of the fighter's height.\n\n" +
+                 "THE one that matters for a run. Foot grounding exists to put a standing " +
+                 "man on the step he is standing on; a foot in mid-stride is off the floor " +
+                 "on purpose, and dragging it back down holds the swing leg behind the " +
+                 "hips, which reads as a leg thrown out backwards. A planted foot is at " +
+                 "zero and gets the full correction; one this far up gets none.")]
+        [Range(0.01f, 0.4f)] public float plantShare = 0.08f;
+
+        [Tooltip("Read the four distances above as metres on a 1.8 m fighter and scale " +
+                 "them to this one.\n\n" +
+                 "They were written against the rig the clips came off. These fighters are " +
+                 "0.91 m, so a 0.3 m limit on moving a foot is a THIRD of the body: no " +
+                 "stride a leg that short can take ever exceeds it, and every foot in the " +
+                 "run cycle was therefore pinned to the floor.")]
+        public bool scaleToBody = true;
+
         [Header("Head")]
         [Tooltip("Look at what matters: the rungs while climbing, the other fighter " +
                  "otherwise. Costs nothing and is most of what makes a figure look alive.")]
@@ -158,19 +175,62 @@ namespace GulagRunners.Game
         Vector3 _leftHandV, _rightHandV, _leftFootV, _rightFootV;
         bool _held;
 
+        PlayerArm _arm;
+
         void Awake()
         {
             _animator = GetComponent<Animator>();
             if (player == null) player = GetComponentInParent<PlayerController>();
+
+            // On THIS object, not in the children: OnAnimatorIK only arrives where the
+            // Animator is, so that is the only place a PlayerArm can be doing anything.
+            _arm = GetComponent<PlayerArm>();
         }
+
+        /// <summary>Climbing or hauling out, which are the two poses that need both hands.</summary>
+        bool Climbing()
+        {
+            if (player == null) return false;
+            PlayerSimState s = player.State;
+            SimWorld world = player.World;
+            bool onLadder = gripLadder && world != null &&
+                            s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length;
+            return onLadder || (gripLedge && !onLadder && s.Mode == MoveMode.Mantling);
+        }
+
+        /// <summary>
+        /// True while this component needs BOTH hands -- climbing, or still blending off a
+        /// climb. <see cref="PlayerArm"/> reads it to know whether its weapon hand is its
+        /// own this frame.
+        ///
+        /// Decided in Update and only read in OnAnimatorIK, because every Update in the
+        /// scene runs before any OnAnimatorIK does. Two components on one object get their
+        /// IK callback in component order, which is whatever order somebody happened to
+        /// add them in -- and for a component added to a nested prefab instance it is not
+        /// visible anywhere. Anything that depends on that order is a coin toss that lands
+        /// the same way until the day it does not.
+        /// </summary>
+        public bool HandsBusy { get; private set; }
 
         /// <summary>
         /// A layer with no IK Pass never calls OnAnimatorIK, and the symptom is that nothing
         /// happens at all — which looks exactly like this component being broken. So it says
         /// so, once, rather than leaving an hour to be spent looking in the wrong place.
         /// </summary>
+
+        /// <summary>Whether the weapon hand is this component's to place this frame.</summary>
+        bool OwnsWeaponHand => HandsBusy || _arm == null || !_arm.isActiveAndEnabled;
+
+        AvatarIKGoal WeaponGoal => _arm != null && !_arm.rightHanded
+            ? AvatarIKGoal.LeftHand : AvatarIKGoal.RightHand;
+
+        AvatarIKGoal FreeGoal => WeaponGoal == AvatarIKGoal.RightHand
+            ? AvatarIKGoal.LeftHand : AvatarIKGoal.RightHand;
+
         void Update()
         {
+            HandsBusy = _ladderBlend > 0.001f || Climbing();
+
             if (!warnIfNoPass || _warned) return;
 
             _since += Time.deltaTime;
@@ -186,6 +246,18 @@ namespace GulagRunners.Game
         void OnAnimatorIK(int layer)
         {
             _calls++;
+
+            // ONE pass, not one per layer.
+            //
+            // Unity calls this once for every animator layer with IK Pass ticked, and the
+            // fighter controller has it on both. Everything below is per-frame work --
+            // blends stepped by deltaTime, springs integrated, goals read back out of the
+            // animator with GetIKPosition and written again -- so a second call a frame
+            // ran every blend at double rate and fed each goal back into itself. The goals
+            // set here survive into the later passes anyway, which is what makes ignoring
+            // them correct rather than merely cheaper.
+            if (layer != 0) return;
+
             if (_animator == null || player == null) return;
 
             PlayerSimState s = player.State;
@@ -194,8 +266,15 @@ namespace GulagRunners.Game
 
             bool onLadder = gripLadder && world != null &&
                             s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length;
-            bool onLedge = gripLedge && !onLadder &&
-                           s.Mode == MoveMode.Mantling && s.ScriptForward;
+            // EVERY climb-out, not only the ones that step straight forward.
+            //
+            // StartScripted clears LadderIndex, so onLadder goes false on the very frame
+            // the climb-out begins. Requiring ScriptForward as well meant a climb-out of a
+            // HATCH -- which travels 1.1 m sideways and is therefore not "forward" -- matched
+            // neither branch, so the hands were released from the rungs over the blend while
+            // the haul clip played. Hands peeling off the ladder on their own schedule,
+            // through the middle of the move, is exactly the leftover jerk at the top.
+            bool onLedge = gripLedge && !onLadder && s.Mode == MoveMode.Mantling;
 
             if (!onLadder) _held = false;
 
@@ -208,8 +287,17 @@ namespace GulagRunners.Game
             else if (_gripping) Release();
             else
             {
-                Clear(AvatarIKGoal.LeftHand);
-                Clear(AvatarIKGoal.RightHand);
+                // Not the hand the weapon is in, if something else owns it.
+                //
+                // This cleared BOTH, every frame, and PlayerArm sets the weapon hand
+                // every frame -- two components writing one goal on one object, with the
+                // winner decided by component order. When this one won, the weapon hand's
+                // weight went to zero and the arm was drawn wherever the clip put it:
+                // held up, ignoring the stick, while the simulation swung an arm nobody
+                // could see. The hitbox was right and invisible, which is the worst way
+                // for this to be wrong.
+                if (!OwnsWeaponHand) Clear(WeaponGoal);
+                Clear(FreeGoal);
             }
 
             bool standing = groundFeet && world != null && s.Mode == MoveMode.Grounded;
@@ -418,19 +506,37 @@ namespace GulagRunners.Game
         {
             Vector3 at = _animator.GetIKPosition(goal);
 
-            FixVec2 from = new FixVec2(F(at.x), F(at.y + probeUp));
-            MoveConfig cfg = player.Config;
+            float body = Mathf.Max(0.2f, player.tuning.bodyHeight);
+            float k = scaleToBody ? body / 1.8f : 1f;
+            float up = probeUp * k, down = probeDown * k;
 
-            if (!PlayerMotor.TryFindGroundBelow(from, s.Depth, world, in cfg,
-                                                F(probeUp + probeDown), out Fix groundY))
+            // How far the CLIP has lifted this foot off the fighter's own floor, and
+            // therefore how much of a correction it has any business receiving. See the
+            // Plant Share tooltip: this is the difference between standing on a step and
+            // running with the feet nailed down.
+            float band = Mathf.Max(0.001f, body * plantShare);
+            float lift = at.y - M(s.Position.Y);
+            float planted = 1f - Mathf.SmoothStep(0f, 1f,
+                                Mathf.Clamp01((lift - band * 0.35f) / (band * 0.65f)));
+            if (planted <= 0.001f)
             {
                 Clear(goal);
                 return at;
             }
 
-            float want = M(groundY) + soleLift;
+            FixVec2 from = new FixVec2(F(at.x), F(at.y + up));
+            MoveConfig cfg = player.Config;
+
+            if (!PlayerMotor.TryFindGroundBelow(from, s.Depth, world, in cfg,
+                                                F(up + down), out Fix groundY))
+            {
+                Clear(goal);
+                return at;
+            }
+
+            float want = M(groundY) + soleLift * k;
             float shift = want - at.y;
-            if (Mathf.Abs(shift) > maxFootShift)
+            if (Mathf.Abs(shift) > maxFootShift * k)
             {
                 Clear(goal);
                 return at;
@@ -438,7 +544,7 @@ namespace GulagRunners.Game
 
             // Eased by how far it has to go, so a foot already in the right place is not
             // nudged and one well off is brought most of the way.
-            float w = groundWeight * _groundBlend;
+            float w = groundWeight * _groundBlend * planted;
             Vector3 target = new Vector3(at.x, want, at.z);
             Set(goal, target, w);
             return target;
@@ -446,6 +552,11 @@ namespace GulagRunners.Game
 
         void Look(in PlayerSimState s, SimWorld world)
         {
+            // The weapon leads the body in a fight, so PlayerArm aims the look at its own
+            // blade and this stands down. Both wrote SetLookAtWeight every frame, which
+            // is the same coin toss the hands were.
+            if (!OwnsWeaponHand && _arm != null && _arm.bodyFollow > 0f) return;
+
             if (lookWeight <= 0.001f)
             {
                 _animator.SetLookAtWeight(0f);

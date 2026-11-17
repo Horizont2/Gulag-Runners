@@ -43,14 +43,10 @@ namespace GulagRunners.Game
                  "which is what a chest made of one model wants.")]
         public Renderer tintTarget;
 
-        [Tooltip("Tier colours: none, white, blue, gold.")]
-        public Color[] tierColours =
-        {
-            new Color(0.55f, 0.55f, 0.58f),
-            new Color(0.90f, 0.90f, 0.92f),
-            new Color(0.35f, 0.62f, 1.00f),
-            new Color(1.00f, 0.78f, 0.25f)
-        };
+        [Tooltip("Tier colours: nothing, common, rare, legendary. The same ramp the loot " +
+                 "and the worn gear use — a chest and the item that comes out of it may not " +
+                 "have two ideas of what \"rare\" looks like.")]
+        public Color[] tierColours = ItemModels.DefaultPalette();
 
         MaterialPropertyBlock _block;
 

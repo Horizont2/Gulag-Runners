@@ -39,32 +39,139 @@ namespace GulagRunners.Sim
         /// reward for finding one is that the world stops while everybody sees it happen.
         /// </summary>
         public int HitStopFrames;
-        public int BlockStopFrames;
+
         public int ParryStopFrames;
 
         /// <summary>Hitstun per point of damage, in frames, and its ceiling.</summary>
         public int HitstunPerDamage;
         public int MaxHitstunFrames;
 
-        public Fix KnockbackSpeed;
-        public Fix HeavyKnockbackSpeed;
-        /// <summary>Upward part of a knockback. A little, so a hit reads; not a launch.</summary>
-        public Fix KnockbackLift;
-
-        // ---- blocking (docs/02: the medieval mode's answer to pressure)
-        /// <summary>Damage that still gets through a block, in thousandths.</summary>
-        public int ChipPermille;
+        /// <summary>
+        /// Frames an attack press survives while it cannot be used yet.
+        ///
+        /// A press during recovery used to be thrown away, so continuing a string meant
+        /// releasing and pressing again on the exact frame the swing ended. The buffer is
+        /// the difference between a game that reads what you meant and one that asks you
+        /// to guess a frame number.
+        /// </summary>
+        public int AttackBufferFrames;
 
         /// <summary>
-        /// Stamina spent for every hit absorbed. It has to outrun the stamina regen or holding
-        /// the guard is free, which is the one thing a guard must never be.
+        /// What a CONNECTED swing gets back of its own recovery, in thousandths.
+        ///
+        /// Measured before this existed, every weapon in the game was at a frame
+        /// DISADVANTAGE after landing a blow: from -3 with a saber to -12 with a scythe.
+        /// The person you just hit acted first. That makes the correct play never to swing
+        /// first, and two players both playing correctly produce the stand-off that reads
+        /// as a wooden fight. Halving the recovery of a swing that landed is what turns a
+        /// hit into a turn.
         /// </summary>
-        public int BlockStaminaCost;
+        public int HitRecoveryCutPermille;
 
-        /// <summary>Frames the guard is down for after it is broken.</summary>
-        public int GuardBreakFrames;
-        /// <summary>Movement speed while holding a block, in thousandths of the run speed.</summary>
-        public int BlockSpeedPermille;
+        /// <summary>
+        /// What each FURTHER hit of a string is worth, in thousandths of the one before.
+        ///
+        /// Without it the game had an infinite. Measured with both fighters holding attack
+        /// in range: a bare-handed fighter landed twenty blows in eight seconds and the man
+        /// with a club landed NONE -- he started twenty swings and every one of them was
+        /// cancelled by the next punch. Fists cycle in 19 frames; his stun plus his own
+        /// wind-up came to 22, so he was always hit first, for ever. The fast weapon simply
+        /// won, and the whole loot layer with it.
+        ///
+        /// So the guarantee below applies to the FIRST hit of a string only. That one
+        /// confirms and buys the turn; the ones after it are paid for out of damage alone
+        /// and worth this much less each time, until the string runs out and the other
+        /// player gets to move.
+        /// </summary>
+        public int ComboStunDecayPermille;
+
+        /// <summary>Frames of not being hit that end a string and clear the decay.</summary>
+        public int ComboStackFrames;
+
+        /// <summary>
+        /// Extra knockback per hit already taken in this string, in thousandths. The second
+        /// way a string ends: the attacker runs out of reach and has to step back in, and
+        /// stepping in is what costs him the frames that hand the turn over.
+        /// </summary>
+        public int ComboPushPermille;
+
+        /// <summary>
+        /// Every weapon's wind-up and recovery, in thousandths of the table's own numbers.
+        ///
+        /// One knob over the whole table, because the question it answers is about the
+        /// whole fight: can a player SEE the blow coming? A dagger wound up in 9 frames and
+        /// a pair of fists in 12 -- 0.15 and 0.20 s -- and human reaction to a visual cue is
+        /// about 0.25. At those speeds there is nothing to read and nothing to answer with,
+        /// which is most of why the fight felt like a blur rather than an exchange. Scaling
+        /// here rather than editing twelve rows keeps the weapons' relationship to each
+        /// other -- which is the design -- and makes the pace one number to tune.
+        /// </summary>
+        public int AttackFramesPermille;
+
+        /// <summary>
+        /// What the ATTACKER is thrown back by, in thousandths of the victim's knockback.
+        ///
+        /// Knockback ends a string by taking the victim out of reach -- except against a
+        /// wall, where there is nowhere for them to go. Measured in the corner, a
+        /// bare-handed fighter still looped a spearman twenty hits to none while the same
+        /// pair on open floor read one to two the other way. Pushing the attacker off
+        /// instead is the oldest answer in the genre: the separation happens either way,
+        /// and who moves is decided by who has room.
+        /// </summary>
+        public int AttackerRecoilPermille;
+
+        /// <summary>Frames the attacker's recoil coasts before the ground takes it back.</summary>
+        public int RecoilFrames;
+
+        /// <summary>
+        /// The frames of initiative a clean hit is guaranteed to buy, whatever the weapon.
+        ///
+        /// Hitstun is raised to at least "what the attacker has left, plus this", so every
+        /// weapon is at worst this far ahead after connecting. Damage can still earn more
+        /// -- a warhammer stuns for longer than this floor on its own -- but nothing is
+        /// ever punished for landing a blow.
+        /// </summary>
+        public int HitAdvantageFrames;
+
+        public Fix KnockbackSpeed;
+        public Fix HeavyKnockbackSpeed;
+
+        /// <summary>
+        /// Upward part of a knockback, and ONLY on the heavy finisher.
+        ///
+        /// It used to be every hit, and it was the quietest of the reasons the fight felt
+        /// bad: 1.6 m/s against this gravity is a peak of three centimetres -- nothing you
+        /// can see -- but it took the victim off the ground for 21 frames while stunning
+        /// them for 8. So a light blow produced no visible lift, slid the victim away with
+        /// no footing, and put them out of reach before the follow-up could land. Keeping
+        /// them planted is what makes a second hit possible at all; the finisher still
+        /// lifts, and that is what makes the finisher read as the finisher.
+        /// </summary>
+        public Fix KnockbackLift;
+
+        // ---- what the worn kit is allowed to add up to
+        /// <summary>
+        /// The most all three worn pieces together may remove from a blow, in thousandths.
+        ///
+        /// docs/02 priced ARMOUR at -15/-30/-45% by rarity, back when armour was one slot.
+        /// It is three slots now, and that number is what a FULL SET of one rarity comes
+        /// to: the helmet, the chest and the belt share it out rather than each carrying
+        /// it. So the shipped table tops out at exactly the 450 docs/02 asks for, the
+        /// 8-14 s time to kill survives the best kit in the game, and this cap never
+        /// fires — which is the point of it. It is the guard rail for the day a fourth
+        /// worn piece is added and nobody re-adds the three numbers.
+        /// </summary>
+        public int MaxArmourPermille;
+
+        /// <summary>
+        /// The most the worn kit may take off the hitstun, in thousandths.
+        ///
+        /// Only the helmet carries any, so today this is a ceiling over one item rather than
+        /// a sum — and it stays a config knob for the same reason as the one above: the day
+        /// a second piece carries stun resistance, the question of what they add up to is
+        /// already answered.
+        /// </summary>
+        public int MaxStunResistPermille;
 
         /// <summary>
         /// Movement speed through the three phases of a swing, in thousandths of the run
@@ -80,6 +187,15 @@ namespace GulagRunners.Sim
         /// The commitment is kept where it belongs — a swing still cannot be cancelled with
         /// a jump or a dodge. It is the walking that is given back, not the escape.
         /// </summary>
+        /// <summary>
+        /// Gathering: you may still close or back off, at this share of the run.
+        ///
+        /// Cut from 620 when the wind-ups were lengthened by a third, because what matters
+        /// is the GROUND covered during one, not the speed: at 620 a slower club carried
+        /// its owner 0.59 m backwards before the blow went live, which is far enough out of
+        /// his own 1.25 m reach that a fighter walking away could no longer land the swing
+        /// he had aimed behind him. 480 keeps the distance where it was.
+        /// </summary>
         public int WindupSpeedPermille;
         public int ActiveSpeedPermille;
         public int RecoverySpeedPermille;
@@ -90,13 +206,6 @@ namespace GulagRunners.Sim
         /// reading the other player rather than reacting to them.
         /// </summary>
         public int ParryFrames;
-
-        /// <summary>
-        /// Frames of holding the guard that cost one charge. docs/02 spends stamina on holding
-        /// the block, and without that a raised guard is free: a fighter can walk the whole
-        /// arena braced at 42% speed and never find out why they are slow. 0 turns it off.
-        /// </summary>
-        public int GuardDrainFrames;
 
         /// <summary>
         /// Below this share of full health, bare hands hit for DesperationDamagePermille.
@@ -126,6 +235,18 @@ namespace GulagRunners.Sim
         public int FallDamagePerSpeed;
         public int StaggerFrames;
 
+        /// <summary>
+        /// Extra frames of hit stop per point of damage, in thousandths of a frame.
+        /// Weight you can feel, instead of one constant for every blow in the game.
+        /// </summary>
+        public int HitStopPerDamagePermille;
+
+        /// <summary>
+        /// Ceiling on it. Past about a sixth of a second a freeze stops reading as
+        /// weight and starts reading as the game having dropped frames.
+        /// </summary>
+        public int MaxHitStopFrames;
+
         public int DeathFrames;
 
         public static CombatConfig Default()
@@ -145,27 +266,53 @@ namespace GulagRunners.Sim
             // felt rather than seen, and past about a tenth of a second on an ordinary hit it
             // stops reading as weight and starts reading as a dropped frame.
             c.HitStopFrames = 3;
-            c.BlockStopFrames = 2;
             c.ParryStopFrames = 7;
 
+            // And the part that was missing: hit stop that knows what hit. Three flat
+            // frames meant a 4-damage jab and a 21-damage warhammer froze the screen for
+            // the same 50 ms, so nothing in the game felt heavier than anything else.
+            // A third of a frame per point of damage puts a jab at 4 frames and a full
+            // hammer at the cap, which is the 2-to-10 range docs/30 asked for.
+            c.HitStopPerDamagePermille = 330;
+            c.MaxHitStopFrames = 10;
+
             c.HitstunPerDamage = 1;
-            c.MaxHitstunFrames = 26;
+            c.MaxHitstunFrames = 34;   // was 26, which clipped the floor below off a warhammer
 
-            c.KnockbackSpeed = Fix.FromMilli(3200);
-            c.HeavyKnockbackSpeed = Fix.FromMilli(6000);
-            c.KnockbackLift = Fix.FromMilli(1600);
+            c.AttackBufferFrames = 18;     // 0.30 s: clears the longest connected recovery (15)
+            c.HitRecoveryCutPermille = 500;
+            c.HitAdvantageFrames = 4;      // +4 on the FIRST hit, more with the heavy
+            c.ComboStunDecayPermille = 620;
+            c.ComboStackFrames = 75;       // 1.25 s without being hit and the string is over
+            c.ComboPushPermille = 300;
+            c.AttackerRecoilPermille = 400;
+            c.RecoilFrames = 10;
+            c.AttackFramesPermille = 1450;   // 0.28 s to read the commonest wind-up
 
-            c.ChipPermille = 300;          // docs/02: a block absorbs 70%, not 85%
-            c.BlockStaminaCost = 1;        // one of the three charges docs/02 gives a fighter
-            c.GuardBreakFrames = 42;       // 0.7 s wide open
-            c.BlockSpeedPermille = 420;
+            // LOWER THAN THEY WERE, and spent rather than braked (MoveConfig.PushDecay).
+            // A heavy blow used to put 6 m/s into the body and a flat drag took it away at a
+            // constant rate: 1.86 m of travel, which is a launch across half a room, and a
+            // dead stop at the end of it. Measured on the mirror, 4.8 m/s against the decay
+            // is 0.91 m -- still past the edge of a blade's reach, so a string still has to
+            // step back in, with none of the sharpness. The light blow goes 0.45 m -> 0.35 m
+            // for the same reason.
+            c.KnockbackSpeed = Fix.FromMilli(2800);
+            c.HeavyKnockbackSpeed = Fix.FromMilli(4800);
 
-            c.WindupSpeedPermille = 620;   // gathering: you may still close or back off
+            // And the finisher lifts enough to SEE. At 1.6 m/s it was 4 cm and 0.11 s of
+            // air, which is the "three centimetres nobody can see" the old comment
+            // complained about one number up; 2.2 is 8 cm and a sixth of a second.
+            c.KnockbackLift = Fix.FromMilli(2200);
+
+            c.MaxArmourPermille = 500;     // the full legendary kit is 450; this never fires
+            c.MaxStunResistPermille = 400; // a great helm is 380 of it
+
+
+            c.WindupSpeedPermille = 480;   // gathering: you may still close or back off
             c.ActiveSpeedPermille = 180;   // the blow itself; a crawl, not a stop
             c.RecoverySpeedPermille = 400; // heavy on your feet again
 
             c.ParryFrames = 12;            // 0.20 s, straight from docs/02
-            c.GuardDrainFrames = 48;       // a charge every 0.8 s, so a full pool holds 3.2 s
             c.StaggerFrames = 48;          // 0.80 s, likewise: the parry is the skill ceiling
 
             c.DesperationHealthPermille = 300;   // docs/02: bare hands below 30% HP

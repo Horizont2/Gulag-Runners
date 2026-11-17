@@ -70,11 +70,20 @@ namespace GulagRunners.Game
                  "the depth you are actually on.")]
         public bool depthFromScene = true;
 
-        [Tooltip("Follow a ladder's own depth while climbing it.\n\n" +
-                 "A ladder modelled in front of the platform it serves is climbed in front of " +
-                 "it too; staying on the plane would draw the body inside the floor it is " +
-                 "climbing past. 0 snaps.")]
-        public float depthSmoothTime = 0.12f;
+        [Tooltip("Smoothing on the DRAWN depth. Leave it at zero.\n\n" +
+                 "This is the last of the days when depth was a presentation flourish, and " +
+                 "it is the whole of \"you jump on a cage and it slowly sucks you inside\". " +
+                 "The simulation moves the body onto the cage's slice IN THE AIR, in about " +
+                 "a tenth of a second, so the lean is spent before the feet land -- and then " +
+                 "this smoothed the DRAWING of it over another fifth of a second, which lands " +
+                 "first and does the rest of the move afterwards, as a slide across the cage " +
+                 "floor. 1.66 m of it on the forest's hanging cages.\n\n" +
+                 "There is nothing here that wants smoothing: the simulation already bounds " +
+                 "how fast depth may change (Depth Snap Speed, and Air Depth Snap in the air), " +
+                 "and the frames between ticks are interpolated like x and y. Anything above " +
+                 "zero is the drawn body disagreeing with the body that collides, which is " +
+                 "the one thing a 2.5D level cannot afford.")]
+        public float depthSmoothTime = 0f;
 
         [Tooltip("Distance from this object's origin down to the feet, because the simulation " +
                  "tracks the feet. For the scaled capsule this is 0.9, half the body height.")]
@@ -193,13 +202,21 @@ namespace GulagRunners.Game
         public event Action<int> Hurt;
 
         /// <summary>
-        /// A hit the guard ate, with what got through it. Separate from Hurt because the two
-        /// have to look nothing alike: docs/02 wants the difference between taking a hit and
-        /// meeting one readable from across the arena, since it is the whole reason to hold
-        /// the guard up.
+        /// <summary>
+        /// There is no block.
+        ///
+        /// docs/31 took the guard button out and made the WEAPON the defence: "зброя
+        /// зупиняє зброю" -- two segments meeting, settled in ArmMotor before any damage
+        /// is. CombatMotor's own note says it plainly: TryHitbox, Resolve, Land, Parry and
+        /// Block used to live there and all five are gone.
+        ///
+        /// What survived the removal was the scaffolding: this event, three subscribers to
+        /// it, a flash colour, a particle slot, a camera shake, eight config numbers, three
+        /// item stats and a sound. None of it could ever fire, because nothing raised the
+        /// event. A reader finding `blockFlash` beside `hitFlash` would reasonably conclude
+        /// the game has a block in it, and would be wrong -- which is the real cost of
+        /// leaving a removed mechanic's furniture standing.
         /// </summary>
-        public event Action<int> Blocked;
-
         /// <summary>A hit turned on its owner. The loudest thing a defender can do.</summary>
         public event Action Parried;
 
@@ -230,6 +247,13 @@ namespace GulagRunners.Game
             ? matchState.Combat.MaxHealth
             : 100;
         public MoveConfig Config => _config;
+
+        /// <summary>
+        /// The arm's tuning, for whatever is drawing it. Off the match when there is one
+        /// so the view and the simulation cannot be looking at two different arms.
+        /// </summary>
+        public ArmConfig ArmSettings =>
+            matchState != null ? matchState.Arm : ArmConfig.Default();
         public SimWorld World => _world;
 
         /// <summary>
@@ -256,8 +280,8 @@ namespace GulagRunners.Game
         float _alpha = 1f;
         float _tilt;
         float _tiltRoll, _tiltLean;
-        InputFlags _held;             // what is held right now
-        InputFlags _pending;          // held, plus anything tapped since the last tick
+        TickInput _held;              // what is held right now, and where the arm is asked to point
+        TickInput _pending;           // held, plus anything tapped since the last tick
         Vector3 _baseVisualScale = Vector3.one;
         Vector2 _spawnPoint;
         bool _warnedEmptyWorld;
@@ -369,7 +393,8 @@ namespace GulagRunners.Game
                 position.Y = groundY;
             }
 
-            _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config);
+            _state = PlayerSimState.Spawn(position, (sbyte)(facing >= 0 ? 1 : -1), in _config,
+                                          ArmSettings);
             _state.Depth = depth;
 
             if (keepLoadout)
@@ -390,9 +415,13 @@ namespace GulagRunners.Game
                     $"{name}: spawned inside a baked solid " +
                     $"(x {stuckIn.MinX.ToMilli() / 1000f:0.00}..{stuckIn.MaxX.ToMilli() / 1000f:0.00}, " +
                     $"y {stuckIn.MinY.ToMilli() / 1000f:0.00}..{stuckIn.MaxY.ToMilli() / 1000f:0.00}) " +
-                    $"and was lifted out to y {_state.Position.Y.ToMilli() / 1000f:0.00}. " +
-                    "Something in the scene is marked solid that should not be: check that box " +
-                    "against the gameplay plane, or mark it Ignore.\n" +
+                    $"and was lifted out to y {_state.Position.Y.ToMilli() / 1000f:0.00}.\n" +
+                    "  that box came from: " +
+                    (worldBaker != null ? worldBaker.Blame(stuckIn) : "no baker to ask") + "\n" +
+                    "  Mark that object Ignore with a SimCollider, or take its collider off. " +
+                    "Remember the simulation is flat boxes: a MeshCollider becomes its " +
+                    "BOUNDS, so an arch, a rock or anything with a hole in it is solid all " +
+                    "the way through.\n" +
                     (worldBaker != null ? worldBaker.LastReport : "no baker"), this);
             }
             else if (_world != null && _world.Solids.Length > 0 &&
@@ -423,6 +452,64 @@ namespace GulagRunners.Game
             Teleported?.Invoke();
         }
 
+        /// <summary>
+        /// True while something else owns the clock -- a network match, a replay, a test.
+        ///
+        /// Each fighter pumps its own accumulator off Time.deltaTime, which is right on
+        /// one device and impossible across two: the whole MATCH has to advance on a
+        /// single clock that waits for the other player's input. So an owner can take the
+        /// clock, and then drives every fighter itself with StepOnce, in a fixed order.
+        /// </summary>
+        public bool ExternallyClocked
+        {
+            get => _externallyClocked;
+            set
+            {
+                if (_externallyClocked == value) return;
+                _externallyClocked = value;
+
+                // Whatever was waiting to be spent goes with the clock that was going to
+                // spend it. A fighter nobody is taking input from still samples every
+                // frame -- so without this, the taps pile up unspent for as long as the
+                // network match lasts and all arrive at once the moment it ends.
+                _pending = default;
+                _accumulator = 0f;
+            }
+        }
+
+        bool _externallyClocked;
+
+        /// <summary>Seconds a tick lasts, for whoever is driving the clock.</summary>
+        public static float SecondsPerTick => TickSeconds;
+
+        /// <summary>
+        /// One tick, from an input somebody else chose. The whole of networked play:
+        /// the simulation never learns where the input came from.
+        /// </summary>
+        public void StepOnce(TickInput intent) => Tick(intent);
+
+        /// <summary>Draw between ticks, for whoever is driving the clock.</summary>
+        public void RenderAt(float alpha) => Render(Mathf.Clamp01(alpha));
+
+        /// <summary>What this fighter's own controls are asking for, this frame.</summary>
+        public TickInput ReadLocalInput() => _input != null ? _input.Read() : default;
+
+        /// <summary>
+        /// What this fighter's own controls have asked for since this was last taken, and
+        /// clears it -- exactly what the local loop below does between two ticks.
+        ///
+        /// Taking rather than reading is the whole point: a tap that begins and ends inside
+        /// one frame never appears in Read, and on a phone at 60 fps against a 60 Hz tick
+        /// that is a real share of the attacks. The networked clock has to consume the
+        /// pending input for the same reason the local one does.
+        /// </summary>
+        public TickInput TakeLocalInput()
+        {
+            TickInput intent = _pending;
+            _pending = _held;              // taps are consumed, held buttons stay held
+            return intent;
+        }
+
         void Update()
         {
             // Sample once per frame. _held is what is down now; _pending also carries anything
@@ -430,8 +517,13 @@ namespace GulagRunners.Game
             if (_input != null)
             {
                 _held = _input.Read();
-                _pending |= _held;
+                _pending = TickInput.Merge(_pending, _held);
             }
+
+            // Somebody else is counting the ticks. The input above is still sampled, so a
+            // tap between two ticks is not lost; the stepping and the drawing are both
+            // theirs, through StepOnce and RenderAt.
+            if (ExternallyClocked) return;
 
             _accumulator += Time.deltaTime;
 
@@ -450,8 +542,9 @@ namespace GulagRunners.Game
             Render(Mathf.Clamp01(_accumulator / TickSeconds));
         }
 
-        void Tick(InputFlags input)
+        void Tick(TickInput intent)
         {
+            InputFlags input = intent.Flags;
             _previous = _state;
             if (worldBaker != null && worldBaker.World != null) _world = worldBaker.World;
 
@@ -511,8 +604,29 @@ namespace GulagRunners.Game
             // The fight decides what the body is allowed to do before it moves: a swing is a
             // commitment to where you are standing, and that is what makes reach matter.
             InputFlags moveInput = input;
+            ArmConfig armCfg = matchState != null ? matchState.Arm : ArmConfig.Default();
             if (matchState != null)
-                moveInput = CombatMotor.Step(ref _state, input, matchState.Combat, in _config);
+                moveInput = CombatMotor.Step(ref _state, input, matchState.Combat,
+                                             in _config, in armCfg);
+
+            // The arm moves BEFORE the body, so the tip speed this tick is measured
+            // against where the shoulder was when the swing was asked for. After the
+            // body, a fighter who merely ran forwards would read as having swung.
+            // The other fighter, so that "forward" on the attack stick means AT HIM
+            // rather than at world right. Nothing is steered: the direction asked for is
+            // kept exactly, and only the zero it is measured from moves (ArmMotor.Assist).
+            //
+            // His SHOULDER, and the same anatomical point as the one it is measured
+            // from. It used to be his chest, which sits a quarter of a metre lower, so
+            // the frame leaned downhill at every range and tipped a quarter turn as the
+            // two of you closed.
+            PlayerController foe = matchState != null ? matchState.Opponent(this) : null;
+            bool hasFoe = foe != null;
+            FixVec2 foeShoulder = hasFoe
+                ? ArmMotor.Shoulder(foe.State, in _config, in armCfg)
+                : FixVec2.Zero;
+
+            ArmMotor.Step(ref _state, intent.Aim, foeShoulder, hasFoe, in _config, in armCfg);
 
             PlayerMotor.Step(ref _state, moveInput, _world, in _config);
 
@@ -520,7 +634,6 @@ namespace GulagRunners.Game
             // one tick each, and a frame that happens to run two ticks or none would double
             // them or lose them.
             if (_state.WasHit) Hurt?.Invoke(_state.DamageTaken);
-            if (_state.WasBlocked) Blocked?.Invoke(_state.DamageTaken);
             if (_state.WasParried) Parried?.Invoke();
             if (_state.JustDied) Died?.Invoke();
 

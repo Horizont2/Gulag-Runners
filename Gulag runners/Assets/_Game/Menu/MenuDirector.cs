@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using GulagRunners.Meta;
 
 namespace GulagRunners.Game
 {
@@ -57,17 +58,77 @@ namespace GulagRunners.Game
 
         [Header("The match")]
         [Tooltip("Scene to load. Empty plays the whole move and loads nothing, which is how " +
-                 "to look at the transition without leaving the menu.")]
-        public string matchScene = "SetupScene";
+                 "to look at the transition without leaving the menu.\n\n" +
+                 "Arena_Demo is the match: the arena, the chests, the cage doors and the " +
+                 "only HUD in the project. SetupScene is the movement bench from docs/11 " +
+                 "and has no canvas at all, so a phone build that lands there has no " +
+                 "controls and nothing to read.\n\n" +
+                 "This is a NAME, checked by nobody. A scene missing from the build list " +
+                 "loads fine in the editor and fails on the device.")]
+        public string matchScene = "Arena_Forest";
 
         [Tooltip("Start loading at this point of the walk, 0 to 1, and show the next scene " +
                  "only once the walk has finished. Loading early hides the wait inside the " +
                  "move; showing early throws the move away.")]
         [Range(0f, 1f)] public float loadStartsAt = 0.2f;
 
+        [Tooltip("The arenas a match may be played in. Empty plays Match Scene below, " +
+                 "which is how this behaved when there was only one.\n\n" +
+                 "The pool is dealt from Map Seed, not chosen here: both devices have " +
+                 "that number before either starts loading, so they arrive at the same " +
+                 "arena without sending anything. Which also means both devices must " +
+                 "carry the SAME pool asset -- two builds whose pools differ connect, " +
+                 "count down and never start.")]
+        public MapPool pool;
+
+        [Tooltip("The number the match is dealt from, set by MatchSearch when a pairing " +
+                 "arrives. Left at 0 against a practice opponent, which is fine: there " +
+                 "is nobody to agree with.")]
+        public uint mapSeed;
+
+        [Tooltip("Hold the finished load until Release() is called.\n\n" +
+                 "Off, the walk ends and the arena appears, which is right when there is " +
+                 "nobody else in it. On, the scene waits — because the other runner may " +
+                 "still be loading, and two fighters who started at different moments are " +
+                 "not in the same match. MatchSearch switches this on.")]
+        public bool waitForRelease;
+
         [Header("Debug")]
         public string state = "waiting";
 
+        /// <summary>0 to 1 while the arena loads, so something can show it.</summary>
+        public float LoadProgress { get; private set; }
+
+        /// <summary>Loaded and waiting for <see cref="Release"/>.</summary>
+        public bool ReadyToHandOver { get; private set; }
+
+        /// <summary>Let the arena through. Only meaningful with Wait For Release on.</summary>
+        public void Release() => _released = true;
+
+        /// <summary>
+        /// The arena this match is in: the pool's answer for this seed, or the single
+        /// scene below when there is no pool. Asked once and remembered, because the
+        /// name is wanted twice -- to load, and to tell the player where they are going
+        /// -- and a pool that answered differently the second time would be a very
+        /// quiet way to load one arena and name another.
+        /// </summary>
+        public string SceneToLoad
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(_chosen)) return _chosen;
+                _chosen = pool != null ? pool.Choose(mapSeed) : matchScene;
+                return _chosen;
+            }
+        }
+
+        /// <summary>What to call it on the screen.</summary>
+        public string SceneShown =>
+            pool != null ? pool.NameOf(SceneToLoad) : SceneToLoad;
+
+        string _chosen;
+
+        bool _released;
         bool _leaving;
         Vector3 _gateHome;
         Vector3 _viewHome;
@@ -106,9 +167,37 @@ namespace GulagRunners.Game
         {
             StopAllCoroutines();
             _leaving = false;
+            _released = false;
+            ReadyToHandOver = false;
+            LoadProgress = 0f;
             state = "waiting";
             if (gate != null) gate.localPosition = _gateHome;
             if (view != null) view.transform.position = _viewHome;
+        }
+
+        /// <summary>
+        /// Which way "out" is.
+        ///
+        /// Toward the gate, when there is one -- NOT the way the camera happens to face.
+        /// In this menu the gate is BEHIND the camera: the shot looks down the cell at the
+        /// dressed back wall, and the way out is the arch at the other end. Walking along
+        /// the camera's forward vector there does not leave the cell, it drives five
+        /// metres into a wall four metres away.
+        ///
+        /// Flattened, and the camera does not turn. Reversing out under the arch while
+        /// still facing the room reads as being taken out of it, which is the right
+        /// feeling for a gulag and costs nothing to animate.
+        /// </summary>
+        Vector3 Leaving(Vector3 from)
+        {
+            if (gate != null)
+            {
+                Vector3 away = gate.position - from;
+                away.y = 0f;
+                if (away.sqrMagnitude > 0.0001f) return away.normalized;
+            }
+
+            return view != null ? view.transform.forward : Vector3.forward;
         }
 
         IEnumerator Leave()
@@ -116,7 +205,7 @@ namespace GulagRunners.Game
             state = "opening";
 
             Vector3 from = view != null ? view.transform.position : Vector3.zero;
-            Vector3 forward = view != null ? view.transform.forward : Vector3.forward;
+            Vector3 forward = Leaving(from);
 
             AsyncOperation load = null;
             float longest = Mathf.Max(gateSeconds, walkStartsAt * gateSeconds + walkSeconds);
@@ -142,20 +231,35 @@ namespace GulagRunners.Game
 
                 // Loading starts inside the move, so the wait happens while there is
                 // something to look at, and the move is never cut short by it.
-                if (load == null && w >= loadStartsAt && !string.IsNullOrEmpty(matchScene))
+                if (load == null && w >= loadStartsAt && !string.IsNullOrEmpty(SceneToLoad))
                 {
-                    state = "loading";
-                    load = SceneManager.LoadSceneAsync(matchScene);
+                    state = "loading " + SceneShown;
+                    load = SceneManager.LoadSceneAsync(SceneToLoad);
                     if (load != null) load.allowSceneActivation = false;
                 }
+
+                // Held back at 0.9 by Unity, which keeps the last tenth for activation.
+                // Reported as the whole of it, because a bar that stops at nine tenths and
+                // then jumps is a bar nobody believes the next time.
+                if (load != null) LoadProgress = Mathf.Clamp01(load.progress / 0.9f);
 
                 yield return null;
             }
 
             if (load == null)
             {
-                state = string.IsNullOrEmpty(matchScene) ? "done (no scene set)" : "done";
+                state = string.IsNullOrEmpty(SceneToLoad) ? "done (no scene set)" : "done";
                 yield break;
+            }
+
+            LoadProgress = 1f;
+
+            // Loaded here. Whether that means ready depends on who else is coming.
+            if (waitForRelease)
+            {
+                ReadyToHandOver = true;
+                state = "loaded, waiting to be let through";
+                while (!_released) yield return null;
             }
 
             state = "handing over";

@@ -133,14 +133,65 @@ namespace GulagRunners.Sim
                 // centre line, so the stand-off is only ever the character's own thickness.
                 // A thick ladder and a thin one then hold the body at the same visible
                 // distance, which is the thing an eye actually checks.
-                Span rungs = world.LadderSpan(s.LadderIndex);
-                Fix halfLadder = (rungs.Max - rungs.Min) / 2;
+                // Half the RAILS, not half the span. The span of a leaning ladder is its
+                // thickness plus the whole lean, and halving that put the body 0.45 m in
+                // front of the rungs on the mine's ladders, which lean 0.9 m over their
+                // height: a climb up thin air beside a ladder the fighter was holding.
+                Fix halfLadder = world.LadderHalfThickness(s.LadderIndex);
 
                 want = world.LadderDepthAt(s.LadderIndex, s.Position.Y, s.Depth, inset)
                      - halfLadder - cfg.LadderStandOff;
             }
             else if (s.Mode != MoveMode.Grounded)
-                return;                                   // mid-air you keep the slice you left
+            {
+                // FALLING, the body leans towards the storey it is dropping onto.
+                //
+                // This used to keep the slice you left until your feet touched, and then
+                // slide you forward where you stood. That is the wrong order and it is
+                // what "he drops to the floor below and stays in the background" means:
+                // the whole move happened after the landing, as a slide, instead of
+                // during the fall where the eye reads it as leaning into the drop.
+                //
+                // ON THE WAY UP TOO, once you are over the thing. This used to be the
+                // way down only, guarding against being "dragged backwards before you are
+                // over a ledge" -- and that guard was doing the job twice, because
+                // TryLandingLane already skips every box whose top is above the feet. The
+                // velocity test only delayed the lean on a surface the fighter had
+                // ALREADY cleared.
+                //
+                // Which is the whole of the forest's cages. They are parkour, on purpose,
+                // and each one stands on its own slice -- the hanging pair 1.66 m behind
+                // the floor's lane, the standing ones about 1.2 m in front of it. Leaning
+                // only on the way down left most of that distance to be travelled AFTER
+                // the feet landed, as a slide across the cage floor, and a slide you did
+                // not ask for towards the back of a cage is being slowly sucked into it.
+                //
+                // Worse than a slide, in fact: a box is only solid to a body whose slice
+                // OVERLAPS it (SolidAt), so arriving with the slice you took off from is
+                // arriving INSIDE the cage. Jump at one whose roof is near the top of the
+                // arc and the old rule had you pass straight through it, drift towards the
+                // camera for a fifth of a second while inside it, and end up on the floor.
+                // Starting the lean at the lip spends the move in the air instead, where
+                // the eye reads it as leaning into the jump, and the roof is solid by the
+                // time the feet reach it.
+                if (!TryLandingLane(ref s, world, in cfg, out want)) return;
+
+                // And faster while the feet are off the ground. The gentle 4 m/s is tuned
+                // for walking from one slice to another; in the air the body is already
+                // travelling, so the same move reads as part of the arc rather than as
+                // something tugging at it -- and it finishes before the landing, which is
+                // the point.
+                //
+                // A config that never set the multiplier moves at the ground speed, which
+                // is what every version before this one did. Nothing in the project builds
+                // a MoveConfig by hand -- they all start from Default -- and the inspector
+                // cannot type a zero, so this is only here to keep the one that does from
+                // freezing the lean altogether.
+                Fix faster = cfg.AirDepthSnap > Fix.Zero ? cfg.AirDepthSnap : Fix.One;
+                s.Depth = Fix.MoveTowards(s.Depth, want,
+                                          cfg.DepthSnapSpeed * faster * Dt);
+                return;
+            }
             else if (!TryLaneAhead(ref s, world, in cfg, out want) &&
                      !TryFloorLane(ref s, world, in cfg, out want))
                 return;
@@ -161,10 +212,22 @@ namespace GulagRunners.Sim
         /// </summary>
         static Fix LaneOn(Span span, Fix depth, in MoveConfig cfg)
         {
-            Fix halfZ = cfg.BodyDepth / 2;
-            return span.Reaches(cfg.HomeDepth, halfZ)
-                ? span.Nearest(cfg.HomeDepth, halfZ)
-                : span.Nearest(depth, halfZ);
+            // Always the part of this surface NEAREST THE FIGHT, and never the part
+            // nearest wherever the body happens to have arrived from.
+            //
+            // The second branch is what this used to do when a surface did not reach the
+            // plane, and it is the same bug the rule above was written against, wearing
+            // the clothes of a fix. Arena_Forest's terrace is 4.4 m deep and stops 23 cm
+            // short of the plane: a fighter who steps off a hanging cage at z -0.67 is
+            // already INSIDE that span, so "the nearest part of it" was where he already
+            // was, and he landed on the terrace two and a half metres behind the man he
+            // is fighting and stayed there for the rest of the round.
+            //
+            // Nothing is lost by dropping it. A ramp or a walkway modelled behind the
+            // plane still holds the body -- on its front edge, which is the part of it
+            // closest to the fight, which is where a fighter standing on a walkway
+            // wants to be anyway.
+            return span.Nearest(cfg.HomeDepth, cfg.BodyDepth / 2);
         }
 
         /// <summary>
@@ -192,17 +255,11 @@ namespace GulagRunners.Sim
         {
             if (wishX != 0) s.Travel = (sbyte)wishX;
 
-            int aimX = input.AimX();
-            if (aimX != 0)
-            {
-                s.Facing = (sbyte)aimX;
-                s.AimLockTimer = cfg.AimLockFrames;
-                return;
-            }
-
-            if (s.AimLockTimer > 0) s.AimLockTimer--;
-            if (s.AimLockTimer > 0 || s.Swinging) return;
-
+            // The aim no longer comes through here. ArmMotor turns the body to follow the
+            // attack stick on the tick it is pushed, because the stick IS the aim now and
+            // there is nothing to hold a facing against: the lock existed because a swipe
+            // was a single frame of input and a held movement stick would steal the facing
+            // back before the windup finished. There is no windup to outlast.
             if (wishX != 0) s.Facing = (sbyte)wishX;
         }
 
@@ -262,6 +319,44 @@ namespace GulagRunners.Sim
             //
             // So the lane follows the floor, which is a thing you are standing on, and the
             // rungs are taken at the moment you take them.
+            return found;
+        }
+
+        /// <summary>
+        /// The slice of the floor this body is falling onto: the highest solid under its
+        /// feet that it could change lane onto from here.
+        ///
+        /// No look-down distance, on purpose. There is nothing to tune: whatever is
+        /// directly below is what the fall ends on, and if there is nothing below then
+        /// there is no lane to aim at and the body keeps the one it has. The lane reach
+        /// is the only limit, and it is the same one that governs stepping sideways onto
+        /// a ramp — a fighter cannot slide two metres through the air to a slice he could
+        /// not have walked to.
+        /// </summary>
+        static bool TryLandingLane(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                   out Fix lane)
+        {
+            lane = s.Depth;
+            Fix half = cfg.BodyWidth / 2;
+
+            bool found = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;
+                Aabb solid = world.Solids[i];
+                if (solid.MaxY > s.Position.Y + Skin) continue;        // not below the feet
+                if (solid.MaxX <= s.Position.X - half ||
+                    solid.MinX >= s.Position.X + half) continue;
+                if (found && solid.MaxY <= top) continue;
+
+                Fix want = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
+                if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
+
+                top = solid.MaxY;
+                lane = want;
+                found = true;
+            }
             return found;
         }
 
@@ -359,7 +454,7 @@ namespace GulagRunners.Sim
 
             // Nothing comes back while the guard is up: a brace you can hold and recover
             // through is a brace you never have to drop.
-            if (s.StaminaCharges < cfg.StaminaMax && !s.Blocking)
+            if (s.StaminaCharges < cfg.StaminaMax )
             {
                 s.StaminaTimer++;
                 if (s.StaminaTimer >= cfg.StaminaRecoverFrames)
@@ -400,13 +495,25 @@ namespace GulagRunners.Sim
             if (s.SpeedPermille > 0)
                 targetSpeed = new Fix((int)(((long)targetSpeed.Raw * s.SpeedPermille) / 1000));
 
-            // Knocked back: the body keeps what the blow gave it. Running the normal ground
-            // deceleration over a hit would wipe the knockback in a tenth of a second, and a hit
-            // that does not move anybody is a hit nobody can read.
-            if (s.HitstunTimer > 0 || s.StaggerTimer > 0)
+            // Knocked back: the body keeps what the blow gave it, and SPENDS it rather than
+            // being braked. Running the normal ground deceleration over a hit would wipe the
+            // knockback in a tenth of a second, and a hit that does not move anybody is a hit
+            // nobody can read -- but the flat drag that replaced it has the other fault: a
+            // constant slowing arrives at zero still travelling and stops dead.
+            //
+            // So the push decays by a share of itself each tick. It is fast at first, eases
+            // out to nothing, and never jolts at either end: the only sudden number in the
+            // whole exchange is the one the blow itself set, and hit stop is already holding
+            // the body still while the eye reads that.
+            if (s.HitstunTimer > 0 || s.StaggerTimer > 0 || s.RecoilTimer > 0)
             {
-                Fix drag = cfg.GroundDecel / 6;
-                s.Velocity.X = Fix.MoveTowards(s.Velocity.X, Fix.Zero, drag * Dt);
+                int keep = cfg.PushDecayPermille > 0 ? cfg.PushDecayPermille : 930;
+                int raw = (int)(((long)s.Velocity.X.Raw * keep) / 1000);
+
+                // And a floor, or the tail runs for a second and a half of creep: below a
+                // centimetre a second there is nothing left to read, and a body that is
+                // still moving is a body the next blow lands on differently.
+                s.Velocity.X = raw > -650 && raw < 650 ? Fix.Zero : new Fix(raw);
             }
             else
             {
@@ -701,7 +808,11 @@ namespace GulagRunners.Sim
 
         static void StepClimb(ref PlayerSimState s, int wishX, int wishY, SimWorld world, in MoveConfig cfg)
         {
-            // Jumping off a ladder is always allowed: never trap the player on one.
+            // Jumping off a ladder, when the game allows it at all. The player is not
+            // trapped either way: a direction at the top climbs out, a direction in the
+            // middle steps off to whichever side has floor, and down at the bottom lets go.
+            if (s.JumpBufferTimer > 0 && !cfg.AllowLadderJump) s.JumpBufferTimer = 0;
+
             if (s.JumpBufferTimer > 0)
             {
                 s.JumpBufferTimer = 0;
@@ -749,12 +860,25 @@ namespace GulagRunners.Sim
             // ladder with nothing underneath — the hatch is a hole — so it fell, touched the
             // ladder again, re-grabbed, and climbed back out. That loop was the juddering.
             Fix ceiling = ladder.MaxY - cfg.LadderTopMargin;
-            bool atTop = s.Position.Y >= ceiling;
-            if (atTop)
+            if (s.Position.Y >= ceiling)
             {
                 s.Position.Y = ceiling;
                 if (s.Velocity.Y > Fix.Zero) s.Velocity.Y = Fix.Zero;
             }
+
+            // The climb-out may begin a little below the top, and has to. The top of a
+            // ladder box stands ABOVE the floor it serves, so a climb-out that waits for
+            // the top is a climb-out that DESCENDS -- 9.8 cm down on this arena's top
+            // ladder -- while the clip over it hauls a man upwards. Half a metre lower and
+            // the move is a climb again: the body rises into the landing rather than
+            // sinking onto it.
+            bool atTop = s.Position.Y >= ceiling;
+
+            // ...but only for somebody CLIMBING. Asking to get out sideways is a thing you
+            // do hanging at the very top over a hole, and allowing it half a metre lower
+            // caught the fighter the moment he stepped into the hatch holding left to climb
+            // DOWN -- it hauled him straight back out onto the floor he came from.
+            bool finishing = s.Position.Y >= ceiling - cfg.MantleRise;
 
             // At the top, climbing out onto the floor beside the hatch is automatic. Asking the
             // player to nudge sideways while hanging over a hole is not a mechanic, it is a trap.
@@ -766,7 +890,7 @@ namespace GulagRunners.Sim
             // sideways means "get me out this way", and the climb-out is the move that does it:
             // edging off the rungs instead walks the body out over the hole it came up through,
             // which is how a fighter ends up standing on air beside a hatch.
-            if (atTop && (wishY > 0 || wishX != 0) &&
+            if (((wishY > 0 && finishing) || (wishX != 0 && atTop)) &&
                 TryStartMantle(ref s, wishX, s.LadderIndex, world, cfg))
                 return;
 
@@ -942,10 +1066,42 @@ namespace GulagRunners.Sim
                     ? 1 : -1;
             }
 
-            // A sideways climb-out stays on its own slice: it is a step along this floor, not
-            // onto the next one.
-            StartScripted(ref s, side > 0 ? landRight : landLeft, side, s.Depth, in cfg);
+            // Onto the lane the floor it lands on actually holds a body at.
+            //
+            // This used to keep the body's own slice, on the grounds that a sideways
+            // climb-out is a step along THIS floor rather than onto the next one. It is
+            // not: the body coming off a ladder is standing on the rungs' stand-off,
+            // which is in front of the floor, so the climb-out finished and UpdateDepth
+            // then pulled it back at the full lane speed -- a lurch at the landing,
+            // eight times faster than the move that had just ended. TryStepOut already
+            // promises the standing lane for the same reason.
+            FixVec2 onto = side > 0 ? landRight : landLeft;
+            StartScripted(ref s, onto, side, LaneUnder(onto, s.Depth, world, in cfg), in cfg);
             return true;
+        }
+
+        /// <summary>The lane a body standing at this landing would be held on.</summary>
+        static Fix LaneUnder(FixVec2 at, Fix fallback, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            bool found = false;
+            Fix top = Fix.Zero, lane = fallback;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;
+                Aabb solid = world.Solids[i];
+                if (solid.MaxX <= at.X - half || solid.MinX >= at.X + half) continue;
+                if (solid.MaxY > at.Y + Skin) continue;
+                if (found && solid.MaxY <= top) continue;
+
+                Fix want = LaneOn(world.SolidSpan(i), fallback, in cfg);
+                if (Fix.Abs(want - fallback) > cfg.LaneReach) continue;
+
+                top = solid.MaxY;
+                lane = want;
+                found = true;
+            }
+            return lane;
         }
 
         /// <summary>Hands the body to the climb-out animation, wherever it is climbing out to.</summary>
@@ -978,7 +1134,25 @@ namespace GulagRunners.Sim
             // "the climb-out is jerky and switches to something else" is.
             Fix spanZ = Fix.Abs(s.ScriptToDepth - s.ScriptFromDepth) * 3 / 2;
 
-            int frames = FramesFor(Fix.Max(spanZ, Fix.Max(spanX, spanY)), in cfg);
+            // EACH PHASE IS SIZED BY THE SPEED IT HAS TO MEET, not by a shared guess.
+            //
+            // The rise runs straight out of a climb, and a climb is a CONSTANT 2 m/s. Eased
+            // in from rest the body went 2.00 m/s on its last climbing tick and 0.22 on its
+            // first hauling one -- a full stop and a fresh start, which is the small jerk
+            // left at the top. An ease-OUT leaves at the speed it arrived at and slows from
+            // there; its opening speed is twice its average, so giving it two spans' worth
+            // of climb time makes that opening speed exactly the climb's own.
+            Fix climb = cfg.ClimbUpSpeed > Fix.Zero ? cfg.ClimbUpSpeed : cfg.RunSpeed;
+            int riseFrames = FramesAt(Fix.Abs(s.ScriptTo.Y - s.ScriptFrom.Y) * 2, climb);
+
+            // The step across starts from rest and ends at rest, so it is a smooth step, and
+            // a smooth step peaks at one and a half times its average. Held to the run speed
+            // so a climb-out can never outrun a sprint.
+            Fix across = Fix.Max(Fix.Abs(s.ScriptTo.X - s.ScriptFrom.X),
+                                 Fix.Abs(s.ScriptToDepth - s.ScriptFromDepth));
+            int acrossFrames = FramesAt(across * 3 / 2, cfg.RunSpeed);
+
+            int frames = riseFrames + acrossFrames;
             if (frames <= 0) frames = cfg.ScriptMinFrames;
 
             // And a haul is not a step. The minimum is shared with the reach onto a ladder,
@@ -988,6 +1162,10 @@ namespace GulagRunners.Sim
 
             s.ScriptFrames = frames;
             s.ScriptTimer = frames;
+            s.ScriptRiseShare = frames > 0
+                ? new Fix((int)(((long)riseFrames * Fix.RawOne) / frames))
+                : Fix.FromMilli(500);
+            s.ScriptRises = s.ScriptTo.Y > s.ScriptFrom.Y + cfg.ScriptRiseMargin;
             s.ScriptDir = (sbyte)(side >= 0 ? 1 : -1);
             s.Mode = MoveMode.Mantling;
             s.LadderIndex = -1;
@@ -996,7 +1174,6 @@ namespace GulagRunners.Sim
             // looks where he is going.
             s.Facing = (sbyte)(side >= 0 ? 1 : -1);
             s.Travel = s.Facing;
-            s.AimLockTimer = 0;
             s.Noise = NoiseLevel.Quiet;
         }
 
@@ -1155,6 +1332,9 @@ namespace GulagRunners.Sim
             // reach for one. The climb-out is deliberately not cancellable: it is already
             // committed to a landing, and breaking it off leaves the body over the hole it was
             // leaving.
+            if (s.Mode == MoveMode.Mounting && s.JumpBufferTimer > 0 && !cfg.AllowLadderJump)
+                s.JumpBufferTimer = 0;
+
             if (s.Mode == MoveMode.Mounting && s.JumpBufferTimer > 0)
             {
                 s.JumpBufferTimer = 0;
@@ -1209,10 +1389,30 @@ namespace GulagRunners.Sim
             }
             else
             {
-                // Height leads and the step across follows, which is the shape of a real mantle
-                // rather than a diagonal slide.
-                yT = SmoothStep(Clamp01(t * 3 / 2));
-                xT = SmoothStep(Clamp01((t - Fix.FromMilli(300)) * 10 / 7));
+                // UP FIRST, ALL THE WAY, THEN ACROSS -- and each phase gets the share of the
+                // window its own distance is worth.
+                //
+                // The two halves may not overlap, and that is not a matter of taste. A
+                // scripted move writes the position straight out with no collision behind
+                // it, so any sideways travel taken before the body has cleared the floor
+                // goes THROUGH the slab beside the hatch: checked across every ladder and
+                // every height, 54 climb-out paths passed through solid geometry, which is
+                // what being dropped out of the level looks like from the inside.
+                //
+                // Splitting by distance rather than at a fixed fraction is what keeps it
+                // smooth anyway. A fixed "two thirds, then seven tenths" gave the axis with
+                // 0.10 m of travel most of the window and the one with 1.10 m what was
+                // left: ten frames creeping under 0.4 m/s, then a bolt at 4.71 m/s. Equal
+                // shares of distance per share of time is one steady speed throughout.
+                Fix rise = s.ScriptRiseShare;
+                if (rise < Fix.FromMilli(50)) rise = Fix.FromMilli(50);
+                if (rise > Fix.FromMilli(950)) rise = Fix.FromMilli(950);
+
+                // Ease OUT, not in: the body is already moving upwards when this begins.
+                yT = EaseOut(Clamp01(Divide(t, rise)));
+                xT = t <= rise
+                    ? Fix.Zero
+                    : SmoothStep(Clamp01(Divide(t - rise, Fix.One - rise)));
             }
 
             s.Position = new FixVec2(
@@ -1228,7 +1428,27 @@ namespace GulagRunners.Sim
 
         static Fix Clamp01(Fix v) => Fix.Clamp(v, Fix.Zero, Fix.One);
 
+        /// <summary>a / b, where b is known positive. Kept here so the split reads as maths.</summary>
+        static Fix Divide(Fix a, Fix b) =>
+            b.Raw == 0 ? Fix.Zero : new Fix((int)(((long)a.Raw * Fix.RawOne) / b.Raw));
+
         static Fix SmoothStep(Fix t) => t * t * (Fix.FromInt(3) - t * 2);
+
+        /// <summary>Full speed at the start, nothing left at the end.</summary>
+        static Fix EaseOut(Fix t)
+        {
+            Fix left = Fix.One - t;
+            return Fix.One - left * left;
+        }
+
+        /// <summary>Frames to cover a distance at a speed, within the scripted bounds.</summary>
+        static int FramesAt(Fix distance, Fix speed)
+        {
+            if (speed <= Fix.Zero) return 1;
+            Fix seconds = Divide(distance, speed);
+            int frames = (seconds * PlayerMotor.TicksPerSecond).ToInt();
+            return frames > 0 ? frames : 1;
+        }
 
         // ---------------------------------------------------------------- collision
 
@@ -1300,7 +1520,34 @@ namespace GulagRunners.Sim
                                      targetX + half, s.Position.Y + height);
                 if (!body.Overlaps(in solid)) continue;
 
-                targetX = dx > Fix.Zero ? solid.MinX - half - Skin : solid.MaxX + half + Skin;
+                // Only a surface the body is moving INTO is a wall. Without this guard a
+                // body that ALREADY overlaps a box is snapped to its far face, and the far
+                // face of the arena floor is the end of the arena: this is how a fighter
+                // knocked off a ladder left the level. He climbs through the floor slab --
+                // the shaft is exempt while he is holding the rungs, which is what makes a
+                // ladder through solid ground work at all -- and the hit takes the ladder
+                // away mid-slab. Nothing else changed: the body is standing inside 29 m of
+                // floor, pushed right, so this line read "the right-hand wall of that floor
+                // is at x -16.69" and put him there, 22 m away, past every floor below, and
+                // he fell out of the world.
+                //
+                // MoveY has had the same guard for a while, against the same thing in the
+                // other axis: "a player spawned with their head inside the floor above gets
+                // snapped to the far side of it and teleports a whole storey".
+                //
+                // With it, being knocked off a ladder drops the man down the shaft he was
+                // climbing, which is what being knocked off a ladder should do.
+                if (dx > Fix.Zero)
+                {
+                    if (s.Position.X + half > solid.MinX + Skin) continue;
+                    targetX = solid.MinX - half - Skin;
+                }
+                else
+                {
+                    if (s.Position.X - half < solid.MaxX - Skin) continue;
+                    targetX = solid.MaxX + half + Skin;
+                }
+
                 s.Velocity.X = Fix.Zero;
             }
 

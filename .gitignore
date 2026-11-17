@@ -108,3 +108,9 @@ Desktop.ini
 # Python bytecode from the simulation test harness
 __pycache__/
 *.pyc
+
+# A second project root at the repository root. The real project is "Gulag runners/";
+# these appear when Unity is opened on the repo root by mistake, and they shadow the
+# real settings with an empty default copy.
+/Packages/
+/ProjectSettings/

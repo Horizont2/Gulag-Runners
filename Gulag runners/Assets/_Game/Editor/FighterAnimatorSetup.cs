@@ -109,7 +109,7 @@ namespace GulagRunners.GameEditor
             ("Block Hit",  "1Hand_Up_Shield_Block_Hit_1_InPlace"),
         };
 
-        [MenuItem("Tools/Gulag Runners/Build fighter animator")]
+        [MenuItem("Tools/Gulag Runners/Setup/Build fighter animator")]
         public static void Build() => Build(false);
 
         /// <summary>
@@ -120,7 +120,7 @@ namespace GulagRunners.GameEditor
         /// clip is from the WRONG SET — an unarmed idle holding a weapon-ready pose — which
         /// the plain build can only report.
         /// </summary>
-        [MenuItem("Tools/Gulag Runners/Build fighter animator (replace clips)")]
+        [MenuItem("Tools/Gulag Runners/Setup/Build fighter animator (replace clips)")]
         public static void Rebuild() => Build(true);
 
         static void Build(bool replace)
@@ -178,11 +178,18 @@ namespace GulagRunners.GameEditor
             built[upper].blendingMode = AnimatorLayerBlendingMode.Override;
             controller.layers = built;
 
-            // IK Pass on every layer, or OnAnimatorIK is never called and PlayerIK runs no
-            // code at all -- the same tick box Set up IK exists for, set here while the
+            // IK Pass on the BASE layer, or OnAnimatorIK is never called and PlayerIK runs
+            // no code at all -- the same tick box Set up IK exists for, set here while the
             // layers are being made rather than fixed up afterwards.
+            //
+            // On the base layer and nowhere else. Unity calls OnAnimatorIK once per layer
+            // that has it, and PlayerIK does a frame's work each time it is called: blends
+            // stepped by deltaTime, springs integrated, goals read back out of the animator
+            // and written again. Ticked on both layers it ran twice a frame, which halved
+            // every blend time and fed each goal back into itself. The goals set on the
+            // base pass carry into the later ones regardless, so there is nothing to gain.
             AnimatorControllerLayer[] layers = controller.layers;
-            for (int i = 0; i < layers.Length; i++) layers[i].iKPass = true;
+            for (int i = 0; i < layers.Length; i++) layers[i].iKPass = i == 0;
             controller.layers = layers;
 
             EditorUtility.SetDirty(controller);

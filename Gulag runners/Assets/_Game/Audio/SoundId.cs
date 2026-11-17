@@ -41,8 +41,11 @@ namespace GulagRunners.Game
         AttackHit = 52,
         AttackHitArmoured = 53,
         AttackWhiff = 54,
-        BlockHold = 55,
-        BlockImpact = 56,
+        // 55 and 56 were BlockHold and BlockImpact. docs/31 took the guard out and
+        // made the weapon the defence, so neither moment exists to be heard. The
+        // numbers are left as a gap rather than reused: a saved sound table in a
+        // scene stores the value, and handing 56 to a different sound would make
+        // every arena play a parry where it used to play a block.
         Parry = 57,
         Stagger = 58,
         Death = 59,
@@ -50,6 +53,12 @@ namespace GulagRunners.Game
         // ---- match
         RoundStart = 70,
         Siren = 71,
-        RoundEnd = 72
+        RoundEnd = 72,
+
+        /// <summary>The pressure building under the floor, three seconds before the gas.</summary>
+        PoisonWarn = 73,
+
+        /// <summary>The clank and the hiss of it coming out. Heard through every floor.</summary>
+        PoisonVent = 74
     }
 }

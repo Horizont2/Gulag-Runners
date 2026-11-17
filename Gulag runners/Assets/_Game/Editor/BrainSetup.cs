@@ -14,7 +14,7 @@ namespace GulagRunners.GameEditor
     /// </summary>
     public static class BrainSetup
     {
-        [MenuItem("Tools/Gulag Runners/Add practice opponent")]
+        [MenuItem("Tools/Gulag Runners/Setup/Add practice opponent")]
         public static void Add()
         {
             PlayerController[] fighters =

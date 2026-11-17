@@ -22,6 +22,27 @@ namespace GulagRunners.Game
         public PlayerController player;
         public Animator animator;
 
+        /// <summary>
+        /// The Animator that is actually driving something, searched over all of them.
+        ///
+        /// GetComponentInChildren alone takes the FIRST, and it searches the object
+        /// itself before its children -- so one stray Animator on the fighter's root,
+        /// with no controller on it, takes over and every clip in the game stops. That
+        /// happened: a RequireComponent on a component dropped in the wrong place
+        /// created exactly such an Animator, and the symptom was a body that moved
+        /// perfectly and never animated.
+        ///
+        /// An Animator with no controller cannot play anything, so it is never the one
+        /// meant. Preferring a controller makes the search say what it means.
+        /// </summary>
+        static Animator Rig(GameObject root)
+        {
+            Animator[] all = root.GetComponentsInChildren<Animator>(true);
+            foreach (Animator a in all)
+                if (a != null && a.runtimeAnimatorController != null) return a;
+            return all.Length > 0 ? all[0] : null;
+        }
+
         [Header("State names in the Animator controller")]
         [Tooltip("Standing still.")]                       public string idleState = "Idle";
         [Tooltip("Moving slowly on the ground.")]          public string walkState = "Walk";
@@ -69,6 +90,14 @@ namespace GulagRunners.Game
         [Tooltip("Climbing down a ladder.")]    public string climbDownState = "Ladder Down";
         [Tooltip("Holding still on a ladder.")] public string climbIdleState = "Ladder Idle";
         [Tooltip("Climbing out at the top of a ladder.")] public string mantleState = "Ladder Out";
+
+        [Tooltip("Getting off a ladder onto a floor that is NOT above you.\n\n" +
+                 "A ladder whose head is flush with its platform leaves the body slightly " +
+                 "above the floor it steps onto, so that climb-out descends — measured at " +
+                 "9.8 cm down on this arena's top ladder — and the haul clip over it is a " +
+                 "man pulling himself up while he sinks. Leave empty to use the haul " +
+                 "anyway.")]
+        public string mantleStepState = "";
         [Tooltip("Reaching for a ladder from below, to climb up it.")]
         public string mountUpState = "Ladder Up Start";
         [Tooltip("Stepping backwards onto a ladder from above, to climb down it.")]
@@ -189,6 +218,17 @@ namespace GulagRunners.Game
         [Tooltip("Cross-fade time between states, in seconds.")]
         [Range(0f, 0.5f)] public float crossFade = 0.12f;
 
+        [Tooltip("How long the swing may keep playing after the simulation has finished " +
+                 "with it, so the follow-through is seen.\n\n" +
+                 "The swing is POSED off a tick counter, and a counter cannot land on a " +
+                 "clip's last frame: that frame belongs to the instant the phase ends. " +
+                 "Dropped there, the arms fade out of a pose the animation never resolved, " +
+                 "which is the jerk at the end of a blow. So the clip is let off the leash " +
+                 "and allowed to run out on its own before the layer fades.\n\n" +
+                 "A cap, not a duration: it ends the moment the clip does. Zero switches " +
+                 "it off.")]
+        [Range(0f, 0.4f)] public float swingTail = 0.14f;
+
         [Tooltip("Below this speed the character counts as standing still, in m/s.")]
         public float idleThreshold = 0.15f;
 
@@ -241,13 +281,31 @@ namespace GulagRunners.Game
                  "starts.")]
         public string nowPlaying;
 
+        [Tooltip("The last few states, newest first, with the frames each was held for.\n\n" +
+                 "Watch it while the thing that looks wrong happens. A clip that flickers " +
+                 "shows up here as two names alternating with tiny frame counts beside " +
+                 "them, which is the difference between knowing and guessing.")]
+        public string stateTrail = "";
+
+        int _heldFrames;
+
         [Tooltip("And on the fight layer, with its weight. Empty means the whole body is " +
                  "playing what is above.")]
         public string nowOnArms;
 
+        // What that line last said, so it is only written again when it changed.
+        string _saidArms;
+        int _saidWeight = -1;
+
         int _currentHash;
         int _upperHash;
         float _upperWeight;
+
+        // The follow-through, on each layer: which swing is still running itself out, and
+        // how long it is still allowed to. See the Swing Tail tooltip.
+        float _armsTail, _bodyTail;
+        int _armsTailHash;
+        string _bodyTailState;
         bool _warned;
         MoveMode _lastMode = MoveMode.Grounded;
         float _exitHold;
@@ -255,13 +313,13 @@ namespace GulagRunners.Game
         void Reset()
         {
             player = GetComponent<PlayerController>();
-            animator = GetComponentInChildren<Animator>();
+            animator = Rig(gameObject);
         }
 
         void Awake()
         {
             if (player == null) player = GetComponent<PlayerController>();
-            if (animator == null) animator = GetComponentInChildren<Animator>();
+            if (animator == null) animator = Rig(gameObject);
 
             if (player == null || animator == null)
             {
@@ -301,9 +359,22 @@ namespace GulagRunners.Game
             // arms. The split is for the case it was built for — a body already going
             // somewhere, whose legs have something of their own to say.
             bool moving = speed > idleThreshold;
-            bool split = splitUpperBody && upperLayer > 0 &&
+            // A climb-out owns the whole body. Fight() already declines to speak during one,
+            // but the layer can still be carrying weight from the frame before, and a
+            // half-faded pair of arms over a haul is one of the things that reads as the
+            // clip changing its mind half way through.
+            bool scripted = s.Mode == MoveMode.Mantling || s.Mode == MoveMode.Mounting;
+
+            bool split = !scripted && splitUpperBody && upperLayer > 0 &&
                          upperLayer < animator.layerCount && !string.IsNullOrEmpty(arms) &&
                          (moving || !fullBodyWhenStill);
+
+            // A NEW blow replays the reaction even when it is the same clip. Play skips a
+            // state whose hash is already current, which is right for everything else and
+            // wrong for exactly this: a string of hits kept the FIRST reaction, let it run
+            // to its end and then held that frame, so being hit four times looked like
+            // being hit once. Clearing the current hash forces the clip to re-enter.
+            if (s.WasHit || s.WasParried) _currentHash = 0;
 
             string state = PickState(in s, speed, split, out float playback, out float scrub,
                                      out float fade);
@@ -311,10 +382,49 @@ namespace GulagRunners.Game
 
             Arms(split ? arms : null, armScrub);
 
+            if (state != nowPlaying)
+            {
+                // What ACTUALLY changed, in order, with how long each one lasted. Read this
+                // in the inspector while the thing that looks wrong is happening: a clip
+                // that flickers shows up here as two names alternating with tiny frame
+                // counts beside them, which is the difference between knowing and guessing.
+                if (!string.IsNullOrEmpty(nowPlaying))
+                    stateTrail = $"{nowPlaying}({_heldFrames}) <- {stateTrail}";
+                if (stateTrail.Length > 160) stateTrail = stateTrail.Substring(0, 160);
+                _heldFrames = 0;
+            }
+            _heldFrames++;
+
+            // THE FREEZE, SHOWN. The simulation stops both fighters dead for a few frames
+            // when a blow lands -- three on a hit, seven on a parry -- and that pause is
+            // half of what gives a blow its weight (docs/20). Nothing was showing it: the
+            // bodies stopped because the simulation stopped writing positions, while the
+            // clips played straight on through, so a hit read as a man sliding to a halt
+            // mid-swing rather than as an arm stopping against something.
+            //
+            // Set after Play, because Play writes the speed itself. A posed state is
+            // already at zero and its scrub cannot move either -- the timers it reads do
+            // not tick during a freeze.
+            if (s.HitStopTimer > 0) animator.speed = 0f;
+
             nowPlaying = state;
-            nowOnArms = split && _upperWeight > 0.001f
-                ? $"{arms}  ({_upperWeight:0.00})"
-                : "";
+
+            // An inspector line, rebuilt only when it would read differently. Built every
+            // frame it was a string allocated sixty times a second for something nobody
+            // looks at while they are playing.
+            bool showArms = split && _upperWeight > 0.001f;
+            int hundredths = Mathf.RoundToInt(_upperWeight * 100f);
+            if (!showArms)
+            {
+                if (!string.IsNullOrEmpty(nowOnArms)) nowOnArms = "";
+                _saidArms = null;
+            }
+            else if (hundredths != _saidWeight || arms != _saidArms)
+            {
+                _saidWeight = hundredths;
+                _saidArms = arms;
+                nowOnArms = $"{arms}  ({_upperWeight:0.00})";
+            }
         }
 
         /// <summary>
@@ -330,26 +440,21 @@ namespace GulagRunners.Game
             scrub = -1f;
 
             if (!splitUpperBody) return null;
-            if (s.Dead || s.StaggerTimer > 0 || s.GuardBreakTimer > 0 ||
+            if (s.Dead || s.StaggerTimer > 0 ||
                 s.HitstunTimer > 0 || s.OpeningChest >= 0) return null;
             if (s.Mode != MoveMode.Grounded && s.Mode != MoveMode.Airborne) return null;
 
-            if (s.Attack != AttackPhase.None)
-            {
-                string chained = ComboSwing(s.ComboIndex);
-                string swing = s.Attack == AttackPhase.Windup
-                        ? First(attackWindupState, chained)
-                        : s.Attack == AttackPhase.Recovery
-                            ? First(attackRecoverState, chained)
-                            : chained;
-
-                if (string.IsNullOrEmpty(swing)) return null;
-                if (poseAttackByPhase && swing == chained) scrub = SwingProgress(in s);
-                return swing;
-            }
-
-            if (s.Blocking) return First(blockIdleState);
-
+            // NOTHING. The arms are not a clip any more.
+            //
+            // docs/31 moved the weapon onto a stick: the arm points where the thumb
+            // points, every tick, and PlayerArm drives the shoulder and elbow from the
+            // simulation's own arm vector through IK. A swing clip played on top of that
+            // would be an animation fighting the thing it is supposed to be showing, and
+            // the player would watch their blade arrive somewhere they did not put it.
+            //
+            // The swing, block and combo clips stay in the controller and stay unwired.
+            // They are what a scripted move would use if one ever comes back -- an
+            // execution, a cutscene -- and deleting them would lose work for nothing.
             return null;
         }
 
@@ -365,6 +470,24 @@ namespace GulagRunners.Game
         void Arms(string state, float scrub)
         {
             if (upperLayer <= 0 || upperLayer >= animator.layerCount) return;
+
+            // The simulation has finished with the blow, but the clip has not. Hold the
+            // layer where it is and stop posing it: with the animator back at speed 1 the
+            // state runs itself out from wherever the last pose left it, which is the
+            // follow-through that puts the arms back to neutral. Then it fades, out of a
+            // pose the animation actually arrived at.
+            if (string.IsNullOrEmpty(state) && _armsTail > 0f)
+            {
+                _armsTail -= Time.deltaTime;
+                AnimatorStateInfo at = animator.GetCurrentAnimatorStateInfo(upperLayer);
+                if (at.shortNameHash == _armsTailHash && at.normalizedTime < 1f)
+                {
+                    _upperWeight = 1f;
+                    animator.SetLayerWeight(upperLayer, 1f);
+                    return;
+                }
+                _armsTail = 0f;
+            }
 
             float want = string.IsNullOrEmpty(state) ? 0f : 1f;
             _upperWeight = upperFade <= 0.001f
@@ -387,6 +510,8 @@ namespace GulagRunners.Game
             if (scrub >= 0f)
             {
                 _upperHash = hash;
+                _armsTail = swingTail;
+                _armsTailHash = hash;
                 animator.Play(hash, upperLayer, scrub);
             }
             else if (hash != _upperHash)
@@ -470,43 +595,37 @@ namespace GulagRunners.Game
             if (s.Dead)
                 return First(deathState, staggerState, hitState) ?? idleState;
 
-            if (s.StaggerTimer > 0 || s.GuardBreakTimer > 0)
+            if (s.StaggerTimer > 0)
                 return First(staggerState, hitState) ?? idleState;
 
-            if (s.HitstunTimer > 0)
-            {
-                // A hit the guard ate is not a hit the body took. docs/02 wants the difference
-                // readable from across the arena: it is the whole reason to hold the guard up.
-                string hurt = s.Blocking
-                    ? First(blockImpactState, blockIdleState, hitState)
-                    : First(hitState, staggerState);
-                if (!string.IsNullOrEmpty(hurt)) return hurt;
-            }
+            // No clip for being hit. The KNOCKBACK is the reaction -- the body is shoved,
+            // and with a weapon live on the other thumb the reader already has plenty to
+            // look at. A reaction clip on top of it took the legs away from a fighter who
+            // was being pushed, so a hit read as a stumble the player did not ask for and
+            // could not steer out of. The hitstun still stops them acting; it just no
+            // longer stops them being drawn doing what they were doing.
+            //
+            // staggerState survives above: the closing gate's shove still sets
+            // StaggerTimer (MatchClock), and that one IS a scripted loss of footing.
 
-            // Unless the upper-body layer has taken it. Two layers both playing the swing is
-            // the swing applied twice, and the legs never get to run.
-            if (s.Attack != AttackPhase.None && !armsBusy)
-            {
-                string chained = ComboSwing(s.ComboIndex);
-                string swing = s.Attack == AttackPhase.Windup
-                        ? First(attackWindupState, chained)
-                        : s.Attack == AttackPhase.Recovery
-                            ? First(attackRecoverState, chained)
-                            : chained;
+            // No swing clip on the legs either, for the same reason: the arms are IK now
+            // and the legs should keep walking, standing or falling while they move.
 
-                if (!string.IsNullOrEmpty(swing))
-                {
-                    // Posed, the one clip spans the whole swing: the wind-up over its opening
-                    // frames, the active window across its middle, the recovery to the end.
-                    // That puts the frame the hitbox goes live on at the same place in the
-                    // animation every time, which is what makes a wind-up readable at all.
-                    if (poseAttackByPhase && swing == chained)
-                    {
-                        scrub = SwingProgress(in s);
-                        playback = 0f;
-                    }
-                    return swing;
-                }
+            // The blow is over for the simulation and the clip is still mid follow-through.
+            // Left posed it would be abandoned at the frame the counter reached; crossfaded
+            // away it would be abandoned faster. Handed back unposed, Play leaves it alone
+            // -- the hash has not changed -- and it runs itself out at speed 1.
+            //
+            // Only while standing: on the move there are legs under this state with
+            // somewhere to be, and the fight layer is carrying the swing anyway.
+            if (_bodyTail > 0f && !string.IsNullOrEmpty(_bodyTailState))
+            {
+                _bodyTail -= Time.deltaTime;
+                if (speed <= idleThreshold && _currentHash ==
+                    Animator.StringToHash(_bodyTailState) &&
+                    animator.GetCurrentAnimatorStateInfo(0).normalizedTime < 1f)
+                    return _bodyTailState;
+                _bodyTail = 0f;
             }
 
             // Working at a chest. The simulation has already turned the fighter to face it.
@@ -540,7 +659,9 @@ namespace GulagRunners.Game
                 case MoveMode.Mantling:
                     if (poseLadderByProgress) { scrub = ScriptProgress(in s); playback = 0f; }
                     else { playback = ladderActionPlayback; fade = ScriptedFade(in s); }
-                    return mantleState;
+                    return !s.ScriptRises && !string.IsNullOrEmpty(mantleStepState)
+                        ? mantleStepState
+                        : mantleState;
 
                 case MoveMode.Mounting:
                     if (poseLadderByProgress) { scrub = ScriptProgress(in s); playback = 0f; }
@@ -593,19 +714,10 @@ namespace GulagRunners.Game
                         return Stance(in s, crouchMoveState, armedCrouchMoveState);
                     }
 
-                    // A raised guard is a pose, and it has to be one the opponent can read:
-                    // it is the difference between walking into a fighter and walking into a
-                    // parry (docs/02 wants the silhouette to carry the information).
-                    if (s.Blocking && !armsBusy)
-                    {
-                        if (speed <= idleThreshold && !string.IsNullOrEmpty(blockIdleState))
-                            return blockIdleState;
-                        if (speed > idleThreshold && !string.IsNullOrEmpty(blockMoveState))
-                        {
-                            playback = Scale(speed, referenceWalkSpeed);
-                            return blockMoveState;
-                        }
-                    }
+                    // The raised-guard pose is gone with the guard button. What the
+                    // opponent reads now is the weapon itself, held wherever the thumb is
+                    // holding it -- which carries more than a pose ever did, because it
+                    // is also literally where the blade will stop theirs.
 
                     if (speed <= idleThreshold)
                         return Stance(in s, idleState, armedIdleState);
@@ -654,31 +766,6 @@ namespace GulagRunners.Game
         /// shares a swing reads with: the wind-up the first two fifths, the active window a
         /// fifth, the recovery the rest.
         /// </summary>
-        /// <summary>
-        /// How far through the attack CLIP the swing is, given how far through the swing the
-        /// simulation is.
-        ///
-        /// The three phases are stretched onto the clip around its own contact window, so the
-        /// frame the hitbox goes live on is the frame the weapon is drawn at the target. The
-        /// window is a pair of inspector fields rather than the 0.40/0.60 it used to be,
-        /// because where a clip connects is a property of that clip and this project has
-        /// already changed character twice.
-        /// </summary>
-        float SwingProgress(in PlayerSimState s)
-        {
-            int total = Mathf.Max(1, s.AttackPhaseFrames);
-            float within = Mathf.Clamp01(1f - s.AttackTimer / (float)total);
-
-            float hit = Mathf.Clamp01(attackContactStart);
-            float done = Mathf.Clamp(attackContactEnd, hit, 1f);
-
-            switch (s.Attack)
-            {
-                case AttackPhase.Windup: return within * hit;
-                case AttackPhase.Active: return hit + within * (done - hit);
-                default: return done + within * (1f - done);
-            }
-        }
 
         /// <summary>
         /// How fast this fighter opens things, against bare hands. The weapon is the crowbar
@@ -709,7 +796,14 @@ namespace GulagRunners.Game
             // interpolated between ticks; a pose that is not steps at 60 Hz beside it, and
             // a climb-out is TEN ticks long, so that is a tenth of the clip at a time
             // against a body moving smoothly. Which is the jerk, exactly.
-            float done = s.ScriptFrames - s.ScriptTimer + player.Alpha;
+            //
+            // And ONE TICK BEHIND the counter, because the body is too. The controller
+            // draws between the PREVIOUS tick's position and this one, so at alpha 0 it is
+            // showing where the body was a tick ago. Reading the counter straight put the
+            // pose a full tick in front of the body for the whole move -- measured at a
+            // constant 1/30 of the clip on this arena's top ladder, which is the hands
+            // arriving on the ledge before the body does.
+            float done = s.ScriptFrames - s.ScriptTimer - 1 + player.Alpha;
             return Mathf.Clamp01(done / s.ScriptFrames);
         }
 

@@ -68,7 +68,28 @@ namespace GulagRunners.Sim
         // item turns a saved round into a different round.
 
         /// <summary>T1 utility.</summary>
-        Bandage = 30
+        Bandage = 30,
+
+        // The head. A helmet is not a second vest: what it buys is the hitstun of the blows
+        // after the first, which is the difference between eating a string and answering
+        // one. docs/02 asks that every piece be a different PLAN, and this is the plan of
+        // the player who keeps getting rushed.
+        /// <summary>T1 helmet — COMMON.</summary>
+        LeatherCap = 40,
+        /// <summary>T2 helmet — RARE.</summary>
+        MailCoif = 41,
+        /// <summary>T3 helmet — LEGENDARY.</summary>
+        GreatHelm = 42,
+
+        // The waist. The belt is where the guard is strapped and the pouches hang: it buys
+        // seconds of holding a block, which is the one defence a rushed fighter has and the
+        // one the stamina pool keeps taking away from him.
+        /// <summary>T1 belt — COMMON.</summary>
+        RopeBelt = 50,
+        /// <summary>T2 belt — RARE.</summary>
+        ToolBelt = 51,
+        /// <summary>T3 belt — LEGENDARY.</summary>
+        WarBelt = 52
     }
 
     /// <summary>
@@ -86,11 +107,25 @@ namespace GulagRunners.Sim
         Legendary = 2
     }
 
+    /// <summary>
+    /// Which slot an item goes in. One kind per slot and no item in two of them, because
+    /// <see cref="Inventory.Equip"/> picks the slot from the kind and nothing else.
+    ///
+    /// Helmet and Belt are armour in every way that matters to the fight — they are summed
+    /// into the same damage reduction — and they are separate KINDS because a kind is a
+    /// slot. Keeping them inside Armour would mean a coif and a breastplate competing for
+    /// the same square, which is the opposite of what a head and a waist are.
+    /// </summary>
     public enum ItemKind : byte
     {
         None = 0,
         Weapon = 1,
+        /// <summary>The chest. The big share of the damage reduction.</summary>
         Armour = 2,
-        Utility = 3
+        Utility = 3,
+        /// <summary>The head. A little reduction, and the hitstun of a string.</summary>
+        Helmet = 4,
+        /// <summary>The waist. A little reduction, and how long a guard holds.</summary>
+        Belt = 5
     }
 }

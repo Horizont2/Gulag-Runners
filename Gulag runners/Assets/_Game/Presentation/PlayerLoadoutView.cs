@@ -35,43 +35,24 @@ namespace GulagRunners.Game
                  "about loot — the movement sandbox of docs/11, say.")]
         public ItemModel[] weapons;
 
-        [Tooltip("Armour models, parented to the body. Optional: the weapon pack this project " +
-                 "ships with has no armour meshes, so this is empty until there is art, and " +
-                 "armour reads through the stat line rather than the silhouette until then.")]
+        [Tooltip("CHEST armour models only, parented to the body, one mesh per item. The " +
+                 "older of the two armour paths and the narrower one: the fighter wears a " +
+                 "helmet and a belt as well, and those go through PlayerArmourView, which " +
+                 "dresses all three worn slots at once from a modular character's own part " +
+                 "categories. Fill one or the other, not both. Optional: the weapon pack " +
+                 "this project ships with has no armour meshes at all.")]
         public ItemModel[] armour;
 
 
         [Header("Size")]
-        [Tooltip("How long a weapon is drawn, as a share of the reach it ADDS over bare " +
-                 "hands, in metres. 0 draws everything at the fallback length instead.\n\n" +
-                 "Weapon packs are authored for a 1.8 m human; this fighter is 0.91 m, so a " +
-                 "pack greataxe in his hand is longer than he is tall. Rather than guess one " +
-                 "number for one pack, each model's own mesh is measured and its longest axis " +
-                 "scaled to this. Taking the length from reach keeps the picture and the " +
-                 "hitbox agreeing: docs/02 makes reach the whole difference between two " +
-                 "weapons, and a spear drawn dagger-sized is that difference thrown away.")]
-        [Range(0f, 3f)] public float reachToLength = 0.73f;
-
-        [Tooltip("The grip and head every weapon has before it has any reach at all, as a " +
-                 "share of the fighter's own height.\n\n" +
-                 "Without it the map from reach to length is a straight line through the " +
-                 "origin, and that is wrong at both ends at once: the dagger adds 0.10 m of " +
-                 "reach, which drew it at the minimum and heaped it in with the mace and " +
-                 "the gladius as the same small stick, while the warhammer came out at 119% " +
-                 "of the fighter's height and the two polearms hit the cap at 143%. A real " +
-                 "warhammer is about half its owner's height and a real spear about 120%.\n\n" +
-                 "With a base, the same table draws 35% for a dagger and 127% for a scythe, " +
-                 "in order and nothing clamped.")]
-        [Range(0f, 0.8f)] public float baseOfBody = 0.27f;
-
-        [Tooltip("Shortest a weapon may be drawn, in metres. A dagger adds almost nothing to " +
-                 "bare reach, and a dagger you cannot see is not a weapon.")]
-        [Range(0f, 0.6f)] public float minLength = 0.28f;
-
-        [Tooltip("Longest a weapon may be drawn, in metres. The map from reach to length is " +
-                 "linear, which over-rewards the two polearms: left uncapped a scythe comes " +
-                 "out nearly twice the fighter's height.")]
-        [Range(0f, 3f)] public float maxLength = 1.3f;
+        // How long a weapon is DRAWN is ArmMotor.BladeLength, off the match's own arm
+        // tuning, and it is not repeated here. It used to be: four numbers on this
+        // component, four more on GroundItemView, and a tooltip on one of them asking
+        // whoever edited it to keep the other in step by hand. Meanwhile the simulation
+        // swung a blade built from the item's whole Reach, which is a different length
+        // again -- about 1.5x the model, on every weapon in the table. A hitbox that is
+        // not the thing you can see is the worst kind of wrong, so there is one rule now
+        // and the sim owns it.
 
         [Tooltip("Longest axis, in metres, for anything with no reach of its own — armour, the " +
                  "bandage, a stand-in cube.")]
@@ -91,6 +72,8 @@ namespace GulagRunners.Game
         public float wornPulse = 3f;
 
         MaterialPropertyBlock _block;
+        MaterialPropertyBlock _armourBlock;
+        Renderer _armourRenderer;
         ItemId _weapon = ItemId.None;
         ItemId _armour = ItemId.None;
         GameObject _weaponRoot;
@@ -132,14 +115,38 @@ namespace GulagRunners.Game
         /// </summary>
         void Start()
         {
-            // Proportional to the fighter, not a number in metres: the one decision this
-            // project has not taken yet is what a metre is, and a hard-coded haft would
-            // have to be found and changed again on the day it does.
-            float haft = baseOfBody * (player != null ? player.tuning.bodyHeight : 0.91f);
+            // Off the match's own arm tuning, through the simulation's own function, so
+            // the weapon drawn in the hand is the weapon the hitbox is.
+            MoveConfig move = player != null ? player.Config : MoveConfig.Default();
+            ArmConfig arm = player != null ? player.ArmSettings : ArmConfig.Default();
 
-            ItemModels.FitAll(weapons, reachToLength, minLength, maxLength, fallbackLength,
-                              haft);
-            ItemModels.FitAll(armour, 0f, minLength, maxLength, fallbackLength);
+            ItemModels.FitAll(weapons, in move, in arm, fallbackLength);
+            ItemModels.FitAll(armour, fallbackLength);
+        }
+
+        /// <summary>
+        /// Hands the socket the model being carried, and the grip its list entry asks for.
+        ///
+        /// The entry is the only place that knows: the socket can see the model but not
+        /// which <see cref="ItemModel"/> it came from, and the axes live next to the model
+        /// in the inspector because that is where somebody looking at a crooked weapon
+        /// would go to fix it.
+        /// </summary>
+        void Equip(GameObject root)
+        {
+            if (socket == null) return;
+
+            Vector3 blade = Vector3.zero, flat = Vector3.zero;
+            if (weapons != null && root != null)
+                foreach (ItemModel m in weapons)
+                {
+                    if (m == null || m.root != root) continue;
+                    blade = m.bladeAxis;
+                    flat = m.flatAxis;
+                    break;
+                }
+
+            socket.Hold(root, blade, flat);
         }
 
         void LateUpdate()
@@ -155,25 +162,47 @@ namespace GulagRunners.Game
                 _weaponRenderer = _weaponRoot != null
                     ? _weaponRoot.GetComponentInChildren<Renderer>() : null;
                 _block = null;
+
+                // Which grip this model was authored with, if anyone typed one. The socket
+                // measures the model when nobody has, which is the case for every weapon
+                // in the project; this is the way out for one the measurement cannot read.
+                Equip(_weaponRoot);
             }
 
             if (inv.Armour != _armour)
             {
                 _armour = inv.Armour;
                 GameObject root = ItemModels.Show(armour, _armour);
-                MaterialPropertyBlock block = null;
-                if (root != null)
-                {
-                    Color worn = ItemModels.RarityGlow(tierColours, _armour, Time.time,
-                                                       glow, out float lit);
-                    ItemModels.Tint(root.GetComponentInChildren<Renderer>(), ref block,
-                                    worn, lit);
-                }
+                _armourRenderer = root != null
+                    ? root.GetComponentInChildren<Renderer>() : null;
+                _armourBlock = null;
+            }
+
+            // Every frame, not only on the frame it changed. Tinted once, a legendary suit
+            // was frozen at whatever phase of the breath it happened to be shown on, so the
+            // one item in the game that is supposed to be the only thing moving stood still
+            // — while the weapon in the same hand pulsed, from the same function.
+            if (_armourRenderer != null)
+            {
+                // Time 0, like PlayerArmourView does and for the same reason: RarityPulse
+                // is a sine and sin(0) is 0, so the tier shows at its steady brightness and
+                // nothing breathes.
+                Color worn = ItemModels.RarityGlow(tierColours, _armour, 0f, glow,
+                                                   out float lit);
+                ItemModels.Tint(_armourRenderer, ref _armourBlock, worn, lit);
             }
 
             if (_weaponRenderer == null) return;
 
-            Color colour = ItemModels.RarityGlow(tierColours, _weapon, Time.time, glow,
+            // AND THE WEAPON DOES NOT BREATHE EITHER.
+            //
+            // The pulse is the FLOOR's: docs/03 gives it one job, which is to answer "is
+            // that worth crossing the room for" from the other side of the arena, and a
+            // legendary is deliberately the only thing moving. In the hand that question
+            // has been answered -- the thing is yours, it is six inches from the camera,
+            // and a weapon that keeps throbbing while you fight with it reads as a bug
+            // rather than as rarity. The colour stays; only the movement goes.
+            Color colour = ItemModels.RarityGlow(tierColours, _weapon, 0f, glow,
                                                  out float emission);
             int left = inv.WeaponDurability;
 

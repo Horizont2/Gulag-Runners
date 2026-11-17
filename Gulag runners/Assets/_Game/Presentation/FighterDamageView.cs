@@ -69,7 +69,6 @@ namespace GulagRunners.Game
 
         [Header("The moment it lands")]
         public Color hitFlash = new Color(1f, 0.15f, 0.1f);
-        public Color blockFlash = new Color(0.85f, 0.9f, 1f);
         public Color parryFlash = new Color(1f, 0.92f, 0.5f);
 
         [Tooltip("How long a flash lasts. Short: it is punctuation, not a light show.")]
@@ -88,10 +87,6 @@ namespace GulagRunners.Game
         [Tooltip("Burst when a hit gets through. Optional — the drain and the flash work " +
                  "without it.")]
         public ParticleSystem bloodOnHit;
-
-        [Tooltip("Burst when the guard eats one. Sparks off a shield, not blood. Optional, " +
-                 "like the rest of the particles here: the flash carries the hit without it.")]
-        public ParticleSystem sparksOnBlock;
 
         [Tooltip("Particles emitted per point of damage, so a big hit sprays and a chip does not.")]
         [Range(0, 20)] public int particlesPerDamage = 3;
@@ -134,7 +129,6 @@ namespace GulagRunners.Game
         {
             if (player == null) return;
             player.Hurt += OnHurt;
-            player.Blocked += OnBlocked;
             player.Parried += OnParried;
             player.Died += OnDied;
         }
@@ -143,7 +137,6 @@ namespace GulagRunners.Game
         {
             if (player == null) return;
             player.Hurt -= OnHurt;
-            player.Blocked -= OnBlocked;
             player.Parried -= OnParried;
             player.Died -= OnDied;
         }
@@ -278,12 +271,6 @@ namespace GulagRunners.Game
             Spray(bloodOnHit, damage);
         }
 
-        void OnBlocked(int chip)
-        {
-            Flash(blockFlash, chip);
-            Spray(sparksOnBlock, chip);
-        }
-
         void OnParried() => Flash(parryFlash, 6);
 
         void OnDied()
@@ -305,9 +292,44 @@ namespace GulagRunners.Game
             _flashLeft = flashSeconds;
         }
 
+        /// <summary>
+        /// Throw the hit's particles, in whichever way the thing wired here actually works.
+        ///
+        /// There are two kinds of effect and they are started differently, which is a trap
+        /// worth spelling out because getting it wrong fails SILENTLY:
+        ///
+        ///   A LOOSE system -- one emitter, no children, the kind a pack usually ships for
+        ///   a blood spray -- wants Emit(n). How hard the hit was is how MANY.
+        ///
+        ///   An AUTHORED effect is several systems under one parent, because the layers
+        ///   need different materials and different render modes (the sparks are stretched
+        ///   billboards, the ring is not, and a sub-emitter cannot have either). Those want
+        ///   Play(withChildren), and Emit on the parent would fire the parent's own emitter
+        ///   -- which has no renderer -- and leave all five layers dark. Nothing would
+        ///   error; the hit would simply have no particles, and it would look like a tuning
+        ///   problem for a week.
+        ///
+        /// How hard the hit was changes the SIZE of an authored effect and not the count.
+        /// Multiplying an authored composition by damage is how you get two hundred sparks
+        /// out of a design that was built around nine: the arrangement is the effect, and
+        /// scaling the arrangement keeps it while scaling the population destroys it.
+        /// </summary>
         void Spray(ParticleSystem system, int damage)
         {
-            if (system == null || particlesPerDamage <= 0) return;
+            if (system == null) return;
+
+            float hard = Mathf.Clamp01(damage / 25f);
+
+            if (system.transform.childCount > 0
+                && system.GetComponentsInChildren<ParticleSystem>(true).Length > 1)
+            {
+                float k = Mathf.Lerp(0.8f, 1.3f, hard);
+                system.transform.localScale = new Vector3(k, k, k);
+                system.Play(true);
+                return;
+            }
+
+            if (particlesPerDamage <= 0) return;
             int count = Mathf.Clamp(damage * particlesPerDamage, 1, 200);
             system.Emit(count);
         }

@@ -107,8 +107,33 @@ namespace GulagRunners.Sim
         /// </summary>
         public Fix BodyDepth;
 
+        /// <summary>
+        /// What is left of a blow's push after one tick, in thousandths.
+        ///
+        /// A hit hands the body a velocity and this is how it spends it: 930 keeps 93% of
+        /// it every tick, which is an exponential tail -- fast at first, then easing out
+        /// to nothing. The alternative, and what this replaced, was a flat drag of a sixth
+        /// of the ground deceleration: a CONSTANT slowing, which arrives at zero with the
+        /// same speed it had the tick before and stops dead. Snapped to full speed on one
+        /// tick and stopped dead at the end of it, a knockback has a jolt at both ends,
+        /// and that is most of "the push is too sharp to play against".
+        ///
+        /// Applied in the air as well. A finisher lifts the victim off the ground, and
+        /// without a decay up there the push is spent entirely by the landing.
+        /// </summary>
+        public int PushDecayPermille;
+
         /// <summary>How fast a body slides between slices, in m/s. 0 snaps.</summary>
         public Fix DepthSnapSpeed;
+
+        /// <summary>
+        /// What DepthSnapSpeed is multiplied by while the feet are off the ground.
+        ///
+        /// One number and not two speeds, so the ground speed stays the thing anybody
+        /// tunes and the air is always a multiple of it: they are the same move, and a
+        /// pair that can drift apart is a pair that will.
+        /// </summary>
+        public Fix AirDepthSnap;
 
         /// <summary>
         /// How far ahead to look for the next thing worth standing on, in metres. A body walks
@@ -151,8 +176,6 @@ namespace GulagRunners.Sim
         /// makes the whole feature feel broken rather than absent. Long enough to cover a
         /// windup and the swing it starts, and no longer: an aim that outlives its swing is
         /// a fighter who will not turn round.
-        /// </summary>
-        public int AimLockFrames;
 
         /// <summary>
         /// The shortest a CLIMB-OUT may be, in frames, whatever its distance.
@@ -166,6 +189,52 @@ namespace GulagRunners.Sim
         /// followed by a cut.
         /// </summary>
         public int MantleMinFrames;
+
+        /// <summary>
+        /// How much higher a scripted move has to end before it counts as a climb UP.
+        ///
+        /// Below this it is a step, and the presentation plays a step rather than a haul:
+        /// a ladder standing flush with its platform ends the climb slightly ABOVE the
+        /// floor, so its climb-out descends, and a haul clip over a descent is a man
+        /// pulling himself up while he sinks.
+        /// </summary>
+        public Fix ScriptRiseMargin;
+
+        /// <summary>
+        /// Whether the defensive button can also dash.
+        ///
+        /// OFF. docs/02 gives the medieval fighter one defensive button and lets a
+        /// direction turn it into a dodge, but the dodge is a burst of speed, and this
+        /// game has one ground speed on purpose: a fighter who can suddenly travel faster
+        /// than he runs reads as the character accelerating for no reason the player
+        /// asked for. With it off the same button raises the guard whatever is held, and
+        /// the guard's 42% is the only thing that changes how fast anybody moves.
+        /// </summary>
+        public bool AllowDodge;
+
+        /// <summary>
+        /// How far below the top of a ladder the climb-out may begin.
+        ///
+        /// Because the top of a ladder box sits ABOVE the floor it serves -- measured on
+        /// this arena, 6.6 cm above -- a climb-out that waits for the top is a climb-out
+        /// that goes DOWN, under a clip of a man hauling himself up. Starting it this far
+        /// below the top turns it back into a climb: the body rises into the landing
+        /// instead of sinking onto it, which is both what the clip shows and what the
+        /// player pressed up for.
+        /// </summary>
+        public Fix MantleRise;
+
+        /// <summary>
+        /// Whether jump leaves a ladder. OFF.
+        ///
+        /// It was always allowed, on the rule that a player must never be trapped on one.
+        /// They are not: a direction at the top climbs out, a direction in the middle steps
+        /// off to whichever side has floor, and holding down at the bottom lets go. What
+        /// jump actually did was launch a climbing fighter off the rungs at full jump
+        /// speed, which is neither something anybody presses on purpose half way up a
+        /// ladder nor something that reads as anything but a glitch when it happens.
+        /// </summary>
+        public bool AllowLadderJump;
 
         public Fix BodyHeight;
         public Fix CrouchHeight;
@@ -206,7 +275,7 @@ namespace GulagRunners.Sim
         public static MoveConfig Default()
         {
             MoveConfig c;
-            c.RunSpeed    = Fix.FromMilli(3600);
+            c.RunSpeed    = Fix.FromMilli(3000);   // what the prefabs run at, not 3.6
             c.CrouchSpeed = Fix.FromMilli(1600);
             c.GroundAccel = Fix.FromMilli(40000);
             c.GroundDecel = Fix.FromMilli(50000);
@@ -246,16 +315,30 @@ namespace GulagRunners.Sim
                                            // was retuned to in the movement pass
             c.StaminaRecoverFrames  = 72;  // 1.2 s a charge, straight from docs/02
 
-            c.BodyWidth   = Fix.FromMilli(600);
+            // The fighter who actually ships, read off Player 1.prefab and Player 2.prefab.
+            //
+            // These used to say 1.8 m and 0.6 m wide, which is a man nobody in this project
+            // has ever played: every prefab, every scene and every movement mirror says
+            // 0.91 m. A default that disagrees with all of them is not a harmless fallback,
+            // it is a trap, and combat fell in it -- the arm was written in metres against
+            // THIS number while being worn by the 0.91 m one, so it came out half his own
+            // height and bent his spine out to reach the IK goal. Everything proportional
+            // is a share now, and the share has to be a share OF something true.
+            c.BodyHeight  = Fix.FromMilli(910);
+            c.CrouchHeight = Fix.FromMilli(682);
+            c.BodyWidth   = Fix.FromMilli(300);
             c.BodyDepth   = Fix.FromMilli(600);
+            c.PushDecayPermille = 930;
             c.DepthSnapSpeed = Fix.FromMilli(4000);
+            c.AirDepthSnap = Fix.FromMilli(3000);
             c.LaneLookahead  = Fix.FromMilli(1200);
             c.LaneReach      = Fix.FromMilli(2000);
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
-            c.AimLockFrames = 24;                    // 0.40 s: a windup and its swing
-            c.MantleMinFrames = 26;                  // 0.43 s: long enough to read as a haul
-            c.BodyHeight  = Fix.FromMilli(1800);
-            c.CrouchHeight = Fix.FromMilli(1100);
+            c.MantleMinFrames = 40;                  // 0.67 s: the two phases no longer share, so each needs its own
+            c.ScriptRiseMargin = Fix.FromMilli(120);   // 12 cm: a step, not a storey
+            c.AllowDodge = true;     // docs/31: the one defensive button, and it works now
+            c.MantleRise = Fix.FromMilli(450);
+            c.AllowLadderJump = false;
 
             c.StepUpHeight  = Fix.FromMilli(300);
             c.ClamberHeight = Fix.FromMilli(550);   // one crate of this location's staircases

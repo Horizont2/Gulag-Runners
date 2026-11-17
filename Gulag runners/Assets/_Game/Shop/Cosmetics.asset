@@ -1,0 +1,327 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c05e71c3a4f9426ab2f1d7e85c3a9f10, type: 3}
+  m_Name: Cosmetics
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Meta.CosmeticCatalogue
+  items:
+  - id: runner.default
+    shown: RUNNER
+    slot: 0
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: default
+    part: 0
+  - id: runner.ash
+    shown: ASH
+    slot: 0
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: runner.copper
+    shown: COPPER
+    slot: 0
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: runner.nightjar
+    shown: NIGHTJAR
+    slot: 0
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: weapon.default
+    shown: AS FOUND
+    slot: 1
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 0
+  - id: weapon.bone
+    shown: BONE
+    slot: 1
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: weapon.riverstone
+    shown: RIVER STONE
+    slot: 1
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: weapon.goldleaf
+    shown: GOLD LEAF
+    slot: 1
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: knockout.default
+    shown: PLAIN
+    slot: 2
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 0
+  - id: knockout.dust
+    shown: DUST
+    slot: 2
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: knockout.embers
+    shown: EMBERS
+    slot: 2
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: knockout.flood
+    shown: THE FLOOD
+    slot: 2
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: plate.default
+    shown: BARE PLATE
+    slot: 3
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 0
+  - id: plate.tally
+    shown: TALLY MARKS
+    slot: 3
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: plate.crown
+    shown: CROWN
+    slot: 3
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: plate.sector
+    shown: SECTOR SEVEN
+    slot: 3
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: lock.body.iron
+    shown: RUSTED IRON
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 0
+  - id: lock.body.stone
+    shown: TEMPLE STONE
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: lock.body.bone
+    shown: BONE
+    slot: 4
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: lock.body.brass
+    shown: BRASS
+    slot: 4
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: lock.rim.none
+    shown: NO RIM
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 1
+  - id: lock.rim.rope
+    shown: ROPE BINDING
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 1
+  - id: lock.rim.band
+    shown: IRON BAND
+    slot: 4
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 1
+  - id: lock.rim.carved
+    shown: CARVED RIM
+    slot: 4
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 1
+  - id: lock.keys.worn
+    shown: WORN KEYS
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 2
+  - id: lock.keys.stone
+    shown: STONE KEYS
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 2
+  - id: lock.keys.bone
+    shown: BONE KEYS
+    slot: 4
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 2
+  - id: lock.keys.gold
+    shown: GOLD KEYS
+    slot: 4
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 2
+  - id: lock.bolts.plain
+    shown: PLAIN BOLTS
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 3
+  - id: lock.bolts.square
+    shown: SQUARE HEADS
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 3
+  - id: lock.bolts.star
+    shown: STAR HEADS
+    slot: 4
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 3
+  - id: lock.bolts.skull
+    shown: SKULL HEADS
+    slot: 4
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 3
+  - id: lock.glow.none
+    shown: NO GLOW
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 4
+  - id: lock.glow.ember
+    shown: EMBER
+    slot: 4
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 4
+  - id: lock.glow.cold
+    shown: COLD
+    slot: 4
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 4
+  - id: lock.glow.violet
+    shown: VIOLET
+    slot: 4
+    tier: 2
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 4
+  - id: pose.default
+    shown: AT EASE
+    slot: 5
+    tier: 0
+    price: 0
+    isDefault: 1
+    applies: 
+    part: 0
+  - id: pose.guard
+    shown: ON GUARD
+    slot: 5
+    tier: 0
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0
+  - id: pose.sit
+    shown: SITTING
+    slot: 5
+    tier: 1
+    price: 0
+    isDefault: 0
+    applies: 
+    part: 0

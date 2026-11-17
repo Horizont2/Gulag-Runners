@@ -1,0 +1,471 @@
+"""Is the arena lit so the fight reads, or so the screenshot does?
+
+docs/02 builds the picture out of a foreground the fight happens on and a background that
+is only there to be looked at, and nothing separates those two for the eye on its own: at
+the same contrast and the same colour, a handrail nine metres back reads as something a
+fighter could stand on. Aerial perspective is how side-on games have solved that since
+parallax scrolling, and docs/08 states the rule in one line -- fog only behind the
+structure, never in front of it.
+
+Which is a rule about a NUMBER, and the number is easy to get wrong in a way no
+screenshot shows you quickly: fog is distance from the CAMERA, the fight plane is wherever
+the fighters happen to stand, and the two are set in different inspectors. Set the fog
+start a metre short and the haze is on the fighters' faces; set it long and the backdrop
+is as crisp as the fight.
+
+So this measures, per arena: where the camera is, where the fight is, where the fog
+begins and ends, and what is behind it.
+
+    python3 light_check.py
+"""
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import arena_demo_geometry as geometry           # noqa: E402
+from sim_motor_mirror import F                   # noqa: E402
+
+SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
+SETTINGS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Settings")
+
+# How far behind the fighters the haze must begin. Less and it is on them; a fighter is
+# 0.6 m thick and leans, so a metre of clearance is the floor and three is comfortable.
+CLEAR_BEHIND = 1.0
+
+# Fog that ends before this much is in front of the fight is just a grey screen.
+MIN_DEPTH = 6.0
+
+
+def field(body, name, cast=float, default=None):
+    m = re.search(r"^\s*%s: (.+?)\s*$" % re.escape(name), body, re.M)
+    if not m:
+        return default
+    try:
+        return cast(m.group(1))
+    except ValueError:
+        return default
+
+
+FOG_SCRIPT = "7a8a4f589d342f24fbade49a21a154f2"      # BK PureVolumetricFog
+
+# How far the cloud may rise ABOVE the lowest walkable surface before the fight is
+# happening inside it rather than above it.
+#
+# Not a clearance below the floor, which is what this asked for first and which was
+# wrong: cloud lapping at the arena's underside is the whole point of standing on
+# nothing, and the layer being level with the floor slab reads as exactly that. What
+# matters is the fighter, who is 0.91 m tall and stands ON the surface -- mist round the
+# ankles is weather, mist over the chest is a fight nobody can see.
+CLOUD_OVER_FLOOR = 0.3
+
+
+def volumetric(name, text, scene, problems, notes):
+    """The ground-fog layer, and whether the fight happens inside it.
+
+    This fog takes its height from a Terrain, which makes it a thing with a POSITION --
+    unlike RenderSettings fog, which is a distance from the camera. Put the terrain a few
+    metres too high and the arena fills with cloud; put it too low and there is no
+    mountain to be high up on. Neither is visible in the inspector, because the layer is
+    the terrain's Y plus a depth set on a different object.
+    """
+    fogs = [m for m in re.finditer(
+        r"--- !u!114 &(-?\d+)\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)", text, re.S)
+        if FOG_SCRIPT in m.group(2)]
+    if not fogs:
+        return
+
+    # Each terrain's own Y, from the transform of the object the Terrain sits on.
+    terrains = {}
+    for m in re.finditer(r"--- !u!218 &(-?\d+)\nTerrain:\n(.*?)(?=\n--- !u!|\Z)", text, re.S):
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", m.group(2))
+        if not go:
+            continue
+        tr = re.search(r"--- !u!4 &-?\d+\nTransform:\n(?:.*?\n)*?"
+                       r"  m_GameObject: \{fileID: %s\}\n(?:.*?\n)*?"
+                       r"  m_LocalPosition: \{x: [-\d.eE+]+, y: ([-\d.eE+]+)" % go.group(1),
+                       text)
+        drawn = re.search(r"m_DrawHeightmap: (\d)", m.group(2))
+        terrains[int(m.group(1))] = (float(tr.group(1)) if tr else 0.0,
+                                     drawn.group(1) == "1" if drawn else True)
+
+    floors = [F(b[3]) for b in geometry.bake(scene)["solid"]
+              if F(b[2]) - F(b[0]) >= 2.0]
+    lowest = min(floors) if floors else None
+
+    for m in fogs:
+        body = m.group(2)
+        height = float((re.search(r"  groundFogHeight: ([-\d.eE+]+)", body)
+                        or re.match(r"(0)", "0")).group(1))
+        auto = re.search(r"  findActiveTerrainsAutomatically: (\d)", body)
+        listed = [int(x) for x in re.findall(r"  - \{fileID: (-?\d+)\}",
+                                             (re.search(r"  terrains:\n((?:  - \{fileID: -?\d+\}\n)*)",
+                                                        body) or re.match(r"()", "")).group(1) or "")]
+        listed = [t for t in listed if t]
+
+        if not listed and (not auto or auto.group(1) == "0"):
+            problems.append(
+                f"{name}: a volumetric fog with no terrain assigned and automatic "
+                f"discovery off. This fog takes its height from a Terrain, so with "
+                f"neither it draws nothing at all.")
+            continue
+        use = listed or list(terrains)
+        if not use:
+            problems.append(
+                f"{name}: a volumetric fog and no Terrain in the scene for it to stand "
+                f"on, so nothing is drawn.")
+            continue
+
+        for t in use:
+            if t not in terrains:
+                problems.append(f"{name}: its volumetric fog points at {t}, which is not "
+                                f"a Terrain in this scene")
+                continue
+            base, drawn = terrains[t]
+            top = base + height
+            notes.append(f"  volumetric fog {base:+.2f} to {top:+.2f} m"
+                         + (f", {lowest - top:+.2f} m under the lowest floor "
+                            f"at y {lowest:+.2f}" if lowest is not None else "")
+                         + (" (terrain drawn)" if drawn else " (terrain not drawn)"))
+            if lowest is not None and top > lowest + CLOUD_OVER_FLOOR:
+                problems.append(
+                    f"{name}: the fog layer reaches y {top:+.2f}, which is "
+                    f"{top - lowest:.2f} m over the lowest floor at y {lowest:+.2f}. A "
+                    f"fighter is 0.91 m tall, so that is cloud up to their "
+                    f"{'chest' if top - lowest > 0.5 else 'knees'} and a fight nobody "
+                    f"can see. Lower the terrain, or take the depth off "
+                    f"Ground Fog Height.")
+
+
+def budget():
+    """(per-object limit, rendering mode) from every render pipeline asset in Settings.
+
+    URP does not light an object with every light that reaches it. It picks the nearest
+    `Additional Lights > Per Object Limit` and drops the rest, so a lamp can be lit, in
+    range, and simply not there on one wall -- with no error anywhere, which is the exact
+    shape of fault the rest of this folder exists to catch.
+    """
+    out = {}
+    if not os.path.isdir(SETTINGS):
+        return out
+    for f in sorted(os.listdir(SETTINGS)):
+        if not f.endswith(".asset"):
+            continue
+        t = open(os.path.join(SETTINGS, f), encoding="utf-8", errors="ignore").read()
+        lim = re.search(r"\n  m_AdditionalLightsPerObjectLimit: (\d+)", t)
+        mode = re.search(r"\n  m_AdditionalLightsRenderingMode: (\d+)", t)
+        if lim:
+            out[f[:-6]] = (int(lim.group(1)), int(mode.group(1)) if mode else None)
+    return out
+
+
+def crowding(name, text, scene, limit, problems, notes):
+    """How many lamps reach one point, against how many URP will actually use.
+
+    A point light here is an additional light, and the per-object limit is a hard count
+    of them. Six lamps lighting one corridor is not six lamps: it is four lamps and two
+    that come and go as the renderer re-sorts them, which reads as flicker nobody wrote.
+
+    The lights it can PLACE are the ones whose whole transform chain is written in the
+    scene. A torch hung on a wall INSIDE a prefab instance is not: its parent is a
+    stripped transform, whose own position lives in the prefab, and the geometry module
+    says so by standing the object at the instance root instead. Which is a plausible
+    place, and wrong -- all eight Nordic torches resolve to the same point, and taking
+    that at face value says eight lamps light one spot and the arena is over budget.
+
+    That mattered on the first run of this check: it duly reported Arena_Forest over the
+    limit, from nine lights it had piled up at the origin. So the chain is walked for a
+    stripped link and those lights are counted as unplaceable rather than measured.
+    """
+    stripped = {int(m) for m in re.findall(r"--- !u!4 &(-?\d+) stripped", text)}
+
+    def placeable(tr):
+        cur, seen = tr, 0
+        while cur in scene.transforms and seen < 64:
+            if cur in stripped:
+                return False
+            cur = scene.transforms[cur]["parent"]
+            seen += 1
+        return cur not in stripped
+
+    placed, lost = [], 0
+    for m in re.finditer(r"--- !u!108 &(-?\d+)\nLight:\n(.*?)(?=\n--- !u!|\Z)", text, re.S):
+        body = m.group(2)
+        kind = field(body, "m_Type", int, 1)
+        if kind == 1:                           # Directional: it reaches everything
+            continue
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        tr = scene.tr_of_go.get(int(go.group(1))) if go else None
+        if tr is None or not placeable(tr):
+            lost += 1
+            continue
+        placed.append((scene.basis(tr)[0], field(body, "m_Range", float, 10.0)))
+
+    if not placed and not lost:
+        return
+    notes.append(f"  {len(placed) + lost} point/spot light(s), {lost} of them hung inside "
+                 f"a prefab and not placeable from the scene; the limit is {limit} per object")
+    if not placed:
+        return
+
+    # Where the most of them land on one spot. A quarter-metre grid over their own
+    # spread: finer buys nothing, because what is being counted is spheres metres wide.
+    import itertools
+    lo = [min(p[i] - r for p, r in placed) for i in range(3)]
+    hi = [max(p[i] + r for p, r in placed) for i in range(3)]
+    step = 0.25
+    axes = [[lo[i] + k * step for k in range(int((hi[i] - lo[i]) / step) + 1)]
+            for i in range(3)]
+    worst, where = 0, None
+    for q in itertools.product(*axes):
+        n = 0
+        for p, r in placed:
+            if (q[0]-p[0])**2 + (q[1]-p[1])**2 + (q[2]-p[2])**2 <= r * r:
+                n += 1
+        if n > worst:
+            worst, where = n, q
+    notes.append(f"  most lamps reaching one point: {worst}")
+    if worst > limit:
+        problems.append(
+            f"{name}: {worst} lights reach ({where[0]:+.1f}, {where[1]:+.1f}, "
+            f"{where[2]:+.1f}) and URP uses {limit} per object, so {worst - limit} of "
+            f"them is dropped there -- and which one is dropped changes as the renderer "
+            f"re-sorts, which is a lamp going on and off with nothing driving it. Raise "
+            f"Additional Lights > Per Object Limit (8 is URP's maximum) or shorten the "
+            f"ranges until no more than {limit} overlap.")
+
+
+SIDE_VIEW = "b921a9be9303a1887f282de341a5ae31"      # SideViewCamera
+
+
+def under_the_feet(text):
+    """How much of the frame is below a standing fighter's feet, in metres.
+
+    Taken off the camera rather than guessed: the view is the fighter's body height over
+    bodyScreenFraction, and the camera aims aimHeightBodies of a body ABOVE his feet, so
+    what is under them is half the view minus that aim. At the arena's own numbers --
+    0.91 m of fighter, 0.22 of the screen, 0.6 of a body -- it is 1.52 m.
+    """
+    frac, aim = None, 0.6
+    for m in re.finditer(r"--- !u!114 &-?\d+\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)",
+                         text, re.S):
+        if SIDE_VIEW not in m.group(1):
+            continue
+        f = re.search(r"^  bodyScreenFraction: ([\d.]+)$", m.group(1), re.M)
+        a = re.search(r"^  aimHeightBodies: ([\d.]+)$", m.group(1), re.M)
+        if f:
+            frac = float(f.group(1))
+        if a:
+            aim = float(a.group(1))
+        break
+    if not frac:
+        return 2.0
+    body = 0.91                                    # PlayerTuning.bodyHeight
+    return body / frac / 2.0 - body * aim
+
+
+def _cloud(text, scene):
+    """(bottom, top) of the volumetric cloud layer in world metres, or None.
+
+    It is drawn by PureVolumetricFog out of a terrain's height rather than by a
+    renderer, so nothing that walks the renderers finds it -- and it is the whole of
+    the Nordic fortress's answer to what is under its lowest floor.
+    """
+    best = None
+    for m in re.finditer(r"--- !u!114 &-?\d+\nMonoBehaviour:\n(.*?)(?=\n--- !u!|\Z)",
+                         text, re.S):
+        if FOG_SCRIPT not in m.group(1):
+            continue
+        height = re.search(r"  groundFogHeight: ([-\d.eE+]+)", m.group(1))
+        if not height:
+            continue
+        for tm in re.finditer(r"--- !u!218 &(-?\d+)\nTerrain:\n(.*?)(?=\n--- !u!|\Z)",
+                              text, re.S):
+            go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", tm.group(2))
+            tr = scene.tr_of_go.get(int(go.group(1))) if go else None
+            if tr is None:
+                continue
+            base = scene.basis(tr)[0][1]
+            if best is None or base < best[0]:
+                best = (base, base + float(height.group(1)))
+    return best
+
+
+def void_below(name, text, scene, problems, notes):
+    """Standing on the bottom floor, is there anything under it, or is that the sky?
+
+    An arena is a cross-section of somewhere bigger, and the bottom edge of the cut is
+    the one the camera actually shows: the frame is about five metres tall and the
+    fighter stands in the middle of it, so two and a half metres below his feet are on
+    screen the whole match. Arena_Mine drew nothing at all under y +0.88 and the bottom
+    of every shot on the ground floor was skybox -- which reads as the level having run
+    out rather than as a mine.
+
+    The Nordic fortress answers it with a cloud layer, because it is on a mountain. The
+    mine answers it with more mine. What matters here is only that something answers it.
+    """
+    want = under_the_feet(text)
+    lowest_floor = None
+    for b in geometry.bake(scene)["solid"]:
+        if F(b[2]) - F(b[0]) < 2.0:
+            continue
+        top = F(b[3])
+        if lowest_floor is None or top < lowest_floor:
+            lowest_floor = top
+    if lowest_floor is None:
+        return
+
+    drawn = None
+    for go, d in scene.gos.items():
+        tr = scene.tr_of_go.get(go)
+        if tr is None or not scene.renders(go):
+            continue
+        if scene.ancestor_has(go, geometry.PLAYER_GUID):
+            continue
+        origin, basis = scene.basis(tr)
+        if abs(origin[0]) < 0.01 and abs(origin[1]) < 0.01 and abs(origin[2]) < 0.01:
+            continue                               # a part parked at the origin
+        centre, half = scene.local_box(go)
+        low = (origin[1] + geometry._apply(basis, centre)[1]
+               - sum(abs(basis[1][k]) * half[k] for k in range(3)))
+        if drawn is None or low < drawn:
+            drawn = low
+
+    # The art dressed in as PREFAB INSTANCES, which the loop above cannot see: the
+    # scene lists an instance and no renderer, so walking renderers finds the arena
+    # somebody built by hand and none of what they filled it with. The mine's whole
+    # underground is instances, and asking only the renderers called it a void.
+    for pos, who in scene.prefab_art():
+        if who.startswith("GroundItem"):
+            continue                           # the loot pool, parked off-screen when empty
+        if drawn is None or pos[1] < drawn:
+            drawn = pos[1]
+
+    # A cloud layer counts. It is drawn by PureVolumetricFog off a terrain's height
+    # rather than by a renderer, so nothing above finds it, and it is the whole of the
+    # Nordic fortress's answer to this question.
+    # The layer fills the view from its top down to its base, so what counts is the
+    # BASE -- but only when its top actually reaches the floor. One hanging in space
+    # below a gap leaves the gap.
+    cloud = _cloud(text, scene)
+    if cloud is not None and cloud[1] >= lowest_floor - want \
+            and (drawn is None or cloud[0] < drawn):
+        drawn = cloud[0]
+
+    room = lowest_floor - drawn if drawn is not None else 0.0
+    notes.append(f"  lowest floor y {lowest_floor:+.2f}, lowest thing drawn y "
+                 f"{drawn:+.2f} -- {room:.2f} m of something under the bottom "
+                 f"storey, against {want:.2f} m of frame below his feet")
+    if room < want:
+        problems.append(
+            f"{name}: the lowest floor is at y {lowest_floor:+.2f} and nothing is drawn "
+            f"below y {drawn:+.2f}, which is {room:.2f} m. The camera frames five metres "
+            f"of height around the fighter, so standing on that floor he is looking at "
+            f"{want - room:.2f} m of skybox under his own feet -- the level "
+            f"running out rather than carrying on. Put something there: the fortress "
+            f"uses a cloud layer, the mine uses more shaft.")
+
+
+def main(argv):
+    wanted = argv or geometry.arena_scenes()
+    problems, notes = [], []
+
+    limits = budget()
+    for who, (lim, mode) in sorted(limits.items()):
+        notes.append(f"{who}: {lim} additional light(s) per object, rendered "
+                     f"{['off', 'per vertex', 'per pixel'][mode] if mode in (0, 1, 2) else mode}")
+    limit = min((v[0] for v in limits.values()), default=8)
+
+    camera_guid = None
+    for base, dirs, files in os.walk(os.path.join(SCENES, "..", "_Game")):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        if "SideViewCamera.cs.meta" in files:
+            camera_guid = re.search(
+                r"guid: ([0-9a-f]{32})",
+                open(os.path.join(base, "SideViewCamera.cs.meta"),
+                     encoding="utf-8").read()).group(1)
+
+    for name in wanted:
+        path = os.path.join(SCENES, name)
+        text = open(path, encoding="utf-8", errors="ignore").read()
+        scene = geometry.Scene(path)
+
+        render = re.search(r"--- !u!104 &\d+\nRenderSettings:\n(.*?)(?=\n--- !u!|\Z)",
+                           text, re.S)
+        if not render:
+            problems.append(f"{name}: no RenderSettings at all")
+            continue
+        render = render.group(1)
+
+        on = field(render, "m_Fog", int, 0)
+        mode = field(render, "m_FogMode", int, 3)
+        start = field(render, "m_LinearFogStart", float, 0.0)
+        end = field(render, "m_LinearFogEnd", float, 0.0)
+        sun = field(render, "m_Sun", str, "{fileID: 0}")
+
+        # Where the camera stands and where the fight is. The fighters' own z is the
+        # fight plane -- that is where PlayerController takes it from.
+        spawns = geometry.spawns(scene)
+        plane = spawns[0][3] if spawns else None
+        camera_z = None
+        for go in sorted(scene.gos):
+            if camera_guid and scene.script(go, camera_guid) is not None:
+                camera_z = scene.basis(scene.tr_of_go[go])[0][2]
+                break
+
+        if camera_z is None or plane is None:
+            notes.append(f"{name}: no camera or no fighters yet, so there is no fight "
+                         f"to measure the fog against")
+            continue
+
+        to_fight = abs(plane - camera_z)
+        notes.append(f"{name}: camera at z {camera_z:.2f}, fight at z {plane:.2f} "
+                     f"-- {to_fight:.2f} m apart")
+
+        if not on:
+            problems.append(
+                f"{name}: fog is off, so the background is as sharp as the fight and a "
+                f"rail nine metres back reads as somewhere to stand")
+            continue
+
+        if mode != 1:
+            problems.append(
+                f"{name}: fog mode is {mode}, not 1 (Linear). Only Linear has a start "
+                f"and an end you can put behind the fighters on purpose")
+
+        notes.append(f"  fog {start:.1f}..{end:.1f} m, which is "
+                     f"{start - to_fight:+.2f} m from the fight")
+
+        if start < to_fight + CLEAR_BEHIND:
+            problems.append(
+                f"{name}: fog starts {start:.1f} m from the camera and the fighters are "
+                f"{to_fight:.1f} m away, so the haze is on the fight itself. It has to "
+                f"begin at least {CLEAR_BEHIND:.0f} m behind them "
+                f"({to_fight + CLEAR_BEHIND:.1f} m or more)")
+
+        if end - start < MIN_DEPTH:
+            problems.append(
+                f"{name}: fog goes from {start:.1f} to {end:.1f} m, which is "
+                f"{end - start:.1f} m of ramp. That is a grey wall rather than depth")
+
+        if "fileID: 0}" in sun:
+            problems.append(
+                f"{name}: RenderSettings has no Sun wired, so ambient and the skybox do "
+                f"not know which light is the key one")
+
+        volumetric(name, text, scene, problems, notes)
+        void_below(name, text, scene, problems, notes)
+        crowding(name, text, scene, limit, problems, notes)
+
+    for n in notes:
+        print("  note: " + n if not n.startswith("  ") else "  " + n)
+    for p in problems:
+        print("  " + p)
+    print(f"light_check: {len(problems)} problem(s)")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

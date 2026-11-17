@@ -28,6 +28,21 @@ namespace GulagRunners.Game
                  "otherwise restart the same system every three frames and never be seen.")]
         [Range(0f, 1f)] public float minInterval;
 
+        [Tooltip("What this action SOUNDS like, posted to the AudioManager when it fires.\n\n" +
+                 "In the same row as the particles on purpose: the dust and the noise are one " +
+                 "event, and the surest way for them to drift apart is for them to be " +
+                 "authored in two places. None is silent.\n\n" +
+                 "Left at None for the four the AudioManager posts for itself — footsteps, " +
+                 "landings, picking up and dropping — because it subscribes to those events " +
+                 "directly and a second post would be the same sound twice.")]
+        public SoundId sound = SoundId.None;
+
+        [Tooltip("How far this carries, for the hearing model and for the other player's " +
+                 "noise indicator. docs/02 makes that indicator a default rather than an " +
+                 "option: noise is how you find the other fighter, so this is a gameplay " +
+                 "number and not a mixing one.")]
+        public NoiseLevel level = NoiseLevel.Medium;
+
         float _last = -999f;
 
         /// <summary>Fires it, unless it fired too recently. Safe on an empty slot.</summary>
@@ -88,6 +103,10 @@ namespace GulagRunners.Game
         [Header("Movement")]
         [Tooltip("A quiet step: crouched, or barely moving. docs/01 makes this the difference " +
                  "between being found and not.")]
+        // No sound on these four: AudioManager subscribes to Noise, Landed, PickedUp and
+        // Dropped itself and posts them, so a second post here would be the same footstep
+        // twice. Everything BELOW them is posted from here, because nothing else posts it --
+        // which is why the fight was silent while walking around was not.
         public ActionEffect stepQuiet = new ActionEffect { minInterval = 0.12f };
         public ActionEffect stepLoud = new ActionEffect { minInterval = 0.12f };
 
@@ -96,14 +115,17 @@ namespace GulagRunners.Game
         public ActionEffect landSoft = new ActionEffect();
         public ActionEffect landHard = new ActionEffect();
 
-        public ActionEffect jump = new ActionEffect();
+        public ActionEffect jump = new ActionEffect
+            { sound = SoundId.Jump, level = NoiseLevel.Medium };
 
         [Tooltip("The dodge. Reads as the one movement that costs stamina.")]
-        public ActionEffect dodge = new ActionEffect();
+        public ActionEffect dodge = new ActionEffect
+            { sound = SoundId.Dodge, level = NoiseLevel.Medium };
 
         [Header("Fight")]
         [Tooltip("The swing leaving the hand, on the frame the hitbox goes live.")]
-        public ActionEffect swing = new ActionEffect();
+        public ActionEffect swing = new ActionEffect
+            { sound = SoundId.AttackSwingLight, level = NoiseLevel.Medium };
 
         [Tooltip("Optional. A trail on the weapon, emitting for the length of a swing and " +
                  "nothing else.\n\n" +
@@ -114,41 +136,64 @@ namespace GulagRunners.Game
         public TrailRenderer swingTrail;
 
         [Tooltip("A hit that got through: this fighter is hurt.")]
-        public ActionEffect hurt = new ActionEffect();
-
-        [Tooltip("A hit the guard ate. Must not look like Hurt — docs/02 wants the difference " +
-                 "readable across the arena, because it is the reason to hold a guard at all.")]
-        public ActionEffect blocked = new ActionEffect();
+        public ActionEffect hurt = new ActionEffect
+            { sound = SoundId.AttackHit, level = NoiseLevel.Loud };
 
         [Tooltip("A hit turned back on its owner. The loudest thing a defender can do, so the " +
                  "biggest effect in this list.")]
-        public ActionEffect parried = new ActionEffect();
+        public ActionEffect parried = new ActionEffect
+            { sound = SoundId.Parry, level = NoiseLevel.Loud };
 
         [Tooltip("The guard breaking under pressure.")]
-        public ActionEffect guardBroken = new ActionEffect();
+        public ActionEffect clashed = new ActionEffect
+            { sound = SoundId.Stagger, level = NoiseLevel.Loud };
 
-        public ActionEffect death = new ActionEffect();
+        public ActionEffect death = new ActionEffect
+            { sound = SoundId.Death, level = NoiseLevel.Loud };
 
         [Header("Loot")]
         [Tooltip("Held on for as long as a chest is being forced — this is the tell that gives " +
                  "the opener away.")]
-        public ActionEffect chestWorking = new ActionEffect();
+        public ActionEffect chestWorking = new ActionEffect
+            { sound = SoundId.ChestPryLoud, level = NoiseLevel.Loud };
 
-        public ActionEffect chestOpened = new ActionEffect();
+        public ActionEffect chestOpened = new ActionEffect
+            { sound = SoundId.ChestOpen, level = NoiseLevel.Loud };
         public ActionEffect pickUp = new ActionEffect();
         public ActionEffect drop = new ActionEffect();
 
         [Header("Climb")]
-        public ActionEffect ladderGrab = new ActionEffect();
-        public ActionEffect mantle = new ActionEffect();
+        public ActionEffect ladderGrab = new ActionEffect
+            { sound = SoundId.LadderGrab, level = NoiseLevel.Quiet };
+        public ActionEffect mantle = new ActionEffect
+            { sound = SoundId.LadderOut, level = NoiseLevel.Quiet };
+
+        [Header("Weight")]
+        [Tooltip("At or above this many frames in its attack, a weapon swings HEAVY and uses " +
+                 "the sound below instead of the one on the Swing row.\n\n" +
+                 "Off the item's own attack frames, which is the number the fight is already " +
+                 "balanced on: the dagger takes 9 and the warhammer 34, so one line splits " +
+                 "the table into the six you flick and the six you commit to. The table has " +
+                 "had a heavy row since it was written and nothing ever chose it, so every " +
+                 "weapon in the game whooshed like a dagger.")]
+        [Range(8, 40)] public int heavyFrames = 20;
+
+        public SoundId heavySwing = SoundId.AttackSwingHeavy;
+
+        [Header("Noise")]
+        [Tooltip("How often the chest-prying noise repeats while the work lasts, in seconds.\n\n" +
+                 "A held particle system lasts by itself; a sound does not, and somebody " +
+                 "forcing a chest for four seconds in silence is not the tell docs/02 wants " +
+                 "it to be. Slow enough to read as prying rather than as a rattle.")]
+        [Range(0.1f, 2f)] public float chestPryEvery = 0.45f;
 
         [Header("Debug")]
         public bool logEvents;
 
         MoveMode _mode = MoveMode.Grounded;
-        AttackPhase _attack = AttackPhase.None;
-        int _guardBreak;
+        bool _swinging;
         bool _subscribed;
+        float _pried = -999f;
 
         void Reset()
         {
@@ -164,7 +209,6 @@ namespace GulagRunners.Game
             player.Noise += OnNoise;
             player.Landed += OnLanded;
             player.Hurt += OnHurt;
-            player.Blocked += OnBlocked;
             player.Parried += OnParried;
             player.Died += OnDied;
             player.PickedUp += OnPickedUp;
@@ -179,7 +223,6 @@ namespace GulagRunners.Game
             player.Noise -= OnNoise;
             player.Landed -= OnLanded;
             player.Hurt -= OnHurt;
-            player.Blocked -= OnBlocked;
             player.Parried -= OnParried;
             player.Died -= OnDied;
             player.PickedUp -= OnPickedUp;
@@ -213,23 +256,47 @@ namespace GulagRunners.Game
                 _mode = s.Mode;
             }
 
-            // The frame the hitbox goes live, which is the frame the swing has to be seen.
-            if (s.Attack != _attack)
+            // There are no phases to watch for any more. A swing is the tip actually
+            // moving fast enough to hurt somebody, which is the same threshold the damage
+            // uses -- so the sound fires exactly when the blade became dangerous, rather
+            // than when a state machine said so.
+            bool swinging = s.SwingShare > 0;
+            if (swinging && !_swinging)
             {
-                if (s.Attack == AttackPhase.Active) Fire(swing, "swing");
-                _attack = s.Attack;
+                bool heavy = heavySwing != SoundId.None &&
+                             ItemTable.Get(s.Inventory.Weapon).AttackFrames >= heavyFrames;
+                Fire(swing, heavy ? "heavy swing" : "swing",
+                     heavy ? heavySwing : SoundId.None);
             }
+            _swinging = swinging;
 
-            // The trail runs for the whole swing, wind-up included: the arc is what makes the
-            // wind-up readable as a wind-up rather than as a pause.
+            // The trail runs for as long as the blade is live, which is now a real
+            // statement about the weapon rather than a window around an animation.
             if (swingTrail != null)
-                swingTrail.emitting = s.Attack != AttackPhase.None && s.HitStopTimer == 0;
+                swingTrail.emitting = swinging && s.HitStopTimer == 0;
 
-            if (s.GuardBreakTimer > 0 && _guardBreak == 0) Fire(guardBroken, "guard broken");
-            _guardBreak = s.GuardBreakTimer;
+            // A clash: two blades met. The old guard-break sound is the right one for it.
+            if (s.WasParried) Fire(clashed, "weapons clashed");
 
             // Held, not fired: the point of this one is that it lasts as long as the work does.
-            chestWorking.Hold(s.OpeningChest >= 0);
+            bool prying = s.OpeningChest >= 0;
+            chestWorking.Hold(prying);
+
+            // And the noise has to last as long as the work too, which a held particle system
+            // does by itself and a one-shot sound does not. docs/02 calls this the tell that
+            // gives the opener away: somebody forcing a chest for four seconds in silence is
+            // not a tell. So it is posted on a beat while the work lasts, slow enough to read
+            // as prying rather than as a rattle.
+            if (prying && Time.time - _pried >= Mathf.Max(0.1f, chestPryEvery))
+            {
+                _pried = Time.time;
+                Noise(chestWorking);          // the sound only: Play would restart the held system
+                if (logEvents) Debug.Log($"{name}: prying a chest", this);
+            }
+            else if (!prying)
+            {
+                _pried = -999f;
+            }
 
             if (s.OpenedChest >= 0) Fire(chestOpened, "chest opened");
         }
@@ -249,18 +316,52 @@ namespace GulagRunners.Game
         }
 
         void OnHurt(int damage) => Fire(hurt, $"hurt {damage}");
-        void OnBlocked(int through) => Fire(blocked, $"blocked, {through} through");
         void OnParried() => Fire(parried, "parried");
         void OnDied() { chestWorking.Hold(false); Fire(death, "death"); }
         void OnPickedUp(ItemId item) => Fire(pickUp, $"picked up {item}");
         void OnDropped(ItemId item) => Fire(drop, $"dropped {item}");
 
-        void Fire(ActionEffect effect, string what)
+        /// <summary>
+        /// One event: its dust, and its noise.
+        ///
+        /// The noise half was missing, and what it cost was not volume. docs/02 makes the
+        /// other fighter's noise the way you find them -- there is an on-screen indicator for
+        /// it, by design rather than as an accessibility option, because the game is played
+        /// on muted phones. AudioManager posts footsteps, landings and loot for itself; every
+        /// event in THIS component had no sound at all, so a fight could be had in silence
+        /// while somebody walking across the room was announced.
+        ///
+        /// Posted through the AudioManager rather than played here, so the hearing model gets
+        /// its say: how far it carries, whether it is through a floor, which way to pan it,
+        /// and whose indicator lights up. A fighter's own position is both where the sound is
+        /// and where it happened, which is what Post wants.
+        /// </summary>
+        void Fire(ActionEffect effect, string what, SoundId instead = SoundId.None)
         {
             effect.Play();
+            Noise(effect, instead);
+
             if (logEvents)
                 Debug.Log($"{name}: {what}" +
                           (effect.particles == null ? "  (no effect wired)" : ""), this);
+        }
+
+        /// <summary>
+        /// The noise half of an event, with no particles touched.
+        ///
+        /// `instead` is for the one event whose sound is not a property of the event but of
+        /// what is being held: a swing. Passed rather than written into the row, because
+        /// the row is a serialized field and borrowing it for a frame would dirty the
+        /// component and show the wrong value to anyone looking at it.
+        /// </summary>
+        void Noise(ActionEffect effect, SoundId instead = SoundId.None)
+        {
+            SoundId sound = instead != SoundId.None ? instead : effect.sound;
+            if (sound == SoundId.None) return;
+            if (AudioManager.Instance == null || player == null) return;
+
+            Vector2 at = player.FeetPosition;
+            AudioManager.Instance.Post(sound, at, effect.level, at);
         }
     }
 }

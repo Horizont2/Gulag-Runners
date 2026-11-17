@@ -34,6 +34,7 @@ namespace GulagRunners.Game
     /// match follows and the only arrangement where a designer can see the whole wardrobe
     /// in the inspector.
     /// </summary>
+    [ExecuteAlways]
     [DisallowMultipleComponent]
     public sealed class MenuFighter : MonoBehaviour
     {
@@ -115,7 +116,11 @@ namespace GulagRunners.Game
 
             // The menu is not the simulation, so root motion has nothing to desync — but a
             // posed clip with root motion on walks the model out of its own cell.
-            if (animator != null) animator.applyRootMotion = false;
+            //
+            // Only while playing: this runs in edit mode too, and a component that writes
+            // to the scene the moment it loads leaves the scene permanently dirty, which
+            // teaches everybody to ignore the asterisk.
+            if (animator != null && Application.isPlaying) animator.applyRootMotion = false;
         }
 
         void Start() => Apply();
@@ -123,7 +128,12 @@ namespace GulagRunners.Game
         void Update()
         {
             Pose();
-            Sway();
+
+            // Posing happens in edit mode as well, because a fighter who only stops
+            // T-posing once you press play is a fighter nobody can dress. Swaying does
+            // not: it writes a rotation every frame, and in edit mode that is an
+            // unsaved change every frame.
+            if (Application.isPlaying) Sway();
         }
 
         /// <summary>
@@ -213,6 +223,7 @@ namespace GulagRunners.Game
                 // played once would carry on from there the moment anything ticks.
                 animator.speed = 0f;
                 animator.Play(hash, 0, poseFrame);
+                Settle();
                 _posed = hash;
                 return;
             }
@@ -222,6 +233,19 @@ namespace GulagRunners.Game
 
             _posed = hash;
             animator.Play(hash, 0, 0f);
+            Settle();
+        }
+
+        /// <summary>
+        /// Makes the pose actually appear outside play mode.
+        ///
+        /// Animator.Play only queues a state; the animator evaluates it on its own update,
+        /// and in edit mode there is no update to wait for. Without this the model stands
+        /// in its bind pose in the scene view -- the T-pose -- however the field is set.
+        /// </summary>
+        void Settle()
+        {
+            if (!Application.isPlaying && animator != null) animator.Update(0f);
         }
 
         void Sway()

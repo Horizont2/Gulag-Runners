@@ -152,6 +152,91 @@ namespace GulagRunners.Game
             transform.localScale = Vector3.one * localScale;
         }
 
+        // ---------------------------------------------------------------- the blade
+
+        Transform _measured;
+        ModelShape.Grip _shape;
+        bool _haveShape;
+
+        GameObject _held;
+        Vector3 _heldBlade;
+        Vector3 _heldFlat;
+
+        /// <summary>
+        /// Which way the weapon in this hand points and which way it is flat, in world
+        /// space. False when the model will not say — see <see cref="ModelShape"/>, which
+        /// owns the measurement and the argument for it.
+        ///
+        /// Used by <see cref="PlayerArm"/> to turn the hand so the drawn weapon lies along
+        /// the one the simulation is swinging, and so its flat faces the player rather than
+        /// whichever way the animation clip happened to leave the wrist. Without the first
+        /// the hand was forced to a world LookRotation, which has no relation to how a hand
+        /// grips anything; without the second a sword could be drawn edge-on.
+        ///
+        /// <paramref name="flat"/> comes back zero for a round weapon — a mace, a club —
+        /// which is not a failure: their roll is free, and leaving it to the clip looks
+        /// better than deciding it.
+        /// </summary>
+        public bool TryGrip(out Vector3 blade, out Vector3 flat)
+        {
+            blade = transform.forward;
+            flat = Vector3.zero;
+
+            Transform model = ActiveModel();
+            if (model == null) return false;
+
+            if (model != _measured)
+            {
+                _measured = model;
+                _haveShape = ModelShape.Measure(model.gameObject, out _shape);
+            }
+
+            // Authored first, measured second. The authored pair arrives through Hold,
+            // from the ItemModel entry the loadout is showing, so a model the measurement
+            // cannot read is fixed in the inspector rather than in here.
+            bool mine = _held != null && _held == model.gameObject;
+            Vector3 bladeLocal = mine && _heldBlade.sqrMagnitude > 1e-6f
+                ? _heldBlade.normalized
+                : _haveShape ? _shape.Blade : Vector3.zero;
+            if (bladeLocal.sqrMagnitude <= 1e-8f) return false;
+
+            Vector3 flatLocal = mine && _heldFlat.sqrMagnitude > 1e-6f
+                ? _heldFlat.normalized
+                : _haveShape ? _shape.Flat : Vector3.zero;
+
+            blade = model.TransformDirection(bladeLocal);
+            if (blade.sqrMagnitude <= 1e-8f) return false;
+
+            if (flatLocal.sqrMagnitude > 1e-8f) flat = model.TransformDirection(flatLocal);
+            return true;
+        }
+
+        /// <summary>
+        /// What is being carried, and the grip it was authored with.
+        ///
+        /// Called by <see cref="PlayerLoadoutView"/> when the weapon changes, because that
+        /// is what knows which <see cref="ItemModel"/> entry a model came from. Both axes
+        /// may be zero, which asks for the measurement — and is how every weapon in the
+        /// project is set up, the measurement being right for all of them.
+        /// </summary>
+        public void Hold(GameObject model, Vector3 bladeAxis, Vector3 flatAxis)
+        {
+            _held = model;
+            _heldBlade = bladeAxis;
+            _heldFlat = flatAxis;
+        }
+
+        /// <summary>The weapon currently switched on under this socket.</summary>
+        Transform ActiveModel()
+        {
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform child = transform.GetChild(i);
+                if (child.gameObject.activeInHierarchy) return child;
+            }
+            return null;
+        }
+
         void OnDrawGizmos()
         {
             if (!drawGizmo) return;
@@ -164,6 +249,21 @@ namespace GulagRunners.Game
             Gizmos.DrawLine(Vector3.zero, Vector3.up * gizmoSize * 2f);     // the grip's "up"
             Gizmos.DrawLine(Vector3.zero, Vector3.forward * gizmoSize);
             Gizmos.DrawWireCube(Vector3.zero, Vector3.one * gizmoSize * 0.35f);
+            Gizmos.matrix = Matrix4x4.identity;
+
+            // And what the grip was actually read as, which is the thing that goes wrong
+            // quietly. Yellow along the weapon, blue out of its flat; no yellow at all means
+            // the model would not say and the hand is left to the clip.
+            if (!TryGrip(out Vector3 blade, out Vector3 flat)) return;
+
+            Gizmos.color = new Color(1f, 0.95f, 0.4f, 0.9f);
+            Gizmos.DrawLine(transform.position,
+                            transform.position + blade.normalized * gizmoSize * 6f);
+            if (flat.sqrMagnitude <= 1e-8f) return;
+
+            Gizmos.color = new Color(0.4f, 0.7f, 1f, 0.9f);
+            Gizmos.DrawLine(transform.position,
+                            transform.position + flat.normalized * gizmoSize * 2f);
         }
     }
 }

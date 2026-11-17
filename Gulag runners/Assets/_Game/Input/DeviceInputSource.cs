@@ -32,9 +32,10 @@ namespace GulagRunners.Game
         [Tooltip("Mouse left button counts as attack. Turn this off for player 2.")]
         public bool useMouseForAttack = true;
 
-        public InputFlags Read()
+        public TickInput Read()
         {
             InputFlags flags = InputFlags.None;
+            int aimX = 0, aimY = 0;
 
             Keyboard k = Keyboard.current;
             if (k != null)
@@ -48,13 +49,14 @@ namespace GulagRunners.Game
                     if (k.spaceKey.isPressed) flags |= InputFlags.Jump;
                     if (k.leftShiftKey.isPressed) flags |= InputFlags.Dodge;
                     if (k.eKey.isPressed) flags |= InputFlags.Action;
-                    if (k.jKey.isPressed) flags |= InputFlags.Attack;
 
-                    // Aim: the keyboard's stand-in for the phone's attack flick. Held
-                    // rather than tapped, because a key cannot have a direction of travel
-                    // and this is the honest way to say the same thing on a desk.
-                    if (k.uKey.isPressed) flags |= InputFlags.AimLeft;
-                    if (k.iKey.isPressed) flags |= InputFlags.AimRight;
+                    // The attack stick, on a desk. Eight directions off IJKL, because a
+                    // key has no magnitude and the arm wants a direction: holding two
+                    // gives the diagonal, which is where most of a swing happens.
+                    if (k.jKey.isPressed) aimX -= 1000;
+                    if (k.lKey.isPressed) aimX += 1000;
+                    if (k.iKey.isPressed) aimY += 1000;
+                    if (k.kKey.isPressed) aimY -= 1000;
                 }
                 else
                 {
@@ -65,9 +67,10 @@ namespace GulagRunners.Game
                     if (k.rightCtrlKey.isPressed) flags |= InputFlags.Jump;
                     if (k.rightShiftKey.isPressed) flags |= InputFlags.Dodge;
                     if (k.numpad0Key.isPressed) flags |= InputFlags.Action;
-                    if (k.numpad1Key.isPressed) flags |= InputFlags.Attack;
-                    if (k.numpad4Key.isPressed) flags |= InputFlags.AimLeft;
-                    if (k.numpad6Key.isPressed) flags |= InputFlags.AimRight;
+                    if (k.numpad4Key.isPressed) aimX -= 1000;
+                    if (k.numpad6Key.isPressed) aimX += 1000;
+                    if (k.numpad8Key.isPressed) aimY += 1000;
+                    if (k.numpad2Key.isPressed) aimY -= 1000;
                 }
             }
 
@@ -86,19 +89,19 @@ namespace GulagRunners.Game
                 if (pad.buttonSouth.isPressed) flags |= InputFlags.Jump;
                 if (pad.rightShoulder.isPressed || pad.buttonEast.isPressed) flags |= InputFlags.Dodge;
                 if (pad.buttonNorth.isPressed) flags |= InputFlags.Action;
-                if (pad.buttonWest.isPressed) flags |= InputFlags.Attack;
 
-                // The RIGHT stick aims, which is the pad's version of the second thumb and
-                // reads the same way round as the phone's flick.
+                // The RIGHT stick IS the weapon now -- the pad's version of the second
+                // thumb, and analog all the way through rather than thresholded, because
+                // the arm follows it continuously.
                 Vector2 aim = pad.rightStick.ReadValue();
-                if (aim.x < -dead) flags |= InputFlags.AimLeft;
-                if (aim.x > dead) flags |= InputFlags.AimRight;
+                if (aim.sqrMagnitude > 0.0001f)
+                {
+                    aimX = Mathf.RoundToInt(Mathf.Clamp(aim.x, -1f, 1f) * 1000f);
+                    aimY = Mathf.RoundToInt(Mathf.Clamp(aim.y, -1f, 1f) * 1000f);
+                }
             }
 
-            if (useMouseForAttack && Mouse.current != null && Mouse.current.leftButton.isPressed)
-                flags |= InputFlags.Attack;
-
-            return flags;
+            return new TickInput(flags, aimX, aimY);
         }
     }
 }

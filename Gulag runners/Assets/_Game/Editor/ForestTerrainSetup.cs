@@ -38,7 +38,7 @@ namespace GulagRunners.GameEditor
         static readonly Vector3 Origin = new Vector3(-26f, 0f, -2f);
         static readonly Vector3 Size = new Vector3(52f, 20f, 48f);
 
-        [MenuItem("Tools/Gulag Runners/Create forest terrain")]
+        [MenuItem("Tools/Gulag Runners/Setup/Create forest terrain")]
         public static void Create()
         {
             if (!AssetDatabase.IsValidFolder(AssetFolder))
@@ -78,7 +78,9 @@ namespace GulagRunners.GameEditor
                 terrain.detailObjectDistance = 90f;
                 terrain.treeDistance = 180f;
                 terrain.treeBillboardDistance = 40f;
-                terrain.castShadows = false;
+                // castShadows is obsolete; shadowCastingMode replaces it.
+                terrain.shadowCastingMode =
+                    UnityEngine.Rendering.ShadowCastingMode.Off;
             }
 
             // The line that keeps this out of the simulation. Without it the TerrainCollider
