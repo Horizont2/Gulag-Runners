@@ -105,7 +105,7 @@ namespace GulagRunners.GameEditor
                 return;
 
             int uvs = EnableLightmapUVs(needUVs);
-            int statics = MarkStatic(scene);
+            int statics = MarkStatic(scene, out int freedUp);
             (int baked, int mixed) = SettleLights();
             int probes = BuildProbes(scene, volume, planeZ);
             Configure(scene);
@@ -114,12 +114,35 @@ namespace GulagRunners.GameEditor
 
             Debug.Log($"{scene.name} is ready to bake.\n"
                       + $"  {statics} renderer(s) now contribute to GI\n"
+                      + (freedUp > 0
+                          ? $"  {freedUp} with vertex-animating shaders taken OUT of "
+                            + "batching and the lightmap -- batching would move their "
+                            + "object space to the world and throw them across the arena\n"
+                          : "")
                       + $"  {baked} light(s) baked, {mixed} left mixed\n"
                       + $"  {probes} light probe(s) on a {ProbeSpacing} m grid\n"
                       + $"  {uvs} model(s) had lightmap UVs turned on\n\n"
                       + "Now: Window > Rendering > Lighting > Generate Lighting. Expect "
                       + "minutes, and expect the first look to be darker — that is the "
                       + "occlusion that was never there before.");
+        }
+
+
+        /// <summary>
+        /// Does any material on this renderer move its own vertices?
+        ///
+        /// Asked of the shader rather than of a list here, so a new animated shader only
+        /// has to tag its SubShader with "VertexAnimation" = "True" and every tool that
+        /// needs to leave it alone already does.
+        /// </summary>
+        static bool Animated(Renderer r)
+        {
+            foreach (Material m in r.sharedMaterials)
+            {
+                if (m == null || m.shader == null) continue;
+                if (m.GetTag("VertexAnimation", false, "") == "True") return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -130,9 +153,10 @@ namespace GulagRunners.GameEditor
         /// into the lightmap would leave its own shadow standing in the arena after it
         /// walked away.
         /// </summary>
-        static int MarkStatic(Scene scene)
+        static int MarkStatic(Scene scene, out int freedUp)
         {
             int touched = 0;
+            freedUp = 0;
             foreach (GameObject root in scene.GetRootGameObjects())
             {
                 // Our own generated things light themselves and must stay out of the bake.
@@ -145,6 +169,39 @@ namespace GulagRunners.GameEditor
                     if (r.GetComponent<ParticleSystem>() != null) continue;
 
                     StaticEditorFlags had = GameObjectUtility.GetStaticEditorFlags(r.gameObject);
+
+                    // A renderer whose shader moves its vertices must be neither batched
+                    // nor baked, and it is worth being exact about why, because marking
+                    // them broke the mine badly enough to look like a different bug.
+                    //
+                    // STATIC BATCHING combines meshes into one, in WORLD space. Every one
+                    // of these shaders works in OBJECT space -- LampSway turns a lantern
+                    // about its hook with `arm = positionOS - pivotOS`. After batching,
+                    // that object space IS world space, so the arm is no longer half a
+                    // metre from the hook, it is fifteen metres from the origin, and five
+                    // degrees of swing throws the lamp across the arena. That is exactly
+                    // what "the lanterns fly half the scene left and right at play" was.
+                    //
+                    // CONTRIBUTE GI bakes a shadow for geometry that then moves out from
+                    // under it.
+                    //
+                    // The shaders say so themselves, through a VertexAnimation tag on
+                    // their SubShader, so a new one declares itself and this tool never
+                    // needs a list of names to fall behind on.
+                    if (Animated(r))
+                    {
+                        StaticEditorFlags freed = had & ~StaticEditorFlags.ContributeGI
+                                                      & ~StaticEditorFlags.BatchingStatic;
+                        if (freed != had)
+                        {
+                            GameObjectUtility.SetStaticEditorFlags(r.gameObject, freed);
+                            r.lightProbeUsage = LightProbeUsage.BlendProbes;
+                            EditorUtility.SetDirty(r);
+                            freedUp++;
+                        }
+                        continue;
+                    }
+
                     StaticEditorFlags want = had | StaticEditorFlags.ContributeGI
                                                  | StaticEditorFlags.BatchingStatic;
                     if (had == want) continue;

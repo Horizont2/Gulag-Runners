@@ -75,6 +75,7 @@ Shader "Gulag Runners / Lamp Sway"
         {
             "RenderType" = "Opaque"
             "RenderPipeline" = "UniversalPipeline"
+            "VertexAnimation" = "True"   // see BakeSetup: never batched, never lightmapped
             "Queue" = "Geometry"
         }
         LOD 200

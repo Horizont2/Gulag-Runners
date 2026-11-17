@@ -72,6 +72,7 @@ Shader "Gulag Runners/Egypt Grass"
         {
             "RenderType" = "TransparentCutout"
             "RenderPipeline" = "UniversalPipeline"
+            "VertexAnimation" = "True"   // see BakeSetup: never batched, never lightmapped
             "Queue" = "AlphaTest"
         }
         LOD 200
