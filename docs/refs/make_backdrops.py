@@ -97,7 +97,10 @@ TEX_W = 1536         # docs/06 caps textures at 120 MB; twelve of these is about
 
 # Distance from the camera, at zoom 1. These ARE chosen -- the art direction, and the only
 # free parameter on this page. They give drifts of 32%, 14% and 6%.
-DEPTHS = (("near", 20.0), ("mid", 46.0), ("far", 105.0))
+# Pushed back from 20/46/105. Further away is a bigger world and a calmer
+# drift -- the Worms look -- and it costs nothing in apparent size, because the
+# quads grow with the depth by construction. Only the drift changes: 27%, 12%, 5%.
+DEPTHS = (("near", 28.0), ("mid", 64.0), ("far", 150.0))
 
 
 def camera_distance(zoom=1.0):
@@ -140,8 +143,16 @@ def layers():
             fight_w, fight_h = view(camera_distance(zoom))
 
             # How far the camera runs, and what fraction of a frame that is at this depth.
+            #
+            # TWICE the vertical travel, and that factor is the whole of why the edges of
+            # the near and middle layers showed in Arena_Forest. The quad is centred on its
+            # anchor, and BackdropBuilder anchors at the BOTTOM of the camera's travel --
+            # where the art is composed, because that is where the camera spends a match.
+            # So the quad has to reach a full travel ABOVE that anchor and still cover the
+            # frame, which is half a frame more again. Sized for a centred anchor it came
+            # out at 0.95 of what it needed, which is exactly an edge in shot.
             need_w = max(need_w, 1.0 + max(0.0, ARENA_W - fight_w) / see_w)
-            need_h = max(need_h, 1.0 + (max(0.0, ARENA_H - fight_h) + SHAKE) / see_h)
+            need_h = max(need_h, 1.0 + 2.0 * (max(0.0, ARENA_H - fight_h) + SHAKE) / see_h)
 
             # And the quad must still cover the frame it is being measured against.
             need_w = max(need_w, see_w / world_w)

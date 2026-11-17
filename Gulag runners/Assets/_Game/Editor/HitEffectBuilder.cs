@@ -47,9 +47,37 @@ namespace GulagRunners.GameEditor
         const string TexturesDir = EffectsDir + "/Textures";
         const string MaterialsDir = EffectsDir + "/Materials";
 
-        // The fighter is about 1.8 m. Every size below is in metres and was read off the
-        // preview, where the body block was 1.8 m tall and the effect was scaled to it.
-        const float Px = 1.35f;
+        // The height the sizes below were DRAWN against. Every one of them was read off
+        // the browser preview, where the body block was 1.8 m tall and each effect was
+        // scaled against it by eye.
+        const float DrawnAgainst = 1.8f;
+
+        // ...and the fighter is 0.91 m. Both player prefabs carry it, matching
+        // MoveConfig.Default exactly; 1.8 was the figure in MovementTuning's C# field
+        // default, which nothing in the game uses. So every effect in the arena came out
+        // at twice the size it was composed at, and GR_Death -- already scaled 1.7 for
+        // being a death -- at better than three times. That is what "some of them are
+        // enormous" was.
+        //
+        // Taken from the fighter now rather than typed, so it cannot drift again: retune
+        // the character and the effects follow.
+        static float Px => 1.35f * (BodyHeight() / DrawnAgainst);
+
+        /// <summary>
+        /// The fighter's own height, out of the scene if there is one in it.
+        ///
+        /// MovementTuning's field default is NOT a safe fallback -- it is 1.8, the number
+        /// that caused this -- so a scene with no fighter falls back to what the sim's own
+        /// MoveConfig.Default says instead.
+        /// </summary>
+        static float BodyHeight()
+        {
+            PlayerController fighter = UnityEngine.Object.FindFirstObjectByType<PlayerController>(
+                FindObjectsInactive.Include);
+            if (fighter != null && fighter.tuning != null && fighter.tuning.bodyHeight > 0.05f)
+                return fighter.tuning.bodyHeight;
+            return 0.91f;
+        }
 
         [MenuItem("Tools/Gulag Runners/Build the hit effects")]
         public static void Run()

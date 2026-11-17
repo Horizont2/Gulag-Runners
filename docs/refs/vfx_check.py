@@ -34,6 +34,8 @@ Run: python3 vfx_check.py
 """
 
 import os
+import struct
+import zlib
 import re
 import sys
 
@@ -76,8 +78,81 @@ def body_of(text, signature):
     return None
 
 
+
+# ---- a texture has to mean what its blend mode reads ---------------------------------
+
+def rgba(path):
+    """The pixels of one of our own PNGs. They are written uncompressed-filter, no
+    interlacing, by make_vfx_textures -- nothing clever is needed to read them back."""
+    raw = open(path, "rb").read()
+    if raw[:8] != b"\x89PNG\r\n\x1a\n":
+        return None, 0, 0
+    w, h = struct.unpack(">II", raw[16:24])
+    idat, i = b"", 8
+    while i < len(raw):
+        ln = struct.unpack(">I", raw[i:i + 4])[0]
+        if raw[i + 4:i + 8] == b"IDAT":
+            idat += raw[i + 8:i + 8 + ln]
+        i += 12 + ln
+    try:
+        data = zlib.decompress(idat)
+    except zlib.error:
+        return None, 0, 0
+    stride = w * 4
+    px = bytearray()
+    for y in range(h):
+        off = y * (stride + 1)
+        if off >= len(data) or data[off] != 0:
+            return None, 0, 0
+        px += data[off + 1:off + 1 + stride]
+    return px, w, h
+
+
+def premultiplied_check(problems):
+    """
+    Every impact texture must be PREMULTIPLIED, and that is not a style choice.
+
+    URP puts these particle materials in premultiplied blend -- _SrcBlend One, _DstBlend
+    OneMinusSrcAlpha -- which adds src.rgb outright and uses alpha only to decide how much
+    background survives. The textures were written white everywhere with the shape in
+    alpha, so every "invisible" pixel went on adding full white: the effects rendered as
+    white SQUARES with a faint shape inside. vfx_slash was 95% such pixels.
+
+    The shadow is the one exception and is listed as such: it is drawn with ordinary alpha
+    blending, which multiplies by alpha itself, so premultiplying there would square it and
+    fade the pool out at its own edges.
+    """
+    straight = {"vfx_shadow"}
+
+    for name in sorted(os.listdir(TEXTURES)):
+        if not name.endswith(".png"):
+            continue
+        px, w, h = rgba(os.path.join(TEXTURES, name))
+        if px is None:
+            continue
+
+        stem = name[:-4]
+        ghosts = sum(1 for k in range(0, len(px), 4)
+                     if px[k + 3] == 0 and (px[k] or px[k + 1] or px[k + 2]))
+
+        if stem in straight:
+            if ghosts == 0 and w * h > 0:
+                problems.append(
+                    "%s is premultiplied, but it is drawn with ordinary ALPHA blending, "
+                    "which multiplies by alpha itself -- the pool will fade out at its own "
+                    "edges" % stem)
+            continue
+
+        if ghosts:
+            problems.append(
+                "%s has %d pixel(s) that are invisible (alpha 0) and yet carry colour. "
+                "These materials blend PREMULTIPLIED, so every one of those adds its "
+                "colour to the frame regardless -- which is what makes an effect render "
+                "as a square. Re-run make_vfx_textures.py" % (stem, ghosts))
+
 def main():
     problems = []
+    premultiplied_check(problems)
 
     for path in (BUILDER, VIEW, GENERATOR):
         if not os.path.exists(path):

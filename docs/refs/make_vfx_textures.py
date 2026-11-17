@@ -145,11 +145,29 @@ TextureImporter:
 """
 
 
-def png(path, w, h, alpha):
-    """White RGB, the shape in alpha. 8-bit RGBA, no interlacing."""
+def png(path, w, h, alpha, premultiplied=True):
+    """
+    The shape in alpha, and the RGB PREMULTIPLIED by it. 8-bit RGBA, no interlacing.
+
+    This was white RGB everywhere with the shape only in alpha, and that is what made
+    every impact effect render as a white square. URP puts these particle materials in
+    PREMULTIPLIED mode -- _SrcBlend One, _DstBlend OneMinusSrcAlpha -- which takes the
+    texture at its word: it adds src.rgb outright and only uses alpha to decide how much
+    of the background survives. With white outside the shape, "invisible" pixels went on
+    adding full white. vfx_slash is 95% such pixels, so it was a solid white card with a
+    faint streak in it.
+
+    Premultiplying makes the texture mean what that blend reads: zero alpha is zero
+    colour, so nothing outside the shape contributes at all.
+
+    The exception is anything drawn with ordinary ALPHA blending, which multiplies by
+    alpha itself -- premultiplying there would square it and the thing would fade out at
+    its own edges. The ground shadow is the one of those.
+    """
     px = bytearray(w * h * 4)
     for i, a in enumerate(alpha):
-        px[i * 4:i * 4 + 4] = bytes((255, 255, 255, a))
+        lit = a if premultiplied else 255
+        px[i * 4:i * 4 + 4] = bytes((lit, lit, lit, a))
     raw = b"".join(b"\x00" + bytes(px[y * w * 4:(y + 1) * w * 4]) for y in range(h))
 
     def chunk(tag, data):
@@ -320,13 +338,18 @@ def shadow(s=128):
     return s, s, out
 
 
+# (name, how to draw it, what it is for, premultiply the RGB)
+#
+# Everything here is drawn PREMULTIPLIED except the shadow: the impact effects are
+# in URP's premultiplied blend, and the shadow is in ordinary alpha, which does the
+# multiplication itself.
 SHAPES = [
-    ("vfx_core", core, "the hot centre of an impact"),
-    ("vfx_spark", spark, "a streak that reads as a direction"),
-    ("vfx_ring", ring, "the thin shell that says force"),
-    ("vfx_slash", slash, "the blade's arc"),
-    ("vfx_puff", puff, "dust: soft, with an edge that is not a circle"),
-    ("vfx_shadow", shadow, "the contact pool under a fighter"),
+    ("vfx_core", core, "the hot centre of an impact", True),
+    ("vfx_spark", spark, "a streak that reads as a direction", True),
+    ("vfx_ring", ring, "the thin shell that says force", True),
+    ("vfx_slash", slash, "the blade's arc", True),
+    ("vfx_puff", puff, "dust: soft, with an edge that is not a circle", True),
+    ("vfx_shadow", shadow, "the contact pool under a fighter", False),
 ]
 
 
@@ -337,7 +360,7 @@ def main(argv):
         os.makedirs(OUT, exist_ok=True)
 
     problems = []
-    for name, draw, what in SHAPES:
+    for name, draw, what, premul in SHAPES:
         w, h, alpha = draw()
         path = os.path.join(OUT, name + ".png")
 
@@ -356,7 +379,7 @@ def main(argv):
                 problems.append("%s: not written yet — run without --check" % name)
             continue
 
-        size = png(path, w, h, alpha)
+        size = png(path, w, h, alpha, premul)
         meta = path + ".meta"
         if not os.path.exists(meta):
             with open(meta, "w") as handle:
