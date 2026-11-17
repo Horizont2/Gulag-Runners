@@ -127916,7 +127916,7 @@ MonoBehaviour:
   zoomSmoothTime: 0.3
   useBorders: 1
   bordersMin: {x: -10.83, y: -0.15}
-  bordersMax: {x: 10.83, y: 6.2}
+  bordersMax: {x: 10.83, y: 7}
   centreWhenSmallerThanView: 1
   landingTrauma: 0.25
   hitTrauma: 0.55
@@ -144386,7 +144386,7 @@ MonoBehaviour:
   zoomSmoothTime: 0.3
   useBorders: 1
   bordersMin: {x: -10.83, y: -0.15}
-  bordersMax: {x: 10.83, y: 6.2}
+  bordersMax: {x: 10.83, y: 7}
   centreWhenSmallerThanView: 1
   landingTrauma: 0.25
   hitTrauma: 0.55
