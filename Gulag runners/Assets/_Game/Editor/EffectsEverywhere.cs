@@ -102,6 +102,11 @@ namespace GulagRunners.GameEditor
                     // fighters, which is the test above.
                     GroundShadowSetup.Run();
 
+                    // And whatever hangs in the air -- in the one arena whose air is empty.
+                    // This one stands down by itself in the three that already have weather,
+                    // so it is safe to call everywhere.
+                    ArenaAtmosphereSetup.Run();
+
                     EditorSceneManager.MarkSceneDirty(scene);
                     EditorSceneManager.SaveScene(scene);
                     did.Add(scene.name);

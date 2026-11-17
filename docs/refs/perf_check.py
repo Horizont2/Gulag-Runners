@@ -32,6 +32,7 @@ second and in CI.
 
     python3 perf_check.py
 """
+import glob
 import os
 import re
 import struct
@@ -210,6 +211,98 @@ def strip(text):
     return "".join(out)
 
 
+
+
+def static_renderers(scene_text):
+    """
+    How many objects in a scene are marked static at all.
+
+    Counted two ways because a scene says it two ways: an object authored in the scene
+    carries m_StaticEditorFlags directly, while a prefab INSTANCE carries it as an override
+    with the value on the following line. Counting only the first finds nothing in a scene
+    built out of prefabs, which is every arena here.
+    """
+    direct = sum(1 for v in re.findall(r"m_StaticEditorFlags: (\d+)", scene_text)
+                 if v != "0")
+    overrides = sum(
+        1 for v in re.findall(
+            r"propertyPath: m_StaticEditorFlags\n      value: (\d+)", scene_text)
+        if v != "0")
+    return direct + overrides
+
+
+# ---- the prerequisite a bake has that nothing announces -------------------------------
+
+_MODEL_GUIDS = None
+
+
+def _model_guids():
+    """guid -> whether that model has Generate Lightmap UVs ticked."""
+    global _MODEL_GUIDS
+    if _MODEL_GUIDS is not None:
+        return _MODEL_GUIDS
+
+    _MODEL_GUIDS = {}
+    for root, _, files in os.walk(ASSETS):
+        for f in files:
+            low = f.lower()
+            if not (low.endswith(".fbx.meta") or low.endswith(".blend.meta")
+                    or low.endswith(".obj.meta")):
+                continue
+            body = read(os.path.join(root, f))
+            g = re.search(r"guid: ([0-9a-f]{32})", body)
+            if not g:
+                continue
+            uv = re.search(r"generateSecondaryUV: (\d)", body)
+            _MODEL_GUIDS[g.group(1)] = bool(uv and uv.group(1) == "1")
+    return _MODEL_GUIDS
+
+
+_PREFAB_MODELS = None
+
+
+def _prefab_models():
+    """guid of a prefab -> the model guids it pulls in."""
+    global _PREFAB_MODELS
+    if _PREFAB_MODELS is not None:
+        return _PREFAB_MODELS
+
+    models = _model_guids()
+    _PREFAB_MODELS = {}
+    for root, _, files in os.walk(ASSETS):
+        for f in files:
+            if not f.endswith(".prefab"):
+                continue
+            path = os.path.join(root, f)
+            used = {g for g in re.findall(r"guid: ([0-9a-f]{32})", read(path))
+                    if g in models}
+            if not used or not os.path.exists(path + ".meta"):
+                continue
+            g = re.search(r"guid: ([0-9a-f]{32})", read(path + ".meta"))
+            if g:
+                _PREFAB_MODELS[g.group(1)] = used
+    return _PREFAB_MODELS
+
+
+def models_without_lightmap_uvs(scene_text):
+    """
+    The models a scene draws, directly or through a prefab, that have no second UV set.
+
+    Through a prefab matters and is easy to miss: a scene file holds only the prefab's
+    guid, so a search for model guids in the scene alone finds a fraction of what the
+    arena actually puts on screen.
+    """
+    models = _model_guids()
+    prefabs = _prefab_models()
+    guids = set(re.findall(r"guid: ([0-9a-f]{32})", scene_text))
+
+    used = {g for g in guids if g in models}
+    for g in guids:
+        used |= prefabs.get(g, set())
+
+    return sorted(g for g in used if not models[g])
+
+
 def main():
     problems, notes = [], []
 
@@ -260,12 +353,41 @@ def main():
                 f"to \"low poly looks cheap\" is BAKED light -- so this scene is paying for "
                 f"the expensive kind and not getting the look the cheap kind buys")
 
-        lighting = os.path.join(os.path.dirname(scene),
-                                os.path.basename(scene)[:-6], "LightingData.asset")
-        if not os.path.exists(lighting) and live > 0:
-            problems.append(
-                f"{name} has no LightingData.asset beside it, so nothing in it is baked at "
-                f"all. Every light is being paid for every frame")
+        # Whether a scene is baked is NOT whether LightingData.asset is beside it. Three of
+        # the arenas have one, 20 KB each, with no lightmap next to it and not a single
+        # renderer in the scene marked Contribute GI -- somebody pressed Generate Lighting
+        # and it dutifully baked nothing. Judging by the file's existence passed all three.
+        folder = os.path.join(os.path.dirname(scene), os.path.basename(scene)[:-6])
+        maps = glob.glob(os.path.join(folder, "Lightmap-*comp_light*")) if \
+            os.path.isdir(folder) else []
+        statics = static_renderers(text)
+
+        if live > 0 and not maps:
+            if statics == 0:
+                problems.append(
+                    f"{name} has NOT ONE renderer marked Contribute GI, so a bake has "
+                    f"nothing to bake -- which is why the LightingData.asset beside it, if "
+                    f"there is one, carries no lightmap. Every light is paid for every "
+                    f"frame. Tools > Gulag Runners > Get this scene ready to bake marks "
+                    f"the scenery")
+            else:
+                problems.append(
+                    f"{name} has {statics} static renderer(s) but no lightmap was produced, "
+                    f"so the bake either has not been run or failed")
+
+            # The finding above says "bake it", so it had better say whether it CAN be
+            # baked. A lightmap needs a second UV set, and almost nothing in this project
+            # has one -- so following the advice as it stood produced overlapping charts
+            # and light coming through walls, which reads as the bake being a bad idea
+            # rather than as a box left unticked in an importer.
+            blind = models_without_lightmap_uvs(text)
+            if blind:
+                problems.append(
+                    f"{name} cannot be baked yet: {len(blind)} of the model(s) it draws "
+                    f"have no lightmap UVs (Generate Lightmap UVs, off by default). "
+                    f"Baking without them gives overlapping charts and light through "
+                    f"walls. Tools > Gulag Runners > Get this scene ready to bake ticks "
+                    f"them and reimports")
 
     # ---- the pipeline asset
     rp = os.path.join(ASSETS, "Settings", "Mobile_RPAsset.asset")
