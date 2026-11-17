@@ -661,6 +661,16 @@ def ladder_at(s, w):
     best, best_shift = -1, 0
     for i, l in enumerate(w["ladder"]):
         if not overlaps(b, l): continue
+
+        # Touching is not holding. Overlapping by a hair was enough, and that is how a body
+        # climbed through a ceiling: jump under a slab, brush the bottom two centimetres of
+        # a ladder serving the floor ABOVE, press up. From there the climb was legitimate,
+        # because that ladder really does run through that slab -- so the grab is the only
+        # place the difference is still visible. A quarter of a body is the same bite this
+        # motor already uses to decide whether you are at the top of a ladder.
+        # Mirrors PlayerMotor.FindLadderInReach.
+        if min(b[3], l[3]) - max(b[1], l[1]) < C["H"] // 4: continue
+
         lane = lane_for(span(w, "ladder", i), s.depth)
         if lane is None: continue
         shift = abs(lane - s.depth)

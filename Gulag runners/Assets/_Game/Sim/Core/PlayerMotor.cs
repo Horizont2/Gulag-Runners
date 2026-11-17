@@ -983,6 +983,24 @@ namespace GulagRunners.Sim
             for (int i = 0; i < world.Ladders.Length; i++)
             {
                 if (!body.Overlaps(in world.Ladders[i])) continue;
+
+                // Touching is not holding. Overlapping the ladder's box by a hair used to
+                // be enough, and that is how a fighter climbed through a ceiling: jump
+                // under a slab, let the top of the head brush the bottom two centimetres
+                // of a ladder serving the floor ABOVE, press up, and the grab took. From
+                // there the climb was legitimate -- that ladder really does run through
+                // that slab -- so nothing further could refuse it. The grab is the only
+                // place where the difference between reaching a ladder and grazing one is
+                // still visible.
+                //
+                // A quarter of a body is the same bite this file already uses to decide
+                // whether you are at the top of a ladder, and it is far more than any
+                // modelling slop while being far less than the half-body a real approach
+                // gives you.
+                Fix bite = Fix.Min(body.MaxY, world.Ladders[i].MaxY)
+                           - Fix.Max(body.MinY, world.Ladders[i].MinY);
+                if (bite < cfg.BodyHeight / 4) continue;
+
                 if (!LaneFor(world.LadderSpan(i), depth, in cfg, out Fix lane)) continue;
 
                 Fix shift = Fix.Abs(lane - depth);

@@ -145,7 +145,10 @@ namespace GulagRunners.GameEditor
             Undo.RecordObject(go.transform, "Light the menu scene");
             go.transform.position = at;
 
-            Light light = go.GetComponent<Light>() ?? go.AddComponent<Light>();
+            // See GroundShadowSetup: ?? tests the reference, and a missing Unity
+            // component is a non-null reference that merely compares equal to null.
+            Light light = go.GetComponent<Light>();
+            if (light == null) light = go.AddComponent<Light>();
             Undo.RecordObject(light, "Light the menu scene");
             light.type = LightType.Point;
             EditorUtility.SetDirty(light);

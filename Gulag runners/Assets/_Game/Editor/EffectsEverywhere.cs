@@ -63,6 +63,7 @@ namespace GulagRunners.GameEditor
             List<string> did = new List<string>();
             List<string> skipped = new List<string>();
             List<string> gassed = new List<string>();
+            List<string> failed = new List<string>();
 
             try
             {
@@ -80,32 +81,32 @@ namespace GulagRunners.GameEditor
                         continue;
                     }
 
-                    HitEffectBuilder.Run();
+                    // Each builder in its own net. One of them throwing used to take the
+                    // whole run with it -- and because the save is at the BOTTOM of this
+                    // loop, every scene it had already finished went unsaved too. That is
+                    // exactly what happened: a MissingComponentException in the shadow
+                    // setup, and four arenas that looked like the tool had simply never
+                    // been run. A builder that fails should cost its own step, nothing more.
+                    Step(scene, "hit effects", failed, HitEffectBuilder.Run);
 
-                    // And the gas announcement, which is a whole feature that was written
-                    // and then stood in no arena at all: the lamps dipping three seconds
-                    // out, the jets, the collar quickening as the surface nears your feet.
-                    // PoisonWarningSetup needs GR_GasVent to exist, which the line above
-                    // has just made, so the order here is not arbitrary.
-                    if (Object.FindFirstObjectByType<PoisonPool>() != null)
-                    {
-                        PoisonWarningSetup.Run();
+                    // The gas announcement: the lamps dipping three seconds out, the jets,
+                    // the collar quickening as the surface nears your feet. It needs
+                    // GR_GasVent to exist, which the line above has just made, so the order
+                    // here is not arbitrary.
+                    if (Object.FindFirstObjectByType<PoisonPool>() != null
+                        && Step(scene, "the gas announcement", failed, PoisonWarningSetup.Run))
                         gassed.Add(scene.name);
-                    }
 
-                    // And the parallax layers behind the arena. This one knows which scenes
-                    // it has a palette for and says so when it does not, so it is safe to
-                    // call in all of them.
-                    BackdropBuilder.Run();
+                    // The parallax layers behind the arena. This one knows which scenes it
+                    // has a palette for and says so when it does not.
+                    Step(scene, "the parallax backdrop", failed, BackdropBuilder.Run);
 
-                    // And the blob under each fighter. Only reached in scenes that have
-                    // fighters, which is the test above.
-                    GroundShadowSetup.Run();
+                    // The blob under each fighter.
+                    Step(scene, "the ground shadows", failed, GroundShadowSetup.Run);
 
                     // And whatever hangs in the air -- in the one arena whose air is empty.
-                    // This one stands down by itself in the three that already have weather,
-                    // so it is safe to call everywhere.
-                    ArenaAtmosphereSetup.Run();
+                    // This stands down by itself where there is weather already.
+                    Step(scene, "the atmosphere", failed, ArenaAtmosphereSetup.Run);
 
                     EditorSceneManager.MarkSceneDirty(scene);
                     EditorSceneManager.SaveScene(scene);
@@ -132,7 +133,36 @@ namespace GulagRunners.GameEditor
             if (skipped.Count > 0)
                 said += "\n\nSkipped: " + string.Join(", ", skipped);
 
+            if (failed.Count > 0)
+                said += $"\n\n{failed.Count} step(s) FAILED and were skipped: "
+                        + string.Join(", ", failed)
+                        + ". Those scenes were saved without them.";
+
             Debug.Log(said);
         }
+        /// <summary>
+        /// Runs one builder and keeps going if it throws.
+        ///
+        /// Returns whether it got through, so a caller can record the step as done. The
+        /// failure is logged where it happened AND collected, because a single exception in
+        /// the middle of a five-scene run is otherwise one red line in a console that is
+        /// already full of warnings from third-party packages.
+        /// </summary>
+        static bool Step(Scene scene, string what, List<string> failed, System.Action build)
+        {
+            try
+            {
+                build();
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"{scene.name}: {what} failed and was skipped. "
+                               + "The rest of this scene was still built and saved.\n" + e);
+                failed.Add($"{scene.name}: {what}");
+                return false;
+            }
+        }
+
     }
 }

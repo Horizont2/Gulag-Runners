@@ -103,12 +103,6 @@ namespace GulagRunners.GameEditor
                 return;
             }
 
-            // Where the camera sits when it is looking at the middle of the arena. The quads
-            // are nailed to the world at that axis; everything the camera does afterwards --
-            // following, leading, zooming, shaking -- is what MAKES the parallax, so none of
-            // it belongs in the placement.
-            Vector2 middle = (rig.bordersMin + rig.bordersMax) * 0.5f;
-            Vector3 focus = new Vector3(middle.x, middle.y, rig.planeZ);
             Quaternion facing = Quaternion.Euler(rig.pitchDegrees, 0f, 0f);
             Vector3 forward = facing * Vector3.forward;
 
@@ -117,6 +111,31 @@ namespace GulagRunners.GameEditor
             // fighter's own height and the fraction of the screen they must fill, and
             // reading the inspector field would quietly give the wrong distance.
             float framing = rig.EffectiveViewHeight;
+
+            // WHERE THE QUADS HANG, and the thing the first version got wrong.
+            //
+            // The art is composed in fractions of the FRAME -- the near horizon two thirds
+            // of the way down, the middle one half, the far one a third -- and that only
+            // means anything if the quads are anchored where the camera actually is. The
+            // first version anchored them to the middle of the arena, reasoning that it is
+            // the midpoint of the camera's vertical travel. It is, and it was still wrong,
+            // because the camera does not spend its time at the midpoint. ClampToBorders
+            // holds the focus half a view inside the borders, so in Arena_Mine it lives
+            // between 0.57 and 4.93 and sits at the BOTTOM of that whenever anyone is
+            // fighting on the floor, which is most of a match.
+            //
+            // Measured from the midpoint, the three horizons landed at 0.32, 0.43 and 0.49
+            // instead of 0.35, 0.51 and 0.66: squeezed into a band 17% of the screen tall
+            // with half the frame below them as flat fill. Anchoring at the low end instead
+            // moves each layer down by 2.18 m -- which at their own depths is 0.17, 0.07 and
+            // 0.03 of a frame -- and puts all three back exactly where they were drawn.
+            //
+            // The cost is the rare shot: with a fighter on the top shelf the near horizon
+            // slides off the bottom and you see sky. That is what looking up should do.
+            Vector2 min = rig.bordersMin, max = rig.bordersMax;
+            float half = framing * 0.5f;
+            float low = Mathf.Min(min.y + half, (min.y + max.y) * 0.5f);
+            Vector3 focus = new Vector3((min.x + max.x) * 0.5f, low, rig.planeZ);
             float rest = framing * 0.5f
                          * Mathf.Cos(Mathf.Deg2Rad * rig.pitchDegrees)
                          / Mathf.Tan(Mathf.Deg2Rad * rig.fieldOfView * 0.5f);

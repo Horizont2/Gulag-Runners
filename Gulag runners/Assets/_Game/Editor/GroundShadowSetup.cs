@@ -75,12 +75,19 @@ namespace GulagRunners.GameEditor
                     quad = go.transform;
                 }
 
-                MeshFilter filter = quad.GetComponent<MeshFilter>()
-                                    ?? Undo.AddComponent<MeshFilter>(quad.gameObject);
+                // NOT `GetComponent<T>() ?? AddComponent<T>()`. A missing component comes
+                // back as Unity's fake null -- an object whose reference is real and whose
+                // overloaded == reports null -- and ?? tests the REFERENCE. So the operator
+                // never fires, the missing component is kept, and the next line throws
+                // MissingComponentException. That exception escaped the per-scene loop in
+                // EffectsEverywhere, which is why no scene ever got saved with a backdrop.
+                MeshFilter filter = quad.GetComponent<MeshFilter>();
+                if (filter == null) filter = Undo.AddComponent<MeshFilter>(quad.gameObject);
                 filter.sharedMesh = quadMesh;
 
-                MeshRenderer renderer = quad.GetComponent<MeshRenderer>()
-                                        ?? Undo.AddComponent<MeshRenderer>(quad.gameObject);
+                MeshRenderer renderer = quad.GetComponent<MeshRenderer>();
+                if (renderer == null)
+                    renderer = Undo.AddComponent<MeshRenderer>(quad.gameObject);
                 renderer.sharedMaterial = ink;
 
                 // It is a shadow. It must not cast one, receive one, or ask a light probe

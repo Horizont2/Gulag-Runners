@@ -300,7 +300,7 @@ namespace GulagRunners.GameEditor
             settings.lightmapResolution = 10f;
             settings.lightmapMaxSize = 1024;
             settings.lightmapPadding = 2;
-            settings.compressLightmaps = true;
+            settings.lightmapCompression = LightmapCompression.NormalQuality;
 
             // Non-directional halves the lightmap memory and costs nothing a flat-shaded
             // arena can show. docs/06 caps textures at 120 MB for the whole game.

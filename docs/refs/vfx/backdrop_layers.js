@@ -2,44 +2,44 @@
 const LAYERS = [
   {
     "name": "near",
-    "depth": 24.0,
-    "drift": 0.3208,
-    "screens_wide": 2.1412,
-    "screens_high": 1.6816,
-    "screens_top": -0.3408,
-    "metres_wide": 64.259,
-    "metres_high": 21.628,
+    "depth": 20.0,
+    "drift": 0.385,
+    "screens_wide": 2.3968,
+    "screens_high": 1.8285,
+    "screens_top": -0.4143,
+    "metres_wide": 59.942,
+    "metres_high": 19.598,
     "pixels": [
       1536,
-      512
+      496
     ]
   },
   {
     "name": "mid",
-    "depth": 55.0,
-    "drift": 0.14,
-    "screens_wide": 1.4957,
-    "screens_high": 1.3105,
-    "screens_top": -0.1552,
-    "metres_wide": 102.862,
-    "metres_high": 38.625,
+    "depth": 46.0,
+    "drift": 0.1674,
+    "screens_wide": 1.587,
+    "screens_high": 1.363,
+    "screens_top": -0.1815,
+    "metres_wide": 91.285,
+    "metres_high": 33.599,
     "pixels": [
       1536,
-      576
+      560
     ]
   },
   {
     "name": "far",
-    "depth": 128.0,
-    "drift": 0.0602,
-    "screens_wide": 1.2411,
-    "screens_high": 1.1641,
-    "screens_top": -0.082,
-    "metres_wide": 198.64,
-    "metres_high": 79.851,
+    "depth": 105.0,
+    "drift": 0.0733,
+    "screens_wide": 1.2819,
+    "screens_high": 1.1876,
+    "screens_top": -0.0938,
+    "metres_wide": 168.312,
+    "metres_high": 66.825,
     "pixels": [
       1536,
-      624
+      608
     ]
   }
 ];

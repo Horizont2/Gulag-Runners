@@ -97,7 +97,7 @@ TEX_W = 1536         # docs/06 caps textures at 120 MB; twelve of these is about
 
 # Distance from the camera, at zoom 1. These ARE chosen -- the art direction, and the only
 # free parameter on this page. They give drifts of 32%, 14% and 6%.
-DEPTHS = (("near", 24.0), ("mid", 55.0), ("far", 128.0))
+DEPTHS = (("near", 20.0), ("mid", 46.0), ("far", 105.0))
 
 
 def camera_distance(zoom=1.0):
@@ -483,7 +483,7 @@ def draw(theme, index, w, h):
     # the bottom third or so, which is why the near ridge sits as low as it does -- most of
     # that layer is never seen, and what shows of it should read as the far side of the pit.
     base = row(0.66 - 0.155 * index)
-    amp = high((0.077, 0.053, 0.034)[index])
+    amp = high((0.125, 0.088, 0.056)[index])
     line = ridge(rng, amp, base, lumps * (1.0, 0.7, 0.45)[index])
 
     if theme == "mine":
@@ -494,16 +494,16 @@ def draw(theme, index, w, h):
             # Two shafts, the second dimmer, so the deepest layer has somewhere to be.
             lit = lerp3(colour, (178, 148, 92), 0.42)
             dim = lerp3(colour, (178, 148, 92), 0.22)
-            shaft(px, w, h, int(w * 0.63), wide(0.035), wide(0.115),
-                  int(row(-0.05)), int(row(0.44)), lit)
-            shaft(px, w, h, int(w * 0.24), wide(0.025), wide(0.080),
-                  int(row(-0.05)), int(row(0.37)), dim)
+            shaft(px, w, h, int(w * 0.63), wide(0.055), wide(0.175),
+                  int(row(-0.05)), int(row(0.52)), lit)
+            shaft(px, w, h, int(w * 0.24), wide(0.040), wide(0.125),
+                  int(row(-0.05)), int(row(0.44)), dim)
         else:
             props = (5, 3)[index]
             for i in range(props):
                 x = int(w * (i + 0.5) / props + rng.between(-60, 60))
-                top = int(line(x / w) - high(rng.between(0.15, 0.21)))
-                prop(px, w, h, x, wide(0.075), top, high(0.011),
+                top = int(line(x / w) - high(rng.between(0.23, 0.33)))
+                prop(px, w, h, x, wide(0.115), top, high(0.016),
                      lerp3(colour, ink, 0.55))
 
     elif theme == "forest":
@@ -513,9 +513,9 @@ def draw(theme, index, w, h):
             x = int(w * (i + rng.between(0.2, 0.8)) / count)
             # Conifers are not a picket fence: the spread has to be wide enough that the
             # tops make a line of their own, or the layer reads as one serrated block.
-            up = rng.between(0.12, 0.40) ** 1.3 + 0.12
+            up = rng.between(0.18, 0.56) ** 1.3 + 0.19
             top = int(line(x / w) - high(up * (1, 0.75, 0.5)[index]))
-            tree(px, w, h, x, wide((0.075, 0.062, 0.050)[index]), top,
+            tree(px, w, h, x, wide((0.110, 0.092, 0.074)[index]), top,
                  lerp3(colour, ink, 0.55))
 
     elif theme == "nordic":
@@ -523,29 +523,29 @@ def draw(theme, index, w, h):
         if index == 1:
             # A fortress on the middle ridge: five towers and a wall between them.
             keep = lerp3(colour, ink, 0.45)
-            span = wide(0.42)
+            span = wide(0.60)
             x0 = int(w * 0.46)
-            wall = int(line((x0 + span * 0.5) / w) - high(0.055))
+            wall = int(line((x0 + span * 0.5) / w) - high(0.082))
             for x in range(x0, min(w, x0 + span)):
                 for y in range(wall, h):
                     i = (y * w + x) * 4
                     px[i:i + 4] = bytes(keep + (255,))
             for t in range(5):
-                tx = x0 + int(span * t / 4) - wide(0.021)
-                column(px, w, h, tx, wide(0.042), wall - high(0.046), keep,
-                       cap=wide(0.008))
+                tx = x0 + int(span * t / 4) - wide(0.030)
+                column(px, w, h, tx, wide(0.060), wall - high(0.068), keep,
+                       cap=wide(0.012))
 
     elif theme == "temple":
         fill_below(px, w, h, line, colour)
         if index == 2:
-            pyramid(px, w, h, int(w * 0.34), wide(1.15), int(row(0.17)),
+            pyramid(px, w, h, int(w * 0.34), wide(1.70), int(row(0.09)),
                     lerp3(colour, ink, 0.60))
         else:
             count = (5, 3)[index]
             for i in range(count):
                 x = int(w * (i + 0.5) / count + rng.between(-60, 60))
-                top = int(line(x / w) - high(rng.between(0.13, 0.20)))
-                obelisk(px, w, h, x, wide(0.019), top, lerp3(colour, ink, 0.55))
+                top = int(line(x / w) - high(rng.between(0.20, 0.30)))
+                obelisk(px, w, h, x, wide(0.028), top, lerp3(colour, ink, 0.55))
 
     return px
 
