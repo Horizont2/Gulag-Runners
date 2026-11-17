@@ -91,6 +91,12 @@ namespace GulagRunners.Game
         [Tooltip("The camera this moves. Leave empty to use the one on this object.")]
         public SideViewCamera view;
 
+        [Tooltip("The last round that gets the opening move. 1 means only the round that " +
+                 "arrives in the arena; the rest start with the camera already where the " +
+                 "player's own camera would put it. 0 turns the move off entirely, which " +
+                 "leaves the countdown as the whole opening.")]
+        [Range(0, 5)] public int firstRoundOnly = 1;
+
         [Tooltip("Where the round opens from, placed by hand in the scene.\n\n" +
                  "This is the whole shot. With it set, the camera STARTS at this transform — " +
                  "position and rotation both — and is blended to the playing framing across " +
@@ -236,6 +242,18 @@ namespace GulagRunners.Game
 
             MatchSimState m = matchState.Match;
             if (m.Phase != MatchPhase.Cages) return;      // the shot is over; hands off
+
+            // THE ARRIVAL IS WORTH SEEING ONCE. This used to run on every round of a series
+            // -- up to three of them in the same arena -- and the second time you have
+            // already looked at the place. Worse, it is three seconds the player cannot act
+            // in, spent being shown something they are waiting out, which is how a flourish
+            // turns into a loading screen.
+            //
+            // So the move belongs to the round that arrives in the arena, and the rounds
+            // after it start with the camera where the player's own camera would put it.
+            // The countdown is what opens those, and it opens the first one too: the two are
+            // not alternatives.
+            if (m.Round > firstRoundOnly) return;
 
             float t = m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne;
             bool crane = style == IntroStyle.Crane;
