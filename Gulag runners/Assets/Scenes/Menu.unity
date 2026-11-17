@@ -93,8 +93,8 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 20201, guid: 0000000000000000f000000000000000, type: 0}
-  m_LightingSettings: {fileID: 0}
+  m_LightingDataAsset: {fileID: 112000000, guid: bf4f3bac21b179f47baf1fd7a1544c68, type: 2}
+  m_LightingSettings: {fileID: 4890085278179872738, guid: 6fbf85d91b14dcb409511b6e478dce42, type: 2}
 --- !u!196 &4
 NavMeshSettings:
   serializedVersion: 2
@@ -130,6 +130,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -257,6 +261,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Barrel
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 94ec7a66a4d82424fa91acca3869042e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -278,6 +286,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (16)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -357,6 +369,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Big Floor Tile (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -430,6 +446,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -557,6 +577,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (10)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -578,6 +602,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_Name
       value: Big Floor Tile (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_LocalScale.x
@@ -652,6 +680,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -778,6 +810,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
       propertyPath: m_Name
       value: Floor_Modular (16)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -944,6 +980,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Table_Small
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 6ff6ac4e8c8b7084fb5849c54b1100ea, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1018,6 +1058,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Coin_Pile
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: a3c269f3784ffb84bb924c4ebafe3c5f, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1039,6 +1083,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (18)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -1113,6 +1161,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (10)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -1244,6 +1296,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
       propertyPath: m_Name
       value: Floor_Modular (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1413,6 +1469,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (13)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -1438,6 +1498,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (16)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -1513,6 +1577,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (19)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -1586,6 +1654,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -1746,6 +1818,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -1872,6 +1948,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (12)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1950,6 +2030,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Column
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: cad6bd9cca0195b4687b18b8d3358902, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1966,6 +2050,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (5)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -2041,6 +2129,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -2114,6 +2206,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_Name
       value: Big Floor Tile
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_LocalScale.x
@@ -2189,6 +2285,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -2262,6 +2362,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (20)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -2389,6 +2493,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (8)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2410,6 +2518,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -2485,6 +2597,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -2558,6 +2674,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -2633,6 +2753,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -2706,6 +2830,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (8)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -2833,6 +2961,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (10)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2885,6 +3017,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (16)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -2959,6 +3095,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (8)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -3094,6 +3234,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Torch (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 170bb9aaa93b52c48b0d3fd73535c586, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -3118,6 +3262,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -3248,6 +3396,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 170bb9aaa93b52c48b0d3fd73535c586, type: 3}
       propertyPath: m_Name
       value: Torch
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 170bb9aaa93b52c48b0d3fd73535c586, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3456,6 +3608,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -3582,6 +3738,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (12)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3603,6 +3763,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (8)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -3729,6 +3893,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
       propertyPath: m_Name
       value: Floor_Modular (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3965,6 +4133,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (13)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3986,6 +4158,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -4060,6 +4236,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_Name
       value: Big Floor Tile
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_LocalScale.x
@@ -4262,6 +4442,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (7)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4336,6 +4520,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (19)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4357,6 +4545,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -4432,6 +4624,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (9)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -4506,6 +4702,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (9)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -4579,6 +4779,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -4799,6 +5003,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (7)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -4925,6 +5133,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (9)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -5002,6 +5214,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
       propertyPath: m_Name
       value: Floor_Modular (17)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -5103,6 +5319,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -5230,6 +5450,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (15)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -5308,6 +5532,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5329,6 +5557,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -5404,6 +5636,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -5477,6 +5713,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (9)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -5604,6 +5844,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (16)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5625,6 +5869,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -5752,6 +6000,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (6)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5773,6 +6025,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (15)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -5851,6 +6107,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -5978,6 +6238,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (11)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5999,6 +6263,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -6074,6 +6342,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -6147,6 +6419,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
@@ -6222,6 +6498,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -6295,6 +6575,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -6422,6 +6706,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (8)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -6496,6 +6784,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (6)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -6517,6 +6809,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (12)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -6591,6 +6887,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -6799,6 +7099,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (11)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -6925,6 +7229,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (14)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -6946,6 +7254,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -7020,6 +7332,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -7226,6 +7542,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (6)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -7247,6 +7567,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (9)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -7322,6 +7646,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -7395,6 +7723,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (5)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -7470,6 +7802,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (10)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -7543,6 +7879,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -7618,6 +7958,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -7691,6 +8035,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (12)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -7766,6 +8114,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -7840,6 +8192,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Arch_bars
       objectReference: {fileID: 0}
+    - target: {fileID: 1726338310292245668, guid: ed5b9a06e19a9114e973745aacc7f337, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 2071373423378847262, guid: ed5b9a06e19a9114e973745aacc7f337, type: 3}
       propertyPath: m_LocalScale.x
       value: 50
@@ -7913,6 +8269,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -8031,6 +8391,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -8104,6 +8468,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (17)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -8183,6 +8551,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (18)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -8257,6 +8629,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (9)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -8330,6 +8706,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -8946,6 +9326,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 334806396}
     m_Modifications:
+    - target: {fileID: -9048784500334463732, guid: 52411a7bfe7286840b39ad2a45af402f, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 52411a7bfe7286840b39ad2a45af402f, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.003
@@ -9002,6 +9386,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Chest
       objectReference: {fileID: 0}
+    - target: {fileID: 5481095547957877325, guid: 52411a7bfe7286840b39ad2a45af402f, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9023,6 +9411,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -9150,6 +9542,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9223,6 +9619,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (13)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -9310,6 +9710,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Banner_wall (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: e25f29a4cdcb3eb45aca80075b50e26b, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9331,6 +9735,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -9405,6 +9813,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (14)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -9536,6 +9948,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9594,6 +10010,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2 (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
@@ -9668,6 +10088,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (14)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -9928,6 +10352,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (16)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -10182,6 +10610,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -10330,6 +10762,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_Name
       value: Big Floor Tile (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_LocalScale.x
@@ -10480,6 +10916,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (13)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -10563,6 +11003,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -10637,6 +11081,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -10710,6 +11158,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -10837,6 +11289,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (17)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -10911,6 +11367,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (7)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -10932,6 +11392,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -11063,7 +11527,7 @@ Light:
     serializedVersion: 2
     m_Bits: 4294967295
   m_RenderingLayerMask: 1
-  m_Lightmapping: 4
+  m_Lightmapping: 1
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 0
@@ -11265,6 +11729,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (9)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -11445,6 +11913,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Chair
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: f22aa08ed0a32e644b421b8e5511d339, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -11518,6 +11990,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
       propertyPath: m_Name
       value: Floor_Modular (9)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -11593,6 +12069,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (10)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -11614,6 +12094,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (17)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -11688,6 +12172,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
@@ -11965,6 +12453,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -12043,6 +12535,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (10)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -12120,6 +12616,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (9)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -12250,6 +12750,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -12427,6 +12931,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2 (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -12500,6 +13008,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (17)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -12627,6 +13139,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (16)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -12685,6 +13201,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (9)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -12812,6 +13332,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -12833,6 +13357,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -12960,6 +13488,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (14)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -12981,6 +13513,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
@@ -13056,6 +13592,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -13129,6 +13669,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (11)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -13255,6 +13799,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (8)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -13328,6 +13876,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (5)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -13439,6 +13991,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -13512,6 +14068,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (11)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -13704,6 +14264,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (6)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -13834,6 +14398,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -13855,6 +14423,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2 (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
@@ -13982,6 +14554,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -14003,6 +14579,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (5)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -14078,6 +14658,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (7)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -14151,6 +14735,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -14395,6 +14983,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Column (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: cad6bd9cca0195b4687b18b8d3358902, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -14491,6 +15083,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -14565,6 +15161,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (13)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -14638,6 +15238,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2 (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
@@ -14765,6 +15369,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (10)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -14876,6 +15484,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -14949,6 +15561,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (14)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -15076,6 +15692,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (18)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -15154,6 +15774,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Torch (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 170bb9aaa93b52c48b0d3fd73535c586, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -15178,6 +15802,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -15338,6 +15966,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (11)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -15468,6 +16100,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Torch (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 170bb9aaa93b52c48b0d3fd73535c586, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -15545,6 +16181,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -15566,6 +16206,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -15769,6 +16413,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (8)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -15843,6 +16491,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Bucket
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 5869e3673393b3341b6bb83f0235dea5, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -15864,6 +16516,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (10)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -15975,6 +16631,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -16101,6 +16761,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -16314,6 +16978,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -16463,6 +17131,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Skull
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: b8a20cbb08beb5a49a5038c9da8a26b1, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -16537,6 +17209,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (14)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -16607,9 +17283,21 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7777292977246879666, guid: bdca320f74588434f875e8e66dbaba74, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: -4706452340541456491, guid: bdca320f74588434f875e8e66dbaba74, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: bdca320f74588434f875e8e66dbaba74, type: 3}
       propertyPath: m_Name
       value: Sword_WallMount
+      objectReference: {fileID: 0}
+    - target: {fileID: 1051022584045285515, guid: bdca320f74588434f875e8e66dbaba74, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -16812,6 +17500,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -16937,6 +17629,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -17146,6 +17842,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -17219,6 +17919,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_Name
       value: Big Floor Tile (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_LocalScale.x
@@ -17346,6 +18050,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (12)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -17371,6 +18079,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (11)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -17434,6 +18146,66 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
   m_PrefabInstance: {fileID: 1585777296}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1601878670
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1601878672}
+  - component: {fileID: 1601878671}
+  m_Layer: 0
+  m_Name: Light probes
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!220 &1601878671
+LightProbeGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1601878670}
+  m_Enabled: 1
+  m_SourcePositions:
+  - {x: -2.7, y: -0.07399997, z: -2.200019}
+  - {x: -2.7, y: 1.278, z: -2.200019}
+  - {x: -2.7, y: 2.6299999, z: -2.200019}
+  - {x: -0.29999995, y: -0.07399997, z: -2.200019}
+  - {x: -0.29999995, y: 1.278, z: -2.200019}
+  - {x: -0.29999995, y: 2.6299999, z: -2.200019}
+  - {x: 2.1000001, y: -0.07399997, z: -2.200019}
+  - {x: 2.1000001, y: 1.278, z: -2.200019}
+  - {x: 2.1000001, y: 2.6299999, z: -2.200019}
+  - {x: -2.7, y: -0.07399997, z: 0.19998121}
+  - {x: -2.7, y: 1.278, z: 0.19998121}
+  - {x: -2.7, y: 2.6299999, z: 0.19998121}
+  - {x: -0.29999995, y: -0.07399997, z: 0.19998121}
+  - {x: -0.29999995, y: 1.278, z: 0.19998121}
+  - {x: -0.29999995, y: 2.6299999, z: 0.19998121}
+  - {x: 2.1000001, y: -0.07399997, z: 0.19998121}
+  - {x: 2.1000001, y: 1.278, z: 0.19998121}
+  - {x: 2.1000001, y: 2.6299999, z: 0.19998121}
+  m_Dering: 1
+--- !u!4 &1601878672
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1601878670}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1603661198
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -17445,6 +18217,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2 (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
@@ -17519,6 +18295,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (12)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -17662,6 +18442,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Arch
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: c4f73b87a4ba2974194b13afc100e74d, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -17740,6 +18524,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Torch (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 170bb9aaa93b52c48b0d3fd73535c586, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -17764,6 +18552,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (8)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -17843,6 +18635,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -18109,6 +18905,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (18)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -18187,6 +18987,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -18260,6 +19064,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (19)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -18391,6 +19199,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -18412,6 +19224,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
@@ -18538,6 +19354,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (12)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -18693,6 +19513,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -18772,6 +19596,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (7)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -18849,6 +19677,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -18976,6 +19808,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (15)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -18997,6 +19833,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -19071,6 +19911,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_Name
       value: Big Floor Tile (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_LocalScale.x
@@ -19231,6 +20075,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (8)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -19361,6 +20209,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Torch (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 170bb9aaa93b52c48b0d3fd73535c586, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -19437,6 +20289,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (5)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -19524,6 +20380,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Banner_wall
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: e25f29a4cdcb3eb45aca80075b50e26b, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -19545,6 +20405,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 2 (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b3f02ff2e1fdb1b49ae01b769574c826, type: 3}
       propertyPath: m_LocalScale.x
@@ -19620,6 +20484,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (15)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -19693,6 +20561,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (13)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -19768,6 +20640,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -19842,6 +20718,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 4 (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 1940969865657354a8510c7ad82e63be, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 1940969865657354a8510c7ad82e63be, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -19915,6 +20795,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -20042,6 +20926,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -20115,6 +21003,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (11)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
@@ -20194,6 +21086,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (9)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -20215,6 +21111,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (10)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -20341,6 +21241,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (13)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -21088,6 +21992,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (15)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -21162,6 +22070,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -21235,6 +22147,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (7)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -21413,7 +22329,7 @@ Light:
     serializedVersion: 2
     m_Bits: 4294967295
   m_RenderingLayerMask: 1
-  m_Lightmapping: 1
+  m_Lightmapping: 2
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 0
@@ -21592,7 +22508,7 @@ Light:
     serializedVersion: 2
     m_Bits: 4294967295
   m_RenderingLayerMask: 1
-  m_Lightmapping: 4
+  m_Lightmapping: 2
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 0
@@ -21840,7 +22756,7 @@ Light:
     serializedVersion: 2
     m_Bits: 4294967295
   m_RenderingLayerMask: 1
-  m_Lightmapping: 4
+  m_Lightmapping: 2
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 0
@@ -22055,7 +22971,7 @@ Light:
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 60, y: 60}
   m_Shadows:
-    m_Type: 2
+    m_Type: 0
     m_Resolution: -1
     m_CustomResolution: -1
     m_Strength: 0.75
@@ -22088,7 +23004,7 @@ Light:
     serializedVersion: 2
     m_Bits: 4294967295
   m_RenderingLayerMask: 1
-  m_Lightmapping: 4
+  m_Lightmapping: 2
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 0
@@ -22671,7 +23587,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 5
   m_IsActive: 1
 --- !u!4 &1900005001
 Transform:
@@ -22846,7 +23762,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 5
   m_IsActive: 1
 --- !u!4 &1900007001
 Transform:
@@ -22931,6 +23847,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -23084,6 +24004,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -23239,6 +24163,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (8)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -23365,6 +24293,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (7)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -23386,6 +24318,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_Name
       value: Big Floor Tile (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 344dc72c0efa28e4a98da96cf6567f61, type: 3}
       propertyPath: m_LocalScale.x
@@ -23460,6 +24396,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
@@ -23587,6 +24527,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_Modular (3)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -23608,6 +24552,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (19)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -23835,6 +24783,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (15)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -24005,6 +24957,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (17)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -24082,6 +25038,10 @@ PrefabInstance:
     - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: m_Name
       value: Wall Tile (15)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -24180,6 +25140,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -24253,6 +25217,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile 2 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 9dec9408adcaf234191d3e34fb6f76e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -24379,6 +25347,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
       propertyPath: m_Name
       value: Floor_Modular (11)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8776101544022894181f5ac1477862f0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -24618,6 +25590,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Big Floor Tile 3 (6)
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: 18fcbf9920d83964e94453cd322aae8e, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -24811,6 +25787,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (11)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -24885,6 +25865,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (14)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5872048744372070402, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -24947,6 +25931,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_Name
       value: Cracked Wall Tile (20)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
@@ -25222,6 +26210,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cracked Wall Tile
       objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: b0cc16a5bc030494ba4a7f9210959fdf, type: 3}
       propertyPath: m_LocalScale.x
       value: 2
@@ -25348,6 +26340,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wall Tile (17)
       objectReference: {fileID: 0}
+    - target: {fileID: 3181260714520515735, guid: 14bfaed0a727cdb4380f895f30866a40, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -25369,6 +26365,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -25443,6 +26443,10 @@ PrefabInstance:
     - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_Name
       value: Cracked Small Floor Tiles (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2534866582062065790, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3248338879622491336, guid: a4a21545b0946c64392ba000cf05d639, type: 3}
       propertyPath: m_LocalScale.x
@@ -25536,3 +26540,4 @@ SceneRoots:
   - {fileID: 274412509}
   - {fileID: 2053575830}
   - {fileID: 946823876}
+  - {fileID: 1601878672}

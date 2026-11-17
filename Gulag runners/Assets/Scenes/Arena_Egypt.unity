@@ -15,11 +15,11 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 1
-  m_FogColor: {r: 0.06, g: 0.08, b: 0.14, a: 1}
+  m_FogColor: {r: 0.74, g: 0.79, b: 0.84, a: 1}
   m_FogMode: 1
   m_FogDensity: 0.01
-  m_LinearFogStart: 14
-  m_LinearFogEnd: 46
+  m_LinearFogStart: 9.96
+  m_LinearFogEnd: 34
   m_AmbientSkyColor: {r: 0.08, g: 0.1, b: 0.16, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
@@ -445,6 +445,46 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7368489861978567794, guid: 946048f2a8e961d42985e902006b2942, type: 3}
   m_PrefabInstance: {fileID: 2100000143}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &328073706
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 960000732}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 217b939720e342438251b4623c555589, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MatchTally
+  matchState: {fileID: 960000733}
+  chestsOpened: 0
+  locksPicked: 0
+  locksForced: 0
+  wrongTouches: 0
+  seriesLocksPicked: 0
+  seriesRoundsWon0: 0
+  seriesRoundsWon1: 0
+  substituted: 0
+--- !u!114 &328073707
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 960000732}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77b8596b7bfc492bad7838203250c32e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MatchLog
+  matchState: {fileID: 960000733}
+  tally: {fileID: 328073706}
+  result: {fileID: 0}
+  fileName: gulag-matches.csv
+  recording: 1
+  alsoLog: 0
+  lastRow: 
 --- !u!4 &329150243 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: e0aeea7a088875043a97f89f5762f0f7, type: 3}
@@ -125811,6 +125851,8 @@ GameObject:
   - component: {fileID: 960000735}
   - component: {fileID: 960000734}
   - component: {fileID: 960000733}
+  - component: {fileID: 328073707}
+  - component: {fileID: 328073706}
   m_Layer: 0
   m_Name: SimWorld
   m_TagString: Untagged
@@ -128709,7 +128751,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7.0
+  m_Range: 7
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -128835,7 +128877,7 @@ Transform:
   m_GameObject: {fileID: 970100007}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.960, y: 2.074, z: 0.238}
+  m_LocalPosition: {x: -9.96, y: 2.074, z: 0.238}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -128997,7 +129039,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7.0
+  m_Range: 7
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -129123,7 +129165,7 @@ Transform:
   m_GameObject: {fileID: 970100017}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.451, y: 2.570, z: 0.332}
+  m_LocalPosition: {x: -2.451, y: 2.57, z: 0.332}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -129141,7 +129183,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7.0
+  m_Range: 7
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -129267,7 +129309,7 @@ Transform:
   m_GameObject: {fileID: 970100022}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.224, y: 6.336, z: 2.890}
+  m_LocalPosition: {x: 2.224, y: 6.336, z: 2.89}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -130306,7 +130348,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 0.64, g: 0.74, b: 1, a: 1}
-  m_Intensity: 0.8
+  m_Intensity: 1.5
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -130368,7 +130410,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1528419289}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.4997392, y: -0.2073675, z: 0.1245990, w: 0.8317058}
+  m_LocalRotation: {x: 0.4997392, y: -0.2073675, z: 0.124599, w: 0.8317058}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -131457,7 +131499,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7.0
+  m_Range: 7
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -131601,7 +131643,7 @@ Light:
   m_Type: 2
   m_Color: {r: 1, g: 0.72, b: 0.38, a: 1}
   m_Intensity: 2.4
-  m_Range: 7.0
+  m_Range: 7
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -139529,7 +139571,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 75f4f099b50a00a49a2e615ae8a967ef, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 7.55
+      value: 7.35
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 75f4f099b50a00a49a2e615ae8a967ef, type: 3}
       propertyPath: m_LocalPosition.z
@@ -142807,7 +142849,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 75f4f099b50a00a49a2e615ae8a967ef, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 7.53
+      value: 7.35
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 75f4f099b50a00a49a2e615ae8a967ef, type: 3}
       propertyPath: m_LocalPosition.z
@@ -143015,6 +143057,10 @@ PrefabInstance:
     - target: {fileID: 3789298612972475192, guid: 8467af37969c87341a194898417f0f75, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4549065150673228899, guid: 8467af37969c87341a194898417f0f75, type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4602005572658301314, guid: 8467af37969c87341a194898417f0f75, type: 3}
       propertyPath: m_LocalPosition.x
