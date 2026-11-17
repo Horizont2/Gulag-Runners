@@ -48,7 +48,10 @@ namespace GulagRunners.GameEditor
             { "Arena_Mine", "mine" },
             { "Arena_Forest", "forest" },
             { "Arena_Nordic fortress", "nordic" },
-            { "loc3_new", "temple" },
+            // The night temple. Named loc3_new until the scene was renamed; a theme table keyed
+            // on scene names is only as good as the day somebody renames one, which is why
+            // backdrop_check reads this table rather than keeping its own copy.
+            { "Arena_Egypt", "temple" },
         };
 
         [Serializable]

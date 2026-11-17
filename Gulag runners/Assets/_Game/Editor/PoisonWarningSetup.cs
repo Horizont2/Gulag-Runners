@@ -86,6 +86,18 @@ namespace GulagRunners.GameEditor
                 Bounds box = pool.Flooded;
                 List<ParticleSystem> made = new List<ParticleSystem>();
 
+                // The jets go on the FIGHT PLANE, not down the middle of the pool.
+                //
+                // Flooded is a MEASUREMENT volume: it spans the whole depth of the arena so
+                // the simulation can tell whether a body on any slice is under the surface.
+                // In Arena_Mine and Arena_Egypt it runs from z -3.4 to +5.2 and its centre
+                // is at +0.9, while the fighters stand at -2.12. Putting the vents at that
+                // centre buried them three metres back, inside and behind the lowest
+                // storey's own geometry -- which is what "the gas appears behind the arena"
+                // was. The pool knows how deep it reaches; only the fighters know where the
+                // fight is.
+                float jetZ = FightPlane(box.center.z);
+
                 Transform old_ = pool.transform.Find("Vents");
                 if (old_ != null) Undo.DestroyObjectImmediate(old_.gameObject);
 
@@ -101,7 +113,7 @@ namespace GulagRunners.GameEditor
                     Undo.RegisterCreatedObjectUndo(vent, "Announce the gas");
                     vent.name = $"Vent {i + 1}";
                     vent.transform.position = new Vector3(
-                        Mathf.Lerp(box.min.x, box.max.x, t), box.min.y, box.center.z);
+                        Mathf.Lerp(box.min.x, box.max.x, t), box.min.y, jetZ);
 
                     ParticleSystem ps = vent.GetComponent<ParticleSystem>();
                     if (ps != null) made.Add(ps);
@@ -129,5 +141,27 @@ namespace GulagRunners.GameEditor
                           : $"{vents} vent(s) burst out of the floor."),
                       warn);
         }
+
+        /// <summary>
+        /// The depth the fighters actually stand on.
+        ///
+        /// Asked of the fighters first, because planeZ on a PlayerController is the number
+        /// the simulation uses; the camera's copy is derived from it and can be stale if
+        /// depthFromPlayer is on. The fallback is whatever was passed in, so a scene with
+        /// neither still gets vents somewhere rather than none.
+        /// </summary>
+        static float FightPlane(float fallback)
+        {
+            PlayerController fighter = Object.FindFirstObjectByType<PlayerController>(
+                FindObjectsInactive.Include);
+            if (fighter != null) return fighter.planeZ;
+
+            SideViewCamera rig = Object.FindFirstObjectByType<SideViewCamera>(
+                FindObjectsInactive.Include);
+            if (rig != null) return rig.planeZ;
+
+            return fallback;
+        }
+
     }
 }

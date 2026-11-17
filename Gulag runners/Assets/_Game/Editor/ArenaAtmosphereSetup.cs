@@ -25,7 +25,7 @@ namespace GulagRunners.GameEditor
     /// Every effect this project builds for hits, dust and gas has playOnAwake off, because
     /// each is fired by an event, so the two kinds cannot be confused.
     ///
-    /// Only loc3_new, the night temple, has empty air, and it gets fine sand drifting on the
+    /// Only Arena_Egypt, the night temple, has empty air, and it gets fine sand drifting on the
     /// wind. The emitter is sized from the arena's own borders rather than from a number
     /// typed here, so it covers whatever the arena actually is.
     /// </summary>
@@ -53,7 +53,7 @@ namespace GulagRunners.GameEditor
         static readonly Dictionary<string, Air> Moods = new Dictionary<string, Air>
         {
             {
-                "loc3_new", new Air
+                "Arena_Egypt", new Air
                 {
                     name = "Sand on the wind",
                     // Warm and pale, and very faint. Lit sand at night is not yellow, it is
