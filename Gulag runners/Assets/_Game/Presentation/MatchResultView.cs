@@ -148,7 +148,13 @@ namespace GulagRunners.Game
                             : _winner < 0 || _winner > 1 ? drawText
                             : lostText;
 
-            if (panel != null) panel.SetActive(true);
+            if (panel != null)
+            {
+                // The end of a round is the most felt moment in a match and it was a cut.
+                if (panel.GetComponent<PanelRise>() == null)
+                    panel.AddComponent<PanelRise>();
+                panel.SetActive(true);
+            }
             HeadlineChanged?.Invoke(headline);
             ScoreChanged?.Invoke(string.Format(scoreFormat, mine, theirs));
             Shown?.Invoke(_winner);

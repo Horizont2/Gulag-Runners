@@ -293,6 +293,12 @@ namespace GulagRunners.Game
             if (openPanel == which) { CloseAll(); return; }
 
             CloseAll();
+
+            // Every panel in this menu came up with a cut. One component fixes all five,
+            // and adding it here rather than in the scene means a panel built later gets
+            // it too -- which is the half that always gets forgotten.
+            if (panel.GetComponent<PanelRise>() == null) panel.AddComponent<PanelRise>();
+
             panel.SetActive(true);
             if (homePanel != null) homePanel.SetActive(false);
             openPanel = which;

@@ -135,6 +135,25 @@ namespace GulagRunners.Game
 
         [Tooltip("Stamina charges, in order. One per charge the fighter can hold.")]
         public Graphic[] pips = Array.Empty<Graphic>();
+
+        /// <summary>
+        /// THE CHIP BAR: the damage just taken, still draining.
+        ///
+        /// Built at runtime from the fill rather than asked for in the scene, because it is
+        /// a copy of a thing that already exists and nobody should have to keep the two in
+        /// step by hand. Sits BEHIND the fill, in the danger colour, and follows the health
+        /// a good deal slower -- so a blow leaves a bright wound that closes over the next
+        /// half second, and the size of that wound is how hard you were hit.
+        ///
+        /// Every fighting game has this and it is the reason their bars read as damage
+        /// rather than as a number changing.
+        /// </summary>
+        [System.NonSerialized] public RectTransform chipRect;
+        [System.NonSerialized] public Graphic chip;
+
+        /// <summary>Where the drawn bar is now, as a share. Chased, not assigned.</summary>
+        [System.NonSerialized] public float shown = -1f;
+        [System.NonSerialized] public float chipShown = -1f;
     }
 
     /// <summary>One square of the equipment column, and which slot it is reading.</summary>
@@ -469,6 +488,47 @@ namespace GulagRunners.Game
 
         // ---------------------------------------------------------------- the top bar
 
+        [Header("How the bars move")]
+        [Tooltip("Seconds for the health bar to cover the gap to its true value. Short: " +
+                 "it has to read as the blow landing, not as the bar making up its mind.")]
+        [Range(0.02f, 0.5f)] public float barCatchUp = 0.09f;
+
+        [Tooltip("Seconds for the chip behind it to catch up. Long enough that the wound " +
+                 "is still open while the exchange is being read, and gone before the " +
+                 "next one.")]
+        [Range(0.1f, 2f)] public float chipCatchUp = 0.55f;
+
+        /// <summary>
+        /// The chip bar, made from the fill the first time it is needed.
+        ///
+        /// A copy of the fill's own object, inserted as the sibling just before it so it
+        /// draws behind, with the same anchors -- which is what makes it drain from the
+        /// same side without anybody saying which side that is. Built here rather than in
+        /// HudBuilder so an already-built HUD gains it without being rebuilt.
+        /// </summary>
+        void Chip(HudBar bar)
+        {
+            if (bar.chipRect != null || bar.fillRect == null) return;
+            if (!Application.isPlaying) return;      // never leave one in a saved scene
+
+            Transform parent = bar.fillRect.parent;
+            if (parent == null) return;
+
+            GameObject made = Instantiate(bar.fillRect.gameObject, parent);
+            made.name = bar.fillRect.name + " / chip";
+            made.hideFlags = HideFlags.DontSave;
+
+            // Anything hanging off the fill -- a shine, a cap -- would be duplicated too.
+            foreach (Transform child in made.transform) Destroy(child.gameObject);
+
+            RectTransform rt = made.GetComponent<RectTransform>();
+            rt.SetSiblingIndex(bar.fillRect.GetSiblingIndex());   // behind the fill
+
+            bar.chipRect = rt;
+            bar.chip = made.GetComponent<Graphic>();
+            if (bar.chip != null) bar.chip.raycastTarget = false;
+        }
+
         void PaintBar(HudBar bar, PlayerController player, bool mine)
         {
             if (bar == null) return;
@@ -506,9 +566,35 @@ namespace GulagRunners.Game
             if (bar.fillRect != null && max > 0)
             {
                 float share = Mathf.Clamp01(health / (float)max);
+                float dt = Application.isPlaying ? Time.deltaTime : 0f;
+
+                // First frame, or the editor: land on it. Easing from a bar that was never
+                // drawn would show it filling up from nothing every time the HUD appears.
+                if (bar.shown < 0f || dt <= 0f) { bar.shown = share; bar.chipShown = share; }
+
+                // The fill catches up quickly -- quickly enough to read as the hit landing
+                // rather than as a bar deciding -- and the chip behind it takes its time.
+                bar.shown = Ease.Towards(bar.shown, share, barCatchUp, dt);
+
+                // The chip only ever follows DOWNWARDS. Healing, or a new round dealing
+                // full health, should not leave a red band growing behind the bar.
+                bar.chipShown = share >= bar.chipShown
+                    ? share
+                    : Ease.Towards(bar.chipShown, share, chipCatchUp, dt);
+
+                Chip(bar);
+                if (bar.chipRect != null)
+                {
+                    Vector3 cs = bar.chipRect.localScale;
+                    bar.chipRect.localScale = new Vector3(bar.chipShown, cs.y, cs.z);
+                    if (bar.chip != null)
+                        Tint(bar.chip, Fade(palette.danger,
+                                            bar.chipShown - bar.shown > 0.004f ? 1f : 0f));
+                }
+
                 Vector3 scale = bar.fillRect.localScale;
-                if (!Mathf.Approximately(scale.x, share))
-                    bar.fillRect.localScale = new Vector3(share, scale.y, scale.z);
+                if (!Mathf.Approximately(scale.x, bar.shown))
+                    bar.fillRect.localScale = new Vector3(bar.shown, scale.y, scale.z);
             }
 
             // What the opponent has left to spend is THEIR information. Shown, it turns

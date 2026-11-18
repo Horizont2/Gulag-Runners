@@ -262,6 +262,15 @@ namespace GulagRunners.Game
                 while (!_released) yield return null;
             }
 
+            // DARK BEFORE THE SWAP, light after. Without this the camera is mid-walk
+            // through a portcullis on one frame and standing in a mine on the next -- the
+            // gate move hides the WAIT, which is why nobody missed this, but it cannot
+            // hide the join. ScreenFade survives the load and brings itself back once the
+            // arena has drawn, so the arrival reads as a reveal rather than a swap.
+            ScreenFade fade = ScreenFade.Instance;
+            fade.Out();
+            while (fade.Dark < 0.98f) yield return null;
+
             state = "handing over";
             load.allowSceneActivation = true;
         }
