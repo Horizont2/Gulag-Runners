@@ -47,12 +47,16 @@ namespace GulagRunners.Game
         [Tooltip("Share of the hold the smoke takes to get out of the frame. The rest of " +
                  "the hold is the countdown on its own, which is what the second and third " +
                  "rounds are entirely.")]
-        [Range(0.15f, 1f)] public float clearBy = 0.85f;
+        [Range(0.15f, 1f)] public float clearBy = 0.95f;
 
         [Tooltip("Share of the clearing window by which the NEAREST layer is gone. The " +
                  "furthest is gone exactly at the end, and the ones between are spread " +
-                 "across. This is what makes the depth: they all leave, at different times.")]
-        [Range(0.2f, 1f)] public float nearDoneBy = 0.50f;
+                 "across. This is what makes the depth: they all leave, at different times.\n\n" +
+                 "LOWER is MORE spread, not less -- it is where the first layer finishes, so " +
+                 "raising it bunches the four together. Measured off the preview at 0.55, " +
+                 "the four leave at 1.18, 1.46, 1.74 and 2.00 seconds of the three second " +
+                 "hold, which leaves a second of open arena before control comes back.")]
+        [Range(0.2f, 1f)] public float nearDoneBy = 0.55f;
 
         [Tooltip("How far each layer is offset sideways at rest, in frame widths. Without " +
                  "it the four start exactly on top of one another and the first frame of " +
@@ -62,6 +66,16 @@ namespace GulagRunners.Game
         [Tooltip("How much wider than the frame a layer is, as a multiple. It has to still " +
                  "cover the frame once it has started moving.")]
         [Range(1.1f, 3f)] public float coverWide = 1.35f;
+
+        [Tooltip("How much TALLER than the frame a layer is, as a multiple.\n\n" +
+                 "Reported as \"half way through you can see the edge of the foreground " +
+                 "as a texture hanging in the air\". That edge is the top or the bottom " +
+                 "of the quad: the band fills its image almost to the edge, so those two " +
+                 "boundaries are nearly straight lines, and at 1.5 the quad was short " +
+                 "enough for one of them to come into shot as the camera moved.\n\n" +
+                 "The only edge of this that should ever be seen is the ragged end of the " +
+                 "bank. Height is free -- the texture stretches, and smoke has no scale.")]
+        [Range(1.2f, 6f)] public float coverHigh = 3.2f;
 
         [Tooltip("How dark the NEAREST layer is against the furthest, which is the tint as " +
                  "given. Without a difference between them the four are one flat field of " +
@@ -139,19 +153,27 @@ namespace GulagRunners.Game
                 float by = Mathf.Lerp(nearDoneBy, 1f, depths.Length <= 1
                     ? 1f : i / (float)(depths.Length - 1));
                 float own = Mathf.Clamp01(t / Mathf.Max(0.01f, by));
-                // Ease OUT: moving from the first frame, settling rather than stopping.
+                // Nearly linear, with just enough ease to not start on a jolt.
                 //
-                // The curve was the wrong thing to blame, and I blamed it twice. A cube, then
-                // a square, then smoothstep -- and smoothstep was the worst of the three to
-                // watch, because its slow start lands on top of a head start that is already
-                // invisible. The real fault was the WIDTH: at 1.9 frames the quad's edge
-                // begins 0.45 of a frame outside the picture, so nearly a third of every
-                // layer's travel happens off screen. Nothing, nothing, nothing, then a sweep.
+                // Two separate faults got blamed on this one line, and only the second was
+                // its own. The FIRST was the dead start: nothing, nothing, nothing, then a
+                // sweep. A cube, a square and a smoothstep all failed to fix it because the
+                // fault was the WIDTH -- at 1.9 frames the quad's edge begins 0.45 of a frame
+                // outside the picture, so a third of every layer's travel happened off
+                // screen. Narrower quads fixed that, not a curve.
                 //
-                // Narrower quads put the edges almost at the frame, so the first thing the
-                // smoke does is visible, and an ease-out then reads as a bank being drawn
-                // aside rather than yanked.
-                float eased = 1f - (1f - own) * (1f - own);
+                // The SECOND is this: reported as still too fast, and measured off the
+                // preview strip, the frame was clear at 1.45s of a three second hold even
+                // with the window stretched to 0.95 of it. A square ease-out covers 76% of
+                // its travel in the first 51% of its time, so widening the window moves the
+                // end hardly at all -- the layer is simply gone before the window is spent.
+                //
+                // Travel needed to clear is (coverWide + 1) / 2, so the exponent that lands
+                // the last layer at two seconds solves (1-t)^p = 1 - 1.052/1.375 with t at
+                // 0.70, which is p = 1.2. Its speed falls from 1.2 to 0.94 across the whole
+                // move: a bank being drawn steadily aside, which is what a parting does, and
+                // the opposite of a curve that spends itself in the first half.
+                float eased = 1f - Mathf.Pow(1f - own, 1.2f);
 
                 // Far enough that the trailing edge is off the frame: half the quad plus
                 // half the frame, and a little over.
@@ -222,7 +244,7 @@ namespace GulagRunners.Game
                 // Wider than the frame, because it has to still be covering it after it has
                 // started moving, and taller because the ends are ragged.
                 go.transform.localPosition = new Vector3(0f, 0f, depth);
-                go.transform.localScale = new Vector3(wide * coverWide, high * 1.5f, 1f);
+                go.transform.localScale = new Vector3(wide * coverWide, high * coverHigh, 1f);
 
                 go.AddComponent<MeshFilter>().sharedMesh = quad;
                 MeshRenderer r = go.AddComponent<MeshRenderer>();

@@ -48,6 +48,24 @@ namespace GulagRunners.Game
             CageDoor = 0,
 
             /// <summary>
+            /// COMING OUT OF THE SMOKE. No boom, no descent, no shoves: the camera starts
+            /// pushed in towards the fight and eases straight back to the playing framing
+            /// while RoundIntroSmoke parts in front of it.
+            ///
+            /// It exists because the other three fight the reveal. The cage shot's two
+            /// jerks are somebody hauling a grille up, and there are no grilles left --
+            /// the cages were taken out of every arena. The crane and the shaft both
+            /// arrive from ABOVE, so the camera is descending through a bank of smoke that
+            /// is sliding sideways, and the two movements have nothing to do with each
+            /// other. Reported as "the camera still goes top-down and it does not feel
+            /// like clouds opening", which is exactly what two unrelated moves look like.
+            ///
+            /// A dolly out is the one move that agrees with it: something was close and
+            /// in the way, and now it is not.
+            /// </summary>
+            Emerge = 3,
+
+            /// <summary>
             /// A crane, high and pitched down, booming down to the playing framing.
             ///
             /// For a location that opens onto itself rather than out of a box -- the
@@ -203,6 +221,17 @@ namespace GulagRunners.Game
                  "is. Small: this is a hint of parallax, not a dolly.")]
         public float craneLead = 1.4f;
 
+        [Header("Coming out of the smoke (Style: Emerge only)")]
+        [Tooltip("Emerge: how far in towards the fight the shot starts, as a share of the " +
+                 "playing distance. 0.18 is close enough to feel like being inside " +
+                 "something and far enough that nothing clips the fighter.")]
+        [Range(0.02f, 0.6f)] public float emergeClose = 0.18f;
+
+        [Tooltip("Emerge: how long it holds at the opening framing before easing out, as " +
+                 "a share of the phase. The smoke is in front of the camera for the first " +
+                 "part of it, so there is nothing to see moving yet.")]
+        [Range(0f, 0.6f)] public float emergeHold = 0.08f;
+
         [Header("The shaft (Style: Shaft only)")]
         [Tooltip("How far above the fighter the descent starts, in metres.\n\n" +
                  "This is the one number in the whole component that can give the match " +
@@ -258,7 +287,8 @@ namespace GulagRunners.Game
             float t = m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne;
             bool crane = style == IntroStyle.Crane;
             bool shaft = style == IntroStyle.Shaft;
-            bool eased = crane || shaft;      // both arrive under their own weight
+            bool emerge = style == IntroStyle.Emerge;
+            bool eased = crane || shaft || emerge;   // all arrive under their own weight
 
             // 1 while the opening frame holds, easing to 0 by the time the phase is up — and
             // overshooting a little past the end, so the camera is RELEASED rather than
@@ -270,8 +300,9 @@ namespace GulagRunners.Game
             // is pulling a tenth of a g, which on a two-second move you see as a flinch at
             // the start and a clip at the finish. Smootherstep is zero in the second
             // derivative as well, so the boom takes up its own weight. It costs one multiply.
-            float k = Mathf.InverseLerp(shaft ? shaftHold : crane ? craneHold : holdUntil,
-                                        settledBy, t);
+            float k = Mathf.InverseLerp(
+                shaft ? shaftHold : crane ? craneHold : emerge ? emergeHold : holdUntil,
+                settledBy, t);
             float close = 1f - (eased ? Smoother(k) : Smooth(k));
 
             // The release: out past the mark and back onto it, inside the gap between
@@ -329,6 +360,20 @@ namespace GulagRunners.Game
                 // invisible: there is no frame where two cameras disagree.
                 facing_ = Quaternion.Slerp(
                     facing_, Quaternion.LookRotation(focus - at, Vector3.up), close);
+            }
+            else if (emerge)
+            {
+                // Straight down the sightline, towards the fight and back out. No height
+                // change and no turn at all: the smoke is doing the work, and a camera
+                // that also swings turns a reveal into two things happening at once.
+                Vector3 forward = cam.forward;
+                Vector3 focus = FocusPoint(at, forward);
+                Vector3 arm = at - focus;
+                if (arm.sqrMagnitude < 4f) { arm = -forward * 8f; focus = at - arm; }
+
+                // `close` is 1 at the opening frame and 0 at the playing framing, so the
+                // camera starts emergeClose of the way in and eases out along its own arm.
+                at = focus + arm * (1f - emergeClose * close);
             }
             else if (shaft)
             {

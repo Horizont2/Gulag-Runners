@@ -403,10 +403,12 @@ def shot(t, at, rot, intro, pivot, facing):
     """RoundIntroCamera's answer for one frame. Mirrors LateUpdate, in its order."""
     crane = intro.get("style") == "1"
     shaft = intro.get("style") == "2"
-    eased = crane or shaft
+    emerge = intro.get("style") == "3"
+    eased = crane or shaft or emerge
 
     hold = (number(intro, "shaftHold", 0.1) if shaft else
             number(intro, "craneHold", 0.14) if crane else
+            number(intro, "emergeHold", 0.08) if emerge else
             number(intro, "holdUntil", 0.52))
     k = inverse_lerp(hold, number(intro, "settledBy", 0.86), t)
     close = 1.0 - (smoother(k) if eased else smooth(k))
@@ -430,6 +432,17 @@ def shot(t, at, rot, intro, pivot, facing):
         high = add(add(focus, (0.0, number(intro, "shaftHeight", 13.0), 0.0)), flat)
         at = add(mul(at, 1.0 - close), mul(high, close))
         rot = q_slerp(rot, q_look(sub(focus, at)), close)
+    elif emerge:
+        # Straight down the sightline and back out: no height change and no turn, so
+        # the smoke is the only thing moving across the frame. The rotation is left
+        # exactly as the playing camera has it, which is why nothing below needs to
+        # blend it back.
+        focus = pivot
+        arm = sub(at, focus)
+        if dot(arm, arm) < 4.0:
+            arm = mul(forward, -8.0)
+            focus = sub(at, arm)
+        at = add(focus, mul(arm, 1.0 - number(intro, "emergeClose", 0.18) * close))
     elif crane:
         focus = pivot
         arm = sub(at, focus)
@@ -517,8 +530,11 @@ def main(argv):
             facing = mine[2]
             crane = intro.get("style") == "1"
             shaft = intro.get("style") == "2"
-            label = (f"  camera {i + 1} "
-                     f"({'shaft' if shaft else 'crane' if crane else 'cage door'})")
+            emerge = intro.get("style") == "3"
+            eased = crane or shaft or emerge
+            shot_name = ("shaft" if shaft else "crane" if crane
+                         else "emerge" if emerge else "cage door")
+            label = f"  camera {i + 1} ({shot_name})"
 
             at0, rot0, view_height, fov = playing(mine, view, 0.91)
             pivot = (mine[0], mine[1], mine[3])
@@ -564,7 +580,7 @@ def main(argv):
                     f"into the opening. docs/01 is built on not knowing where they are, "
                     f"and this hands it over before the fight starts.")
 
-            if (crane or shaft) and ratio > STEP_RATIO:
+            if eased and ratio > STEP_RATIO:
                 problems.append(
                     f"{name}{label}: the peak acceleration grows x{ratio:.2f} when the "
                     f"shot is sampled twice as finely, which means the camera's SPEED "
@@ -572,7 +588,7 @@ def main(argv):
                     f"the device runs. A crane that snaps is what this style exists to "
                     f"stop doing.")
 
-            if (crane or shaft) and peak_a > VIOLENT:
+            if eased and peak_a > VIOLENT:
                 problems.append(
                     f"{name}{label}: peaks at {peak_a:.1f} m/s^2. Smooth, but that is a "
                     f"camera being thrown rather than boomed.")

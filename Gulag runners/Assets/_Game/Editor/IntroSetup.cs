@@ -84,11 +84,25 @@ namespace GulagRunners.GameEditor
             foreach (RoundIntroCamera intro in Object.FindObjectsByType<RoundIntroCamera>(
                          FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
-                if (intro.firstRoundOnly == 1) continue;
+                bool already = intro.firstRoundOnly == 1
+                               && intro.style == RoundIntroCamera.IntroStyle.Emerge;
+                if (already) continue;
+
                 Undo.RecordObject(intro, "Build the round opening");
                 intro.firstRoundOnly = 1;
+
+                // THE MOVE HAS TO AGREE WITH THE SMOKE. The arenas were on three different
+                // shots -- Forest on the cage door, Egypt and Mine on the shaft, Nordic on
+                // the crane -- and all three fight the reveal. The cage shot's two jerks
+                // are somebody hauling a grille up and there are no grilles left; the
+                // crane and the shaft both arrive from ABOVE, so the camera descends
+                // through a bank that is sliding sideways and the two moves have nothing
+                // to say to each other. Emerge is a dolly out: something was close and in
+                // the way, and now it is not.
+                intro.style = RoundIntroCamera.IntroStyle.Emerge;
+
                 EditorUtility.SetDirty(intro);
-                did.Add("the opening move is the first round only");
+                did.Add("the camera comes out of the smoke, first round only");
             }
 
             // ---- the smoke, on the camera that renders the arena

@@ -125935,7 +125935,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e8b15c0d7a2496fb3e09c742a5d1f68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  style: 2
+  style: 3
   matchState: {fileID: 0}
   view: {fileID: 960000470}
   firstRoundOnly: 1
@@ -125955,6 +125955,8 @@ MonoBehaviour:
   craneAngle: 42
   craneHold: 0.14
   craneLead: 1.4
+  emergeHold: 0.08
+  emergeClose: 0.18
   shaftHeight: 9
   shaftBack: 6
   shaftHold: 0.04
@@ -126905,7 +126907,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e8b15c0d7a2496fb3e09c742a5d1f68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  style: 2
+  style: 3
   matchState: {fileID: 0}
   view: {fileID: 960000781}
   firstRoundOnly: 1
@@ -126925,6 +126927,8 @@ MonoBehaviour:
   craneAngle: 42
   craneHold: 0.14
   craneLead: 1.4
+  emergeHold: 0.08
+  emergeClose: 0.18
   shaftHeight: 9
   shaftBack: 6
   shaftHold: 0.04
