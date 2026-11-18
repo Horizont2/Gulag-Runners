@@ -24824,6 +24824,8 @@ MonoBehaviour:
   - {fileID: 1726160613}
   lineArtAlpha: 0.75
   paintInEditMode: 1
+  barCatchUp: 0.09
+  chipCatchUp: 0.55
 --- !u!114 &367346952
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -84435,6 +84437,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuLabel
   target: {fileID: 0}
   placeholder: VICTORY
+  roll: 1
+  rollSeconds: 0.5
 --- !u!114 &1303634782
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -96075,6 +96079,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuLabel
   target: {fileID: 0}
   placeholder: SILVER III
+  roll: 1
+  rollSeconds: 0.5
 --- !u!114 &1407765305
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -101771,6 +101777,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuLabel
   target: {fileID: 0}
   placeholder: "2 \u2014 1"
+  roll: 1
+  rollSeconds: 0.5
 --- !u!114 &1486301708
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -146912,6 +146920,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuLabel
   target: {fileID: 0}
   placeholder: +40
+  roll: 1
+  rollSeconds: 0.5
 --- !u!1001 &2105907576
 PrefabInstance:
   m_ObjectHideFlags: 0

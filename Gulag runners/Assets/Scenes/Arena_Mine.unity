@@ -128364,6 +128364,8 @@ MonoBehaviour:
   - {fileID: 2046272584}
   lineArtAlpha: 0.75
   paintInEditMode: 1
+  barCatchUp: 0.09
+  chipCatchUp: 0.55
 --- !u!114 &962777040
 MonoBehaviour:
   m_ObjectHideFlags: 0
