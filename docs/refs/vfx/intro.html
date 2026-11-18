@@ -24,8 +24,8 @@
 <div id=out></div>
 <script>
 const DEPTHS = [1.1, 1.9, 3.0, 4.6];
-const NEAR_DONE_BY = 0.45, STAGGER = 0.11, COVER = 1.9, NEAR_SHADE = 0.55;
-const CLEAR_BY = 0.60, ASPECT = 4.5, CAGE = 3.0;
+const NEAR_DONE_BY = 0.50, STAGGER = 0.06, COVER = 1.35, NEAR_SHADE = 0.55;
+const CLEAR_BY = 0.85, ASPECT = 4.5, CAGE = 3.0;
 const TINT = { mine:'#453e39', forest:'#5c7378', nordic:'#707fa0', temple:'#705c85' };
 
 const band = new Image();
@@ -78,8 +78,8 @@ band.onload = band.onerror = () => {
     out.insertAdjacentHTML('beforeend', `<h2>${theme}</h2>`);
     const strip = document.createElement('div');
     strip.className = 'strip';
-    for (let k = 0; k <= 8; k++) {
-      const held = k / 8 * CLEAR_BY * 1.15;
+    for (let k = 0; k <= 13; k++) {
+      const held = k / 13 * CLEAR_BY * 1.1;
       const fig = document.createElement('figure');
       const c = document.createElement('canvas');
       c.width = 300; c.height = Math.round(300 / ASPECT);

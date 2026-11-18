@@ -47,21 +47,21 @@ namespace GulagRunners.Game
         [Tooltip("Share of the hold the smoke takes to get out of the frame. The rest of " +
                  "the hold is the countdown on its own, which is what the second and third " +
                  "rounds are entirely.")]
-        [Range(0.15f, 1f)] public float clearBy = 0.60f;
+        [Range(0.15f, 1f)] public float clearBy = 0.85f;
 
         [Tooltip("Share of the clearing window by which the NEAREST layer is gone. The " +
                  "furthest is gone exactly at the end, and the ones between are spread " +
                  "across. This is what makes the depth: they all leave, at different times.")]
-        [Range(0.2f, 1f)] public float nearDoneBy = 0.45f;
+        [Range(0.2f, 1f)] public float nearDoneBy = 0.50f;
 
         [Tooltip("How far each layer is offset sideways at rest, in frame widths. Without " +
                  "it the four start exactly on top of one another and the first frame of " +
                  "the round is one flat field of colour with no edge in it.")]
-        [Range(0f, 0.4f)] public float stagger = 0.11f;
+        [Range(0f, 0.4f)] public float stagger = 0.06f;
 
         [Tooltip("How much wider than the frame a layer is, as a multiple. It has to still " +
                  "cover the frame once it has started moving.")]
-        [Range(1.2f, 3f)] public float coverWide = 1.9f;
+        [Range(1.1f, 3f)] public float coverWide = 1.35f;
 
         [Tooltip("How dark the NEAREST layer is against the furthest, which is the tint as " +
                  "given. Without a difference between them the four are one flat field of " +
@@ -139,10 +139,18 @@ namespace GulagRunners.Game
                 float by = Mathf.Lerp(nearDoneBy, 1f, depths.Length <= 1
                     ? 1f : i / (float)(depths.Length - 1));
                 float own = Mathf.Clamp01(t / Mathf.Max(0.01f, by));
-                // Squared, not cubed. A cube front-loads the movement so hard that the
-                // whole bank was off the frame in six tenths of a second, leaving two and a
-                // half of the hold with nothing in it -- the filmstrip in
-                // docs/refs/vfx/intro.html is where that showed.
+                // Ease OUT: moving from the first frame, settling rather than stopping.
+                //
+                // The curve was the wrong thing to blame, and I blamed it twice. A cube, then
+                // a square, then smoothstep -- and smoothstep was the worst of the three to
+                // watch, because its slow start lands on top of a head start that is already
+                // invisible. The real fault was the WIDTH: at 1.9 frames the quad's edge
+                // begins 0.45 of a frame outside the picture, so nearly a third of every
+                // layer's travel happens off screen. Nothing, nothing, nothing, then a sweep.
+                //
+                // Narrower quads put the edges almost at the frame, so the first thing the
+                // smoke does is visible, and an ease-out then reads as a bank being drawn
+                // aside rather than yanked.
                 float eased = 1f - (1f - own) * (1f - own);
 
                 // Far enough that the trailing edge is off the frame: half the quad plus
