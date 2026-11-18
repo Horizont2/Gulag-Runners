@@ -374,6 +374,61 @@ ParticleSystem:
   m_CorrespondingSourceObject: {fileID: 9102351051118027325, guid: 7eb3deaf7cf09024f89df980f9c2ebf1, type: 3}
   m_PrefabInstance: {fileID: 118916948}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &121349277
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 121349279}
+  - component: {fileID: 121349278}
+  m_Layer: 0
+  m_Name: Round Countdown
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &121349278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 121349277}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42e36cdf6c5c27b48b073202472a633c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.RoundCountdown
+  matchState: {fileID: 960000733}
+  label: {fileID: 0}
+  heightFraction: 0.26
+  numberColour: {r: 0.95, g: 0.68, b: 0.26, a: 1}
+  goColour: {r: 0.91, g: 0.93, b: 0.96, a: 0.85}
+  punchFrom: 1.65
+  punchFor: 0.22
+  overshoot: 0.09
+  leaveAt: 0.78
+  goWord: FIGHT
+  goSeconds: 0.55
+--- !u!4 &121349279
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 121349277}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &123729399 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: a83b3f7be40daea4c929ddc243412221, type: 3}
@@ -2439,6 +2494,33 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 4981836282949982424, guid: 536fb2e4ed1584d2bb6d71edfe7dc9e5, type: 3}
   m_PrefabInstance: {fileID: 647944936}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &830961752
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 960000776}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 69360cb8e3d0b10429e0348b771c99c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.RoundIntroSmoke
+  matchState: {fileID: 960000733}
+  view: {fileID: 960000783}
+  band: {fileID: 2800000, guid: 09d65b817b1144339dc74369ddfe57d8, type: 3}
+  tint: {r: 0.44, g: 0.36, b: 0.52, a: 1}
+  clearBy: 0.6
+  nearDoneBy: 0.45
+  stagger: 0.11
+  coverWide: 1.9
+  nearShade: 0.55
+  depths:
+  - 1.1
+  - 1.9
+  - 3
+  - 4.6
+  firstRoundOnly: 1
 --- !u!4 &836239244 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 211e34aab665865418c09a0d4d5ac48c, type: 3}
@@ -119932,6 +120014,7 @@ GameObject:
   - component: {fileID: 960000469}
   - component: {fileID: 960000468}
   - component: {fileID: 960000467}
+  - component: {fileID: 2014559761}
   m_Layer: 0
   m_Name: Camera Player 1
   m_TagString: MainCamera
@@ -126172,6 +126255,7 @@ GameObject:
   - component: {fileID: 960000780}
   - component: {fileID: 960000779}
   - component: {fileID: 960000778}
+  - component: {fileID: 830961752}
   m_Layer: 0
   m_Name: Camera Player 2
   m_TagString: Untagged
@@ -133006,6 +133090,33 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -4216859302048453862, guid: 2ec0205ea18ad844597cc2589f33473e, type: 3}
   m_PrefabInstance: {fileID: 2100000007}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &2014559761
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 960000465}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 69360cb8e3d0b10429e0348b771c99c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.RoundIntroSmoke
+  matchState: {fileID: 960000733}
+  view: {fileID: 960000473}
+  band: {fileID: 2800000, guid: 09d65b817b1144339dc74369ddfe57d8, type: 3}
+  tint: {r: 0.44, g: 0.36, b: 0.52, a: 1}
+  clearBy: 0.6
+  nearDoneBy: 0.45
+  stagger: 0.11
+  coverWide: 1.9
+  nearShade: 0.55
+  depths:
+  - 1.1
+  - 1.9
+  - 3
+  - 4.6
+  firstRoundOnly: 1
 --- !u!114 &2031695937
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -147443,3 +147554,4 @@ SceneRoots:
   - {fileID: 1425097485}
   - {fileID: 1078853051}
   - {fileID: 1565489389}
+  - {fileID: 121349279}
