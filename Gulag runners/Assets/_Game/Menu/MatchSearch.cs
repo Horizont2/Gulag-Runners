@@ -112,7 +112,12 @@ namespace GulagRunners.Game
         public string[] tips =
         {
             "THE SIREN AT 0:25\nGIVES A DIRECTION,\nNEVER A POSITION.",
-            "CROUCHING IS SILENT.\nRUNNING IS THE LOUDEST\nTHING YOU CAN DO.",
+            // This used to say crouching was silent and running the loudest thing you
+            // could do. Crouching was taken out of the motor, and the tip outlived it by
+            // the same route the three guard tips did -- it quotes no number, so the pins
+            // below had nothing to catch it with. The rule that does catch it now is in
+            // tips_check: a tip may not name a mechanic PlayerMotor never enters.
+            "A STEP IS LOUD ABOVE\n2.5 M/S. A FULL RUN IS 3.\nEASE OFF AND HE LOSES YOU.",
             "A TOOL HALVES THE PRY,\n2.5 S TO 1.25 — AND COSTS\nTWO SWINGS AND THE NOISE.",
             "BELOW 30% HEALTH\nYOUR BLOWS HIT 40% HARDER.\nSO DO HIS.",
             "A PARRY IS TWELVE FRAMES\nWIDE AND STAGGERS HIM\nFOR EIGHT TENTHS.",

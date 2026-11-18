@@ -186,6 +186,15 @@ namespace UnityEngine.UI
     public class GraphicRaycaster : MonoBehaviour { }
     public class Mask : MonoBehaviour { public bool showMaskGraphic; }
 
+    // Clips its children to its own rect, which is what lets a backdrop be sized to COVER
+    // the screen -- bigger than the frame in one direction -- without the overflow drawing
+    // across the rest of the canvas. Cheaper than Mask: no stencil, no extra draw.
+    public class RectMask2D : MonoBehaviour
+    {
+        public Vector4 padding;
+        public Vector2Int softness;
+    }
+
     public class LayoutGroup : MonoBehaviour
     {
         public RectOffset padding;

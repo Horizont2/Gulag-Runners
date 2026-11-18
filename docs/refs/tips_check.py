@@ -52,6 +52,23 @@ def number(src, field, where):
     return int(m.group(1))
 
 
+def decimal(src, field, where):
+    """
+    A float field from an inspector class, as the text a tip would print.
+
+    number() above reads integers, because the simulation keeps its figures in
+    thousandths and MoveConfig assigns them as whole numbers. MovementTuning is the other
+    half of the same settings and writes them as people read them -- `loudSpeed = 2.5f` --
+    and the integer pattern silently matches nothing there, which reported the field as
+    GONE and the tip as teaching a removed mechanic. Two notations, two readers.
+    """
+    m = re.search(r"\b" + re.escape(field) + r"\s*=\s*(-?\d+(?:\.\d+)?)f?\b", src or "")
+    if m is None:
+        GONE.append((field, where))
+        return "?"
+    return ("%g" % float(m.group(1)))
+
+
 def tips():
     """The array as the inspector will show it, with \\n still escaped."""
     src = read(TIPS_FILE)
@@ -68,6 +85,45 @@ def seconds(frames, places=2):
 
 def clock(mmss):
     return f"{mmss // 60}:{mmss % 60:02d}"
+
+
+# ---------------------------------------------------------------- mechanics, not numbers
+#
+# A tip may not teach something the motor never does any more, and the pins above cannot
+# see that: they check the FIGURES in a tip against the config, so a tip with no figure in
+# it is invisible to them. That is exactly how "CROUCHING IS SILENT, RUNNING IS THE LOUDEST
+# THING YOU CAN DO" survived crouching being taken out of PlayerMotor -- the same way the
+# three guard tips survived docs/31 removing the guard.
+#
+# So each entry here is a word a tip might use and the PROOF that the thing still happens,
+# as a pattern that has to appear in the simulation. Not the field: MovementTuning still
+# carries crouchSpeed and crouchHeight, and a config field nothing sets is not a mechanic.
+# What makes a mechanic real is the motor entering it.
+LIVE = [
+    ("CROUCH", "Sim/Core/PlayerMotor.cs", r"Crouching\s*=\s*(?!false)\w",
+     "the motor only ever sets Crouching to false, so nothing can crouch"),
+    ("GUARD", "Sim/Core/PlayerMotor.cs", r"\bGuard(ing)?\s*=\s*(?!false)\w",
+     "docs/31 took the guard out; the weapon is the defence"),
+    ("BLOCK", "Sim/Core/CombatMotor.cs", r"\bBlock(ing)?\s*=\s*(?!false)\w",
+     "docs/31 took the block out with the guard"),
+]
+
+
+def dead(pool):
+    """Tips naming a mechanic the simulation never enters."""
+    out = []
+    for word, where, proof, why in LIVE:
+        src = read(os.path.join(GAME, where))
+        if src is None:
+            continue
+        if re.search(proof, src):
+            continue                      # the mechanic is alive; nothing to say
+        for tip in pool:
+            if word in tip:
+                out.append(f"a tip still teaches {word}: {tip!r}. But {why}. Rewrite it "
+                           f"for whatever replaced it, as the guard tips were rewritten "
+                           f"for the dodge")
+    return out
 
 
 def main():
@@ -107,12 +163,19 @@ def main():
 
     # (a word out of the tip, what has to be in it, why) -- the key is matched against
     # the tips loosely, so reordering the array does not break this file.
+    tuning = read(os.path.join(GAME, "Presentation", "MovementTuning.cs"))
+    loud_speed = decimal(tuning, "loudSpeed", "the speed a step becomes Loud")
+    run_speed = decimal(tuning, "runSpeed", "full running speed")
+
     pins = [
         ("SIREN", [clock(siren_at)],
          "MatchConfig: the siren lands after the cages and the scavenge"),
 
-        ("CROUCHING", [],
-         "NoiseLevel only, no number to drift"),
+        # Was ("CROUCHING", [], "NoiseLevel only, no number to drift") -- a pin with no
+        # numbers in it, which is a pin that checks nothing, on a tip about a mechanic that
+        # has since been removed. Its replacement has two real figures in it.
+        ("STEP IS LOUD", [loud_speed, run_speed],
+         "MovementTuning.loudSpeed, the speed a footfall becomes Loud, against runSpeed"),
 
         ("TOOL HALVES", [seconds(bare), seconds(bare // 2), words[wear] + " SWINGS"],
          "ChestConfig.BareFrames, halved by a tool, at ToolWear per pry"),
@@ -177,6 +240,8 @@ def main():
         problems.append(f"the ceiling now falls at {clock(ceiling_at)} and the rooms shut "
                         f"at {clock(rooms_at)}, so the tip saying the ceiling 'comes "
                         "later' is backwards")
+
+    problems.extend(dead(pool))
 
     for p in problems:
         print(f"  {p}")
