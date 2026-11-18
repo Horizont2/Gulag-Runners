@@ -164,9 +164,31 @@ namespace GulagRunners.Game
             // The search owns the walk once it exists: it has to find somebody before
             // there is any point opening a gate, and it is the thing that holds the loaded
             // scene back until the other runner is in.
+            //
+            // LOOKED FOR, NOT JUST TAKEN FROM THE FIELD. Reported twice as "PLAY does not
+            // search, it just starts Arena_Forest", and the cause was one unassigned
+            // reference: the scene's MenuUI had search at fileID 0, so every press fell
+            // through to the line below and loaded the director's matchScene -- which is
+            // Arena_Forest. The fall-through is correct for a build with no matchmaking in
+            // it; what was wrong is that it happened SILENTLY, and looked exactly like a
+            // matchmaking bug rather than a missing wire.
+            //
+            // The search panel is normally inactive until it is opened, so the search has
+            // to include inactive objects or this finds nothing and changes nothing.
+            if (search == null)
+                search = FindFirstObjectByType<MatchSearch>(FindObjectsInactive.Include);
+
             if (search != null) { search.Begin(); return; }
 
-            if (director != null) director.Play();
+            if (director != null)
+            {
+                Debug.LogWarning(
+                    $"{name}: there is no MatchSearch in this scene, so PLAY is loading "
+                    + $"\"{director.matchScene}\" straight away with no opponent and no "
+                    + "matchmaking. That is the right thing for a scene built without the "
+                    + "search screen and the wrong thing everywhere else.", this);
+                director.Play();
+            }
             else Debug.LogWarning($"{name}: no MenuDirector, so PLAY has nothing to open.", this);
         }
 

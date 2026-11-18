@@ -10446,7 +10446,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MenuUI
   director: {fileID: 1053348788}
-  search: {fileID: 0}
+  search: {fileID: 820177704}
   fighter: {fileID: 1900006000}
   profile:
     playerName: Runner

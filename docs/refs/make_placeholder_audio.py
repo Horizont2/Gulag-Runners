@@ -58,6 +58,8 @@ happened to produce. Nothing reaches full scale — a clipping placeholder teach
 wrong level, and placeholder_audio_check fails on one. Jump and Dodge sit at a fifth of full
 scale on purpose: they fire constantly and the job of a constant sound is to not be noticed.
 """
+
+import sys
 import array, io, math, os, random, struct, uuid, zlib
 
 RATE = 22050
@@ -480,6 +482,23 @@ def main():
     wav("Chest_Open", chest_open())
     wav("Item_Pickup", take())
     wav("Item_Drop", take(0.22, up=False))
+
+
+
+# ---------------------------------------------------------------------------- not by default
+#
+# THE SOUNDS THIS WROTE HAVE BEEN DELETED, at the user's request: they were placeholders I
+# generated, they were wired into all four arenas and both fighter prefabs, and they were
+# the first thing heard when a match started. Asked for plainly: gone.
+#
+# The script stays because the shape of the table it fills is worth keeping, and because
+# deleting a tool to delete its output is the wrong way round. But it will not run itself
+# into the project again by somebody opening the folder and running everything in it. Pass
+# --yes-write-placeholder-audio and it does what it always did.
+if "--yes-write-placeholder-audio" not in sys.argv:
+    print("make_placeholder_audio: refusing. The placeholder sounds were removed on "
+          "purpose; pass --yes-write-placeholder-audio to write them again.")
+    raise SystemExit(0)
 
 
 if __name__ == "__main__":
