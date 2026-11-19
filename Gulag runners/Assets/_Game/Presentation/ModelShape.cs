@@ -20,8 +20,8 @@ namespace GulagRunners.Game
     ///       because that is the only way a weapon prefab can be dropped onto a hand -- so
     ///       the question "which way does this point" is "which way is there most of it".
     ///
-    ///       Two older rules are still worth naming, because both of them shipped and both
-    ///       of them were visibly wrong on the same two weapons:
+    ///       Three older rules are still worth naming, because all three shipped and all
+    ///       three were visibly wrong on the same two weapons:
     ///
     ///       the LONGEST AXIS OF THE BOX measures hi-lo, which counts the butt behind the
     ///           hand as part of the blade and counts an axe head reaching sideways as
@@ -31,9 +31,17 @@ namespace GulagRunners.Game
     ///       the DIRECTION TO THE BOX'S CENTRE is pulled sideways by anything heavy at the
     ///           top. It is exact for the nine symmetrical weapons and 35 and 45 degrees out
     ///           on the axe and the scythe, whose heads hang off one side.
+    ///       the DIRECTION OF THE FURTHEST VERTEX is the subtlest of the three and was the
+    ///           last to be believed. It is exact for a sword, whose furthest point IS its
+    ///           tip, and it points at the far corner of the head on anything that has one:
+    ///           36.7 degrees off the haft on the axe, 37.3 on the scythe, 11.7 on the mace.
+    ///           It replaced the box rule precisely because the box cannot see a model
+    ///           authored a few degrees off its own axis -- and traded that small error for
+    ///           a large one. What it was genuinely better at, the cross section, is kept:
+    ///           see Spread.
     ///
     ///       Reach from the grip is exact for all eleven: +Y, by between 1.21x (the scythe)
-    ///       and 7.1x (the sword) over the furthest it reaches any other way.
+    ///       and 13.45x (the spear) over the furthest it reaches any other way.
     ///
     ///   WHICH WAY IT IS FLAT is the thinnest axis across that one. A sword, an axe and a
     ///       scythe are all a plane with a handle; which way that plane faces decides
@@ -120,24 +128,35 @@ namespace GulagRunners.Game
         {
             grip = default;
 
-            // THE TIP IS A VERTEX, when the mesh will say where its vertices are.
+            // WHICH WAY IT POINTS IS THE AXIS IT REACHES FURTHEST ALONG, and the rule that
+            // used to stand here instead -- the direction of the furthest VERTEX -- is why
+            // three weapons hung crooked in the hand however the socket was tuned.
             //
-            // Everything below this is the box rule, and the box is why two weapons sat
-            // crooked in the hand. A box has six faces and the rule can only answer with
-            // one of them, so a model authored a few degrees off its own axis is gripped
-            // along the axis and hangs at that angle for the rest of the match: the pack's
-            // axe is 11 degrees off and its scythe 19. Worse, the reach is then measured
-            // along the axis rather than along the weapon, which is shorter by the cosine
-            // -- so the fit scales the model UP to compensate and the steel overshoots the
-            // hitbox it is supposed to BE. Measured on the pack: 125% of it on the axe.
+            // The argument for the vertex was that the furthest point from the grip is the
+            // tip, so the line to it is the weapon. That is true of a sword and false of
+            // anything with a head. An axe's furthest vertex is the far CORNER OF ITS
+            // BLADE, which hangs off the side of the haft; a mace's is a spike on the ball.
+            // Measured on the eleven weapons this game ships, as the angle between the
+            // vertex rule's answer and the weapon's own haft:
             //
-            // A vertex cloud has no such problem. The furthest point from the grip is the
-            // tip, wherever it is, and the line from the grip to it is what the simulation
-            // swings -- so pointing that line along the arm puts the drawn steel exactly
-            // where the blade is. The haft may then hang at whatever angle the model was
-            // authored with, which is what a real weapon does.
-            if (Tip(root, out grip)) return true;
-
+            //   axe 36.7 degrees, scythe 37.3, mace 11.7, club 3.3, hammer 2.9, rest 0.0
+            //
+            // Those first three are exactly the ones reported as not pointing where the arm
+            // points, and no amount of turning the socket could have fixed them: PlayerArm
+            // overwrites the hand's rotation every frame with the one that puts THIS answer
+            // on the arm's line, so the answer is the only thing that decides.
+            //
+            // Reach from the grip, along the model's own axes, is exact for all eleven: +Y
+            // every time, by between 1.21x (the scythe) and 13.45x (the spear) over the
+            // furthest the model reaches any other way. A head that hangs off the side
+            // cannot beat a haft along its own length, which is the property the vertex
+            // rule threw away.
+            //
+            // What the vertices are still read for is the cross section -- see Spread --
+            // because the box genuinely cannot say which way a blade FACES when the model
+            // was authored at an angle. A model whose haft is not on an axis at all, like
+            // this pack's scythe, is what ItemModel.bladeAxis is for; the measurement is
+            // allowed to be approximate as long as it is never confidently wrong.
             if (!Box(root, out Bounds box)) return false;
 
             Vector3 lo = box.min, hi = box.max;
@@ -162,6 +181,10 @@ namespace GulagRunners.Game
             grip.Reach = reach[far];
             grip.Behind = Mathf.Max(0f, reach[far ^ 1]);
 
+            // The cross section about that line, from the vertices when the importer kept
+            // them and from the box when it did not.
+            if (Spread(root, grip.Blade, ref grip)) return true;
+
             Vector3 size = box.size;
             int a = (axis + 1) % 3, b = (axis + 2) % 3;
             int thin = size[a] <= size[b] ? a : b;
@@ -174,53 +197,32 @@ namespace GulagRunners.Game
         }
 
         /// <summary>
-        /// The grip from the model's own vertices, or false when they cannot be read.
+        /// The cross section about a line that has already been chosen: how wide the model
+        /// is across it, how thin, and which way that thin direction faces. False when the
+        /// vertices cannot be read, and the caller falls back to the box.
         ///
         /// Mesh data is only there when the importer was told to keep it (Read/Write), so
-        /// this is allowed to fail and the box rule above is what answers then. The eleven
-        /// weapons this game ships are marked readable; a pack dropped in tomorrow may not
-        /// be, and it will be gripped the blunter way rather than not at all.
+        /// this is allowed to fail. The eleven weapons this game ships are marked readable;
+        /// a pack dropped in tomorrow may not be, and its roll will be left to the clip
+        /// rather than decided wrongly.
+        ///
+        /// It does NOT touch Blade or Reach. It used to choose both, by taking the furthest
+        /// vertex as the tip, and that is the fault this file now exists to not repeat: a
+        /// cloud is the right thing to ask how wide a blade is and the wrong thing to ask
+        /// which way a weapon points, because the furthest point of an axe is a corner of
+        /// its head.
         /// </summary>
-        static bool Tip(GameObject root, out Grip grip)
+        static bool Spread(GameObject root, Vector3 blade, ref Grip grip)
         {
-            grip = default;
             if (root == null) return false;
 
             Matrix4x4 toRoot = root.transform.worldToLocalMatrix;
-            Vector3 tip = Vector3.zero;
-            float far = 0f;
-            bool any = false;
-
-            foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
-            {
-                Mesh mesh = mf.sharedMesh;
-                if (mesh == null || !mesh.isReadable) continue;
-
-                Matrix4x4 m = toRoot * mf.transform.localToWorldMatrix;
-                Vector3[] points = mesh.vertices;
-                for (int i = 0; i < points.Length; i++)
-                {
-                    Vector3 p = m.MultiplyPoint3x4(points[i]);
-                    float d = p.sqrMagnitude;
-                    if (d > far) { far = d; tip = p; }
-                    any = true;
-                }
-            }
-
-            if (!any || far <= 1e-8f) return false;
-
-            grip.Blade = tip.normalized;
-            grip.Reach = Mathf.Sqrt(far);
-
-            // And the rest of the shape, about that line: how far the butt hangs out the
-            // back of the hand, how wide it is across, and which way it is flat.
-            Vector3 blade = grip.Blade;
             Vector3 u = Mathf.Abs(blade.x) < 0.9f
                 ? Vector3.Normalize(Vector3.Cross(blade, Vector3.right))
                 : Vector3.Normalize(Vector3.Cross(blade, Vector3.up));
             Vector3 v = Vector3.Cross(blade, u);
 
-            float behind = 0f, uMin = 0f, uMax = 0f, vMin = 0f, vMax = 0f;
+            float uMin = 0f, uMax = 0f, vMin = 0f, vMax = 0f;
             float uu = 0f, vv = 0f, uv = 0f;
             int n = 0;
 
@@ -234,9 +236,6 @@ namespace GulagRunners.Game
                 for (int i = 0; i < points.Length; i++)
                 {
                     Vector3 p = m.MultiplyPoint3x4(points[i]);
-                    float along = Vector3.Dot(p, blade);
-                    if (-along > behind) behind = -along;
-
                     float a = Vector3.Dot(p, u), b = Vector3.Dot(p, v);
                     if (a < uMin) uMin = a;
                     if (a > uMax) uMax = a;
@@ -247,10 +246,12 @@ namespace GulagRunners.Game
                 }
             }
 
-            grip.Behind = behind;
+            if (n == 0) return false;
+
             float wide = uMax - uMin, thin = vMax - vMin;
             grip.Across = Mathf.Max(wide, thin);
             grip.Thick = Mathf.Min(wide, thin);
+            grip.Flat = Vector3.zero;
 
             // WHICH WAY IT IS FLAT, from the spread of the cloud rather than from the box.
             //
@@ -259,7 +260,7 @@ namespace GulagRunners.Game
             // leaves the roll to chance. The second moments do not care how the model was
             // oriented: the smaller eigenvector of the two-by-two across the blade is the
             // normal of the plane, whatever angle it sits at.
-            if (n > 0 && grip.Across >= grip.Thick * ClearlyFlat)
+            if (grip.Across >= grip.Thick * ClearlyFlat)
             {
                 uu /= n; vv /= n; uv /= n;
                 float half = 0.5f * (uu + vv);

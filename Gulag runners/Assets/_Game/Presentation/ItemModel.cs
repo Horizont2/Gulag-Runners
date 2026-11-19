@@ -114,6 +114,14 @@ namespace GulagRunners.Game
         /// So the thing being matched is the reach out of the fist, measured along the
         /// model's own blade axis, and the butt is left to hang out the back of the hand
         /// where it belongs.
+        ///
+        /// It scales along the MEASURED axis, never an authored bladeAxis, because the row
+        /// that carries one is not in scope here. On the one weapon in the pack that has
+        /// an authored axis -- the scythe, whose snath is curved -- the two lines differ by
+        /// 16.7 degrees and the extents they give differ by 4.6%: three centimetres on a
+        /// weapon two thirds of a metre long. Worth knowing, not worth threading the row
+        /// through for; if a pack ever arrives where most weapons need an authored axis,
+        /// that is the moment to.
         /// </summary>
         public static void FitBlade(GameObject root, float want)
         {

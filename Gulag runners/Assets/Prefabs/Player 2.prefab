@@ -253,7 +253,7 @@ MonoBehaviour:
     flatAxis: {x: 0, y: 0, z: 0}
   - item: 12
     root: {fileID: 0}
-    bladeAxis: {x: 0, y: 0, z: 0}
+    bladeAxis: {x: -0.2867, y: 0.958, z: 0.0}
     flatAxis: {x: 0, y: 0, z: 0}
   - item: 7
     root: {fileID: 0}
