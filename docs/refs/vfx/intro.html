@@ -1,0 +1,100 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>loading</title>
+<!--
+  The smoke clearing, with the numbers RoundIntroSmoke.cs uses and the band it draws.
+
+  Everything here normalises to the frame width, which is the thing worth knowing about
+  this effect: all four layers cover the frame identically at the start, and only their
+  OFFSET differs, scaled by depths[0]/depth. So on screen each layer is the same rectangle
+  moving at a different speed, which is the whole illusion.
+
+  If this and the component disagree, the component is the game.
+-->
+<style>
+  body { background:#0b0d10; color:#c8ccd2; margin:0; padding:14px;
+         font:12px/1.5 ui-monospace, Menlo, Consolas, monospace }
+  h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+       color:#8d949c; margin:14px 0 6px }
+  .strip { display:flex; gap:3px; flex-wrap:wrap }
+  figure { margin:0 }
+  canvas { display:block; background:#1b2026; border-radius:2px }
+  figcaption { color:#6d747c; font-size:10px; text-align:center; margin-top:2px }
+</style>
+<div id=out></div>
+<script>
+const DEPTHS = [1.1, 1.9, 3.0, 4.6];
+const NEAR_DONE_BY = 0.55, STAGGER = 0.06, COVER = 1.35, COVER_HIGH = 3.2, NEAR_SHADE = 0.55;
+const CLEAR_BY = 0.95, ASPECT = 4.5, CAGE = 3.0;
+const TINT = { mine:'#453e39', forest:'#5c7378', nordic:'#707fa0', temple:'#705c85' };
+
+const band = new Image();
+band.src = '../../../Gulag runners/Assets/_Game/Effects/fx_intro_smoke.png';
+
+function draw(c, theme, held) {
+  const g = c.getContext('2d'), W = c.width, H = c.height;
+  // The arena behind it, as something to be revealed.
+  g.fillStyle = '#1b2026'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#2b3744'; g.fillRect(0, H * 0.62, W, H * 0.38);
+  g.fillStyle = '#d8dde3'; g.fillRect(W * 0.30, H * 0.44, 5, H * 0.18);
+  g.fillStyle = '#d8dde3'; g.fillRect(W * 0.66, H * 0.44, 5, H * 0.18);
+
+  // The camera is moving while this happens: Emerge dollies out, and the frame drifts
+  // vertically with the fight. Both are what brought the quad's straight top edge into
+  // shot, so the preview has to do them or it cannot show the bug coming back.
+  const camDrift = (1 - Math.min(1, held / CLEAR_BY)) * 0.10;
+  const t = Math.min(1, held / CLEAR_BY);
+  if (t >= 1) return;
+  const eased = 1 - Math.pow(1 - t, 3);
+
+  // Tinted once into an offscreen copy, the way the material tints the white band.
+  for (let i = 0; i < DEPTHS.length; i++) {
+    const side = (i % 2 === 0) ? 1 : -1;
+    const by = NEAR_DONE_BY + (1 - NEAR_DONE_BY) * (i / (DEPTHS.length - 1));
+    const own = Math.min(1, t / by);
+    const eased = 1 - Math.pow(1 - own, 1.2);
+    const clear = (COVER + 1) * 0.5 + 0.2;
+
+    const start = STAGGER * side * (1 + i * 0.35);
+    const gone = start + eased * clear * side;
+    const lift = eased * 0.10 * ((i % 4 < 2) ? 1 : -1);
+
+    const qw = W * COVER, qh = (W / ASPECT) * COVER_HIGH;
+    const x = W / 2 + gone * W - qw / 2;
+    const y = H / 2 - (lift + camDrift) * (W / ASPECT) - qh / 2;
+
+    g.save();
+    g.drawImage(band, x, y, qw, qh);
+    g.globalCompositeOperation = 'source-atop';
+    const far = i / (DEPTHS.length - 1);
+    const shade = NEAR_SHADE + (1 - NEAR_SHADE) * far;
+    const c = TINT[theme];
+    const rgb = [1,3,5].map(k => Math.round(parseInt(c.substr(k,2),16) * shade));
+    g.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    g.fillRect(x, y, qw, qh);
+    g.restore();
+  }
+}
+
+band.onload = band.onerror = () => {
+  const out = document.getElementById('out');
+  for (const theme of ['mine', 'forest', 'nordic', 'temple']) {
+    out.insertAdjacentHTML('beforeend', `<h2>${theme}</h2>`);
+    const strip = document.createElement('div');
+    strip.className = 'strip';
+    for (let k = 0; k <= 13; k++) {
+      const held = k / 13 * CLEAR_BY * 1.1;
+      const fig = document.createElement('figure');
+      const c = document.createElement('canvas');
+      c.width = 300; c.height = Math.round(300 / ASPECT);
+      draw(c, theme, held);
+      fig.appendChild(c);
+      fig.insertAdjacentHTML('beforeend',
+        `<figcaption>${(held * CAGE).toFixed(2)}s</figcaption>`);
+      strip.appendChild(fig);
+    }
+    out.appendChild(strip);
+  }
+  document.title = 'ready';
+};
+</script>

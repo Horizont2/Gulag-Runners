@@ -1,0 +1,596 @@
+"""Does the poison actually drown anything, and does it leave anywhere to stand?
+
+The rising poison (docs/33) is three numbers: where the surface starts, where it stops, and
+how long it takes. Two of them are the arena's, authored as a box, and every way this feature
+fails is a way that box can be wrong -- none of which looks wrong in the scene view, because
+a green box over a dark floor looks like a green box over a dark floor either way.
+
+  IT REACHES NOBODY. The pool has a depth span, like every other piece of the arena, and the
+      fight happens on one slice of it. A pool modelled in front of the fighters, or behind
+      them, fills the screen with poison that bites nothing at all. This is the silent one,
+      and the reason this check exists.
+
+  IT STARTS ABOVE THE FLOOR. The surface rises from the box's BOTTOM face. Authored above the
+      lowest ground, the first part of the flood happens inside the floor, where nobody can
+      see it -- and the pit, which is the first place that should drown, is the last.
+
+  IT DROWNS EVERYTHING. Set the top above every standable surface and the last twenty seconds
+      are two fighters dying side by side: the round is then decided by who had more health,
+      which is the one ending docs/01 asks the closing phase to prevent.
+
+  IT DROWNS NOTHING. Set the top below every floor and the last minute does nothing at all,
+      which is what it did before any of this existed.
+
+  YOU CAN STAND ON IT. The box somebody drags in to make a pool is a Unity cube, and a Unity
+      cube arrives with a BoxCollider. Baked, that is a solid block filling the bottom of the
+      arena: the fighters stand on the poison, dry, and it looks like the feature WORKING.
+
+So each rule is asked of each arena's own baked floors, and the answers are metres rather
+than opinions.
+
+    python3 poison_check.py [--scene "Arena_Mine.unity"]
+"""
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import arena_demo_geometry as geometry           # noqa: E402
+from sim_motor_mirror import F                   # noqa: E402
+
+ASSETS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets")
+SCENES = os.path.join(ASSETS, "Scenes")
+POOL_CS = os.path.join(ASSETS, "_Game", "Presentation", "PoisonPool.cs")
+
+# A floor worth FIGHTING on, as depth_check measures one: anything narrower is a crate.
+# This is the bar for what the flood takes away -- drowning a crate is not drowning a storey.
+FIGHT_WIDTH = 2.0
+
+# How deep the waterline may reach before it stops being a line. Half a metre either side
+# of the fight plane is a bar at the fighters' feet; six metres is the floor of a room.
+LINE_DEPTH = 1.5
+
+# And how LOUD it may be. The report after the line was thinned was "make it less
+# eye-catching, so it looks like part of the game" -- and the numbers behind that feeling
+# are the two below.
+#
+# Alpha, because a surface you cannot see through is not a surface: at 0.85 the line is a
+# painted strip lying on the arena, at 0.40 it is the top of something the stone continues
+# through. And emission against the arena's own bloom threshold, which is 1.0: any channel
+# at or over it is a strip the bloom then smears across the screen -- a marker drawn over
+# the game rather than a thing in it.
+LINE_ALPHA = 0.60
+LINE_EMISSION = 0.60
+
+# And a bar for somewhere to STAND, which is a different question and a much lower one. The
+# body is 0.30 m wide, so two body widths is a ledge two people can be on; the hanging cages
+# of Arena_Forest are 0.68 m across and are deliberately the last ground left. A check that
+# demanded a whole storey above the water would call the parkour a mistake.
+STAND_WIDTH = 0.6
+
+# How much of the arena's width the pool has to cover. Less than this and there is dry
+# ground beside the flood, which is a corner to wait the last minute out in.
+COVERS = 0.9
+
+# How close to the lowest floor the surface may start. A hand's breadth of slack for a pool
+# whose bottom was dropped a little into the ground to hide the seam.
+STARTS_WITHIN = 0.25
+
+# And how much air a surviving floor needs above the top face before it counts as somewhere
+# to stand rather than somewhere to drown slowly.
+DRY = 0.10
+
+
+def read(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
+def guid_of(path):
+    return re.search(r"guid: ([0-9a-f]{32})", read(path + ".meta")).group(1)
+
+
+def documents(text):
+    return {int(m.group(2)): (int(m.group(1)), m.group(4)) for m in
+            re.finditer(r"(?m)^--- !u!(\d+) &(-?\d+)( stripped)?\n(.*?)(?=^--- !u!|\Z)",
+                        text, re.S)}
+
+
+def vec(body, field, default=(0.0, 0.0, 0.0)):
+    m = re.search(field + r": \{x: (-?[\d.eE+-]+), y: (-?[\d.eE+-]+), z: (-?[\d.eE+-]+)\}",
+                  body)
+    return tuple(float(v) for v in m.groups()) if m else default
+
+
+def placed(docs, transform):
+    """World position and scale of a transform, by walking up its fathers.
+
+    Positions and scales only. A rotated pool is reported rather than resolved: a level is a
+    horizontal line by definition, and a tilted one is a mistake to be told about.
+    """
+    pos, scale, tilted = [0.0, 0.0, 0.0], [1.0, 1.0, 1.0], False
+    cur = transform
+    while cur in docs:
+        body = docs[cur][1]
+        rot = re.search(r"m_LocalRotation: \{x: (-?[\d.eE+-]+), y: (-?[\d.eE+-]+), "
+                        r"z: (-?[\d.eE+-]+), w: (-?[\d.eE+-]+)\}", body)
+        if rot and any(abs(float(v)) > 1e-4 for v in rot.groups()[:3]):
+            tilted = True
+        p, s = vec(body, "m_LocalPosition"), vec(body, "m_LocalScale", (1.0, 1.0, 1.0))
+        for i in range(3):
+            pos[i] = pos[i] * s[i] + p[i]
+            scale[i] *= s[i]
+        up = re.search(r"m_Father: \{fileID: (-?\d+)\}", body)
+        cur = int(up.group(1)) if up else 0
+    return pos, scale, tilted
+
+
+def pools(text, docs, pool_guid):
+    """Every PoisonPool in the scene, as the box its body draws."""
+    out = []
+    for fid, (cls, body) in sorted(docs.items()):
+        if cls != 114 or pool_guid not in body:
+            continue
+        if re.search(r"^  m_Enabled: 0", body, re.M):
+            continue
+
+        art = re.search(r"\n  body: \{fileID: (-?\d+)\}", body)
+        own = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        owner = int(own.group(1)) if own else 0
+        box = int(art.group(1)) if art and int(art.group(1)) != 0 else None
+        if box is None:
+            # No body wired: the component measures its own object instead.
+            box = next((f for f, (c, b) in docs.items()
+                        if c == 4 and f"m_GameObject: {{fileID: {owner}}}" in b), None)
+
+        def slot(name):
+            m = re.search(r"\n  " + name + r": \{fileID: (-?\d+)\}", body)
+            return int(m.group(1)) if m else 0
+
+        hide = re.search(r"\n  hideBoxesInPlay: (\d)", body)
+        line = re.search(r"\n  showWaterline: (\d)", body)
+        out.append(dict(component=fid, owner=owner, body=box,
+                        surface=slot("surface"), mist=slot("mist"), source=slot("source"),
+                        glow=slot("glow"),
+                        hidden=hide is None or hide.group(1) == "1",
+                        waterline=line is None or line.group(1) == "1"))
+    return out
+
+
+def emitters_under(docs, transform):
+    """How many particle systems hang off this transform, prefab instances included.
+
+    A prefab instance writes no components into the scene at all -- only a stripped shell
+    pointing at the asset -- so counting class 198 in the scene file finds nothing and the
+    smoke reads as missing. This follows the shell into the prefab, which is where the
+    pack's effect actually lives.
+    """
+    found, stack = 0, [transform]
+    while stack:
+        t = stack.pop()
+        if t not in docs:
+            continue
+        body = docs[t][1]
+
+        src = re.search(r"m_CorrespondingSourceObject: \{fileID: -?\d+, "
+                        r"guid: ([0-9a-f]{32}), type: \d\}", body)
+        if src:
+            asset = geometry._asset_of(src.group(1))
+            if asset and os.path.exists(asset):
+                found += len(re.findall(r"(?m)^--- !u!198 &", read(asset)))
+            continue
+
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        if go:
+            comps = re.search(r"  m_Component:\n((?:  - component: \{fileID: -?\d+\}\n)*)",
+                              docs.get(int(go.group(1)), (0, ""))[1])
+            if comps and comps.group(1):
+                for c in re.findall(r"fileID: (-?\d+)", comps.group(1)):
+                    if docs.get(int(c), (0,))[0] == 198:
+                        found += 1
+
+        kids = re.search(r"  m_Children:(?: \[\]|\n((?:  - \{fileID: -?\d+\}\n)*))", body)
+        if kids and kids.group(1):
+            stack += [int(v) for v in re.findall(r"fileID: (-?\d+)", kids.group(1))]
+    return found
+
+
+def colliders_under(docs, transform):
+    """Any collider on this transform or its children, by class id."""
+    found = []
+    stack = [transform]
+    while stack:
+        t = stack.pop()
+        if t not in docs:
+            continue
+        body = docs[t][1]
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        if go:
+            owner = int(go.group(1))
+            comps = re.search(r"  m_Component:\n((?:  - component: \{fileID: -?\d+\}\n)*)",
+                              docs.get(owner, (0, ""))[1])
+            if comps and comps.group(1):
+                for c in re.findall(r"fileID: (-?\d+)", comps.group(1)):
+                    cls = docs.get(int(c), (0,))[0]
+                    if cls in (23, 33, 54, 64, 65, 135, 136, 114, 4):
+                        if cls in (64, 65, 135, 136):
+                            found.append(int(c))
+        kids = re.search(r"  m_Children:(?: \[\]|\n((?:  - \{fileID: -?\d+\}\n)*))", body)
+        if kids and kids.group(1):
+            stack += [int(v) for v in re.findall(r"fileID: (-?\d+)", kids.group(1))]
+    return found
+
+
+def screen_clamps(docs, transform):
+    """Every particle renderer's min/max particle size under this transform.
+
+    These two are fractions of the SCREEN, not metres, and that is the whole reason this
+    rule exists. A min of 0.2 means no particle may be drawn smaller than a fifth of the
+    screen's height however far away it is, and a max of 1.2 means one may cover the lot --
+    so the same build looks like soft fog on one machine and like a screen-filling green
+    texture on another, because the two have different resolutions and the camera frames by
+    height. It cannot be seen in the inspector without knowing what the numbers mean, and it
+    cannot be reproduced on the machine that looks right.
+
+    Polyart's fog ships with 0.2 and 1.2, which is correct for a prop you walk past and
+    wrong for a volume that fills an arena.
+    """
+    out, stack = [], [transform]
+    while stack:
+        t = stack.pop()
+        if t not in docs:
+            continue
+        body = docs[t][1]
+
+        src = re.search(r"m_CorrespondingSourceObject: \{fileID: -?\d+, "
+                        r"guid: ([0-9a-f]{32}), type: \d\}", body)
+        if src:
+            asset = geometry._asset_of(src.group(1))
+            if asset and os.path.exists(asset):
+                text = read(asset)
+                name = os.path.basename(asset)
+                for m in re.finditer(r"  m_MinParticleSize: ([\d.]+)\n"
+                                     r"  m_MaxParticleSize: ([\d.]+)", text):
+                    out.append((name, float(m.group(1)), float(m.group(2))))
+            continue
+
+        kids = re.search(r"  m_Children:(?: \[\]|\n((?:  - \{fileID: -?\d+\}\n)*))", body)
+        if kids and kids.group(1):
+            stack += [int(v) for v in re.findall(r"fileID: (-?\d+)", kids.group(1))]
+    return out
+
+
+# What a particle may cover, as a share of the screen. Above this the look depends on the
+# machine's resolution rather than on the arena.
+MAX_ON_SCREEN = 0.4
+
+# And a minimum above zero is a particle that cannot be far away: it is held at this share
+# of the screen whatever the distance.
+MIN_ON_SCREEN = 0.02
+
+
+def lights_under(docs, transform):
+    """How many lights hang off this transform. Class 108, counted through children."""
+    found, stack = 0, [transform]
+    while stack:
+        tr = stack.pop()
+        if tr not in docs:
+            continue
+        body = docs[tr][1]
+        go = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        if go:
+            comps = re.search(r"  m_Component:\n((?:  - component: \{fileID: -?\d+\}\n)*)",
+                              docs.get(int(go.group(1)), (0, ""))[1])
+            if comps and comps.group(1):
+                for c in re.findall(r"fileID: (-?\d+)", comps.group(1)):
+                    if docs.get(int(c), (0,))[0] == 108:
+                        found += 1
+        kids = re.search(r"  m_Children:(?: \[\]|\n((?:  - \{fileID: -?\d+\}\n)*))", body)
+        if kids and kids.group(1):
+            stack += [int(v) for v in re.findall(r"fileID: (-?\d+)", kids.group(1))]
+    return found
+
+
+def floors(baked, min_width):
+    """Every surface at least this wide: its top, and the ground it covers."""
+    out = []
+    for box in baked["solid"]:
+        x0, y0, x1, y1 = (F(v) for v in box)
+        if x1 - x0 >= min_width:
+            out.append((y1, x0, x1))
+    return sorted(out)
+
+
+def material_of(docs, transform):
+    """The material on the waterline, as (name, alpha, brightest emission channel, on?).
+
+    Read from the ASSET rather than from the scene, because a material is a file and the
+    scene only points at it -- and the one thing worth knowing about this one is how loud
+    it is.
+    """
+    owner = None
+    for fid, (cls, body) in sorted(docs.items()):
+        if cls == 4 and fid == transform:
+            m = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+            owner = int(m.group(1)) if m else None
+    if owner is None:
+        return None
+
+    guid = None
+    for fid, (cls, body) in sorted(docs.items()):
+        if cls != 23:
+            continue
+        m = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+        if not m or int(m.group(1)) != owner:
+            continue
+        g = re.search(r"- \{fileID: \d+, guid: (\w+), type: 2\}", body)
+        guid = g.group(1) if g else None
+
+    if guid is None:
+        return None
+
+    for base, _dirs, files in os.walk(os.path.join(ASSETS, "_Game", "Materials")):
+        for f in files:
+            if not f.endswith(".mat.meta"):
+                continue
+            text = open(os.path.join(base, f), encoding="utf-8", errors="replace").read()
+            if guid not in text:
+                continue
+            mat = open(os.path.join(base, f[:-5]), encoding="utf-8",
+                       errors="replace").read()
+            a = re.search(r"- _BaseColor: \{r: [-\d.eE+]+, g: [-\d.eE+]+, "
+                          r"b: [-\d.eE+]+, a: ([-\d.eE+]+)\}", mat)
+            e = re.search(r"- _EmissionColor: \{r: ([-\d.eE+]+), g: ([-\d.eE+]+), "
+                          r"b: ([-\d.eE+]+), a: [-\d.eE+]+\}", mat)
+            on = "_EMISSION" in mat
+            return (f[:-9], float(a.group(1)) if a else 1.0,
+                    max(float(v) for v in e.groups()) if e else 0.0, on)
+    return None
+
+
+def main(argv):
+    only = None
+    if "--scene" in argv:
+        only = argv[argv.index("--scene") + 1]
+
+    pool_guid = guid_of(POOL_CS)
+    problems, notes = [], []
+
+    wanted = [only] if only else geometry.arena_scenes()
+    for scene in wanted:
+        path = os.path.join(SCENES, scene)
+        if not os.path.exists(path):
+            continue
+        text = read(path)
+        docs = documents(text)
+
+        sc = geometry.Scene(path)
+        try:
+            baked = geometry.bake(sc)
+        except SystemExit:
+            notes.append(f"{scene}: no SimWorldBaker, so there is no arena to flood")
+            continue
+
+        plane = sc.baker_field("planeZ", float, 0.0)
+        found = pools(text, docs, pool_guid)
+
+        if not found:
+            problems.append(
+                f"{scene}: no PoisonPool, so the closing phase does nothing. The arena does "
+                f"not narrow any more (docs/33) -- without a pool the last minute is a clock "
+                f"running down.")
+            continue
+        if len(found) > 1:
+            problems.append(
+                f"{scene}: {len(found)} PoisonPools and the simulation holds one level. The "
+                f"first is the poison; the rest rise with it and bite nobody.")
+
+        p = found[0]
+        pos, scale, tilted = placed(docs, p["body"])
+        y0, y1 = pos[1] - scale[1] / 2, pos[1] + scale[1] / 2
+        x0, x1 = pos[0] - scale[0] / 2, pos[0] + scale[0] / 2
+        z0, z1 = pos[2] - scale[2] / 2, pos[2] + scale[2] / 2
+
+        notes.append(f"{scene}: poison y {y0:+.2f} -> {y1:+.2f} ({y1 - y0:.2f} m), "
+                     f"x {x0:.1f}..{x1:.1f}, z {z0:.2f}..{z1:.2f}")
+
+        if tilted:
+            problems.append(
+                f"{scene}: the pool is rotated. A level is a horizontal line, and the "
+                f"simulation only reads the box's bottom and top -- so a tilted pool bites "
+                f"at a height nothing in the scene is drawn at.")
+
+        if y1 <= y0:
+            problems.append(f"{scene}: the pool has no height, so nothing ever floods.")
+            continue
+
+        # --- the silent one: does it reach the fighters at all
+        if not (z1 > plane and z0 < plane):
+            problems.append(
+                f"{scene}: the pool spans z {z0:.2f}..{z1:.2f} and the fight is on the plane "
+                f"at z {plane:.2f}. Nobody is ever inside it, so a screen full of poison "
+                f"bites nothing -- and nothing warns, because the picture is correct.")
+
+        level = floors(baked, FIGHT_WIDTH)
+        standable = floors(baked, STAND_WIDTH)
+        if not level:
+            notes.append(f"  no floor wide enough to measure against")
+            continue
+
+        lowest, highest = level[0][0], level[-1][0]
+
+        if y0 > lowest + STARTS_WITHIN:
+            problems.append(
+                f"{scene}: the surface starts at y {y0:+.2f} and the lowest floor is at "
+                f"y {lowest:+.2f}. The first {y0 - lowest:.2f} m of the flood happens inside "
+                f"the floor, where nobody can see it, and the lowest ground -- which should "
+                f"drown first -- drowns last.")
+
+        # What is taken away is judged on floors; what is LEFT is judged on anything a body
+        # can stand on, because the last ground in an arena is allowed to be a ledge.
+        drowned = [top for top, _a, _b in level if top < y1 - DRY]
+        dry = [(top, b - a) for top, a, b in standable if top >= y1 - DRY]
+
+        if not drowned:
+            problems.append(
+                f"{scene}: the surface stops at y {y1:+.2f}, below every floor (lowest "
+                f"y {lowest:+.2f}), so the poison takes no ground away and the last minute "
+                f"is a clock running down.")
+        elif not dry:
+            problems.append(
+                f"{scene}: the surface stops at y {y1:+.2f} and there is nothing at all above "
+                f"it -- not a floor, not a ledge, not a crate (the highest is y "
+                f"{standable[-1][0]:+.2f}). Both fighters drown together and the round is "
+                f"decided on health, which is the ending docs/01 wants the closing phase to "
+                f"prevent. Leave the high ground dry.")
+        else:
+            widest = max(w for _t, w in dry)
+            notes.append(f"  drowns {len(drowned)} floor(s), leaves {len(dry)} thing(s) to "
+                         f"stand on (highest drowned y {max(drowned):+.2f}; the widest dry "
+                         f"ground is {widest:.2f} m at y {min(t for t, w in dry):+.2f})")
+            if widest < FIGHT_WIDTH:
+                notes.append(f"  the last ground is a LEDGE, not a floor ({widest:.2f} m "
+                             f"against {FIGHT_WIDTH:.2f}) -- which is the parkour ending, and "
+                             f"worth meaning on purpose")
+
+        # --- does it cover the ground it is meant to
+        ground = [(a, b) for top, a, b in level if top < y1]
+        if ground:
+            want_lo = min(a for a, _b in ground)
+            want_hi = max(b for _a, b in ground)
+            covered = max(0.0, min(x1, want_hi) - max(x0, want_lo))
+            share = covered / (want_hi - want_lo)
+            if share < COVERS:
+                problems.append(
+                    f"{scene}: the pool covers {share * 100:.0f}% of the ground it floods "
+                    f"(x {x0:.1f}..{x1:.1f} against x {want_lo:.1f}..{want_hi:.1f}). The rest "
+                    f"is dry floor beside the flood: a corner to wait the last minute out in.")
+
+        # --- is the waterline a LINE, or a lid
+        #
+        # IT WAS A LID, and this is the report the rule exists for: "the poison rises not
+        # as smoke but as some kind of green platform". Not the body box, which is hidden
+        # in play -- the thin bright bar added to make the surface readable, authored at
+        # the pool's whole footprint: 32 m by 6.8 m, six centimetres thick. Six centimetres
+        # is a line seen edge-on, and nobody sees it edge-on. The camera sits four metres
+        # in front of the fight plane and looks slightly down, so most of that bar is
+        # between the camera and the fighters, and a horizontal plane seen from above its
+        # own edge is a FLOOR. Rising, lit, and bright green: a platform.
+        #
+        # So the bar has to be a bar. Its width is the arena's -- that is the point of it --
+        # and its depth has to stay around the fight plane, where the fighters are and where
+        # the eye already is.
+        if p["surface"] and p["waterline"]:
+            spos, sscale, _tilt = placed(docs, p["surface"])
+            deep = abs(sscale[2])
+            if deep > LINE_DEPTH:
+                problems.append(
+                    f"{scene}: the waterline is {deep:.1f} m deep (x {abs(sscale[0]):.1f} m "
+                    f"wide, {abs(sscale[1]) * 100:.0f} cm thick). That is a LID, not a line: "
+                    f"the camera looks slightly down from in front of the fight plane, so a "
+                    f"horizontal plane that reaches toward it reads as a floor -- a green "
+                    f"platform that rises, which is the one thing the smoke is there to be "
+                    f"instead of. Keep it under {LINE_DEPTH:.1f} m, across the fight plane.")
+            elif abs(spos[2]) > deep / 2 + FIGHT_WIDTH / 2:
+                problems.append(
+                    f"{scene}: the waterline sits at z {spos[2]:+.1f} and is {deep:.1f} m "
+                    f"deep, so it misses the fight plane at z 0 entirely -- a bright line "
+                    f"somewhere behind or in front of the only depth anybody is standing at.")
+
+        # --- and how loud the line is
+        surface_mat = material_of(docs, p["surface"]) if p["surface"] else None
+        if surface_mat:
+            name, alpha, emission, emitting = surface_mat
+            notes.append(f"  the line wears {name}: alpha {alpha:.2f}"
+                         + (f", emission {emission:.2f}" if emitting else ", no emission"))
+            if alpha > LINE_ALPHA:
+                problems.append(
+                    f"{scene}: the waterline is {alpha * 100:.0f}% opaque ({name}). That is "
+                    f"a painted strip lying on the arena rather than the top of something: "
+                    f"the stone has to carry on through it. Keep it under "
+                    f"{LINE_ALPHA * 100:.0f}%.")
+            if emitting and emission > LINE_EMISSION:
+                problems.append(
+                    f"{scene}: the waterline's emission is {emission:.2f} ({name}) against "
+                    f"an arena bloom threshold of 1.0, so the line is smeared across the "
+                    f"screen by the bloom and reads as a marker drawn over the game. The "
+                    f"smoke and the three lights are what it should read from; keep this "
+                    f"under {LINE_EMISSION:.2f}.")
+
+        # --- and the cube's own collider
+        solid = colliders_under(docs, p["body"]) + colliders_under(docs, p["owner"])
+        if solid:
+            problems.append(
+                f"{scene}: the pool carries {len(solid)} collider(s). The baker skips them, "
+                f"but anything else in Unity will not: delete them. A cube dragged into a "
+                f"scene brings a BoxCollider with it, and a solid pool is one the fighters "
+                f"STAND on -- which looks exactly like the poison working.")
+
+        # --- and can anybody SEE it
+        #
+        # The boxes are a measurement and are switched off the moment the game starts, so
+        # the smoke is the whole picture. Nothing wired means poison that kills from an
+        # empty-looking floor -- the only failure here that is worse than a boxy one.
+        band = emitters_under(docs, p["mist"]) if p["mist"] else 0
+        below = emitters_under(docs, p["source"]) if p["source"] else 0
+
+        if p["hidden"] and band + below == 0:
+            problems.append(
+                f"{scene}: the boxes are hidden in play and no smoke is wired (Mist, Source), "
+                f"so the poison is INVISIBLE: health drains on a floor that looks dry. Wire "
+                f"the smoke, or switch Hide Boxes In Play off and live with a green slab.")
+        elif band + below == 0:
+            notes.append(f"  no smoke wired; the pool is drawn as the box itself, which is a "
+                         f"measurement rather than a picture")
+        else:
+            lit = lights_under(docs, p["glow"]) if p["glow"] else 0
+            notes.append(f"  smoke: {band} emitter(s) in the pool itself, {below} under "
+                         f"the floor; {lit} light(s) on the waterline; the line itself is "
+                         f"{'drawn' if p['waterline'] else 'OFF'}")
+
+            # Neither of these is a failure -- a flood of smoke alone is a legitimate
+            # look -- but both are the difference between poison you see coming and
+            # poison you notice when the health starts dropping, so they are said.
+            if lit == 0:
+                notes.append(f"  no light on the waterline: smoke is transparent, and a "
+                             f"transparent thing in a dark arena is a suggestion. Green on "
+                             f"the floor is what makes a flood read from across the room")
+            if not p["waterline"]:
+                notes.append(f"  and the waterline is switched off, so the one height a "
+                             f"player has to read has no edge at all")
+
+            # The clamps, which are the one thing about this smoke that can look right on
+            # the machine it was built on and wrong on the next one.
+            for where in (p["mist"], p["source"]):
+                if not where:
+                    continue
+                for asset, lo, hi in screen_clamps(docs, where):
+                    if hi > MAX_ON_SCREEN:
+                        problems.append(
+                            f"{scene}: {asset} lets one particle cover {hi * 100:.0f}% of the "
+                            f"SCREEN (Max Particle Size {hi}). That is a fraction of the "
+                            f"viewport, not metres, so the poison is soft fog on one "
+                            f"resolution and a screen-filling texture on another. Keep it "
+                            f"under {MAX_ON_SCREEN}.")
+                    if lo > MIN_ON_SCREEN:
+                        problems.append(
+                            f"{scene}: {asset} forces every particle to at least "
+                            f"{lo * 100:.0f}% of the screen (Min Particle Size {lo}), so the "
+                            f"smoke cannot be far away and the far end of the arena is drawn "
+                            f"in the same giant cards as the near end. Zero it.")
+            if band == 0:
+                notes.append(f"  nothing in the pool, so the surface -- the one height a "
+                             f"player has to read -- is only implied by the smoke below it")
+
+    for n in notes:
+        print(("  " + n) if n.startswith(" ") else ("  note: " + n))
+    for p in problems:
+        print("  " + p)
+    print(f"poison_check: {len(problems)} problem(s) across {len(wanted)} scene(s)")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

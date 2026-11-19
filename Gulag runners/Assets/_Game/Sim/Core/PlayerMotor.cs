@@ -1,0 +1,1913 @@
+namespace GulagRunners.Sim
+{
+    /// <summary>
+    /// The movement simulation for one player.
+    ///
+    /// Pure, deterministic and engine-free: given the same state, input and world it produces
+    /// the same result on every device, which is what rollback netcode needs (docs/06).
+    /// Nothing here may use float, UnityEngine, Time, or any random source.
+    ///
+    /// It implements the movement described in docs/02-combat-and-controls.md:
+    ///   - one flat gameplay plane, depth is presentation only
+    ///   - stick left/right to move, up/down to climb ladders and hatches, a small jump button
+    ///   - a dodge with invulnerability frames, paid for with stamina
+    ///   - ledge assist so nobody falls because of the thickness of a thumb
+    ///   - noise as simulation state, because during the scavenge phase sound is the only way
+    ///     to know where the other player is (docs/01)
+    /// </summary>
+    public static class PlayerMotor
+    {
+        public const int TicksPerSecond = 60;
+
+        /// <summary>One tick. Fixed step: the simulation never sees a variable delta time.</summary>
+        public static readonly Fix Dt = new Fix(Fix.RawOne / TicksPerSecond);
+
+        /// <summary>Separation kept after resolving a collision, so the body never re-overlaps.</summary>
+        static readonly Fix Skin = new Fix(16);           // ~0.00024 m
+        static readonly Fix GroundProbe = Fix.FromMilli(20);
+        static readonly Fix GroundStick = Fix.FromMilli(200);
+
+        public static void Step(ref PlayerSimState s, InputFlags input, SimWorld world,
+                                in MoveConfig cfg)
+        {
+            // Hit stop. Nothing integrates: no gravity, no velocity, no depth. The body is
+            // held exactly where the blow caught it, which is the whole point — a freeze that
+            // still drifted would read as lag rather than as weight.
+            //
+            // The one place the timer is decremented, so the order inside a tick cannot
+            // matter: CombatMotor.Step sees it and returns, this sees it and counts it down.
+            if (s.HitStopTimer > 0)
+            {
+                s.HitStopTimer--;
+                return;
+            }
+
+            StepFlat(ref s, input, world, in cfg);
+            UpdateDepth(ref s, world, in cfg);
+            ShoveFromWalls(ref s, world, in cfg);
+        }
+
+        /// <summary>
+        /// Pushes a body out of a closing wall that has caught up with it.
+        ///
+        /// Blocking alone is not enough for a wall that MOVES: a fighter standing still as
+        /// one arrives is not walking into anything, so nothing would stop it passing through
+        /// them. Being shoved is also the whole feeling the closing phase is for — docs/01
+        /// wants the arena to herd, and a wall you can stand inside herds nobody.
+        ///
+        /// Out the way it came, always, so a wall closing from the left pushes right. Pushing
+        /// out of the nearest face would sometimes post a fighter THROUGH the wall into the
+        /// dead ground behind it, which ends the match in an empty room.
+        /// </summary>
+        static void ShoveFromWalls(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            if (world.Walls.Length == 0) return;
+
+            Fix half = cfg.BodyWidth / 2;
+            Fix height = s.Crouching ? cfg.CrouchHeight : cfg.BodyHeight;
+            Fix halfZ = cfg.BodyDepth / 2;
+
+            for (int i = 0; i < world.Walls.Length; i++)
+            {
+                if (!world.WallReaches(i, s.Depth, halfZ)) continue;
+
+                Aabb wall = world.WallAt(i);
+                Aabb body = new Aabb(s.Position.X - half, s.Position.Y,
+                                     s.Position.X + half, s.Position.Y + height);
+                if (!body.Overlaps(in wall)) continue;
+
+                // Out the way the wall is growing, always. Out of the NEAREST face would
+                // sometimes post a fighter back into the ground the wall has already eaten,
+                // which ends the match in a room with nobody in it.
+                switch (world.Walls[i].Grows)
+                {
+                    case GateToward.PlusX:
+                        s.Position.X = wall.MaxX + half + Skin;
+                        if (s.Velocity.X < Fix.Zero) s.Velocity.X = Fix.Zero;
+                        break;
+                    case GateToward.MinusX:
+                        s.Position.X = wall.MinX - half - Skin;
+                        if (s.Velocity.X > Fix.Zero) s.Velocity.X = Fix.Zero;
+                        break;
+                    case GateToward.MinusY:
+                        s.Position.Y = wall.MinY - height - Skin;
+                        if (s.Velocity.Y > Fix.Zero) s.Velocity.Y = Fix.Zero;
+                        break;
+                    default:
+                        s.Position.Y = wall.MaxY + Skin;
+                        if (s.Velocity.Y < Fix.Zero) s.Velocity.Y = Fix.Zero;
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Which slice of the level the body is on, and how it gets there.
+        ///
+        /// A location built in 3D does not have one floor at one depth: this one has a ground
+        /// floor nine metres deep carrying a ramp at z -3.0 and a crate staircase at z -1.4,
+        /// and a gallery above at z -0.6 that the ladder in between reaches at z -2.1. Climbing
+        /// is therefore a move AWAY from the camera and coming down is a move towards it, which
+        /// is the thing the fighter has to work out for themselves because there is no button
+        /// for it and docs/06 has no input bit to spare for one.
+        ///
+        /// Three rules, in order: a ladder is a thing you are holding, so it wins; otherwise
+        /// whatever is just ahead and low enough to step onto, because that is where you are
+        /// evidently going; otherwise the floor underfoot, which only moves you if it does not
+        /// already hold you.
+        /// </summary>
+        static void UpdateDepth(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            if (cfg.DepthSnapSpeed <= Fix.Zero || world.SolidZ.Length == 0) return;
+
+            Fix inset = cfg.BodyDepth / 2;
+            Fix want;
+
+            if (s.LadderIndex >= 0 && s.LadderIndex < world.Ladders.Length)
+            {
+                // The rungs at this height, not just anywhere on the ladder: one propped
+                // against a walkway leans away from the camera as it rises, and holding one
+                // depth the whole way up pushes the body through the rungs at one end of it.
+                //
+                // And in FRONT of them, measured off the ladder's near face rather than its
+                // centre line, so the stand-off is only ever the character's own thickness.
+                // A thick ladder and a thin one then hold the body at the same visible
+                // distance, which is the thing an eye actually checks.
+                // Half the RAILS, not half the span. The span of a leaning ladder is its
+                // thickness plus the whole lean, and halving that put the body 0.45 m in
+                // front of the rungs on the mine's ladders, which lean 0.9 m over their
+                // height: a climb up thin air beside a ladder the fighter was holding.
+                Fix halfLadder = world.LadderHalfThickness(s.LadderIndex);
+
+                want = world.LadderDepthAt(s.LadderIndex, s.Position.Y, s.Depth, inset)
+                     - halfLadder - cfg.LadderStandOff;
+            }
+            else if (s.Mode != MoveMode.Grounded)
+            {
+                // FALLING, the body leans towards the storey it is dropping onto.
+                //
+                // This used to keep the slice you left until your feet touched, and then
+                // slide you forward where you stood. That is the wrong order and it is
+                // what "he drops to the floor below and stays in the background" means:
+                // the whole move happened after the landing, as a slide, instead of
+                // during the fall where the eye reads it as leaning into the drop.
+                //
+                // ON THE WAY UP TOO, once you are over the thing. This used to be the
+                // way down only, guarding against being "dragged backwards before you are
+                // over a ledge" -- and that guard was doing the job twice, because
+                // TryLandingLane already skips every box whose top is above the feet. The
+                // velocity test only delayed the lean on a surface the fighter had
+                // ALREADY cleared.
+                //
+                // Which is the whole of the forest's cages. They are parkour, on purpose,
+                // and each one stands on its own slice -- the hanging pair 1.66 m behind
+                // the floor's lane, the standing ones about 1.2 m in front of it. Leaning
+                // only on the way down left most of that distance to be travelled AFTER
+                // the feet landed, as a slide across the cage floor, and a slide you did
+                // not ask for towards the back of a cage is being slowly sucked into it.
+                //
+                // Worse than a slide, in fact: a box is only solid to a body whose slice
+                // OVERLAPS it (SolidAt), so arriving with the slice you took off from is
+                // arriving INSIDE the cage. Jump at one whose roof is near the top of the
+                // arc and the old rule had you pass straight through it, drift towards the
+                // camera for a fifth of a second while inside it, and end up on the floor.
+                // Starting the lean at the lip spends the move in the air instead, where
+                // the eye reads it as leaning into the jump, and the roof is solid by the
+                // time the feet reach it.
+                if (!TryLandingLane(ref s, world, in cfg, out want)) return;
+
+                // And faster while the feet are off the ground. The gentle 4 m/s is tuned
+                // for walking from one slice to another; in the air the body is already
+                // travelling, so the same move reads as part of the arc rather than as
+                // something tugging at it -- and it finishes before the landing, which is
+                // the point.
+                //
+                // A config that never set the multiplier moves at the ground speed, which
+                // is what every version before this one did. Nothing in the project builds
+                // a MoveConfig by hand -- they all start from Default -- and the inspector
+                // cannot type a zero, so this is only here to keep the one that does from
+                // freezing the lean altogether.
+                Fix faster = cfg.AirDepthSnap > Fix.Zero ? cfg.AirDepthSnap : Fix.One;
+                s.Depth = Fix.MoveTowards(s.Depth, want,
+                                          cfg.DepthSnapSpeed * faster * Dt);
+                return;
+            }
+            else if (!TryLaneAhead(ref s, world, in cfg, out want) &&
+                     !TryFloorLane(ref s, world, in cfg, out want))
+                return;
+
+            s.Depth = Fix.MoveTowards(s.Depth, want, cfg.DepthSnapSpeed * Dt);
+        }
+
+        /// <summary>
+        /// Which slice of a box to stand on: the gameplay plane whenever the box reaches it,
+        /// and otherwise the nearest part of the box to where the body already is.
+        ///
+        /// The plane is where the fight happens. Lanes exist so a fighter can step back onto a
+        /// ramp or a walkway modelled behind it, not so he can take up residence there — and a
+        /// floor wide enough to hold both lanes used to hold him on whichever one he arrived
+        /// with. Drop off the upper walkway and you landed on the ground floor still on the
+        /// walkway's slice, a metre behind your opponent, and nothing either of you could do
+        /// would connect for the rest of the round.
+        /// </summary>
+        static Fix LaneOn(Span span, Fix depth, in MoveConfig cfg)
+        {
+            // Always the part of this surface NEAREST THE FIGHT, and never the part
+            // nearest wherever the body happens to have arrived from.
+            //
+            // The second branch is what this used to do when a surface did not reach the
+            // plane, and it is the same bug the rule above was written against, wearing
+            // the clothes of a fix. Arena_Forest's terrace is 4.4 m deep and stops 23 cm
+            // short of the plane: a fighter who steps off a hanging cage at z -0.67 is
+            // already INSIDE that span, so "the nearest part of it" was where he already
+            // was, and he landed on the terrace two and a half metres behind the man he
+            // is fighting and stayed there for the rest of the round.
+            //
+            // Nothing is lost by dropping it. A ramp or a walkway modelled behind the
+            // plane still holds the body -- on its front edge, which is the part of it
+            // closest to the fight, which is where a fighter standing on a walkway
+            // wants to be anyway.
+            return span.Nearest(cfg.HomeDepth, cfg.BodyDepth / 2);
+        }
+
+        /// <summary>
+        /// Which way the fighter aims, and which way he is going — two answers, one tick.
+        ///
+        /// TRAVEL is simple and has not changed: you are going the way you are pushing.
+        ///
+        /// AIM is the new one, and the order of the three cases is the whole design:
+        ///
+        ///   * a swipe wins outright, and starts a clock. One frame of input cannot hold a
+        ///     facing against a stick that is held for hundreds, so the swipe buys itself
+        ///     enough frames to cover the swing it is asking for.
+        ///   * while that clock runs, OR while a swing is live, movement may not take the
+        ///     aim back. This is the case the feature exists for: holding left and striking
+        ///     right has to still be striking right by the time the blow lands, or the
+        ///     player is being lied to.
+        ///   * otherwise the aim follows the feet, which is what it did when there was only
+        ///     one of these and is why nothing that does not swipe behaves any differently.
+        ///
+        /// A swing keeps its own aim alive past the clock on purpose: a long weapon's windup
+        /// can outlast the lock, and a blade that turns round half way through a swing is
+        /// worse than one that cannot turn at all.
+        /// </summary>
+        static void Aim(ref PlayerSimState s, InputFlags input, int wishX, in MoveConfig cfg)
+        {
+            if (wishX != 0) s.Travel = (sbyte)wishX;
+
+            // The aim no longer comes through here. ArmMotor turns the body to follow the
+            // attack stick on the tick it is pushed, because the stick IS the aim now and
+            // there is nothing to hold a facing against: the lock existed because a swipe
+            // was a single frame of input and a held movement stick would steal the facing
+            // back before the windup finished. There is no windup to outlast.
+            if (wishX != 0) s.Facing = (sbyte)wishX;
+        }
+
+        /// <summary>The slice of the nearest thing ahead that is low enough to climb onto.</summary>
+        static bool TryLaneAhead(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                 out Fix lane)
+        {
+            lane = s.Depth;
+            if (cfg.LaneLookahead <= Fix.Zero) return false;
+
+            Fix half = cfg.BodyWidth / 2;
+            Fix limit = cfg.ClamberHeight > cfg.StepUpHeight ? cfg.ClamberHeight
+                                                             : cfg.StepUpHeight;
+            // Travel, not aim: a fighter backing away with his blade the other way is still
+            // backing INTO whatever is behind him, and it is that step he has to find.
+            Fix from = s.Travel > 0 ? s.Position.X + half : s.Position.X - half - cfg.LaneLookahead;
+            Fix to = s.Travel > 0 ? s.Position.X + half + cfg.LaneLookahead : s.Position.X - half;
+
+            bool found = false;
+            Fix nearestX = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;           // a shutter that has not shut
+                Aabb solid = world.Solids[i];
+                if (solid.MaxX <= from || solid.MinX >= to) continue;
+
+                Fix step = solid.MaxY - s.Position.Y;
+                if (step <= Fix.Zero || step > limit) continue;
+
+                // Strictly ahead. A box whose X already surrounds the body is not somewhere
+                // the body is going — and the wall at the back of a building runs the length
+                // of the arena, so measured by its near edge it is ahead of everything and
+                // would win every time.
+                Fix gap = s.Travel > 0 ? solid.MinX - (s.Position.X + half)
+                                       : (s.Position.X - half) - solid.MaxX;
+                if (gap < Fix.Zero) continue;
+                if (found && gap >= nearestX) continue;
+
+                Fix want = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
+                if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
+
+                nearestX = gap;
+                lane = want;
+                found = true;
+            }
+
+            // Ladders deliberately do NOT steer the lane.
+            //
+            // They used to, and the reasoning looked sound: this location's ladders stand a
+            // metre in front of the floor they rise from, so the body was walked onto their
+            // slice in order to be able to reach them. But reaching them never needed it —
+            // the grab only asks that the rungs be within the lane REACH, not that the body
+            // already stand on them, and the mount sets the depth itself. All the steering
+            // bought was movement nobody asked for: a fighter placed half a metre from a
+            // ladder slid a third of a metre towards it before the match began, and one
+            // walking past two of them slid between their slices the whole way.
+            //
+            // So the lane follows the floor, which is a thing you are standing on, and the
+            // rungs are taken at the moment you take them.
+            return found;
+        }
+
+        /// <summary>
+        /// The slice of the floor this body is falling onto: the highest solid under its
+        /// feet that it could change lane onto from here.
+        ///
+        /// No look-down distance, on purpose. There is nothing to tune: whatever is
+        /// directly below is what the fall ends on, and if there is nothing below then
+        /// there is no lane to aim at and the body keeps the one it has. The lane reach
+        /// is the only limit, and it is the same one that governs stepping sideways onto
+        /// a ramp — a fighter cannot slide two metres through the air to a slice he could
+        /// not have walked to.
+        /// </summary>
+        static bool TryLandingLane(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                   out Fix lane)
+        {
+            lane = s.Depth;
+            Fix half = cfg.BodyWidth / 2;
+
+            bool found = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;
+                Aabb solid = world.Solids[i];
+                if (solid.MaxY > s.Position.Y + Skin) continue;        // not below the feet
+                if (solid.MaxX <= s.Position.X - half ||
+                    solid.MinX >= s.Position.X + half) continue;
+                if (found && solid.MaxY <= top) continue;
+
+                Fix want = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
+                if (Fix.Abs(want - s.Depth) > cfg.LaneReach) continue;
+
+                top = solid.MaxY;
+                lane = want;
+                found = true;
+            }
+            return found;
+        }
+
+        /// <summary>The slice of the floor underfoot. Keeps the body where it is if it fits.</summary>
+        static bool TryFloorLane(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                 out Fix lane)
+        {
+            lane = s.Depth;
+            Fix half = cfg.BodyWidth / 2;
+            Fix halfZ = cfg.BodyDepth / 2;
+            Aabb feet = new Aabb(s.Position.X - half + Skin, s.Position.Y - GroundProbe,
+                                 s.Position.X + half - Skin, s.Position.Y);
+
+            bool found = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!feet.Overlaps(in world.Solids[i])) continue;
+                if (!world.SolidAt(i, s.Depth, halfZ)) continue;
+                if (found && world.Solids[i].MaxY <= top) continue;
+
+                top = world.Solids[i].MaxY;
+                lane = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
+                found = true;
+            }
+            return found;
+        }
+
+        static void StepFlat(ref PlayerSimState s, InputFlags input, SimWorld world,
+                             in MoveConfig cfg)
+        {
+            s.Noise = NoiseLevel.Silent;
+
+            TickTimers(ref s, cfg);
+
+            int wishX = input.MoveX();
+            int wishY = input.MoveY();
+
+            bool jumpHeldNow = input.Has(InputFlags.Jump);
+            if (jumpHeldNow && !s.JumpHeld) s.JumpBufferTimer = cfg.JumpBufferFrames;
+            s.JumpHeld = jumpHeldNow;
+
+            Aim(ref s, input, wishX, in cfg);
+
+            // Both scripted moves — the grab at the bottom of a ladder and the climb-out at the
+            // top — run before anything else, because while one is playing the body is being
+            // walked along a path and nothing else may touch it.
+            if (s.Mode == MoveMode.Mantling || s.Mode == MoveMode.Mounting)
+            {
+                StepScripted(ref s, world, cfg);
+                return;
+            }
+
+            if (s.Mode == MoveMode.Dodging)
+            {
+                StepDodge(ref s, world, cfg);
+                return;
+            }
+
+            if (TryStartDodge(ref s, input, wishX, cfg))
+            {
+                StepDodge(ref s, world, cfg);
+                return;
+            }
+
+            if (s.Mode == MoveMode.Climbing)
+            {
+                StepClimb(ref s, wishX, wishY, world, cfg);
+                return;
+            }
+
+            if (TryMountLadder(ref s, wishY, world, cfg))
+            {
+                // A grab that has distance to cover plays its reach first; one that starts
+                // already on the centre line goes straight to climbing, so standing at a ladder
+                // and pressing up never costs a frame it does not need to.
+                if (s.Mode == MoveMode.Mounting) StepScripted(ref s, world, cfg);
+                else StepClimb(ref s, wishX, wishY, world, cfg);
+                return;
+            }
+
+            StepWalk(ref s, wishX, wishY, world, cfg);
+        }
+
+        // ---------------------------------------------------------------- timers
+
+        static void TickTimers(ref PlayerSimState s, in MoveConfig cfg)
+        {
+            if (s.CoyoteTimer > 0) s.CoyoteTimer--;
+            if (s.JumpBufferTimer > 0) s.JumpBufferTimer--;
+            if (s.DodgeRecoverTimer > 0) s.DodgeRecoverTimer--;
+            if (s.FallThroughTimer > 0) s.FallThroughTimer--;
+            if (s.LadderCooldownTimer > 0) s.LadderCooldownTimer--;
+            if (s.StepNoiseTimer > 0) s.StepNoiseTimer--;
+
+            // Nothing comes back while the guard is up: a brace you can hold and recover
+            // through is a brace you never have to drop.
+            if (s.StaminaCharges < cfg.StaminaMax )
+            {
+                s.StaminaTimer++;
+                if (s.StaminaTimer >= cfg.StaminaRecoverFrames)
+                {
+                    s.StaminaTimer = 0;
+                    s.StaminaCharges++;
+                }
+            }
+            else
+            {
+                s.StaminaTimer = 0;
+            }
+        }
+
+        // ---------------------------------------------------------------- walking
+
+        static void StepWalk(ref PlayerSimState s, int wishX, int wishY, SimWorld world, in MoveConfig cfg)
+        {
+            bool grounded = s.Mode == MoveMode.Grounded;
+
+            // CROUCHING IS GONE. Asked for directly, and this is the one place that ever
+            // turned it on: holding down while grounded. Down still means what else it has
+            // always meant — climbing down a ladder, and dropping through a one-way platform
+            // with jump — so the stick loses a state, not a direction.
+            //
+            // The field stays, and stays false. ArmMotor, MatchClock and PlayerController all
+            // ask it how tall the body is, and a body that is never crouched answers the same
+            // way every time; taking the field out would be a change to the shape of the
+            // simulation state for no gain, and rollback compares that state frame by frame.
+            //
+            // Nothing in the arenas needed it. Every floor and beam in all four scenes was
+            // measured for a gap between crouch height (0.68 m) and standing height (0.91 m)
+            // — the only kind of passage crouching opens — and there is not one, so no route
+            // anywhere closes with it. The quiet-movement idea it carried (docs/03: crouching
+            // is Silent, running is Loud) goes with it; walking is still quieter than running.
+            s.Crouching = false;
+
+            // Drop through a one-way platform: hold down and press jump.
+            if (grounded && wishY < 0 && s.JumpBufferTimer > 0 && StandingOnOneWayOnly(ref s, world, cfg))
+            {
+                s.JumpBufferTimer = 0;
+                s.FallThroughTimer = cfg.FallThroughFrames;
+                s.Mode = MoveMode.Airborne;
+                grounded = false;
+            }
+
+            Fix targetSpeed = (s.Crouching ? cfg.CrouchSpeed : cfg.RunSpeed) * wishX;
+            if (s.SpeedPermille > 0)
+                targetSpeed = new Fix((int)(((long)targetSpeed.Raw * s.SpeedPermille) / 1000));
+
+            // Knocked back: the body keeps what the blow gave it, and SPENDS it rather than
+            // being braked. Running the normal ground deceleration over a hit would wipe the
+            // knockback in a tenth of a second, and a hit that does not move anybody is a hit
+            // nobody can read -- but the flat drag that replaced it has the other fault: a
+            // constant slowing arrives at zero still travelling and stops dead.
+            //
+            // So the push decays by a share of itself each tick. It is fast at first, eases
+            // out to nothing, and never jolts at either end: the only sudden number in the
+            // whole exchange is the one the blow itself set, and hit stop is already holding
+            // the body still while the eye reads that.
+            if (s.HitstunTimer > 0 || s.StaggerTimer > 0 || s.RecoilTimer > 0)
+            {
+                int keep = cfg.PushDecayPermille > 0 ? cfg.PushDecayPermille : 930;
+                int raw = (int)(((long)s.Velocity.X.Raw * keep) / 1000);
+
+                // And a floor, or the tail runs for a second and a half of creep: below a
+                // centimetre a second there is nothing left to read, and a body that is
+                // still moving is a body the next blow lands on differently.
+                s.Velocity.X = raw > -650 && raw < 650 ? Fix.Zero : new Fix(raw);
+            }
+            else
+            {
+                Fix accel = wishX != 0
+                    ? (grounded ? cfg.GroundAccel : cfg.AirAccel)
+                    : (grounded ? cfg.GroundDecel : cfg.AirDecel);
+                s.Velocity.X = Fix.MoveTowards(s.Velocity.X, targetSpeed, accel * Dt);
+            }
+
+            // Jump. Coyote time and the input buffer together are the "ledge assist" of docs/02:
+            // a jump pressed just before landing, or just after stepping off, still fires.
+            if (s.JumpBufferTimer > 0 && (grounded || s.CoyoteTimer > 0))
+            {
+                s.JumpBufferTimer = 0;
+                s.CoyoteTimer = 0;
+                s.Crouching = false;
+                s.Velocity.Y = cfg.JumpSpeed;
+                s.Mode = MoveMode.Airborne;
+                grounded = false;
+                s.Noise = NoiseLevel.Quiet;
+            }
+
+            // A jump is one height. Releasing the button early used to cut the rise short, which
+            // reads well on a pad and badly on glass: the same tap gives a different height every
+            // time, so no gap in the arena has a reliable answer.
+            if (cfg.VariableJumpHeight && !s.JumpHeld && s.Velocity.Y > Fix.Zero)
+                s.Velocity.Y = s.Velocity.Y * cfg.JumpCutMul;
+
+            if (!grounded)
+            {
+                s.Velocity.Y = s.Velocity.Y - cfg.Gravity * Dt;
+                if (s.Velocity.Y < -cfg.MaxFallSpeed) s.Velocity.Y = -cfg.MaxFallSpeed;
+            }
+            else if (s.Velocity.Y <= Fix.Zero)
+            {
+                s.Velocity.Y = -GroundStick;              // keeps contact on slopes and seams
+            }
+
+            Fix impactSpeed = -s.Velocity.Y;
+            bool wasAirborne = s.Mode == MoveMode.Airborne;
+
+            MoveX(ref s, s.Velocity.X * Dt, world, cfg);
+            MoveY(ref s, s.Velocity.Y * Dt, world, cfg);
+
+            bool nowGrounded = Grounded(ref s, world, cfg);
+
+            // Walking off the edge of a step is not falling. Every ramp in this game is a
+            // staircase — an AABB world has no slopes — so a fighter walking down one left the
+            // floor ten times a second: the fall animation strobed, the descent arrived in
+            // lurches, and each tiny drop was a frame of air the player never asked for. If the
+            // next floor is within one step of the feet, the feet go to it.
+            //
+            // Only from a walk: `grounded` is already false on the frame a jump fires, so this
+            // can never glue a jump back down, and FallThroughTimer keeps it off a one-way
+            // platform the player is dropping through on purpose.
+            if (!nowGrounded && grounded && s.Velocity.Y <= Fix.Zero &&
+                s.FallThroughTimer == 0 && TryStepDown(ref s, world, in cfg))
+                nowGrounded = true;
+
+            if (nowGrounded)
+            {
+                if (wasAirborne)
+                {
+                    s.Noise = impactSpeed > cfg.HardLandSpeed ? NoiseLevel.Loud : NoiseLevel.Medium;
+                    s.StepNoiseTimer = cfg.StepNoiseFrames;
+                    s.LandedSpeed = impactSpeed;
+                }
+                s.Mode = MoveMode.Grounded;
+                s.CoyoteTimer = cfg.CoyoteFrames;
+                if (s.Velocity.Y < Fix.Zero) s.Velocity.Y = Fix.Zero;
+            }
+            else
+            {
+                s.Mode = MoveMode.Airborne;
+            }
+
+            FootstepNoise(ref s, cfg);
+        }
+
+        /// <summary>
+        /// Puts the feet on the next floor down when it is within one step of them. False when
+        /// there is nothing that close, which is the whole difference between a step and a drop.
+        /// </summary>
+        static bool TryStepDown(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            if (cfg.StepUpHeight <= Fix.Zero) return false;
+
+            if (!TryFindGroundBelow(s.Position, s.Depth, world, in cfg, cfg.StepUpHeight,
+                                    out Fix groundY))
+                return false;
+            if (groundY >= s.Position.Y) return false;    // already standing on it
+
+            s.Position.Y = groundY;
+            s.Velocity.Y = Fix.Zero;
+            return true;
+        }
+
+        static void FootstepNoise(ref PlayerSimState s, in MoveConfig cfg)
+        {
+            if (s.Mode != MoveMode.Grounded || s.Noise != NoiseLevel.Silent) return;
+            if (s.Crouching) return;                      // crouch-walking is silent, by design
+
+            Fix speed = Fix.Abs(s.Velocity.X);
+            if (speed <= Fix.FromMilli(100)) return;
+
+            if (s.StepNoiseTimer == 0)
+            {
+                s.Noise = speed >= cfg.LoudSpeed ? NoiseLevel.Loud : NoiseLevel.Quiet;
+                s.StepNoiseTimer = cfg.StepNoiseFrames;
+            }
+        }
+
+        // ---------------------------------------------------------------- dodge
+
+        static bool TryStartDodge(ref PlayerSimState s, InputFlags input, int wishX, in MoveConfig cfg)
+        {
+            if (!input.Has(InputFlags.Dodge)) return false;
+            if (s.DodgeRecoverTimer > 0) return false;
+
+            // Feet on the floor or it does not happen. A dodge in the air is a second jump
+            // with invulnerability on it, which is a different game from the one docs/02
+            // describes — there the ground is where you answer an attack.
+            if (s.Mode != MoveMode.Grounded) return false;
+
+            int cost = cfg.DodgeStaminaCost > 0 ? cfg.DodgeStaminaCost : 1;
+            if (s.StaminaCharges < cost) return false;
+
+            s.StaminaCharges -= cost;
+            s.Mode = MoveMode.Dodging;
+            s.DodgeTimer = cfg.DodgeFrames;
+            s.Crouching = false;
+            s.LadderIndex = -1;
+
+            // A dodge with no direction goes the way the body was already going — not the
+            // way the blade points. Rolling backwards out of your own swing is a dodge
+            // backwards, and it must not turn you round on the way.
+            int dir = wishX != 0 ? wishX : s.Travel;
+            if (dir == 0) dir = s.Facing;
+            s.Travel = (sbyte)dir;
+            s.Velocity = new FixVec2(cfg.DodgeSpeed * dir, Fix.Zero);
+            s.Noise = NoiseLevel.Medium;
+            return true;
+        }
+
+        static void StepDodge(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            MoveX(ref s, s.Velocity.X * Dt, world, cfg);
+
+            // The dodge visually steps into the background, so it ignores gravity for its
+            // duration. Keeping it on one plane is what keeps the hit reads honest (docs/02).
+            s.DodgeTimer--;
+            if (s.DodgeTimer > 0) return;
+
+            s.DodgeRecoverTimer = cfg.DodgeRecoverFrames;
+            s.Velocity.X = s.Velocity.X / 2;
+            s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
+        }
+
+        // ---------------------------------------------------------------- ladders
+
+        /// <summary>
+        /// Grabbing a ladder. Succeeds into either Mounting — a short eased reach onto the centre
+        /// line — or straight into Climbing when the body is already on it.
+        ///
+        /// Everything refused here is refused because accepting it would flicker: a grab that is
+        /// undone by the next tick's automatic release is a character twitching on the spot, which
+        /// is exactly how the old instant snap read.
+        /// </summary>
+        static bool TryMountLadder(ref PlayerSimState s, int wishY, SimWorld world, in MoveConfig cfg)
+        {
+            if (wishY == 0) return false;
+            if (s.LadderCooldownTimer > 0) return false;
+
+            // Nobody climbs a ladder crouched, and the grab clears the crouch — so there has to be
+            // room to stand up first, or the grab would push the head into the ceiling it was
+            // ducking under.
+            if (s.Crouching && !HasHeadroom(ref s, world, cfg)) return false;
+
+            Aabb body = s.Body(in cfg);
+            int ladder = FindLadderInReach(in body, s.Depth, world, in cfg);
+
+            // Standing on top of a ladder whose rungs start just under the feet. A ladder with
+            // no hatch beside it is the whole level here, and without this the only ones you
+            // could ever climb down are the ones with a hole to drop into first.
+            //
+            // Judged on where the ladder's HEAD is, not on which search found it. It used to
+            // be the second: a ladder the reach search had already picked could never be one
+            // you were standing on, so whether stepping over the top worked came down to
+            // whether the body's box happened to touch the ladder's box. Two ladders in this
+            // arena, one modelled 2 cm proud of its landing and one flush with it: the flush
+            // one missed the reach search by a hair and worked, the proud one was found by it
+            // and was then refused for having floor underneath — "the left ladder does not
+            // let you down", with nothing in the level to explain it.
+            bool steppingOn = false;
+            if (wishY < 0 && s.Mode == MoveMode.Grounded)
+            {
+                if (ladder < 0)
+                {
+                    ladder = LadderUnderFeet(ref s, world, in cfg);
+                    steppingOn = ladder >= 0;
+                }
+                else
+                {
+                    steppingOn = world.Ladders[ladder].MaxY
+                                 <= s.Position.Y + cfg.StepUpHeight;
+                }
+            }
+            if (ladder < 0) return false;
+
+            Aabb box = world.Ladders[ladder];
+            Fix centreX = world.LadderCentreAt(ladder, s.Position.Y);
+
+            if (wishY > 0)
+            {
+                // Nothing worth climbing: the body is already at the top of this ladder. Without
+                // this, pressing up while standing beside a hatch grabs the ladder you just left
+                // and the climb-out immediately puts you back where you were.
+                if (s.Position.Y >= box.MaxY - cfg.LadderTopMargin - cfg.BodyHeight / 4)
+                    return false;
+            }
+            else
+            {
+                // Pressing down on the floor means crouch, not climb, unless the ladder goes below.
+                if (s.Mode == MoveMode.Grounded && box.MinY >= s.Position.Y) return false;
+
+                // And there has to be a way down on the centre line — a hatch, or the lip of a
+                // ledge. At the foot of a ladder there is floor instead, and grabbing it there
+                // would be undone by the release at the bottom on the very next tick. Stepping
+                // over the top of a ladder is the exception: the floor underfoot is the floor
+                // the ladder runs through, which is exactly what you are leaving.
+                if (!steppingOn &&
+                    SupportUnder(centreX, s.Position.Y, s.Depth, s.FallThroughTimer,
+                                 world, in cfg))
+                    return false;
+            }
+
+            // The reach is a straight slide sideways, so it must not pass through anything. If it
+            // would, grab the ladder where the body already stands instead of refusing: being on
+            // the rungs slightly off centre is harmless, being pushed into a wall is not.
+            Fix targetX = SweepFree(s.Position.X, centreX, s.Position.Y, s.Depth, world, in cfg)
+                ? centreX : s.Position.X;
+
+            // Stepping over the top means the grab also has to come DOWN onto the top rung,
+            // which is below the floor being left.
+            Fix targetY = steppingOn ? box.MaxY - cfg.LadderTopMargin : s.Position.Y;
+
+            int frames = FramesFor(Fix.Max(Fix.Abs(targetX - s.Position.X),
+                                           Fix.Abs(targetY - s.Position.Y)), in cfg);
+
+            s.LadderIndex = ladder;
+            s.Crouching = false;
+            s.Velocity = FixVec2.Zero;
+            s.ScriptDir = (sbyte)(wishY > 0 ? 1 : -1);
+
+            if (frames <= 0)
+            {
+                s.Position.X = targetX;
+                s.Position.Y = targetY;
+                s.Mode = MoveMode.Climbing;
+                return true;
+            }
+
+            s.ScriptFrom = s.Position;
+            s.ScriptTo = new FixVec2(targetX, targetY);
+            s.ScriptForward = false;
+            s.ScriptFrames = frames;
+            s.ScriptTimer = frames;
+            s.Mode = MoveMode.Mounting;
+            s.Noise = NoiseLevel.Quiet;
+            return true;
+        }
+
+        /// <summary>
+        /// How long a scripted move takes: its distance at the scripted-move speed, within the
+        /// configured floor and ceiling. Zero means there is nothing to show.
+        ///
+        /// Deriving it from the distance is the whole point. A fixed frame count has to be short
+        /// enough not to feel like a pause on a short move, which makes it a lurch on a long one —
+        /// the climb-out used to cover a metre and a half in fourteen frames, ten metres a second,
+        /// faster than a dodge.
+        /// </summary>
+        static int FramesFor(Fix distance, in MoveConfig cfg)
+        {
+            if (distance <= Fix.FromMilli(20)) return 0;
+            if (cfg.ScriptSpeed <= Fix.Zero) return cfg.ScriptMaxFrames;
+
+            int frames = (distance / cfg.ScriptSpeed * TicksPerSecond).ToInt() + 1;
+            if (frames < cfg.ScriptMinFrames) frames = cfg.ScriptMinFrames;
+            if (frames > cfg.ScriptMaxFrames) frames = cfg.ScriptMaxFrames;
+            return frames;
+        }
+
+        static void StepClimb(ref PlayerSimState s, int wishX, int wishY, SimWorld world, in MoveConfig cfg)
+        {
+            // Jumping off a ladder, when the game allows it at all. The player is not
+            // trapped either way: a direction at the top climbs out, a direction in the
+            // middle steps off to whichever side has floor, and down at the bottom lets go.
+            if (s.JumpBufferTimer > 0 && !cfg.AllowLadderJump) s.JumpBufferTimer = 0;
+
+            if (s.JumpBufferTimer > 0)
+            {
+                s.JumpBufferTimer = 0;
+                s.Mode = MoveMode.Airborne;
+                s.LadderIndex = -1;
+                s.LadderCooldownTimer = cfg.LadderRegrabFrames;
+                s.Velocity = new FixVec2(cfg.RunSpeed * wishX, cfg.JumpSpeed);
+                s.Noise = NoiseLevel.Quiet;
+                return;
+            }
+
+            if (s.LadderIndex < 0 || s.LadderIndex >= world.Ladders.Length)
+            {
+                s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
+                return;
+            }
+
+            Aabb ladder = world.Ladders[s.LadderIndex];
+            Fix rung = world.LadderCentreAt(s.LadderIndex, s.Position.Y);
+
+            // Keep the body on the ladder's centre line, every frame: nothing else moves X
+            // while climbing, and on a leaning ladder that line walks sideways as the body
+            // rises, so it is a line to follow rather than a point to sit on. At climbing speed
+            // it cannot be seen; at the 6 m/s this used to run at it was a yank.
+            Fix want = Fix.MoveTowards(s.Position.X, rung, cfg.LadderSnapSpeed * Dt);
+
+            // The pull writes X directly, so it has to check its own way: a ladder mounted from
+            // an awkward angle must not drag the body into the wall beside it. The floors this
+            // ladder runs up into are exempt, as they are for the climb itself — a fighter on
+            // the last metre of a ladder has his head inside the landing he is about to stand
+            // on, and counting that as a wall froze the pull exactly where a leaning ladder
+            // needs it most.
+            if (SweepFree(s.Position.X, want, s.Position.Y, s.Depth, world, in cfg,
+                          s.LadderIndex))
+                s.Position.X = want;
+
+            s.Velocity.X = Fix.Zero;
+            s.Velocity.Y = wishY > 0 ? cfg.ClimbUpSpeed
+                         : wishY < 0 ? -cfg.ClimbDownSpeed
+                         : Fix.Zero;
+
+            MoveY(ref s, s.Velocity.Y * Dt, world, cfg, s.LadderIndex);
+
+            // Never climb past the top of the ladder box. Doing so dropped the body out of the
+            // ladder with nothing underneath — the hatch is a hole — so it fell, touched the
+            // ladder again, re-grabbed, and climbed back out. That loop was the juddering.
+            Fix ceiling = ladder.MaxY - cfg.LadderTopMargin;
+            if (s.Position.Y >= ceiling)
+            {
+                s.Position.Y = ceiling;
+                if (s.Velocity.Y > Fix.Zero) s.Velocity.Y = Fix.Zero;
+            }
+
+            // The climb-out may begin a little below the top, and has to. The top of a
+            // ladder box stands ABOVE the floor it serves, so a climb-out that waits for
+            // the top is a climb-out that DESCENDS -- 9.8 cm down on this arena's top
+            // ladder -- while the clip over it hauls a man upwards. Half a metre lower and
+            // the move is a climb again: the body rises into the landing rather than
+            // sinking onto it.
+            bool atTop = s.Position.Y >= ceiling;
+
+            // ...but only for somebody CLIMBING. Asking to get out sideways is a thing you
+            // do hanging at the very top over a hole, and allowing it half a metre lower
+            // caught the fighter the moment he stepped into the hatch holding left to climb
+            // DOWN -- it hauled him straight back out onto the floor he came from.
+            bool finishing = s.Position.Y >= ceiling - cfg.MantleRise;
+
+            // At the top, climbing out onto the floor beside the hatch is automatic. Asking the
+            // player to nudge sideways while hanging over a hole is not a mechanic, it is a trap.
+            // Hold a direction and you climb out that way; hold nothing and the climb-out picks
+            // the side with more floor on it, rather than depositing you in whatever pocket
+            // happens to be nearest.
+            //
+            // A direction on its own counts as asking, not only up. At the top of a ladder
+            // sideways means "get me out this way", and the climb-out is the move that does it:
+            // edging off the rungs instead walks the body out over the hole it came up through,
+            // which is how a fighter ends up standing on air beside a hatch.
+            if (((wishY > 0 && finishing) || (wishX != 0 && atTop)) &&
+                TryStartMantle(ref s, wishX, s.LadderIndex, world, cfg))
+                return;
+
+            // The same courtesy at the other end: keep holding down at the foot of a ladder and
+            // you step off it onto the floor. Before this, the bottom was the trap the top used
+            // to be — the body stopped on the ground still bolted to the rungs, in a climb-idle
+            // pose, until the player thought to nudge sideways.
+            if (wishY < 0 && Grounded(ref s, world, cfg, s.LadderIndex))
+            {
+                s.LadderIndex = -1;
+                s.LadderCooldownTimer = cfg.LadderRegrabFrames;
+                s.Mode = MoveMode.Grounded;
+                s.Velocity = FixVec2.Zero;
+                s.Noise = NoiseLevel.Quiet;
+                return;
+            }
+
+            // A direction, with the climb let go of, asks to get off the ladder on that side,
+            // and the climb-out is the move that does it: it looks for floor within reach at or
+            // above the feet, and refuses — leaving the fighter on the rungs — when there is
+            // none. Nothing edges the body sideways off the rungs any more. That was the trap
+            // under two separate complaints: you walk INTO a ladder holding a direction, so
+            // pressing up while still holding it slid the body straight back off and dropped
+            // it, and pressing sideways at the top walked it out over the hole it had just come
+            // up through, standing on air beside the hatch.
+            if (wishX != 0 && wishY == 0 &&
+                TryFindLanding(ref s, wishX, world, in cfg, out FixVec2 stepOff))
+            {
+                StartScripted(ref s, stepOff, wishX, s.Depth, in cfg);
+                return;
+            }
+
+            if (wishY != 0 && s.StepNoiseTimer == 0)
+            {
+                s.Noise = NoiseLevel.Quiet;              // climbing is quiet, but not silent
+                s.StepNoiseTimer = cfg.StepNoiseFrames;
+            }
+
+            Aabb body = s.Body(in cfg);
+            if (!body.Overlaps(in ladder))
+            {
+                s.LadderIndex = -1;
+                s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
+                return;
+            }
+
+        }
+
+        /// <summary>
+        /// Can a body standing on this slice get onto that piece of collision by changing lane,
+        /// and which slice would it be standing on. True with no shift at all when the body
+        /// already reaches it.
+        ///
+        /// This is the question a location modelled in 3D keeps asking. Nothing here lines its
+        /// floors up: the ladder stands in FRONT of the walkway it serves, and the walkway is
+        /// half a metre further from the camera than the platform the ladder's foot is on. A
+        /// climb-out that insists on one slice finds nothing to step onto and leaves the fighter
+        /// hanging at the top of the ladder — which is precisely what it did.
+        ///
+        /// LaneReach bounds it, so this is a step back onto the next floor, never a teleport
+        /// into the scenery behind it.
+        /// </summary>
+        /// <summary>
+        /// Can a body standing at this depth reach into that span, and at what depth would it
+        /// be standing if it did.
+        ///
+        /// Public because it is the one question a depth bug ever turns out to be, and a
+        /// diagnostic that asks it a second way is a diagnostic that can disagree with the
+        /// motor. Presentation calls exactly this.
+        /// </summary>
+        public static bool LaneFor(Span span, Fix depth, in MoveConfig cfg, out Fix lane)
+        {
+            Fix half = cfg.BodyDepth / 2;
+            if (span.Reaches(depth, half)) { lane = depth; return true; }
+
+            lane = span.Nearest(depth, half);
+            return cfg.LaneReach > Fix.Zero && Fix.Abs(lane - depth) <= cfg.LaneReach;
+        }
+
+        /// <summary>
+        /// The ladder a body is touching, on its own slice or one lane away. Nearest lane wins,
+        /// so a ladder the body already stands on is never passed over for one behind it.
+        /// </summary>
+        static int FindLadderInReach(in Aabb body, Fix depth, SimWorld world,
+                                     in MoveConfig cfg)
+        {
+            int best = -1;
+            Fix bestShift = Fix.Zero;
+
+            for (int i = 0; i < world.Ladders.Length; i++)
+            {
+                if (!body.Overlaps(in world.Ladders[i])) continue;
+
+                // Touching is not holding. Overlapping the ladder's box by a hair used to
+                // be enough, and that is how a fighter climbed through a ceiling: jump
+                // under a slab, let the top of the head brush the bottom two centimetres
+                // of a ladder serving the floor ABOVE, press up, and the grab took. From
+                // there the climb was legitimate -- that ladder really does run through
+                // that slab -- so nothing further could refuse it. The grab is the only
+                // place where the difference between reaching a ladder and grazing one is
+                // still visible.
+                //
+                // A quarter of a body is the same bite this file already uses to decide
+                // whether you are at the top of a ladder, and it is far more than any
+                // modelling slop while being far less than the half-body a real approach
+                // gives you.
+                Fix bite = Fix.Min(body.MaxY, world.Ladders[i].MaxY)
+                           - Fix.Max(body.MinY, world.Ladders[i].MinY);
+                if (bite < cfg.BodyHeight / 4) continue;
+
+                if (!LaneFor(world.LadderSpan(i), depth, in cfg, out Fix lane)) continue;
+
+                Fix shift = Fix.Abs(lane - depth);
+                if (best >= 0 && shift >= bestShift) continue;
+                best = i;
+                bestShift = shift;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// The ladder a standing body is on top of: one that reaches the feet from below and
+        /// runs under them. This is how you get onto a ladder that has no hatch beside it.
+        ///
+        /// "Under them" allows a free step of slack UPWARDS as well as half a body downwards,
+        /// and that slack is the whole difference between a ladder that works and one that
+        /// does not. A ladder is modelled flush with its landing only by luck: this arena has
+        /// one whose top sits 2 cm above the floor and one whose top is level with it, and
+        /// with no slack the first could not be climbed down at all while the second could —
+        /// which is exactly how it was reported, as "the left ladder does not work". Two
+        /// centimetres is not a decision anybody made, so it must not decide anything. The
+        /// allowance is the free step, because a lip you could walk up is a lip you can step
+        /// onto.
+        /// </summary>
+        static int LadderUnderFeet(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Fix reach = cfg.BodyHeight / 2;
+            Fix lip = cfg.StepUpHeight;
+
+            for (int i = 0; i < world.Ladders.Length; i++)
+            {
+                Aabb l = world.Ladders[i];
+                if (!LaneFor(world.LadderSpan(i), s.Depth, in cfg, out _)) continue;
+                if (l.MinX >= s.Position.X + half || l.MaxX <= s.Position.X - half) continue;
+
+                Fix drop = s.Position.Y - l.MaxY;
+                if (drop < Fix.Zero - lip || drop > reach) continue;
+                return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Looks for floor beside the ladder to climb out onto, nearest first and preferring the
+        /// side asked for. Returns false when there is nothing to step onto, in which case the
+        /// player simply stays on the ladder rather than being dropped into a hole.
+        /// </summary>
+        static bool TryStartMantle(ref PlayerSimState s, int preferSide, int ladderIndex,
+                                   SimWorld world, in MoveConfig cfg)
+        {
+            // A ladder that ends INSIDE its own landing has no hatch to climb out of: in the
+            // level it stands in front of the platform, and the last move is a step onto the
+            // floor the rungs end at, not a shuffle sideways. Try that first — a ladder with a
+            // hatch has nothing above it to find, so it falls through to the sideways search on
+            // its own, with no flag to set and nothing to keep in step with the art.
+            if (TryStepOut(ref s, ladderIndex, world, in cfg, out FixVec2 landUp,
+                           out Fix laneUp))
+            {
+                StartScripted(ref s, landUp, s.Travel, laneUp, in cfg);
+                return true;
+            }
+
+            bool right = TryFindLanding(ref s, 1, world, in cfg, out FixVec2 landRight);
+            bool left = TryFindLanding(ref s, -1, world, in cfg, out FixVec2 landLeft);
+
+            if (!right && !left) return false;
+
+            int side;
+            if (preferSide > 0 && right) side = 1;
+            else if (preferSide < 0 && left) side = -1;
+            else if (!left) side = 1;
+            else if (!right) side = -1;
+            else
+            {
+                // No direction asked for, and both sides work: take the one with more floor
+                // beyond it. Climbing out of a hatch into the narrow side means the first step
+                // back is into the hole you just left.
+                side = FloorRun(landRight, 1, s.Depth, world, in cfg)
+                       >= FloorRun(landLeft, -1, s.Depth, world, in cfg)
+                    ? 1 : -1;
+            }
+
+            // Onto the lane the floor it lands on actually holds a body at.
+            //
+            // This used to keep the body's own slice, on the grounds that a sideways
+            // climb-out is a step along THIS floor rather than onto the next one. It is
+            // not: the body coming off a ladder is standing on the rungs' stand-off,
+            // which is in front of the floor, so the climb-out finished and UpdateDepth
+            // then pulled it back at the full lane speed -- a lurch at the landing,
+            // eight times faster than the move that had just ended. TryStepOut already
+            // promises the standing lane for the same reason.
+            FixVec2 onto = side > 0 ? landRight : landLeft;
+            StartScripted(ref s, onto, side, LaneUnder(onto, s.Depth, world, in cfg), in cfg);
+            return true;
+        }
+
+        /// <summary>The lane a body standing at this landing would be held on.</summary>
+        static Fix LaneUnder(FixVec2 at, Fix fallback, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            bool found = false;
+            Fix top = Fix.Zero, lane = fallback;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;
+                Aabb solid = world.Solids[i];
+                if (solid.MaxX <= at.X - half || solid.MinX >= at.X + half) continue;
+                if (solid.MaxY > at.Y + Skin) continue;
+                if (found && solid.MaxY <= top) continue;
+
+                Fix want = LaneOn(world.SolidSpan(i), fallback, in cfg);
+                if (Fix.Abs(want - fallback) > cfg.LaneReach) continue;
+
+                top = solid.MaxY;
+                lane = want;
+                found = true;
+            }
+            return lane;
+        }
+
+        /// <summary>Hands the body to the climb-out animation, wherever it is climbing out to.</summary>
+        static void StartScripted(ref PlayerSimState s, FixVec2 landing, int side, Fix toDepth,
+                                  in MoveConfig cfg)
+        {
+            s.ScriptFrom = s.Position;
+            s.ScriptTo = landing;
+            s.ScriptFromDepth = s.Depth;
+            s.ScriptToDepth = toDepth;
+
+            // A climb-out that covers no ground sideways is a step forward onto the floor the
+            // rungs end at. Presentation keeps the body facing the ladder through one of those,
+            // and turns side-on only once it is standing.
+            s.ScriptForward = Fix.Abs(landing.X - s.Position.X) <= cfg.LadderTopMargin;
+
+            // Each axis is charged for the part of the window it actually gets — Y the first two
+            // thirds, X the last seven tenths — so neither has to hurry to fit a window the other
+            // one sized.
+            Fix spanX = Fix.Abs(s.ScriptTo.X - s.ScriptFrom.X) * 10 / 7;
+            Fix spanY = Fix.Abs(s.ScriptTo.Y - s.ScriptFrom.Y) * 3 / 2;
+
+            // DEPTH counts, and leaving it out was most of why the climb-out looked wrong.
+            // Every ladder in this arena stands in front of the floor it serves with its head
+            // flush to it, so the climb-out raises the body about four centimetres and moves
+            // it nearly half a metre backwards onto the floor. Timed on X and Y alone that is
+            // four centimetres of travel, which lands on the ten-frame minimum — a sixth of a
+            // second to cover 0.45 m, which is 2.7 m/s, faster than a run, with an 0.83 s
+            // haul animation crammed into it. It reads as a flicker and a cut, which is what
+            // "the climb-out is jerky and switches to something else" is.
+            Fix spanZ = Fix.Abs(s.ScriptToDepth - s.ScriptFromDepth) * 3 / 2;
+
+            // EACH PHASE IS SIZED BY THE SPEED IT HAS TO MEET, not by a shared guess.
+            //
+            // The rise runs straight out of a climb, and a climb is a CONSTANT 2 m/s. Eased
+            // in from rest the body went 2.00 m/s on its last climbing tick and 0.22 on its
+            // first hauling one -- a full stop and a fresh start, which is the small jerk
+            // left at the top. An ease-OUT leaves at the speed it arrived at and slows from
+            // there; its opening speed is twice its average, so giving it two spans' worth
+            // of climb time makes that opening speed exactly the climb's own.
+            Fix climb = cfg.ClimbUpSpeed > Fix.Zero ? cfg.ClimbUpSpeed : cfg.RunSpeed;
+            int riseFrames = FramesAt(Fix.Abs(s.ScriptTo.Y - s.ScriptFrom.Y) * 2, climb);
+
+            // The step across starts from rest and ends at rest, so it is a smooth step, and
+            // a smooth step peaks at one and a half times its average. Held to the run speed
+            // so a climb-out can never outrun a sprint.
+            Fix across = Fix.Max(Fix.Abs(s.ScriptTo.X - s.ScriptFrom.X),
+                                 Fix.Abs(s.ScriptToDepth - s.ScriptFromDepth));
+            int acrossFrames = FramesAt(across * 3 / 2, cfg.RunSpeed);
+
+            int frames = riseFrames + acrossFrames;
+            if (frames <= 0) frames = cfg.ScriptMinFrames;
+
+            // And a haul is not a step. The minimum is shared with the reach onto a ladder,
+            // which really is quick; climbing OUT of one is a whole-body move and reads as a
+            // mistake when it is over before the clip has started.
+            if (frames < cfg.MantleMinFrames) frames = cfg.MantleMinFrames;
+
+            s.ScriptFrames = frames;
+            s.ScriptTimer = frames;
+            s.ScriptRiseShare = frames > 0
+                ? new Fix((int)(((long)riseFrames * Fix.RawOne) / frames))
+                : Fix.FromMilli(500);
+            s.ScriptRises = s.ScriptTo.Y > s.ScriptFrom.Y + cfg.ScriptRiseMargin;
+            s.ScriptDir = (sbyte)(side >= 0 ? 1 : -1);
+            s.Mode = MoveMode.Mantling;
+            s.LadderIndex = -1;
+            s.Velocity = FixVec2.Zero;
+            // Both: a climb-out is not a fight, and a fighter hauling himself onto a walkway
+            // looks where he is going.
+            s.Facing = (sbyte)(side >= 0 ? 1 : -1);
+            s.Travel = s.Facing;
+            s.Noise = NoiseLevel.Quiet;
+        }
+
+        /// <summary>
+        /// The floor a ladder ends inside, which is the one it serves. Returns false for a
+        /// ladder that comes up through a hatch, because the hatch is a hole and there is
+        /// nothing overhead to step onto.
+        /// </summary>
+        static bool TryStepOut(ref PlayerSimState s, int ladderIndex, SimWorld world,
+                               in MoveConfig cfg, out FixVec2 landing, out Fix lane)
+        {
+            landing = default;
+            lane = s.Depth;
+            if (ladderIndex < 0 || ladderIndex >= world.Ladders.Length) return false;
+
+            Aabb ladder = world.Ladders[ladderIndex];
+            Fix half = cfg.BodyWidth / 2;
+            Fix x = s.Position.X;
+
+            bool found = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!world.SolidLive(i)) continue;           // a shutter that has not shut
+                Aabb solid = world.Solids[i];
+                if (solid.MinX >= x + half || solid.MaxX <= x - half) continue;
+                if (ladder.MaxY < solid.MinY) continue;
+                if (ladder.MaxY > solid.MaxY + cfg.LadderTopMargin) continue;
+
+                // The landing may be a lane behind the rungs — here it always is.
+                if (!LaneFor(world.SolidSpan(i), s.Depth, in cfg, out Fix candidate)) continue;
+                if (found && solid.MaxY <= top) continue;
+
+                // And it must be the lane a body STANDING there is held on, not merely one
+                // it can reach. These are two different rules and they disagreed on every
+                // ladder in this arena: LaneFor answers "the nearest part of that floor to
+                // where you are now", which off a ladder is its front edge, while the floor
+                // underfoot holds a standing body on the gameplay plane whenever the floor
+                // reaches it. So the climb-out finished, the body came to rest, and then
+                // UpdateDepth pulled it 0.41 to 0.49 m backwards at the full lane speed of
+                // 4 m/s -- a half-metre lurch at the landing, measured on all four ladders,
+                // eight times faster than the climb-out that had just ended.
+                //
+                // Promising the standing lane costs nothing when the two agree and removes
+                // the lurch when they do not. If the standing lane is out of reach from the
+                // rungs, the reachable one stands: a climb-out that happens with a small
+                // correction beats one that does not happen.
+                Fix settled = LaneOn(world.SolidSpan(i), s.Depth, in cfg);
+                if (Fix.Abs(settled - s.Depth) <= cfg.LaneReach) candidate = settled;
+
+                // Climbing out has to end standing, not wedged under the next floor up, and the
+                // whole footprint has to be on it. Both judged on the slice it would land on,
+                // and both now only rule THIS candidate out: the old version took the highest
+                // floor it could see and gave up if that one did not work, so one awkward box
+                // over a ladder's head cancelled the climb-out altogether.
+                Aabb standing = new Aabb(x - half, solid.MaxY + Skin,
+                                         x + half, solid.MaxY + cfg.BodyHeight);
+                if (AnySolidOverlap(world, in standing, candidate, in cfg)) continue;
+                if (!FullySupported(x, solid.MaxY, candidate, world, in cfg)) continue;
+
+                top = solid.MaxY;
+                lane = candidate;
+                found = true;
+            }
+            if (!found) return false;
+
+            landing = new FixVec2(x, top + Skin);
+            return true;
+        }
+
+        /// <summary>Nearest spot on one side where the whole body can stand, within reach.</summary>
+        static bool TryFindLanding(ref PlayerSimState s, int side, SimWorld world,
+                                   in MoveConfig cfg, out FixVec2 landing)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Fix step = Fix.FromMilli(100);
+            int steps = cfg.MantleReach.Raw / step.Raw;
+
+            for (int i = 1; i <= steps; i++)
+            {
+                Fix x = s.Position.X + step * (i * side);
+
+                FixVec2 probe = new FixVec2(x, s.Position.Y + cfg.BodyHeight);
+                if (!TryFindGroundBelow(probe, s.Depth, world, in cfg, cfg.BodyHeight * 2,
+                                        out Fix groundY))
+                    continue;
+
+                // Only ever climb UP and out, never down into something.
+                if (groundY < s.Position.Y - cfg.LadderTopMargin * 4) continue;
+
+                Aabb standing = new Aabb(x - half, groundY + Skin,
+                                         x + half, groundY + cfg.BodyHeight);
+                if (AnySolidOverlap(world, in standing, s.Depth, in cfg)) continue;
+
+                // The whole footprint must be supported, not just its middle. Without this the
+                // climb-out happily picks the lip of a slab, leaving the body half over the hole
+                // it just climbed out of, and the next step walks straight back in.
+                if (!FullySupported(x, groundY, s.Depth, world, in cfg)) continue;
+
+                landing = new FixVec2(x, groundY + Skin);
+                return true;
+            }
+
+            landing = default;
+            return false;
+        }
+
+        /// <summary>How far unbroken floor continues beyond a landing point.</summary>
+        static Fix FloorRun(FixVec2 from, int dir, Fix depth, SimWorld world,
+                            in MoveConfig cfg)
+        {
+            Fix step = Fix.FromMilli(200);
+            Fix reached = Fix.Zero;
+
+            for (int i = 1; i <= 25; i++)                     // 5 m is plenty to decide on
+            {
+                Fix x = from.X + step * (i * dir);
+                FixVec2 probe = new FixVec2(x, from.Y + cfg.BodyHeight);
+                if (!TryFindGroundBelow(probe, depth, world, in cfg, cfg.BodyHeight * 2,
+                                        out Fix groundY))
+                    break;
+                if (!FullySupported(x, groundY, depth, world, in cfg)) break;
+                reached = step * i;
+            }
+
+            return reached;
+        }
+
+        /// <summary>Solid under the left edge, the middle and the right edge of the footprint.</summary>
+        static bool FullySupported(Fix x, Fix groundY, Fix depth, SimWorld world,
+                                   in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            for (int i = -1; i <= 1; i++)
+            {
+                Fix px = x + half * i;
+                Aabb probe = new Aabb(px - Skin * 4, groundY - GroundProbe,
+                                      px + Skin * 4, groundY - Skin);
+                if (!AnySolidOverlap(world, in probe, depth, in cfg)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// The two scripted ladder moves: the grab at the bottom and the climb-out at the top.
+        ///
+        /// Both walk the body from one checked position to another with no gravity and no
+        /// collision, because the destination was proved free before the move started. They exist
+        /// for the same reason: the frame where the body changes between standing and climbing is
+        /// the frame that used to jump, and a jump cannot be smoothed away afterwards by
+        /// presentation. It has to not happen in the simulation.
+        /// </summary>
+        static void StepScripted(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            // Never trap the player on a ladder — not even during the quarter second it takes to
+            // reach for one. The climb-out is deliberately not cancellable: it is already
+            // committed to a landing, and breaking it off leaves the body over the hole it was
+            // leaving.
+            if (s.Mode == MoveMode.Mounting && s.JumpBufferTimer > 0 && !cfg.AllowLadderJump)
+                s.JumpBufferTimer = 0;
+
+            if (s.Mode == MoveMode.Mounting && s.JumpBufferTimer > 0)
+            {
+                s.JumpBufferTimer = 0;
+                s.ScriptTimer = 0;
+                s.LadderIndex = -1;
+                s.LadderCooldownTimer = cfg.LadderRegrabFrames;
+                s.Mode = MoveMode.Airborne;
+                s.Velocity = new FixVec2(Fix.Zero, cfg.JumpSpeed);
+                s.Noise = NoiseLevel.Quiet;
+                return;
+            }
+
+            s.ScriptTimer--;
+
+            if (s.ScriptTimer <= 0)
+            {
+                s.Position = s.ScriptTo;
+                s.Velocity = FixVec2.Zero;
+
+                // The climb-out owns the slice for its whole length, so it also has to finish on
+                // the one it promised. A mount does not: UpdateDepth is already drawing the body
+                // onto the ladder's own slice while the reach plays.
+                if (s.Mode == MoveMode.Mantling) s.Depth = s.ScriptToDepth;
+
+                if (s.Mode == MoveMode.Mounting)
+                {
+                    // On the rungs, holding still. The climb itself starts on the next tick, from
+                    // the input of that tick, so letting go of the stick during the grab does not
+                    // smuggle a frame of climbing in behind it.
+                    s.Mode = MoveMode.Climbing;
+                }
+                else
+                {
+                    s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
+                    s.LadderCooldownTimer = cfg.LadderRegrabFrames;
+                    s.Noise = NoiseLevel.Quiet;
+                }
+                return;
+            }
+
+            int total = s.ScriptFrames > 0 ? s.ScriptFrames : 1;
+            int done = total - s.ScriptTimer;
+            Fix t = new Fix((int)(((long)Fix.RawOne * done) / total));
+
+            Fix xT, yT;
+            if (s.Mode == MoveMode.Mounting)
+            {
+                // One eased step sideways onto the centre line. Reaching for a ladder is a step,
+                // not a hop: nothing about it is vertical, and the Y ends where it began.
+                xT = SmoothStep(t);
+                yT = xT;
+            }
+            else
+            {
+                // UP FIRST, ALL THE WAY, THEN ACROSS -- and each phase gets the share of the
+                // window its own distance is worth.
+                //
+                // The two halves may not overlap, and that is not a matter of taste. A
+                // scripted move writes the position straight out with no collision behind
+                // it, so any sideways travel taken before the body has cleared the floor
+                // goes THROUGH the slab beside the hatch: checked across every ladder and
+                // every height, 54 climb-out paths passed through solid geometry, which is
+                // what being dropped out of the level looks like from the inside.
+                //
+                // Splitting by distance rather than at a fixed fraction is what keeps it
+                // smooth anyway. A fixed "two thirds, then seven tenths" gave the axis with
+                // 0.10 m of travel most of the window and the one with 1.10 m what was
+                // left: ten frames creeping under 0.4 m/s, then a bolt at 4.71 m/s. Equal
+                // shares of distance per share of time is one steady speed throughout.
+                Fix rise = s.ScriptRiseShare;
+                if (rise < Fix.FromMilli(50)) rise = Fix.FromMilli(50);
+                if (rise > Fix.FromMilli(950)) rise = Fix.FromMilli(950);
+
+                // Ease OUT, not in: the body is already moving upwards when this begins.
+                yT = EaseOut(Clamp01(Divide(t, rise)));
+                xT = t <= rise
+                    ? Fix.Zero
+                    : SmoothStep(Clamp01(Divide(t - rise, Fix.One - rise)));
+            }
+
+            s.Position = new FixVec2(
+                s.ScriptFrom.X + (s.ScriptTo.X - s.ScriptFrom.X) * xT,
+                s.ScriptFrom.Y + (s.ScriptTo.Y - s.ScriptFrom.Y) * yT);
+
+            // Depth rides with the height: the fighter leans back onto the next floor as they
+            // come up over its edge, which is the one moment in the game where the lane moves
+            // because the move says so rather than because the floor underfoot asked for it.
+            if (s.Mode == MoveMode.Mantling)
+                s.Depth = s.ScriptFromDepth + (s.ScriptToDepth - s.ScriptFromDepth) * yT;
+        }
+
+        static Fix Clamp01(Fix v) => Fix.Clamp(v, Fix.Zero, Fix.One);
+
+        /// <summary>a / b, where b is known positive. Kept here so the split reads as maths.</summary>
+        static Fix Divide(Fix a, Fix b) =>
+            b.Raw == 0 ? Fix.Zero : new Fix((int)(((long)a.Raw * Fix.RawOne) / b.Raw));
+
+        static Fix SmoothStep(Fix t) => t * t * (Fix.FromInt(3) - t * 2);
+
+        /// <summary>Full speed at the start, nothing left at the end.</summary>
+        static Fix EaseOut(Fix t)
+        {
+            Fix left = Fix.One - t;
+            return Fix.One - left * left;
+        }
+
+        /// <summary>Frames to cover a distance at a speed, within the scripted bounds.</summary>
+        static int FramesAt(Fix distance, Fix speed)
+        {
+            if (speed <= Fix.Zero) return 1;
+            Fix seconds = Divide(distance, speed);
+            int frames = (seconds * PlayerMotor.TicksPerSecond).ToInt();
+            return frames > 0 ? frames : 1;
+        }
+
+        // ---------------------------------------------------------------- collision
+
+        static void MoveX(ref PlayerSimState s, Fix dx, SimWorld world, in MoveConfig cfg)
+        {
+            if (dx == Fix.Zero) return;
+
+            Fix half = cfg.BodyWidth / 2;
+            Fix height = s.Crouching ? cfg.CrouchHeight : cfg.BodyHeight;
+            Fix targetX = s.Position.X + dx;
+
+            // Two passes, because a stack of boxes is not a list of separate problems.
+            // Resolving them one at a time takes the first ledge in array order, finds the
+            // next layer of the stack sitting on top of it, gives up on the step — and the
+            // body stops dead at the foot of a staircase it could have walked up. So: find
+            // the HIGHEST surface this step could put the feet on, and only if there is none
+            // treat what is left as a wall.
+            Fix limit = cfg.ClamberHeight > cfg.StepUpHeight ? cfg.ClamberHeight
+                                                             : cfg.StepUpHeight;
+            bool found = false;
+            Fix bestTop = Fix.Zero;
+
+            Fix halfZ = cfg.BodyDepth / 2;
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (!world.SolidAt(i, s.Depth, halfZ)) continue;
+                Aabb body = new Aabb(targetX - half, s.Position.Y,
+                                     targetX + half, s.Position.Y + height);
+                if (!body.Overlaps(in solid)) continue;
+
+                Fix step = solid.MaxY - s.Position.Y;
+                if (step <= Fix.Zero || step > limit) continue;
+
+                // Hauling up is for a body with its feet on something. Mid-jump it would be
+                // a second, free climb out of anything you happened to brush.
+                if (step > cfg.StepUpHeight && s.Mode != MoveMode.Grounded) continue;
+                if (found && solid.MaxY <= bestTop) continue;
+
+                Fix raised = solid.MaxY + Skin;
+                Aabb raisedBody = new Aabb(targetX - half, raised,
+                                           targetX + half, raised + height);
+                if (AnySolidOverlap(world, in raisedBody, s.Depth, in cfg)) continue;
+
+                bestTop = solid.MaxY;
+                found = true;
+            }
+
+            if (found)
+            {
+                bool clamber = bestTop - s.Position.Y > cfg.StepUpHeight;
+                s.Position.Y = bestTop + Skin;
+                s.Position.X = targetX;
+
+                // A haul costs the speed it was walked at, so a stepped slope is climbed at a
+                // crawl and a kerb still feels like nothing.
+                if (clamber)
+                    s.Velocity.X = new Fix((int)(((long)s.Velocity.X.Raw *
+                                                  cfg.ClamberSpeedPermille) / 1000));
+                return;
+            }
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (!world.SolidAt(i, s.Depth, halfZ)) continue;
+                Aabb body = new Aabb(targetX - half, s.Position.Y,
+                                     targetX + half, s.Position.Y + height);
+                if (!body.Overlaps(in solid)) continue;
+
+                // Only a surface the body is moving INTO is a wall. Without this guard a
+                // body that ALREADY overlaps a box is snapped to its far face, and the far
+                // face of the arena floor is the end of the arena: this is how a fighter
+                // knocked off a ladder left the level. He climbs through the floor slab --
+                // the shaft is exempt while he is holding the rungs, which is what makes a
+                // ladder through solid ground work at all -- and the hit takes the ladder
+                // away mid-slab. Nothing else changed: the body is standing inside 29 m of
+                // floor, pushed right, so this line read "the right-hand wall of that floor
+                // is at x -16.69" and put him there, 22 m away, past every floor below, and
+                // he fell out of the world.
+                //
+                // MoveY has had the same guard for a while, against the same thing in the
+                // other axis: "a player spawned with their head inside the floor above gets
+                // snapped to the far side of it and teleports a whole storey".
+                //
+                // With it, being knocked off a ladder drops the man down the shaft he was
+                // climbing, which is what being knocked off a ladder should do.
+                if (dx > Fix.Zero)
+                {
+                    if (s.Position.X + half > solid.MinX + Skin) continue;
+                    targetX = solid.MinX - half - Skin;
+                }
+                else
+                {
+                    if (s.Position.X - half < solid.MaxX - Skin) continue;
+                    targetX = solid.MaxX + half + Skin;
+                }
+
+                s.Velocity.X = Fix.Zero;
+            }
+
+            // The closing walls, which are not in the baked list because they move.
+            for (int i = 0; i < world.Walls.Length; i++)
+            {
+                GateToward grows = world.Walls[i].Grows;
+                if (grows == GateToward.MinusY || grows == GateToward.PlusY) continue;
+                if (!world.WallReaches(i, s.Depth, halfZ)) continue;
+
+                Aabb wall = world.WallAt(i);
+                Aabb body = new Aabb(targetX - half, s.Position.Y,
+                                     targetX + half, s.Position.Y + height);
+                if (!body.Overlaps(in wall)) continue;
+
+                targetX = dx > Fix.Zero ? wall.MinX - half - Skin : wall.MaxX + half + Skin;
+                s.Velocity.X = Fix.Zero;
+            }
+
+            s.Position.X = targetX;
+        }
+
+        static void MoveY(ref PlayerSimState s, Fix dy, SimWorld world, in MoveConfig cfg)
+            => MoveY(ref s, dy, world, in cfg, -1);
+
+        /// <summary>
+        /// Vertical movement. <paramref name="shaft"/> is a ladder whose solids are not in the
+        /// way: everything it passes through is the hole it climbs through.
+        ///
+        /// A level built in 3D puts its ladders in front of the floors they serve, and the hole
+        /// is in depth — there is nothing to model in the flat world and nothing to cut out of
+        /// it. Treating the ladder itself as the shaft is what lets the same motor climb both
+        /// kinds of ladder, the one through a hatch and the one up a wall.
+        /// </summary>
+        static void MoveY(ref PlayerSimState s, Fix dy, SimWorld world, in MoveConfig cfg,
+                          int shaft)
+        {
+            if (dy == Fix.Zero) return;
+
+            Fix half = cfg.BodyWidth / 2;
+            Fix height = s.Crouching ? cfg.CrouchHeight : cfg.BodyHeight;
+            Fix startY = s.Position.Y;
+            Fix targetY = startY + dy;
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (!world.SolidAt(i, s.Depth, cfg.BodyDepth / 2)) continue;
+                if (shaft >= 0 && InShaft(in solid, in world.Ladders[shaft])) continue;
+                Aabb body = new Aabb(s.Position.X - half, targetY, s.Position.X + half, targetY + height);
+                if (!body.Overlaps(in solid)) continue;
+
+                // Only resolve against a surface the body is actually moving into. Without
+                // these two guards a body that already overlaps a box — a player spawned with
+                // their head inside the floor above, say — gets snapped to the far side of it
+                // and teleports a whole storey.
+                if (dy > Fix.Zero)
+                {
+                    if (startY + height > solid.MinY + Skin) continue;   // not a ceiling from below
+
+                    // Ledge assist: a rising jump that clips a corner is nudged past it rather
+                    // than stopped, which is what makes the arena feel fair on a phone.
+                    if (TryCornerCorrect(ref s, in solid, targetY, half, height, world, cfg))
+                        continue;
+
+                    targetY = solid.MinY - height - Skin;
+                }
+                else
+                {
+                    if (startY + Skin < solid.MaxY) continue;            // not a floor from above
+                    targetY = solid.MaxY + Skin;
+                }
+
+                s.Velocity.Y = Fix.Zero;
+            }
+
+            if (dy < Fix.Zero && s.FallThroughTimer == 0)
+            {
+                for (int i = 0; i < world.OneWay.Length; i++)
+                {
+                    Aabb plat = world.OneWay[i];
+                    if (!world.OneWaySpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) continue;
+                    if (startY + Skin < plat.MaxY) continue;   // we were already below it
+
+                    Aabb body = new Aabb(s.Position.X - half, targetY, s.Position.X + half, targetY + height);
+                    if (!body.Overlaps(in plat)) continue;
+
+                    targetY = plat.MaxY + Skin;
+                    s.Velocity.Y = Fix.Zero;
+                }
+            }
+
+            s.Position.Y = targetY;
+        }
+
+        static bool TryCornerCorrect(ref PlayerSimState s, in Aabb solid, Fix targetY,
+                                     Fix half, Fix height, SimWorld world, in MoveConfig cfg)
+        {
+            Fix overlapRight = (s.Position.X + half) - solid.MinX;   // clipped the left corner
+            Fix overlapLeft  = solid.MaxX - (s.Position.X - half);   // clipped the right corner
+
+            Fix shift;
+            if (overlapRight > Fix.Zero && overlapRight <= cfg.CornerCorrect) shift = -overlapRight - Skin;
+            else if (overlapLeft > Fix.Zero && overlapLeft <= cfg.CornerCorrect) shift = overlapLeft + Skin;
+            else return false;
+
+            Fix shiftedX = s.Position.X + shift;
+            Aabb shifted = new Aabb(shiftedX - half, targetY, shiftedX + half, targetY + height);
+            if (AnySolidOverlap(world, in shifted, s.Depth, in cfg)) return false;
+
+            s.Position.X = shiftedX;
+            return true;
+        }
+
+        /// <summary>
+        /// Is this solid something the ladder comes up INTO from below — the floor it climbs
+        /// through — rather than the floor it stands on.
+        ///
+        /// The whole distinction is the solid's underside: a floor the ladder passes through
+        /// has its underside inside the ladder's span, while the floor at the ladder's foot has
+        /// its underside below the rungs entirely. Getting this wrong in either direction is
+        /// loud: too narrow and the climb stops at the underside of its own landing, too wide
+        /// and the ladder's own footing becomes a hole and the fighter falls out of the world.
+        /// </summary>
+        static bool InShaft(in Aabb solid, in Aabb ladder) =>
+            solid.MinY > ladder.MinY && solid.MinY < ladder.MaxY;
+
+        /// <summary>
+        /// Is anything solid in this box, on this slice of the level. Depth is never moved
+        /// through — it only decides which boxes are here at all, which is what stops the
+        /// backdrop of a location being a wall across the fight.
+        /// </summary>
+        static bool AnySolidOverlap(SimWorld world, in Aabb box, Fix depth, in MoveConfig cfg) =>
+            AnySolidOverlap(world, in box, depth, in cfg, -1);
+
+        /// <summary>
+        /// Anything solid in this box, on this slice. A shaft index exempts the floors that
+        /// ladder runs up into: while climbing, those are what the body is going past, not
+        /// what is in its way.
+        /// </summary>
+        static bool AnySolidOverlap(SimWorld world, in Aabb box, Fix depth, in MoveConfig cfg,
+                                    int shaft)
+        {
+            Fix half = cfg.BodyDepth / 2;
+            bool hasShaft = shaft >= 0 && shaft < world.Ladders.Length;
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                if (!box.Overlaps(in world.Solids[i])) continue;
+                if (!world.SolidAt(i, depth, half)) continue;
+                if (hasShaft && InShaft(in world.Solids[i], in world.Ladders[shaft])) continue;
+                return true;
+            }
+            return false;
+        }
+
+        static bool Grounded(ref PlayerSimState s, SimWorld world, in MoveConfig cfg) =>
+            SupportUnder(s.Position.X, s.Position.Y, s.Depth, s.FallThroughTimer,
+                         world, in cfg, -1);
+
+        static bool Grounded(ref PlayerSimState s, SimWorld world, in MoveConfig cfg, int shaft) =>
+            SupportUnder(s.Position.X, s.Position.Y, s.Depth, s.FallThroughTimer,
+                         world, in cfg, shaft);
+
+        /// <summary>
+        /// Whether a footprint placed at this x, with its feet at this y, has something to stand
+        /// on. Grounded is this question asked about where the body actually is; the ladder grab
+        /// asks it about where the body is about to be, which is why it is a free function.
+        /// </summary>
+        static bool SupportUnder(Fix x, Fix y, Fix depth, int fallThroughTimer, SimWorld world,
+                                 in MoveConfig cfg) =>
+            SupportUnder(x, y, depth, fallThroughTimer, world, in cfg, -1);
+
+        static bool SupportUnder(Fix x, Fix y, Fix depth, int fallThroughTimer, SimWorld world,
+                                 in MoveConfig cfg, int shaft)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Fix halfZ = cfg.BodyDepth / 2;
+            Aabb feet = new Aabb(x - half + Skin, y - GroundProbe, x + half - Skin, y);
+
+            // Inside a ladder's shaft the floor it runs through is not floor: it is the hole.
+            // Without this the climb lets go the instant it reaches the underside of its own
+            // landing, and the fighter rides the ladder up and down forever.
+            if (shaft >= 0)
+            {
+                for (int i = 0; i < world.Solids.Length; i++)
+                {
+                    if (InShaft(in world.Solids[i], in world.Ladders[shaft])) continue;
+                    if (feet.Overlaps(in world.Solids[i]) &&
+                        world.SolidAt(i, depth, halfZ)) return true;
+                }
+            }
+            else if (AnySolidOverlap(world, in feet, depth, in cfg)) return true;
+
+            if (fallThroughTimer == 0)
+            {
+                for (int i = 0; i < world.OneWay.Length; i++)
+                {
+                    Aabb plat = world.OneWay[i];
+                    if (!world.OneWaySpan(i).Reaches(depth, halfZ)) continue;
+                    if (y + Skin < plat.MaxY) continue;
+                    if (feet.Overlaps(in plat)) return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether the body can slide along the ground from one x to another without passing
+        /// through anything. One box covering both ends is enough: the world is axis-aligned, so
+        /// anything in the way of a straight sideways slide is inside that box.
+        /// </summary>
+        static bool SweepFree(Fix fromX, Fix toX, Fix y, Fix depth, SimWorld world,
+                              in MoveConfig cfg) =>
+            SweepFree(fromX, toX, y, depth, world, in cfg, -1);
+
+        static bool SweepFree(Fix fromX, Fix toX, Fix y, Fix depth, SimWorld world,
+                              in MoveConfig cfg, int shaft)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Aabb swept = new Aabb(Fix.Min(fromX, toX) - half, y + Skin,
+                                  Fix.Max(fromX, toX) + half, y + cfg.BodyHeight);
+            return !AnySolidOverlap(world, in swept, depth, in cfg, shaft);
+        }
+
+        static bool StandingOnOneWayOnly(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Aabb feet = new Aabb(s.Position.X - half + Skin, s.Position.Y - GroundProbe,
+                                 s.Position.X + half - Skin, s.Position.Y);
+
+            if (AnySolidOverlap(world, in feet, s.Depth, in cfg)) return false;
+
+            for (int i = 0; i < world.OneWay.Length; i++)
+                if (feet.Overlaps(in world.OneWay[i]) &&
+                    world.OneWaySpan(i).Reaches(s.Depth, cfg.BodyDepth / 2)) return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Finds the top of the first solid under a body, within maxDistance.
+        /// Used to seat a player on the floor at spawn instead of dropping them onto it:
+        /// a spawn that starts with a fall reads as "the collision is broken" even when it
+        /// is not.
+        /// </summary>
+        /// <summary>
+        /// Gets a body out of a solid it is standing inside, and says which one it was.
+        ///
+        /// Nothing else will. MoveY deliberately leaves a box the body already overlaps alone,
+        /// because resolving it would teleport a fighter who merely clipped a floor up a whole
+        /// storey — so a body that STARTS inside geometry is never pushed out, it falls
+        /// through the world instead, forever. That is one bad box in a hand-marked level away
+        /// at all times, and it has to be a nudge and a line in the console, not a match that
+        /// cannot be played.
+        /// </summary>
+        public static bool TryLiftClear(ref PlayerSimState s, SimWorld world, in MoveConfig cfg,
+                                        out Aabb stuckIn)
+        {
+            stuckIn = default;
+            Aabb body = s.Body(in cfg);
+
+            bool inside = false;
+            Fix top = Fix.Zero;
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (!world.SolidAt(i, s.Depth, cfg.BodyDepth / 2)) continue;
+                if (!body.Overlaps(in solid)) continue;
+                if (!inside || solid.MaxY > top) { top = solid.MaxY; stuckIn = solid; }
+                inside = true;
+            }
+            if (!inside) return false;
+
+            // Up and out, onto the thing it was inside. Only if there is room to stand there:
+            // lifting a body into a ceiling would trade one trap for another.
+            Fix half = cfg.BodyWidth / 2;
+            Fix raised = top + Skin;
+            Aabb standing = new Aabb(s.Position.X - half, raised,
+                                     s.Position.X + half, raised + cfg.BodyHeight);
+            if (AnySolidOverlap(world, in standing, s.Depth, in cfg))
+                return true;                                   // stuck, and we said so
+
+            s.Position.Y = raised;
+            s.Velocity = FixVec2.Zero;
+            return true;
+        }
+
+        /// <summary>
+        /// The top of the floor under a body, on that body's own slice of the level.
+        ///
+        /// Depth is not a refinement here, it is the whole answer. This used to have an
+        /// overload that searched every baked box regardless of depth, and the spawn used it:
+        /// the wall standing behind this location is a metre taller than the platform in front
+        /// of it, so the spawn snapped the fighter onto the backdrop — a box their own lane
+        /// cannot touch — and the first frame of the match dropped them through the floor.
+        /// </summary>
+        public static bool TryFindGroundBelow(FixVec2 feet, Fix depth, SimWorld world,
+                                              in MoveConfig cfg, Fix maxDistance,
+                                              out Fix groundY)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Fix halfZ = cfg.BodyDepth / 2;
+            Fix lowest = feet.Y - maxDistance;
+            bool found = false;
+            groundY = feet.Y;
+
+            for (int i = 0; i < world.Solids.Length; i++)
+            {
+                Aabb solid = world.Solids[i];
+                if (!world.SolidAt(i, depth, halfZ)) continue;
+                if (solid.MaxX <= feet.X - half || solid.MinX >= feet.X + half) continue;
+                if (solid.MaxY > feet.Y + Skin) continue;      // above the feet
+                if (solid.MaxY < lowest) continue;             // too far down
+
+                if (!found || solid.MaxY > groundY)
+                {
+                    groundY = solid.MaxY;
+                    found = true;
+                }
+            }
+
+            return found;
+        }
+
+        static bool HasHeadroom(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
+        {
+            Fix half = cfg.BodyWidth / 2;
+            Aabb standing = new Aabb(s.Position.X - half, s.Position.Y,
+                                     s.Position.X + half, s.Position.Y + cfg.BodyHeight);
+            return !AnySolidOverlap(world, in standing, s.Depth, in cfg);
+        }
+    }
+}

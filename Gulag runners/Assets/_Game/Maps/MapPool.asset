@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96f521365a01752c4cfdf5fc2b79c3ac, type: 3}
+  m_Name: MapPool
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Meta.MapPool
+  arenas:
+  - scene: Arena_Forest
+    shown: THE PIT
+    enabled: 1
+    weight: 4
+  - scene: Arena_Nordic fortress
+    shown: NORDIC FORTRESS
+    enabled: 1
+    weight: 1
+  - scene: Arena_Mine
+    shown: THE MINE
+    enabled: 1
+    weight: 3
+  - scene: Arena_Egypt
+    shown: THE TEMPLE
+    enabled: 1
+    weight: 3
+  fallback: Arena_Forest

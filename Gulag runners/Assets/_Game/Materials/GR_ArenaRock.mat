@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: GR_ArenaRock
+  m_Shader: {fileID: 4800000, guid: 3f7c1ad2be5e4c84ab90d6f71c2e5a38, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _SideMap:
+        m_Texture: {fileID: 2800000, guid: 8b1d20f6985bdee43b8ac257fdfaf324, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SideNormal:
+        m_Texture: {fileID: 2800000, guid: 15bfbda3d1778b8429155790dfbe98de, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopMap:
+        m_Texture: {fileID: 2800000, guid: 846a26185a354b64abcb7fb6d85af414, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopNormal:
+        m_Texture: {fileID: 2800000, guid: 9553e1bbd3d530a41bf549e190be393b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _DebugBlend: 0
+    - _Detune: 0.2
+    - _EdgeRound: 0.16
+    - _EdgeRoundStrength: 0.8
+    - _FootShade: 0.3
+    - _FootShadeHeight: 0.45
+    - _Interlock: 0.5
+    - _LipJitter: 0.8
+    - _LipJitterScale: 0.45
+    - _LipShade: 0.3
+    - _LipShadeDepth: 0.18
+    - _MacroScale: 16
+    - _MacroStrength: 0.34
+    - _MacroWarm: 0.45
+    - _Overhang: 0.03
+    - _OverhangFade: 2.4
+    - _Sharpness: 8
+    - _SideNormalStrength: 1.25
+    - _SideSmoothness: 0.05
+    - _SideTile: 2
+    - _TopBlend: 0.12
+    - _TopFacing: 0.72
+    - _TopNormalStrength: 1
+    - _TopSmoothness: 0.08
+    - _TopTile: 2
+    - _Warp: 0.35
+    - _Wear: 0.3
+    m_Colors:
+    - _MeshSize: {r: 1, g: 1, b: 1, a: 0}
+    - _SideColor: {r: 1.8, g: 1.74, b: 1.62, a: 1}
+    - _TopColor: {r: 1.15, g: 1.15, b: 1.1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

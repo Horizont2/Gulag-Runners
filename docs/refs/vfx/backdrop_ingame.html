@@ -1,0 +1,158 @@
+<!doctype html>
+<meta charset=utf-8>
+<title>working</title>
+<!--
+  The backdrop as the GAME camera sees it, not as the maths says it should be.
+
+  backdrops.html composites the three layers against an idealised frame. This one puts the
+  real quads at their real world positions and looks through the real camera from where it
+  actually stands during a match -- on the fighter, near the floor -- which is about three
+  metres below the arena centre the builder anchors them to.
+
+  Every number comes from layers.json and the scene files. The quads face the camera, so
+  each one projects to an axis-aligned rectangle and the texture can be drawn straight into
+  it.
+-->
+<style>
+  body { background:#0b0d10; margin:0; padding:12px;
+         font:11px ui-monospace,SFMono-Regular,monospace; color:#7d848c }
+  h2 { font:11px inherit; color:#c9d0d8; margin:14px 0 6px; letter-spacing:.09em;
+       text-transform:uppercase }
+  .row { display:flex; gap:6px; margin-bottom:4px }
+  figure { margin:0; flex:1 }
+  canvas { width:100%; display:block; background:#000 }
+  figcaption { padding:3px 1px; color:#6b727a }
+</style>
+<div id=out></div>
+<script src="backdrop_layers.js"></script>
+<script>
+const DIR = '../../../Gulag runners/Assets/_Game/Effects/Backdrops/';
+// ASPECT is the shape a camera RENDERS INTO, not the shape of the phone. Every arena
+// gives each camera a viewport of full width by HALF height -- two players, one screen --
+// so each half is twice as wide as the screen is. At 19.5/9 this said 2.17 and drew a
+// frame half as wide as the game's, which is the one measurement that would hide an edge
+// rather than show it. It comes off the table now, like everything else here.
+const FOV = 30, PITCH = 4, ASPECT = LAYERS_ASPECT;
+const REST = 7.70;
+const HALF = 4.136 / 2;                       // layers.json camera.rest_distance
+const r = d => d * Math.PI / 180;
+
+const F = [0, -Math.sin(r(PITCH)), Math.cos(r(PITCH))];   // camera forward
+const U = [0,  Math.cos(r(PITCH)), Math.sin(r(PITCH))];   // camera up
+const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+
+// Arena_Mine: borders x -15.4..15.4, y -1.5..7
+// Arena_Mine's CameraRig, read out of the scene: these are the camera's world bounds and
+// the rig holds the focus half a view inside them.
+const ARENA = { minX:-15.92, maxX:15.92, minY:0.82, maxY:8.00 };
+const ARENA_CY = (ARENA.minY + ARENA.maxY) / 2;
+
+function project(p, cam, W, H) {
+  const v = [p[0]-cam[0], p[1]-cam[1], p[2]-cam[2]];
+  const z = dot(v, F);
+  if (z <= 0.01) return null;
+  return [W/2 + ((dot(v, [1,0,0]) / z) / (Math.tan(r(FOV/2)) * ASPECT)) * W/2,
+          H/2 - ((dot(v, U)       / z) /  Math.tan(r(FOV/2))) * H/2];
+}
+
+// anchorY: the focus height the BUILDER uses when it places the quads
+// focusX/focusY: where the camera actually is for this shot
+function draw(c, img, anchorY, focusX, focusY) {
+  const W = c.width, H = c.height, g = c.getContext('2d');
+  const cam = [focusX - F[0]*REST, focusY - F[1]*REST, 0 - F[2]*REST];
+
+  g.fillStyle = '#10151c'; g.fillRect(0, 0, W, H);
+
+  const order = [...LAYERS].sort((a, b) => b.depth - a.depth);   // furthest first
+  for (let i = 0; i < order.length; i++) {
+    const L = order[i], d = L.depth - REST;
+    const slot = LAYERS.indexOf(L);
+    const C = [0, anchorY + F[1]*d, 0 + F[2]*d];
+    const hw = L.metres_wide / 2, hh = L.metres_high / 2;
+    const tl = project([C[0] - hw, C[1] + hh*U[1], C[2] + hh*U[2]], cam, W, H);
+    const br = project([C[0] + hw, C[1] - hh*U[1], C[2] - hh*U[2]], cam, W, H);
+    if (!tl || !br) continue;
+    const t = img[slot];
+    if (!(t && t.complete && t.naturalWidth)) continue;
+    // Tiled, because the material tiles. Drawing one image across the whole quad would
+    // show the art L.tiles times wider than the game does.
+    const w = (br[0]-tl[0]) / L.tiles, h = br[1]-tl[1];
+    for (let k = 0; k < L.tiles; k++) g.drawImage(t, tl[0] + k*w, tl[1], w, h);
+  }
+
+  // the arena itself, as a flat silhouette, so the backdrop is judged behind something
+  const box = [[ARENA.minX, ARENA.minY], [ARENA.maxX, ARENA.minY],
+               [ARENA.maxX, ARENA.maxY], [ARENA.minX, ARENA.maxY]]
+    .map(p => project([p[0], p[1], 0], cam, W, H));
+  if (box.every(Boolean)) {
+    g.strokeStyle = '#ff5a4d'; g.lineWidth = 2; g.setLineDash([6, 4]);
+    g.beginPath(); g.moveTo(...box[0]);
+    box.slice(1).forEach(p => g.lineTo(...p)); g.closePath(); g.stroke();
+    g.setLineDash([]);
+  }
+  // the floor the fighter stands on
+  const f0 = project([ARENA.minX, ARENA.minY, 0], cam, W, H);
+  const f1 = project([ARENA.maxX, ARENA.minY, 0], cam, W, H);
+  if (f0 && f1) {
+    g.fillStyle = '#05070b';
+    g.fillRect(Math.min(f0[0], f1[0]), f0[1], Math.abs(f1[0]-f0[0]), H - f0[1]);
+  }
+  // a fighter, for scale
+  const b0 = project([focusX, ARENA.minY, 0], cam, W, H);
+  const b1 = project([focusX, ARENA.minY + 0.91, 0], cam, W, H);
+  if (b0 && b1) {
+    g.fillStyle = '#d8dde3';
+    g.fillRect(b0[0] - 4, b1[1], 8, b0[1] - b1[1]);
+  }
+}
+
+// The camera's real range: the rig holds the focus half a view inside the borders, so at
+// zoom 1 it runs between these. The TOP of that range is the shot that would expose the
+// bottom edge of a backdrop, and it was never drawn before.
+const CAM_LOW  = ARENA.minY + HALF;
+const CAM_HIGH = ARENA.maxY - HALF;
+const ANCHOR = Math.min(CAM_LOW, ARENA_CY);          // BackdropBuilder's own rule
+
+// One anchor -- the one BackdropBuilder uses. The row below already walks the camera
+// through its own range, which is where a bottom edge would show if there is one.
+const SHOTS = [['якір ' + ANCHOR.toFixed(2) + ', камера ходить ' +
+                CAM_LOW.toFixed(2) + '..' + CAM_HIGH.toFixed(2), ANCHOR]];
+const out = document.getElementById('out');
+let pending = 0;
+const imgs = LAYERS.map(L => {
+  const im = new Image(); pending++;
+  im.onload = im.onerror = () => { if (--pending === 0) paint(); };
+  im.src = DIR + `bg_mine_${L.name}.png`;
+  return im;
+});
+
+function paint() {
+  out.innerHTML = '';
+  for (const [label, anchor] of SHOTS) {
+    out.insertAdjacentHTML('beforeend', `<h2>${label}</h2>`);
+    const row = document.createElement('div'); row.className = 'row';
+    // SideViewCamera.ClampToBorders keeps the focus inside the arena by half a view, so
+    // it can never actually sit on a fighter standing on the floor -- it stops 2.07 m
+    // above them. Using the fighter's own height here was wrong and made the first read
+    // of this page worse than the truth.
+    const half = 4.136 / 2;
+    const LO = ARENA.minY + half, HI = ARENA.maxY - half;
+    for (const [cap, fx, fy] of [
+      ['камера внизу (боєць на підлозі)', 0, LO],
+      ['камера внизу, лівий край', -11, LO],
+      ['камера вгорі (верхня полиця)', 0, HI],
+    ]) {
+      const fig = document.createElement('figure');
+      const c = document.createElement('canvas');
+      c.width = 900; c.height = Math.round(900 / ASPECT);   // the frame's own shape
+      fig.appendChild(c);
+      fig.insertAdjacentHTML('beforeend', `<figcaption>${cap}</figcaption>`);
+      row.appendChild(fig);
+      draw(c, imgs, anchor, fx, fy);
+    }
+    out.appendChild(row);
+  }
+  document.title = 'ready';
+}
+if (pending === 0) paint();
+</script>

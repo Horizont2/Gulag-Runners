@@ -1,0 +1,278 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using GulagRunners.Meta;
+
+namespace GulagRunners.Game
+{
+    /// <summary>
+    /// Runs the menu scene: what is in it, and the one move it makes.
+    ///
+    /// The move is the whole reason the menu is a cell rather than a screen with buttons.
+    /// docs/01 opens with "two wake in cages at opposite edges of the arena. The doors
+    /// open." So PLAY opens this one: the portcullis rises, the camera walks through it,
+    /// and the match loads behind that movement. No loading screen, because there is
+    /// something to watch instead.
+    ///
+    /// Nothing here is created at play time. The gate, the camera and the fighter are
+    /// objects in the scene; this only moves two of them and then asks for the next scene.
+    /// </summary>
+    [DisallowMultipleComponent]
+    public sealed class MenuDirector : MonoBehaviour
+    {
+        [Header("Wiring")]
+        [Tooltip("The fighter on show. Found in the scene when empty.")]
+        public MenuFighter fighter;
+
+        [Tooltip("The camera that walks through the gate. The main camera when empty.")]
+        public Camera view;
+
+        [Tooltip("The portcullis, or whatever shuts the way out. Leave empty and only the " +
+                 "camera moves, which still reads as leaving.")]
+        public Transform gate;
+
+        [Header("The gate")]
+        [Tooltip("How far it rises, in metres. Far enough that its bottom edge leaves the " +
+                 "top of the frame — a gate that stops halfway is a gate you walk into.")]
+        [Range(0f, 6f)] public float gateRise = 2.6f;
+
+        [Tooltip("Seconds it takes. Heavy things start slowly and arrive slowly.")]
+        [Range(0.1f, 4f)] public float gateSeconds = 1.1f;
+
+        public AnimationCurve gateEase =
+            AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+        [Header("The walk through")]
+        [Tooltip("How far the camera moves forward, in metres. It does not have to reach " +
+                 "the gate: it has to be MOVING when the screen is handed over.")]
+        [Range(0f, 20f)] public float walkDistance = 5f;
+
+        [Tooltip("Seconds of walking. It begins part way through the gate's rise, so the " +
+                 "two moves overlap rather than queue.")]
+        [Range(0.1f, 6f)] public float walkSeconds = 1.4f;
+
+        [Range(0f, 1f)] public float walkStartsAt = 0.45f;
+
+        public AnimationCurve walkEase =
+            AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+        [Header("The match")]
+        [Tooltip("Scene to load. Empty plays the whole move and loads nothing, which is how " +
+                 "to look at the transition without leaving the menu.\n\n" +
+                 "Arena_Demo is the match: the arena, the chests, the cage doors and the " +
+                 "only HUD in the project. SetupScene is the movement bench from docs/11 " +
+                 "and has no canvas at all, so a phone build that lands there has no " +
+                 "controls and nothing to read.\n\n" +
+                 "This is a NAME, checked by nobody. A scene missing from the build list " +
+                 "loads fine in the editor and fails on the device.")]
+        public string matchScene = "Arena_Forest";
+
+        [Tooltip("Start loading at this point of the walk, 0 to 1, and show the next scene " +
+                 "only once the walk has finished. Loading early hides the wait inside the " +
+                 "move; showing early throws the move away.")]
+        [Range(0f, 1f)] public float loadStartsAt = 0.2f;
+
+        [Tooltip("The arenas a match may be played in. Empty plays Match Scene below, " +
+                 "which is how this behaved when there was only one.\n\n" +
+                 "The pool is dealt from Map Seed, not chosen here: both devices have " +
+                 "that number before either starts loading, so they arrive at the same " +
+                 "arena without sending anything. Which also means both devices must " +
+                 "carry the SAME pool asset -- two builds whose pools differ connect, " +
+                 "count down and never start.")]
+        public MapPool pool;
+
+        [Tooltip("The number the match is dealt from, set by MatchSearch when a pairing " +
+                 "arrives. Left at 0 against a practice opponent, which is fine: there " +
+                 "is nobody to agree with.")]
+        public uint mapSeed;
+
+        [Tooltip("Hold the finished load until Release() is called.\n\n" +
+                 "Off, the walk ends and the arena appears, which is right when there is " +
+                 "nobody else in it. On, the scene waits — because the other runner may " +
+                 "still be loading, and two fighters who started at different moments are " +
+                 "not in the same match. MatchSearch switches this on.")]
+        public bool waitForRelease;
+
+        [Header("Debug")]
+        public string state = "waiting";
+
+        /// <summary>0 to 1 while the arena loads, so something can show it.</summary>
+        public float LoadProgress { get; private set; }
+
+        /// <summary>Loaded and waiting for <see cref="Release"/>.</summary>
+        public bool ReadyToHandOver { get; private set; }
+
+        /// <summary>Let the arena through. Only meaningful with Wait For Release on.</summary>
+        public void Release() => _released = true;
+
+        /// <summary>
+        /// The arena this match is in: the pool's answer for this seed, or the single
+        /// scene below when there is no pool. Asked once and remembered, because the
+        /// name is wanted twice -- to load, and to tell the player where they are going
+        /// -- and a pool that answered differently the second time would be a very
+        /// quiet way to load one arena and name another.
+        /// </summary>
+        public string SceneToLoad
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(_chosen)) return _chosen;
+                _chosen = pool != null ? pool.Choose(mapSeed) : matchScene;
+                return _chosen;
+            }
+        }
+
+        /// <summary>What to call it on the screen.</summary>
+        public string SceneShown =>
+            pool != null ? pool.NameOf(SceneToLoad) : SceneToLoad;
+
+        string _chosen;
+
+        bool _released;
+        bool _leaving;
+        Vector3 _gateHome;
+        Vector3 _viewHome;
+
+        void Reset()
+        {
+            fighter = FindFirstObjectByType<MenuFighter>();
+            view = Camera.main;
+        }
+
+        void Awake()
+        {
+            if (fighter == null) fighter = FindFirstObjectByType<MenuFighter>();
+            if (view == null) view = Camera.main;
+
+            if (gate != null) _gateHome = gate.localPosition;
+            if (view != null) _viewHome = view.transform.position;
+        }
+
+        /// <summary>
+        /// Opens the gate and leaves. Wire PLAY to this.
+        ///
+        /// Ignores a second press on purpose: the one thing a player will do while a door
+        /// is opening is press the door again.
+        /// </summary>
+        public void Play()
+        {
+            if (_leaving) return;
+            _leaving = true;
+            StartCoroutine(Leave());
+        }
+
+        /// <summary>Puts everything back, for testing the move more than once.</summary>
+        [ContextMenu("Reset the gate")]
+        public void Rewind()
+        {
+            StopAllCoroutines();
+            _leaving = false;
+            _released = false;
+            ReadyToHandOver = false;
+            LoadProgress = 0f;
+            state = "waiting";
+            if (gate != null) gate.localPosition = _gateHome;
+            if (view != null) view.transform.position = _viewHome;
+        }
+
+        /// <summary>
+        /// Which way "out" is.
+        ///
+        /// Toward the gate, when there is one -- NOT the way the camera happens to face.
+        /// In this menu the gate is BEHIND the camera: the shot looks down the cell at the
+        /// dressed back wall, and the way out is the arch at the other end. Walking along
+        /// the camera's forward vector there does not leave the cell, it drives five
+        /// metres into a wall four metres away.
+        ///
+        /// Flattened, and the camera does not turn. Reversing out under the arch while
+        /// still facing the room reads as being taken out of it, which is the right
+        /// feeling for a gulag and costs nothing to animate.
+        /// </summary>
+        Vector3 Leaving(Vector3 from)
+        {
+            if (gate != null)
+            {
+                Vector3 away = gate.position - from;
+                away.y = 0f;
+                if (away.sqrMagnitude > 0.0001f) return away.normalized;
+            }
+
+            return view != null ? view.transform.forward : Vector3.forward;
+        }
+
+        IEnumerator Leave()
+        {
+            state = "opening";
+
+            Vector3 from = view != null ? view.transform.position : Vector3.zero;
+            Vector3 forward = Leaving(from);
+
+            AsyncOperation load = null;
+            float longest = Mathf.Max(gateSeconds, walkStartsAt * gateSeconds + walkSeconds);
+            float t = 0f;
+
+            while (t < longest)
+            {
+                t += Time.deltaTime;
+
+                if (gate != null && gateSeconds > 0f)
+                {
+                    float g = gateEase.Evaluate(Mathf.Clamp01(t / gateSeconds));
+                    gate.localPosition = _gateHome + Vector3.up * (gateRise * g);
+                }
+
+                float began = walkStartsAt * gateSeconds;
+                float w = walkSeconds > 0f
+                    ? Mathf.Clamp01((t - began) / walkSeconds)
+                    : 1f;
+
+                if (w > 0f && view != null)
+                    view.transform.position = from + forward * (walkDistance * walkEase.Evaluate(w));
+
+                // Loading starts inside the move, so the wait happens while there is
+                // something to look at, and the move is never cut short by it.
+                if (load == null && w >= loadStartsAt && !string.IsNullOrEmpty(SceneToLoad))
+                {
+                    state = "loading " + SceneShown;
+                    load = SceneManager.LoadSceneAsync(SceneToLoad);
+                    if (load != null) load.allowSceneActivation = false;
+                }
+
+                // Held back at 0.9 by Unity, which keeps the last tenth for activation.
+                // Reported as the whole of it, because a bar that stops at nine tenths and
+                // then jumps is a bar nobody believes the next time.
+                if (load != null) LoadProgress = Mathf.Clamp01(load.progress / 0.9f);
+
+                yield return null;
+            }
+
+            if (load == null)
+            {
+                state = string.IsNullOrEmpty(SceneToLoad) ? "done (no scene set)" : "done";
+                yield break;
+            }
+
+            LoadProgress = 1f;
+
+            // Loaded here. Whether that means ready depends on who else is coming.
+            if (waitForRelease)
+            {
+                ReadyToHandOver = true;
+                state = "loaded, waiting to be let through";
+                while (!_released) yield return null;
+            }
+
+            // DARK BEFORE THE SWAP, light after. Without this the camera is mid-walk
+            // through a portcullis on one frame and standing in a mine on the next -- the
+            // gate move hides the WAIT, which is why nobody missed this, but it cannot
+            // hide the join. ScreenFade survives the load and brings itself back once the
+            // arena has drawn, so the arrival reads as a reveal rather than a swap.
+            ScreenFade fade = ScreenFade.Instance;
+            fade.Out();
+            while (fade.Dark < 0.98f) yield return null;
+
+            state = "handing over";
+            load.allowSceneActivation = true;
+        }
+    }
+}
