@@ -140,11 +140,35 @@ namespace GulagRunners.Net
             link.Adopt(wire, host, seed);
         }
 
+        /// <summary>
+        /// Hands the link one number for the arena this device baked, so the handshake can
+        /// refuse a device that is in a different one.
+        ///
+        /// Lazily, and every frame until it has one, because the baker does its work in
+        /// its own Awake and this runs in the same pass: asking once, early, is asking
+        /// before there is an arena to ask about. Once set it is left alone -- a rebake
+        /// mid-match would change the number under a link that is already agreed, and a
+        /// mid-match rebake is a much bigger problem than this check.
+        /// </summary>
+        void TellTheLinkWhichArena()
+        {
+            if (link.WorldFingerprint != 0u) return;
+
+            SimWorldBaker baker = match.worldBaker != null
+                ? match.worldBaker : SimWorldBaker.Instance;
+            SimWorld world = baker != null ? baker.World : null;
+            if (world == null || world.Solids.Length == 0) return;
+
+            link.WorldFingerprint = world.Fingerprint();
+        }
+
         void OnDisable() => ReleaseClock();
 
         void Update()
         {
             if (link == null || match == null) return;
+
+            TellTheLinkWhichArena();
 
             // Once a bot has their fighter the link is gone on purpose, and the match
             // is this device's alone to finish. Tearing the clock down here would hand

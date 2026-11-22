@@ -140,6 +140,23 @@ namespace GulagRunners.Net
         public string Desync => _desync;
 
         /// <summary>
+        /// One number for the arena this device baked, compared at the handshake.
+        ///
+        /// Set it before hosting or joining -- NetMatch does, from SimWorld.Fingerprint --
+        /// and the guest refuses a host whose number differs. Zero means "do not know",
+        /// and is let through: an older build sends a welcome with no room for this, and
+        /// refusing those would break pairing with every phone that has not updated.
+        ///
+        /// THE SEED ABOVE WAS ONLY HALF THE AGREEMENT. Two devices that deal their own
+        /// loot are playing two different arenas, which is why the seed is sent; two
+        /// devices in two different SCENES are playing two different arenas just as much,
+        /// and nothing said so. Both fighters then step the same inputs against different
+        /// ground, so one of them walks on a floor the other has not got -- reported, from
+        /// the outside, as falling through the world or being able to fly.
+        /// </summary>
+        public uint WorldFingerprint;
+
+        /// <summary>
         /// The tick the match is on. The clock sets it; the link needs it only to put a
         /// rematch a little way into the future rather than right now.
         /// </summary>
@@ -645,12 +662,38 @@ namespace GulagRunners.Net
                     break;
 
                 case PacketWelcome:
+                {
                     if (_role != LinkRole.Guest || _connected) break;
                     if (length < 5) break;
                     int at = 1;
-                    _seed = unchecked((uint)ReadInt(data, ref at));
+                    uint seed = unchecked((uint)ReadInt(data, ref at));
+
+                    // The arena, before anything else is accepted. A welcome from an older
+                    // build has no room for it and is let through unchecked -- see
+                    // WorldFingerprint -- but one that disagrees is refused here, while
+                    // there is still nothing to undo. Connecting and then discovering it
+                    // means two fighters already falling through two different floors.
+                    if (length >= 9 && WorldFingerprint != 0u)
+                    {
+                        uint theirs = unchecked((uint)ReadInt(data, ref at));
+                        if (theirs != 0u && theirs != WorldFingerprint)
+                        {
+                            _desync =
+                                "the other device is in a different arena, or has baked "
+                                + $"the same one differently (theirs {theirs:X8}, ours "
+                                + $"{WorldFingerprint:X8}). Not connecting: both would "
+                                + "step the same inputs against different ground, and the "
+                                + "fighters would walk through walls and fall through "
+                                + "floors with neither phone saying anything was wrong.";
+                            state = "refused: the other device is in a different arena";
+                            break;
+                        }
+                    }
+
+                    _seed = seed;
                     _connected = true;
                     break;
+                }
 
                 case PacketInput:
                     // Input alone is enough for the HOST to call itself connected: it
@@ -708,10 +751,11 @@ namespace GulagRunners.Net
         {
             if (_wire == null || !_wire.Ready) return;
 
-            byte[] packet = new byte[1 + 4];
+            byte[] packet = new byte[1 + 4 + 4];
             int at = 0;
             packet[at++] = PacketWelcome;
             Write(packet, ref at, unchecked((int)_seed));
+            Write(packet, ref at, unchecked((int)WorldFingerprint));
             _wire.Send(packet, at);
         }
 

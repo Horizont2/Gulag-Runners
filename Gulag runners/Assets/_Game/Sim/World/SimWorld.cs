@@ -220,6 +220,67 @@ namespace GulagRunners.Sim
         public WallDef[] Walls = System.Array.Empty<WallDef>();
 
         /// <summary>
+        /// One number for the whole shape of this arena, so two devices can find out they
+        /// are not in the same one.
+        ///
+        /// LOCKSTEP AGREES ON INPUT AND NOTHING ELSE. Both phones step the same ticks from
+        /// the same seed, and everything either of them collides with comes from the world
+        /// IT baked out of ITS OWN scene. Nothing in the handshake ever compared the two,
+        /// and nothing in the running checksum does either -- NetMatch.Hash folds the
+        /// fighters and not the ground they are standing on. So two devices in different
+        /// arenas, or with the same arena baked differently, pair happily and agree tick by
+        /// tick while one fighter walks on a floor the other does not have. The report that
+        /// sent me looking for this was "after connecting, players fall through the ground
+        /// or can just fly", which is exactly what that looks like from inside.
+        ///
+        /// Folded from the geometry a body can touch, in raw fixed point, so it is the same
+        /// number on both machines or it is not the same world. Counts go in as well as
+        /// coordinates: a world with one box missing must not be able to collide with the
+        /// world that has it.
+        ///
+        /// It is a tripwire, not a diff. It cannot say WHICH box differs, only that the two
+        /// are not the same arena -- which is the thing nobody was being told.
+        /// </summary>
+        public uint Fingerprint()
+        {
+            uint h = 2166136261u;
+
+            Fold(ref h, Solids.Length);
+            for (int i = 0; i < Solids.Length; i++) Fold(ref h, in Solids[i]);
+
+            Fold(ref h, OneWay.Length);
+            for (int i = 0; i < OneWay.Length; i++) Fold(ref h, in OneWay[i]);
+
+            Fold(ref h, Ladders.Length);
+            for (int i = 0; i < Ladders.Length; i++) Fold(ref h, in Ladders[i]);
+
+            // The things a round is dealt onto. A chest in a different place is a different
+            // match even when the ground is identical.
+            Fold(ref h, Chests.Length);
+            Fold(ref h, Gates.Length);
+            Fold(ref h, Walls.Length);
+
+            return h;
+        }
+
+        static void Fold(ref uint h, in Aabb box)
+        {
+            Fold(ref h, box.MinX.Raw);
+            Fold(ref h, box.MinY.Raw);
+            Fold(ref h, box.MaxX.Raw);
+            Fold(ref h, box.MaxY.Raw);
+        }
+
+        static void Fold(ref uint h, int value)
+        {
+            unchecked
+            {
+                h = (h ^ (uint)(value & 0xFFFF)) * 16777619u;
+                h = (h ^ (uint)((value >> 16) & 0xFFFF)) * 16777619u;
+            }
+        }
+
+        /// <summary>
         /// How shut the walls are, 0 to 1. The only other thing about the arena that changes
         /// during a match, and like <see cref="GatesShut"/> it is written from the clock
         /// before anything moves and is a pure function of the frame.
