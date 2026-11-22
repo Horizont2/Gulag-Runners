@@ -81,6 +81,14 @@ def dotnet():
 #   LightProbeGroup.probePositions  gained its setter after 2021.3
 #   ISession.IsHost                 Unity Services, versioned separately
 #   GUILayoutOption                 a stub's signature, not the project's call
+#   TMP_Text.fontSharedMaterial     the TMP in this reference set is a shallow stand-in
+#
+# The last one is worth a word, because it is the widest of the four. Probed member by
+# member against the stub: font, fontSizeMin/Max, enableWordWrapping and characterSpacing
+# are all there, and fontSharedMaterial, fontMaterial, outlineWidth and even the inherited
+# Graphic.material are not -- the stub's TextMeshProUGUI has no path to a material at all.
+# Real TMP has had fontSharedMaterial since it shipped; it is the documented way to give a
+# label an outline, and UiType uses it for exactly that.
 #
 # Listed one by one with the reason, because the alternative is what this check did for
 # weeks: carry a standing count of errors nobody reads, and go on reporting the same
@@ -90,6 +98,7 @@ KNOWN = (
     "'Light' does not contain a definition for 'lightmapBakeType'",
     "'ISession' does not contain a definition for 'IsHost'",
     "cannot convert from 'bool' to 'UnityEngine.GUILayoutOption'",
+    "'TextMeshProUGUI' does not contain a definition for 'fontSharedMaterial'",
 )
 
 
