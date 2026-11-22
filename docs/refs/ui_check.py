@@ -86,6 +86,47 @@ BUILTIN = {
 }
 
 # Events that are allowed to have nobody listening, and why.
+# ---- events a scene may leave bare because CODE picks them up ------------------------
+#
+# Not an exemption. Each of these names a file and the line in it that subscribes, and the
+# line has to still be there: delete the floor and the finding comes straight back as a
+# problem. Without that the entry would be a standing excuse, which is the thing this
+# check exists to not become.
+#
+# All three are the same story. HudBuilder has built the Net Notice label and wired both
+# of NetMatch's events to it since it was written, and NetSetup wires the rematch -- and
+# all four arenas still report them bare, because the scenes are older than the tools and
+# nobody re-ran them. Rather than carry four red findings for ever, NetNotice subscribes
+# to whatever the scene left bare, and this is the record of that bargain.
+FLOORED = {
+    "NetMatch.WaitingChanged": (
+        "NetNotice subscribes at runtime when nothing in the scene does",
+        "NetNotice.cs", "WaitingChanged.AddListener"),
+    "NetMatch.Substituted": (
+        "NetNotice subscribes at runtime when nothing in the scene does",
+        "NetNotice.cs", "Substituted.AddListener"),
+    "MatchResultView.RematchAsked": (
+        "NetNotice draws it, and attaches NetMatch.AskRematch when the event is bare",
+        "NetNotice.cs", "RematchAsked.AddListener"),
+}
+
+PRESENTATION = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "..", "..", "Gulag runners", "Assets", "_Game",
+                            "Presentation")
+
+
+def floored(key):
+    """The reason this event may be bare, or None if the floor under it has gone."""
+    entry = FLOORED.get(key)
+    if entry is None:
+        return None
+    why, source, marker = entry
+    path = os.path.join(PRESENTATION, source)
+    if not os.path.exists(path):
+        return None
+    return why if marker in open(path, encoding="utf-8").read() else None
+
+
 SPARE = {
     "MenuUI.leagueBadgeChanged": "no rank badge on the first screen yet",
     "MatchSearch.detailChanged": "optional second line",
@@ -408,9 +449,13 @@ def main():
                     continue
                 key = f"{cls_name}.{ev}"
                 if not got:
+                    floor = floored(key)
                     if key in SPARE:
                         notes.append(f"{here}: {key} on '{where}' has no listener "
                                      f"({SPARE[key]})")
+                    elif floor:
+                        notes.append(f"{here}: {key} on '{where}' has no listener in the "
+                                     f"scene; {floor}")
                     else:
                         problems.append(f"{here}: {key} on '{where}' goes nowhere -- "
                                         "nothing is drawing it")
