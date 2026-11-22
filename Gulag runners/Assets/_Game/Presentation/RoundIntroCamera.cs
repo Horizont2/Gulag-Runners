@@ -115,15 +115,20 @@ namespace GulagRunners.Game
                  "leaves the countdown as the whole opening.")]
         [Range(0, 5)] public int firstRoundOnly = 1;
 
-        [Tooltip("Where the round opens from, placed by hand in the scene.\n\n" +
-                 "This is the whole shot. With it set, the camera STARTS at this transform — " +
+        [Tooltip("Where the round opens from, placed by hand in the scene. Optional, and " +
+                 "read by the Cage style ONLY.\n\n" +
+                 "Leave empty on every other style. Crane, Shaft and Emerge build their own " +
+                 "move around the framing the playing camera has chosen for this frame, " +
+                 "which is what lets them land on it exactly; a hand-placed start would be " +
+                 "a second opinion about where the camera belongs. Every arena in this " +
+                 "project is on Emerge, so nothing reads this at all today — it is kept " +
+                 "because the Cage style is still selectable and this is the whole of it.\n\n" +
+                 "With it set, and the style on Cage, the camera STARTS at this transform — " +
                  "position and rotation both — and is blended to the playing framing across " +
-                 "the cage phase, which gives an arc with real parallax rather than a dolly " +
-                 "in and out along one line. Without it the component falls back to offsetting " +
-                 "the playing framing, which is what it used to do and which reads as exactly " +
-                 "what it is: a zoom.\n\n" +
-                 "Compose it like a photograph: low, close, the bars across the frame, the " +
-                 "fighter behind them, and no arena in shot at all.")]
+                 "the hold. Without it that style falls back to offsetting the playing " +
+                 "framing, which reads as exactly what it is: a zoom.\n\n" +
+                 "Compose it like a photograph: low, close, the fighter off centre, and as " +
+                 "little arena in shot as the move can get away with.")]
         public Transform openingShot;
 
         [Header("The opening shot")]
