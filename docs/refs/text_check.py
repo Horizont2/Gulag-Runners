@@ -176,10 +176,51 @@ def main():
                 "that Text clears the renderer when it is destroyed at the end of the "
                 "frame. Every upgraded line goes blank.")
 
+        # And everything that pointed at the label it replaced has to be moved onto it.
+        #
+        # The views hold their labels as Graphic -- HudView.clock, name1, name2,
+        # roundLabel -- and a legacy Text is one, so those references were valid before
+        # the upgrade. Without rebinding they point at a destroyed component afterwards,
+        # which made the upgrade WORSE than leaving well alone: the names and the round
+        # counter worked until the day it shipped.
+        # The CALL, not the name: the method's own declaration contains "Rebind(" and
+        # would satisfy a looser test while nothing ever invoked it. The same mistake I
+        # made in shop_check and had to be shown by its own injection.
+        if "Rebind(old, made)" not in source:
+            problems.append(
+                "UiType no longer moves the references that pointed at the label it "
+                "replaced, so every view holding one as a Graphic -- the HUD's clock, "
+                "names and round counter -- is left pointing at a destroyed component.")
+
         if "sceneLoaded" not in source:
             problems.append(
                 "UiType no longer listens for a scene load, so only the first scene's "
                 "labels are upgraded -- the menu would work and every arena would not.")
+
+    # ---- and the view that draws the match has to be able to write either kind
+    #
+    # The HUD was split down the middle in its own code: its Label helper handled only
+    # the legacy Text and PaintClock only TMP. So in an arena built with legacy labels
+    # the names and the round counter moved and the clock did not, and in one built with
+    # TMP it was the other way round -- and the half that did nothing did it silently,
+    # leaving the string the builder typed. Reported from a device as the texts being
+    # dead, with the clock stopped on the mock's own 1:24.
+    hud = ASSETS / "_Game/Presentation/HudView.cs"
+    if hud.exists():
+        source = hud.read_text()
+        writer = re.search(r"static void Label\(Graphic[^{]*\{(?:[^{}]|\{[^{}]*\})*\}",
+                           source)
+        body = writer.group(0) if writer else ""
+        if "TMP_Text" not in body or "is Text" not in body:
+            problems.append(
+                "HudView's one writer no longer handles both kinds of label. Half the "
+                "readouts then go silent in half the arenas -- whichever half the scene "
+                "was built with -- and the string the builder typed stays on screen.")
+        if re.search(r"if \(clock is TMP_Text", source):
+            problems.append(
+                "HudView writes the clock through its own narrow test again, so an arena "
+                "whose HUD is legacy text shows the mock's painted-on 1:24 for the whole "
+                "match.")
 
     for line in notes:
         print(line)

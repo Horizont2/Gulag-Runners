@@ -130,9 +130,6 @@ namespace GulagRunners.Game
             // A child of its own has a CanvasRenderer of its own, so nothing is shared and
             // nothing is cleared. It is stretched over its parent, so the words land where
             // the old ones did without copying a single layout number.
-            old.enabled = false;
-            Object.Destroy(old);
-
             GameObject holder = new GameObject("Label");
             RectTransform box = holder.AddComponent<RectTransform>();
             box.SetParent(go.transform, false);
@@ -157,7 +154,22 @@ namespace GulagRunners.Game
             if (made.font == null) made.font = TMP_Settings.defaultFontAsset;
             if (made.font != null) made.fontSharedMaterial = Skin(made.font.material);
 
+            // EVERYTHING THAT POINTED AT THE OLD ONE, BEFORE IT IS DESTROYED.
+            //
+            // This was the missing half and it made things worse rather than better. The
+            // views hold their labels as Graphic -- HudView.clock, name1, name2,
+            // roundLabel -- and a legacy Text is a Graphic, so those references were
+            // valid. Upgrading without rebinding left them pointing at a destroyed
+            // component: the names and the round counter, which DID work, stopped
+            // working the day I shipped the upgrade.
+            //
+            // Done while the old one is still alive, which is the only reason it can be
+            // done at all: once Destroy has run there is nothing left to match against.
+            Rebind(old, made);
+
             Repoint(go, made);
+            old.enabled = false;
+            Object.Destroy(old);
             return true;
         }
 
@@ -226,6 +238,63 @@ namespace GulagRunners.Game
         /// written once, early, by something that then never writes again -- the tip on the
         /// search screen is exactly that -- would otherwise miss its only write.
         /// </summary>
+        /// <summary>
+        /// Every reference anywhere in the scene that pointed at this label, moved onto
+        /// the new one.
+        ///
+        /// A view holds its labels as Graphic -- which a legacy Text is, and so is a TMP
+        /// one -- so these references were valid before the upgrade and would be dangling
+        /// after it. HudView.clock, name1, name2 and roundLabel are all of them, in all
+        /// four arenas.
+        ///
+        /// By reflection over the behaviours in the scene, because there is no index of
+        /// who points at what. It runs once per upgraded label at scene load and touches
+        /// only fields that could hold one: a field typed Text cannot take a TMP label
+        /// and is left alone and reported, because silently leaving it empty is how this
+        /// went unnoticed the first time.
+        ///
+        /// Arrays and lists too. The HUD keeps its round pips in a Graphic[], and a view
+        /// that lost half an array would be a worse bug than the one being fixed --
+        /// visible only on the fourth round of a series.
+        /// </summary>
+        static void Rebind(Graphic old, TMP_Text made)
+        {
+            foreach (MonoBehaviour mb in Object.FindObjectsByType<MonoBehaviour>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (mb == null) continue;
+
+                foreach (System.Reflection.FieldInfo f in mb.GetType().GetFields(
+                             System.Reflection.BindingFlags.Public
+                             | System.Reflection.BindingFlags.NonPublic
+                             | System.Reflection.BindingFlags.Instance))
+                {
+                    System.Type t = f.FieldType;
+
+                    if (t.IsArray && typeof(Graphic).IsAssignableFrom(t.GetElementType()))
+                    {
+                        if (f.GetValue(mb) is System.Array row)
+                            for (int i = 0; i < row.Length; i++)
+                                if (ReferenceEquals(row.GetValue(i), old)
+                                    && t.GetElementType().IsInstanceOfType(made))
+                                    row.SetValue(made, i);
+                        continue;
+                    }
+
+                    if (!typeof(Graphic).IsAssignableFrom(t)) continue;
+                    if (!ReferenceEquals(f.GetValue(mb), old)) continue;
+
+                    if (t.IsInstanceOfType(made)) f.SetValue(mb, made);
+                    else
+                        Debug.LogWarning(
+                            $"UiType: {mb.GetType().Name}.{f.Name} is typed {t.Name} and "
+                            + $"cannot hold the upgraded label on \"{old.name}\", so that "
+                            + "readout will stay blank. Widen the field to Graphic, or "
+                            + "rebuild this screen with its own tool.", mb);
+                }
+            }
+        }
+
         static void Repoint(GameObject go, TMP_Text made)
         {
             foreach (MenuLabel label in go.GetComponents<MenuLabel>())

@@ -618,11 +618,10 @@ namespace GulagRunners.Game
             // A clock that does not move is worse than no clock: the whole of docs/01 is a
             // match on a timer, and an interface that shows a stopped one is lying about
             // the only thing on screen the player cannot work out for himself.
-            if (clock is TMP_Text label)
-            {
-                string now = ClockText();
-                if (label.text != now) label.text = now;
-            }
+            // Through the one writer, which knows both kinds. This used to test for a TMP
+            // label and do nothing otherwise, so in an arena whose HUD is legacy text the
+            // clock sat on the mock's painted-on 1:24 for the whole match.
+            Label(clock, ClockText());
         }
 
         /// <summary>
@@ -671,8 +670,26 @@ namespace GulagRunners.Game
             }
         }
 
+        /// <summary>
+        /// Writes a line, whichever kind of label it turns out to be.
+        ///
+        /// THE HUD WAS SPLIT DOWN THE MIDDLE AND NOBODY NOTICED. This handled only the
+        /// legacy Text; PaintClock, fifty lines up, handled only TMP. So in an arena
+        /// built with legacy labels the names and the round counter moved and the clock
+        /// did not, and in one built with TMP it was the other way round -- and in both
+        /// cases the half that did nothing did it silently, leaving the string the
+        /// builder had typed in. Reported from a device as the texts being dead, with the
+        /// clock stopped on the mock's own 1:24.
+        ///
+        /// One place that writes a line, and it knows about both. There is no third kind.
+        /// </summary>
         static void Label(Graphic target, string text)
         {
+            if (target is TMP_Text tmp)
+            {
+                if (tmp.text != text) tmp.text = text;
+                return;
+            }
             if (target is Text label && label.text != text) label.text = text;
         }
 
