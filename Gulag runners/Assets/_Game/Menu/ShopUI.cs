@@ -246,17 +246,66 @@ namespace GulagRunners.Game
         {
             if (fighter == null || catalogue == null) return;
             Cosmetic item = catalogue.Find(picked);
-            if (item == null || item.slot != Slot.Runner) return;
-            fighter.Wear(item.Key);
+            if (item == null) return;
+            Dress(item);
         }
+
+        /// <summary>
+        /// Puts one cosmetic onto the fighter, by what KIND of thing it is.
+        ///
+        /// This used to be one line that handled Slot.Runner and returned for everything
+        /// else, which is five of the six slots picked and nothing happening -- a screen
+        /// where the player taps a thing they own and the game ignores them.
+        ///
+        /// Two kinds are free of new art and are done here. A COLOURWAY is a colour on the
+        /// model there already, which is what ASH, COPPER and NIGHTJAR are; a POSE is a
+        /// state on the animator the fighter already carries. The rest -- knockout dust,
+        /// a name plate, the lock's five pieces -- need their own art before there is
+        /// anything to put on, and shop_check names each one that cannot be shown rather
+        /// than letting the screen go quiet about it.
+        /// </summary>
+        void Dress(Cosmetic item)
+        {
+            if (item.slot == Slot.Runner)
+            {
+                // The model first and the colour second: Wear re-applies, and a tint set
+                // before the skin changes would be painted onto the one going off.
+                fighter.Wear(item.Key);
+                fighter.Paint(item.tint);
+                return;
+            }
+
+            if (item.slot == Slot.Pose)
+            {
+                fighter.poseState = Pose(item);
+                fighter.Apply();
+            }
+        }
+
+        /// <summary>
+        /// Which animator state a pose means.
+        ///
+        /// The names on PlayerAnimator are the vocabulary -- Idle, Idle Armed, Block Idle,
+        /// Attack -- and `applies` is where a cosmetic names one. A pose that names a
+        /// state the controller has not got is caught by MenuFighter, loudly, and the
+        /// fighter holds the pose he arrived in rather than snapping to nothing.
+        /// </summary>
+        static string Pose(Cosmetic item) =>
+            string.IsNullOrEmpty(item.applies) ? "Idle" : item.applies;
 
         /// <summary>Puts on what is actually EQUIPPED. Used after a buy and on close.</summary>
         public void Wear()
         {
             if (fighter == null || progress == null || catalogue == null) return;
-            string worn = Wardrobe.WornIn(catalogue, progress.equipped, Slot.Runner);
-            Cosmetic item = catalogue.Find(worn);
-            if (item != null) fighter.Wear(item.Key);
+            // Every slot the fighter can show, not just the runner: a pose equipped and
+            // then forgotten the moment the shop closes is the same bug as a skin that
+            // never goes on.
+            foreach (Slot which in new[] { Slot.Runner, Slot.Pose })
+            {
+                Cosmetic item = catalogue.Find(Wardrobe.WornIn(catalogue, progress.equipped,
+                                                               which));
+                if (item != null) Dress(item);
+            }
         }
 
         /// <summary>Everything the screen draws, from the state, in one place.</summary>

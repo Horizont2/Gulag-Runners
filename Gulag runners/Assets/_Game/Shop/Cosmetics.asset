@@ -29,6 +29,7 @@ MonoBehaviour:
     isDefault: 0
     applies: 
     part: 0
+    tint: {r: 0.62, g: 0.63, b: 0.65, a: 1}
   - id: runner.copper
     shown: COPPER
     slot: 0
@@ -37,6 +38,7 @@ MonoBehaviour:
     isDefault: 0
     applies: 
     part: 0
+    tint: {r: 0.72, g: 0.42, b: 0.24, a: 1}
   - id: runner.nightjar
     shown: NIGHTJAR
     slot: 0
@@ -45,6 +47,7 @@ MonoBehaviour:
     isDefault: 0
     applies: 
     part: 0
+    tint: {r: 0.2, g: 0.22, b: 0.29, a: 1}
   - id: weapon.default
     shown: AS FOUND
     slot: 1
@@ -315,7 +318,7 @@ MonoBehaviour:
     tier: 0
     price: 0
     isDefault: 0
-    applies: 
+    applies: Block Idle
     part: 0
   - id: pose.sit
     shown: SITTING
@@ -323,5 +326,5 @@ MonoBehaviour:
     tier: 1
     price: 0
     isDefault: 0
-    applies: 
+    applies: Sitting
     part: 0

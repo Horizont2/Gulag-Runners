@@ -161,8 +161,58 @@ namespace GulagRunners.Game
 
             _posed = 0;
             Pose();
+            Paint(worn);
 
             showing = $"{(worn != null ? worn.name : "no skin")} / {weapon} / {wearing}";
+        }
+
+        /// <summary>
+        /// The colourway, written over whatever the model was made with.
+        ///
+        /// WHY A TINT AND NOT A MODEL. The menu carries exactly one runner, and the shop
+        /// sells four. Three of them could be bought and then not seen, which is the one
+        /// thing a shop must never do -- and they are already NAMED as colours: ASH,
+        /// COPPER, NIGHTJAR. A colourway needs no mesh, no texture and no prefab, so it is
+        /// what those three are.
+        ///
+        /// Through a property block rather than by touching the material. A material
+        /// assigned at run time is a material instance per renderer -- a draw call each,
+        /// on a screen that already carries the whole menu -- and worse, editing
+        /// sharedMaterial in the editor writes the tint into the ASSET, where it stays
+        /// after play mode ends.
+        ///
+        /// Alpha zero is "leave it alone", which is what every default is, and which is
+        /// also what clears a tint: the block is set either way, so taking a colourway off
+        /// puts the original colours back rather than leaving the last one on.
+        /// </summary>
+        void Paint(GameObject worn)
+        {
+            GameObject on = worn != null ? worn : gameObject;
+            if (_block == null) _block = new MaterialPropertyBlock();
+
+            foreach (Renderer r in on.GetComponentsInChildren<Renderer>(true))
+            {
+                r.GetPropertyBlock(_block);
+                if (tint.a > 0.001f)
+                    _block.SetColor(BaseColour, new Color(tint.r, tint.g, tint.b, 1f));
+                else
+                    _block.SetColor(BaseColour, Color.white);
+                r.SetPropertyBlock(_block);
+            }
+        }
+
+        static readonly int BaseColour = Shader.PropertyToID("_BaseColor");
+        MaterialPropertyBlock _block;
+
+        [Tooltip("The colourway worn, as a colour. Alpha zero wears none and the model " +
+                 "keeps the colours it was made with. Set by the shop; see Cosmetic.tint.")]
+        public Color tint = new Color(1f, 1f, 1f, 0f);
+
+        /// <summary>Wears a colourway. Alpha zero takes one off.</summary>
+        public void Paint(Color colour)
+        {
+            tint = colour;
+            Apply();
         }
 
         /// <summary>One skin on, the rest off. Returns the one that is showing.</summary>

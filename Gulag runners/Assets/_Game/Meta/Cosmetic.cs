@@ -143,6 +143,22 @@ namespace GulagRunners.Meta
                  "is improved a piece at a time rather than replaced whole.")]
         public LockPart part = LockPart.Plate;
 
+        [Tooltip("Optional. The colour this is, for anything that is a COLOURWAY rather " +
+                 "than a model.\n\n" +
+                 "Most of what this shop sells is already named as a colour -- ASH, " +
+                 "COPPER, NIGHTJAR, BONE, RIVER STONE, GOLD LEAF -- and a colourway needs " +
+                 "no new mesh, no new texture and no new prefab in the scene. Which " +
+                 "matters more than it sounds: the menu carries exactly ONE runner model, " +
+                 "so without this, three of the four runners on sale could be bought and " +
+                 "then not seen, and a shop that sells what it cannot show is a shop that " +
+                 "is lying.\n\n" +
+                 "Alpha ZERO means no tint: the thing keeps the colours it was made with, " +
+                 "which is what every default should be.")]
+        public Color tint = new Color(1f, 1f, 1f, 0f);
+
+        /// <summary>Whether this is a colourway at all. Alpha zero is "leave it alone".</summary>
+        public bool Tints => tint.a > 0.001f;
+
         /// <summary>What it costs, with the tier's price standing in for a zero.</summary>
         public int Cost => price > 0 ? price : Prices.Of(tier);
 

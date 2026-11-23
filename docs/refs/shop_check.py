@@ -73,7 +73,8 @@ def catalogue():
             continue
         if current is None:
             continue
-        m = re.match(r"\s*(shown|slot|tier|price|isDefault|applies|part): (.*)$", line)
+        m = re.match(r"\s*(shown|slot|tier|price|isDefault|applies|part|tint): (.*)$",
+                     line)
         if m:
             current[m.group(1)] = m.group(2).strip()
     return rows
@@ -327,6 +328,64 @@ def main():
         elif rows_made:
             notes.append(f" every category fits in {rows_made} rows; the list never "
                          f"scrolls")
+
+    # ---- can what is sold actually be SEEN
+    #
+    # The one thing a shop must never do. Of the thirty-nine things on sale, five were
+    # showable -- the defaults -- and the rest were bought and then invisible, because the
+    # menu carries exactly one runner model and ShopUI.Preview handled one slot and
+    # returned for the other five.
+    #
+    # Two slots have an applier now and neither needed new art. A COLOURWAY is the model
+    # already there, painted, which is what ASH, COPPER and NIGHTJAR were always named as;
+    # a POSE is the name of a state on the controller the fighter already carries. So for
+    # those two a cosmetic that cannot be shown is a hole in the DATA and is failed on.
+    # For the four slots with no applier the honest report is a count, not a failure:
+    # nothing is broken, the work is simply not done.
+    shop_ui = read(os.path.join(GAME, "Menu", "ShopUI.cs")) or ""
+    fighter = read(os.path.join(GAME, "Menu", "MenuFighter.cs")) or ""
+    controller = read(os.path.join(GAME, "Animation", "GR_Player.controller")) or ""
+    states = set(re.findall(r"^  m_Name: (.+)$", controller, re.M))
+    models = set(menu_skins() or [])
+
+    applied = set()
+    if "item.slot == Slot.Runner" in shop_ui and "Paint(" in fighter:
+        applied.add("Runner")
+    if "item.slot == Slot.Pose" in shop_ui:
+        applied.add("Pose")
+
+    waiting = {}
+    for i, name in enumerate(SLOTS):
+        mine = [r for r in rows if r.get("slot") == str(i)]
+        if name not in applied:
+            waiting[name] = len(mine) - len([r for r in mine if r.get("isDefault") == "1"])
+            continue
+
+        for r in mine:
+            if r.get("isDefault") == "1":
+                continue
+            rid = r["id"]
+            key = r.get("applies") or rid
+
+            if name == "Runner":
+                tinted = r.get("tint", "").find("a: 1") >= 0
+                if not tinted and key not in models:
+                    problems.append(
+                        f"{rid} is a runner with no model called {key!r} in the menu and no "
+                        f"colourway either, so buying it changes nothing on screen. Give it "
+                        f"a tint -- docs/refs/cosmetic_appliers.py -- or a model")
+            elif name == "Pose":
+                if key not in states:
+                    problems.append(
+                        f"{rid} is a pose naming the state {key!r}, which GR_Player has "
+                        f"not got, so the fighter holds whatever pose he arrived in. The "
+                        f"controller's states are the vocabulary")
+
+    if waiting:
+        notes.append(" nothing applies these yet, so they are bought and not seen: "
+                     + ", ".join(f"{k} {v}" for k, v in sorted(waiting.items()) if v))
+    if applied:
+        notes.append(" shown on the fighter: " + ", ".join(sorted(applied)))
 
     # ---- and the iron rule, as a rule about the code rather than about intentions
     for word in ("Damage", "Health", "Armour", "Speed", "Reach"):
