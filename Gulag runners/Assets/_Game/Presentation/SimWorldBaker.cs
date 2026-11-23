@@ -467,6 +467,37 @@ namespace GulagRunners.Game
             // fighter dropping through a hatch met nothing he was on the same slice as and
             // fell out of the arena. Which is presumably why ladderCutsHatch is switched
             // off in Arena_Demo, and why there is no way down from the walkway at all.
+            // A LADDER HAS TO REACH THE FLOOR IT IS CLIMBED FROM, and two of the four
+            // arenas author ladders that do not.
+            //
+            // Measured by ladder_reach_check: in Egypt and in Mine, no ladder a body
+            // standing on the storey at y 1.12 can take hold of carries it above y 3.27.
+            // Their markers are 0.62 m stubs that straddle only the lip of the floor they
+            // LAND on, because neither arena ever went through LadderSetup -- the markers
+            // are whatever the prop's mesh bounds happened to be. Forest's, which did,
+            // measure 1.79 and 3.00 m: foot on the floor you leave, head above the floor
+            // you reach.
+            //
+            // The arenas were climbable only through a bug. A graze of seven centimetres
+            // used to count as a grab, and a ladder that runs through a solid turns that
+            // solid into a hole -- so the climb went up through solid stone. Tightening
+            // the grab to a quarter of a body closed that, and closed the only way up with
+            // it: six chests in those two arenas are now scenery nobody can reach.
+            //
+            // So the reach is a rule of the BAKE rather than a thing each arena has to
+            // remember. Every ladder's foot comes down to the top of the floor beneath it
+            // -- exactly to that top and never past it, because a solid counts as a hole
+            // only when its underside lies inside the ladder's span, and stopping flush
+            // leaves the floor you stand on solid while the slab overhead becomes the
+            // hatch it was always drawn as.
+            //
+            // It cannot lengthen a ladder that already reaches, and it does nothing at all
+            // where there is no floor underneath. The editor tool that fixes the markers
+            // themselves (Tools > Setup > "Make the ladders reach the floor below") is
+            // still the right thing to run -- this is what stops the arena being broken
+            // until somebody does.
+            int grown = GrowLaddersToTheFloor(ladders, ladderZ, solids, solidZ);
+
             int hatches = ladderCutsHatch ? CutHatches(solids, solidZ, ladders) : 0;
 
             // A safety net now rather than the mechanism: if these two ever disagree again
@@ -561,7 +592,8 @@ namespace GulagRunners.Game
                 $"{skippedDepth} off the plane, {skippedLayer} wrong layer, " +
                 $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid " +
                 $"({hatches} cut by ladders), " +
-                $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder, " +
+                $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder " +
+                $"({grown} grown down to the floor below), " +
                 $"{World.Gates.Length} gate ({gated} box(es)), " +
                 (World.HasPoison
                     ? $"poison from y {World.Poison.MinY} to y {World.Poison.MaxY}, "
@@ -803,6 +835,105 @@ namespace GulagRunners.Game
         /// it, because hand-built levels have ladder feet a centimetre inside their own platform
         /// and a hole there is a fighter falling out of the arena.
         /// </summary>
+        /// <summary>
+        /// Brings every ladder's foot down to the top of the floor beneath it.
+        ///
+        /// The floor beneath is the HIGHEST solid that is under the ladder's foot and
+        /// stands where the ladder stands: overlapping it across, and on a slice of the
+        /// level the ladder is also on. Anything lower is a floor further down, and a
+        /// ladder that reached past one storey to the next would turn the slab between
+        /// them into a hole.
+        ///
+        /// Across is measured with an inset rather than at the lip, because a ladder
+        /// modelled flush against the end of a walkway touches the next platform along by
+        /// a millimetre, and that platform is not what it stands on.
+        ///
+        /// Returns how many were grown. Measured on the four arenas: Nordic 0, Forest 2
+        /// (0.72 and 0.75 m, feet that hung above their own floor), Mine 1 and Egypt 3
+        /// (about 1.83 m each, the stubs that made those storeys unreachable).
+        /// </summary>
+        /// <summary>
+        /// The highest floor top at or below a line, among the solids standing where the
+        /// ladder stands. Used twice: once to find the landing, once for the floor below
+        /// it.
+        /// </summary>
+        static Fix Highest(List<Aabb> solids, List<Span> solidZ, Fix left, Fix right,
+                           Span lane, Fix below, out bool found)
+        {
+            found = false;
+            Fix top = default;
+
+            for (int s = 0; s < solids.Count; s++)
+            {
+                Aabb floor = solids[s];
+                if (floor.MaxY > below) continue;
+                if (floor.MaxX <= left || floor.MinX >= right) continue;
+
+                Span fz = s < solidZ.Count ? solidZ[s] : Span.Everywhere;
+                if (fz.Max <= lane.Min || fz.Min >= lane.Max) continue;
+
+                if (!found || floor.MaxY > top) { top = floor.MaxY; found = true; }
+            }
+            return top;
+        }
+
+        /// <summary>
+        /// How much slack there is around a floor top. A ladder's foot or head modelled
+        /// within this of a slab is standing on it rather than beside it; wider than the
+        /// few centimetres hand-built levels miss by, and far narrower than a storey.
+        /// </summary>
+        static Fix Step => Fix.FromMilli(300);
+
+        static int GrowLaddersToTheFloor(List<Aabb> ladders, List<Span> ladderZ,
+                                         List<Aabb> solids, List<Span> solidZ)
+        {
+            if (ladders.Count == 0 || solids.Count == 0) return 0;
+
+            // A tenth of a metre in from each side. Narrower than any ladder and wider
+            // than the overlap a flush-modelled foot has with the platform next door.
+            Fix inset = Fix.FromMilli(100);
+            int grown = 0;
+
+            for (int i = 0; i < ladders.Count; i++)
+            {
+                Aabb ladder = ladders[i];
+                Span lane = i < ladderZ.Count ? ladderZ[i] : Span.Everywhere;
+
+                Fix left = ladder.MinX + inset;
+                Fix right = ladder.MaxX - inset;
+                if (right <= left) { left = ladder.MinX; right = ladder.MaxX; }
+
+                // TWO floors, not one, and the difference is a hole in a level.
+                //
+                // The first rule here was "the highest floor under the foot", and
+                // measured against the four arenas it moved Nordic's upper ladder from
+                // y 2.31 down to y 0.05: its foot sits two centimetres BELOW the landing
+                // it stands on, so that landing did not count as under it and the search
+                // fell through to the storey below. One ladder spanning two storeys turns
+                // the floor between them into a hatch, and a fighter standing there drops
+                // through it. The arena was fine before and would not have been after.
+                //
+                // So the floor is found from the ladder's TOP. The landing is the highest
+                // floor at or just below where the ladder ends; the floor it is climbed
+                // FROM is the highest one below that. A ladder already standing on it is
+                // left alone, which is every ladder in an arena that was authored through
+                // LadderSetup.
+                Fix landing = Highest(solids, solidZ, left, right, lane,
+                                      ladder.MaxY + Step, out bool haveLanding);
+                if (!haveLanding) continue;
+
+                Fix top = Highest(solids, solidZ, left, right, lane,
+                                  landing - Step, out bool haveFloor);
+                if (!haveFloor || top >= ladder.MinY) continue;
+
+                ladder.MinY = top;
+                ladders[i] = ladder;
+                grown++;
+            }
+
+            return grown;
+        }
+
         int CutHatches(List<Aabb> solids, List<Span> depths, List<Aabb> ladders)
         {
             if (ladders.Count == 0 || solids.Count == 0) return 0;

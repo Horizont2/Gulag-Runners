@@ -790,6 +790,69 @@ def slope_steps(corners, step, min_rise):
     return out or None
 
 
+# How much slack there is around a floor top. A ladder's foot or head modelled within
+# this of a slab is standing on it rather than beside it. Mirrors SimWorldBaker.Step.
+STEP = X(0.3)
+
+
+def _highest(solids, solidz, left, right, lane, below):
+    """The highest floor top at or below a line, among solids where the ladder stands."""
+    top = None
+    for s, floor in enumerate(solids):
+        if floor[3] > below:
+            continue
+        if floor[2] <= left or floor[0] >= right:
+            continue
+        fz = solidz[s] if s < len(solidz) else (X(-1000.0), X(1000.0))
+        if fz[1] <= lane[0] or fz[0] >= lane[1]:
+            continue
+        if top is None or floor[3] > top:
+            top = floor[3]
+    return top
+
+
+def grow_ladders(ladders, ladderz, solids, solidz):
+    """Brings every ladder's foot down to the top of the floor beneath it.
+
+    The mirror of SimWorldBaker.GrowLaddersToTheFloor, number for number. The floor
+    beneath is the HIGHEST solid under the ladder's foot that stands where the ladder
+    stands -- overlapping it across, and on a slice the ladder is also on. Across is
+    measured a tenth of a metre in from each side, because a ladder modelled flush with
+    the end of a walkway touches the next platform along by a millimetre and that is not
+    what it stands on.
+
+    Returns how many were grown; zero for an arena whose ladders were authored properly.
+    """
+    if not ladders or not solids:
+        return 0
+
+    inset = X(0.1)
+    grown = 0
+
+    for i, lad in enumerate(ladders):
+        lane = ladderz[i] if i < len(ladderz) else (X(-1000.0), X(1000.0))
+        left, right = lad[0] + inset, lad[2] - inset
+        if right <= left:
+            left, right = lad[0], lad[2]
+
+        # TWO floors, not one. The first version of this took "the highest floor under
+        # the foot" and moved Nordic's upper ladder from y 2.31 to y 0.05, because its
+        # foot sits two centimetres BELOW its own landing -- one ladder across two
+        # storeys, and a hole in the floor between them. The landing is found from the
+        # ladder's TOP, and the floor it is climbed from is the one below that.
+        landing = _highest(solids, solidz, left, right, lane, lad[3] + STEP)
+        if landing is None:
+            continue
+        top = _highest(solids, solidz, left, right, lane, landing - STEP)
+        if top is None or top >= lad[1]:
+            continue
+
+        ladders[i] = (lad[0], top, lad[2], lad[3])
+        grown += 1
+
+    return grown
+
+
 def cut_hatches(solids, depths, ladders, margin, min_overlap):
     """SimWorldBaker.CutHatches: a ladder opens a hole through anything it runs through.
 
@@ -983,6 +1046,12 @@ def bake(scene=None, report=False):
     if band_took_everything:
         solids.extend(culled)
         fill(solidz, len(solids), (X(-1000.0), X(1000.0)))
+
+    # A LADDER HAS TO REACH THE FLOOR IT IS CLIMBED FROM. Mirrors
+    # SimWorldBaker.GrowLaddersToTheFloor; see the argument there. Before the hatch cut,
+    # exactly as in the baker, because a ladder that has just been lengthened is the one
+    # that should cut the slab it now reaches.
+    grown = grow_ladders(ladders, ladderz, solids, solidz)
 
     hatches = 0
     if cuts_hatch:
