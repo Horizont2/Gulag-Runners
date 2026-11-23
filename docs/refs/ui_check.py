@@ -101,18 +101,20 @@ BUILTIN = {
 FLOORED = {
     "NetMatch.WaitingChanged": (
         "NetNotice subscribes at runtime when nothing in the scene does",
-        "NetNotice.cs", "WaitingChanged.AddListener"),
+        "Presentation/NetNotice.cs", "WaitingChanged.AddListener"),
     "NetMatch.Substituted": (
         "NetNotice subscribes at runtime when nothing in the scene does",
-        "NetNotice.cs", "Substituted.AddListener"),
+        "Presentation/NetNotice.cs", "Substituted.AddListener"),
     "MatchResultView.RematchAsked": (
         "NetNotice draws it, and attaches NetMatch.AskRematch when the event is bare",
-        "NetNotice.cs", "RematchAsked.AddListener"),
+        "Presentation/NetNotice.cs", "RematchAsked.AddListener"),
+    "ShopUI.listChanged": (
+        "ShopList redraws the rows on it, subscribed at runtime",
+        "Menu/ShopList.cs", "listChanged.AddListener"),
 }
 
-PRESENTATION = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            "..", "..", "Gulag runners", "Assets", "_Game",
-                            "Presentation")
+GAME = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                    "..", "..", "Gulag runners", "Assets", "_Game")
 
 
 def floored(key):
@@ -121,7 +123,7 @@ def floored(key):
     if entry is None:
         return None
     why, source, marker = entry
-    path = os.path.join(PRESENTATION, source)
+    path = os.path.join(GAME, source)
     if not os.path.exists(path):
         return None
     return why if marker in open(path, encoding="utf-8").read() else None
@@ -155,6 +157,14 @@ SPARE = {
     # The connect panel hides ITSELF on connecting, so this is a hook for anything else
     # that wants to know, and a scene with nothing else up needs nobody listening.
     "NetConnectView.Connected": "optional: the panel takes itself down either way",
+
+    # The picked item's own readouts, for a layout that has a detail line. This one does
+    # not: the shop is a list, and what is picked is shown by the lit row -- its name,
+    # its price and its rarity edge are already on it, drawn by ShopList. Wiring these
+    # as well would be the same three facts twice on one screen.
+    "ShopUI.nameChanged": "the picked item is named on its own row, not on a detail line",
+    "ShopUI.priceChanged": "priced on its row, as above",
+    "ShopUI.tierChanged": "its rarity is the coloured edge of its row, as above",
 
     # The search screen does not listen for this -- it holds its Loading phase on
     # OnlineMatch.OpponentReady, polled, because a gate that can miss its own

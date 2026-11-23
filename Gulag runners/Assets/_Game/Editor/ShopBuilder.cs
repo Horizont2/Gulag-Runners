@@ -553,6 +553,17 @@ namespace GulagRunners.GameEditor
                 PrefabUtility.RecordPrefabInstancePropertyModifications(menu);
             }
 
+            // The thing that puts the catalogue INTO the four rows above. They were built
+            // "to be filled by whatever lists the catalogue at run time" and for a long
+            // while nothing did, so every row read ASH / COMMON / 800 whatever category
+            // was open. ShopList also installs itself at load for a scene built before it
+            // existed; adding it here is what makes it part of the scene.
+            ShopList list = root.GetComponent<ShopList>();
+            if (list == null) list = Undo.AddComponent<ShopList>(root.gameObject);
+            list.shop = view;
+            list.rows = null;                 // found by name, so a re-layout cannot stale them
+            EditorUtility.SetDirty(list);
+
             EditorUtility.SetDirty(view);
             Selection.activeGameObject = root.gameObject;
 

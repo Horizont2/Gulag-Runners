@@ -276,6 +276,58 @@ def main():
             "reordered -- as it was when emotes and graffiti came off sale -- every old "
             "save is one or two places out, and a knockout effect is worn as a lock face")
 
+    # ---- can a thumb actually REACH everything on sale
+    #
+    # The shop draws a fixed number of rows -- built once, because a screen that
+    # instantiates rows is a screen that allocates while a thumb is moving -- and for a
+    # long while nothing filled them at all: every row read the same name and price
+    # whatever category was open, and ShopUI.listChanged went nowhere, so the list did not
+    # redraw after a purchase either.
+    #
+    # The arithmetic that matters is the one the builder's own comment got wrong. It says
+    # the widest category holds four and nothing is hidden; the catalogue has since grown
+    # a Locks slot of twenty -- five parts with four faces each -- so sixteen of them had
+    # nowhere to appear. A list longer than its window has to move, and that is checked
+    # here rather than assumed, because the catalogue will grow again.
+    builder = read(os.path.join(GAME, "Editor", "ShopBuilder.cs"))
+    lister = read(os.path.join(GAME, "Menu", "ShopList.cs"))
+
+    rows_made = re.search(r"const int Rows = (\d+)", builder or "")
+    rows_made = int(rows_made.group(1)) if rows_made else 0
+    counts = [len([r for r in rows if r.get("slot") == str(i)])
+              for i in range(len(SLOTS))]
+    widest = max(counts) if counts else 0
+
+    if not lister:
+        problems.append(
+            "ShopList is gone, so nothing puts the catalogue into the shop's rows and "
+            "every row shows whatever the builder typed into it")
+    else:
+        if "Showing()" not in lister:
+            problems.append(
+                "ShopList no longer reads ShopUI.Showing(), so the rows are not the "
+                "catalogue any more -- they are decoration that happens to look right")
+        # The SUBSCRIPTION, not the word. "listChanged" alone passes against a file where
+        # every mention has been renamed to listChangedSomething, which is exactly what my
+        # own fault injection did -- a rule that cannot be broken is not a rule.
+        if "listChanged.AddListener" not in lister:
+            problems.append(
+                "ShopList no longer listens for listChanged, so the list does not redraw "
+                "after a buy or an equip: the thing just bought still says its price")
+
+        if rows_made and widest > rows_made:
+            if "Dragged(" not in lister or "Step(" not in lister:
+                problems.append(
+                    f"the widest category holds {widest} and the shop draws {rows_made} "
+                    f"rows, so {widest - rows_made} of them cannot be reached -- and "
+                    f"ShopList has no way to move the window over the list")
+            else:
+                notes.append(f" the widest category holds {widest} against {rows_made} "
+                             f"rows, so the list scrolls")
+        elif rows_made:
+            notes.append(f" every category fits in {rows_made} rows; the list never "
+                         f"scrolls")
+
     # ---- and the iron rule, as a rule about the code rather than about intentions
     for word in ("Damage", "Health", "Armour", "Speed", "Reach"):
         if re.search(r"\b" + word + r"\b", wardrobe):
