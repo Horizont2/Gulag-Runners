@@ -489,6 +489,30 @@ def shaft(px, w, h, x0, narrow, broad, top, bottom, colour):
             px[i:i + 4] = bytes(tuple(colour) + (255,))
 
 
+def logs(px, w, h, x0, span, top, rows, colour, gap=0):
+    """
+    A stack of cut timber: bars lying on bars, each course a little shorter.
+
+    The one shape a sawmill has that nothing else in this game does. A single bar is a
+    fence rail and a solid block is a crate; it is the STEPPING of the courses that says
+    the pile was stacked by somebody and is taller in the middle. Drawn with a gap
+    between courses so the layer keeps the hard edges docs/00 asks for rather than
+    merging into one slab at distance.
+    """
+    thick = max(2, int(h * 0.016))
+    step = thick + max(1, gap or int(thick * 0.45))
+    r, g, b = colour
+
+    for k in range(rows):
+        # Each course loses a little from both ends, so the pile reads as a pile.
+        inset = int(span * 0.08 * k)
+        y0 = top + (rows - 1 - k) * step
+        for x in across(x0 + inset, x0 + span - inset, w):
+            for y in range(max(0, y0), min(h, y0 + thick)):
+                i = (y * w + x) * 4
+                px[i:i + 4] = bytes((r, g, b, 255))
+
+
 def tree(px, w, h, x0, wide, top, colour):
     """A conifer: a triangle on a trunk. Three strokes, no leaves."""
     r, g, b = colour
@@ -590,6 +614,11 @@ THEMES = {
     "forest":  ((0.05, 0.09, 0.08), (0.36, 0.45, 0.47), 1.4, True),   # morning mist
     "nordic":  ((0.10, 0.12, 0.17), (0.44, 0.51, 0.61), 2.2, True),   # cold daylight
     "temple":  ((0.05, 0.04, 0.08), (0.44, 0.36, 0.52), 0.7, True),   # moonlit air
+    # The one overcast sky in the set, and the lightest haze by a long way. Snow under a
+    # white sky has almost no contrast at distance -- that is what makes it read as cold
+    # rather than as a forest with a pale filter on it. Lumps are low because snow fills
+    # a landscape in: a drift has a softer horizon than a ridge of rock.
+    "sawmill": ((0.09, 0.11, 0.15), (0.70, 0.76, 0.82), 0.9, True),   # overcast snow
 }
 
 def frame(layer, w, h):
@@ -730,6 +759,61 @@ def draw(theme, index, w, h):
 
             stones(line, colour, (5, 3)[index], 0.55)
             plant = lambda k, on, tone: stones(on, tone, (3, 2)[index] - k, 0.45 - 0.1 * k)
+
+    elif theme == "sawmill":
+        # SNOW IS DRAWN AS A RIM, not as a colour. Filling the band pale would make the
+        # whole layer lighter and lose the ridge entirely under an overcast sky; a bright
+        # edge along the top of the land with the darker ground under it is what a covered
+        # slope actually looks like from across a valley, and it costs one extra fill.
+        snow = lerp3(colour, (236, 241, 247), (0.70, 0.55, 0.38)[index])
+        cap = max(2, int(high((0.020, 0.014, 0.009)[index])))
+        fill_below(px, w, h, line, snow)
+        fill_below(px, w, h, lambda u: line(u) + cap, colour)
+
+        if index == 2:
+            # The mill itself, once, on the far horizon: a long shed under a gable, with
+            # the stack beside it. It is the thing that names the place, so it is drawn
+            # where nothing can stand in front of it.
+            shed = lerp3(colour, ink, 0.55)
+            x0, span = int(w * 0.30), wide(0.62)
+            roof = int(row(0.30))
+            column(px, w, h, x0, span, roof, shed)
+            pyramid(px, w, h, x0 - wide(0.04), span + wide(0.08),
+                    roof - high(0.105), shed)
+            column(px, w, h, x0 + span - wide(0.14), wide(0.045),
+                   roof - high(0.150), lerp3(shed, ink, 0.3))
+
+        def stand(on, tone, count, scale, mix):
+            """Conifers under snow: dark trunks, and a pale one here and there."""
+            for i in range(count):
+                x = int(w * (i + rng.between(0.15, 0.85)) / count)
+                up = rng.between(0.10, 1.0) ** 3 * 0.66 + 0.18
+                top = int(on(x / w) - high(up * scale))
+                # One tree in four wears its snow: a whole stand of pale trees is a
+                # Christmas card, and none at all is the forest arena in grey.
+                laden = rng.between(0.0, 1.0) < 0.28
+                shade = lerp3(tone, (228, 236, 244) if laden else ink,
+                              0.42 if laden else mix)
+                tree(px, w, h, x, wide((0.130, 0.108, 0.086)[index]), top, shade)
+
+        def piles(on, tone, count, mix):
+            """Cut timber, stacked and waiting. The near bands get the big ones."""
+            for i in range(count):
+                x = int(w * (i + 0.5) / count + rng.between(-70, 70))
+                base = int(on(x / w))
+                rows = (4, 3, 2)[index]
+                logs(px, w, h, x, wide((0.145, 0.110, 0.080)[index]),
+                     base - rows * max(2, int(h * 0.023)), rows,
+                     lerp3(tone, ink, mix))
+
+        stand(line, colour, (14, 10, 7)[index], (1, 0.78, 0.52)[index], 0.58)
+        if index < 2:
+            piles(line, colour, (3, 2)[index], 0.50)
+
+        plant = lambda k, on, tone: (
+            stand(on, tone, (9, 7, 4)[index] - k * 2,
+                  (1.1, 0.82, 0.55)[index] * (1.0 + 0.2 * k), 0.5 - 0.1 * k),
+            piles(on, tone, max(1, (2, 1, 1)[index] - k), 0.45 - 0.1 * k))
 
     # Last, so the near bands occlude the feet of everything standing behind them.
     near_bands(px, w, h, rng, row, high, colour, ink if sky else haze, lumps, index, plant)

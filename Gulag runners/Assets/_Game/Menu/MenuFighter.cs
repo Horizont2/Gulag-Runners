@@ -188,18 +188,44 @@ namespace GulagRunners.Game
         void Paint(GameObject worn)
         {
             GameObject on = worn != null ? worn : gameObject;
+            bool wanted = tint.a > 0.001f;
+
+            // NOTHING AT ALL WHEN THERE IS NO COLOURWAY, and that is the whole of the bug
+            // this replaces. The first version wrote white into every renderer whenever
+            // the tint was clear, reasoning that white is the neutral multiply -- and it
+            // is, against a material whose own _BaseColor is white. These models' are
+            // not: the fighter carries its skin tone in that property, and forcing it to
+            // white threw the tone away and left the character reading yellow and raw.
+            // Reported within the hour, which is what it deserved.
+            //
+            // So an untinted fighter is never touched, and one that HAS been tinted is put
+            // back to what its materials said rather than to a guess at what they said.
+            if (!wanted && !_painted) return;
+
             if (_block == null) _block = new MaterialPropertyBlock();
 
             foreach (Renderer r in on.GetComponentsInChildren<Renderer>(true))
             {
+                if (!_was.TryGetValue(r, out Color home))
+                {
+                    Material m = r.sharedMaterial;
+                    home = m != null && m.HasProperty(BaseColour)
+                        ? m.GetColor(BaseColour) : Color.white;
+                    _was[r] = home;
+                }
+
                 r.GetPropertyBlock(_block);
-                if (tint.a > 0.001f)
-                    _block.SetColor(BaseColour, new Color(tint.r, tint.g, tint.b, 1f));
-                else
-                    _block.SetColor(BaseColour, Color.white);
+                _block.SetColor(BaseColour, wanted
+                    ? new Color(tint.r, tint.g, tint.b, home.a) : home);
                 r.SetPropertyBlock(_block);
             }
+
+            _painted = wanted;
         }
+
+        readonly System.Collections.Generic.Dictionary<Renderer, Color> _was =
+            new System.Collections.Generic.Dictionary<Renderer, Color>();
+        bool _painted;
 
         static readonly int BaseColour = Shader.PropertyToID("_BaseColor");
         MaterialPropertyBlock _block;

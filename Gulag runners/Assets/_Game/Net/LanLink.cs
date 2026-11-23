@@ -676,17 +676,30 @@ namespace GulagRunners.Net
                     if (length >= 9 && WorldFingerprint != 0u)
                     {
                         uint theirs = unchecked((uint)ReadInt(data, ref at));
+                        // SAID, NOT REFUSED, and that is a correction to how this shipped
+                        // yesterday. It turned the connection down, on the reasoning that
+                        // a silent desync is worse than no match -- and within a day the
+                        // report was that matchmaking announces the opponent has left and
+                        // hands their fighter to a bot. I have no evidence the two arenas
+                        // ever actually differ, and plenty that refusing breaks a game
+                        // that was working. A check with no field evidence behind it does
+                        // not get to be the thing that stops a match starting.
+                        //
+                        // So the number is still compared and the disagreement is still
+                        // named, loudly, in the log and on screen through NetNotice -- and
+                        // the match goes ahead. If it IS wrong, the fighters will walk
+                        // through walls and now there is a line saying why, which is what
+                        // was missing in the first place.
                         if (theirs != 0u && theirs != WorldFingerprint)
                         {
                             _desync =
                                 "the other device is in a different arena, or has baked "
                                 + $"the same one differently (theirs {theirs:X8}, ours "
-                                + $"{WorldFingerprint:X8}). Not connecting: both would "
-                                + "step the same inputs against different ground, and the "
-                                + "fighters would walk through walls and fall through "
-                                + "floors with neither phone saying anything was wrong.";
-                            state = "refused: the other device is in a different arena";
-                            break;
+                                + $"{WorldFingerprint:X8}). Playing anyway, but the two "
+                                + "are stepping the same inputs against different ground: "
+                                + "expect fighters walking through walls and falling "
+                                + "through floors.";
+                            state = "connected, but the two arenas do not match";
                         }
                     }
 

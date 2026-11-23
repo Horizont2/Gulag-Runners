@@ -117,13 +117,31 @@ namespace GulagRunners.Game
             // in the five scenes are m_BestFit: 0. Mapping it would mean inventing the two
             // bounds TMP wants, for a case that does not occur.
 
-            // Off before the new one arrives: both are Graphics on one object and Destroy
-            // only takes effect at the end of the frame, so without this the first frame of
-            // every scene draws the word twice, once in each typeface.
+            // THE NEW LABEL GETS ITS OWN OBJECT, and the first version of this did not.
+            //
+            // It put the TextMeshProUGUI on the same GameObject and destroyed the legacy
+            // Text beside it, which looks reasonable and is not: a GameObject has ONE
+            // CanvasRenderer and a Graphic owns it. Destroy is deferred to the end of the
+            // frame, and when the old Text finally goes it clears that CanvasRenderer --
+            // wiping the mesh the TMP label had just built. Every upgraded line came out
+            // blank and stayed blank, which is exactly how it was reported: the texts
+            // still do not update, at least on the search panel.
+            //
+            // A child of its own has a CanvasRenderer of its own, so nothing is shared and
+            // nothing is cleared. It is stretched over its parent, so the words land where
+            // the old ones did without copying a single layout number.
             old.enabled = false;
             Object.Destroy(old);
 
-            TextMeshProUGUI made = go.AddComponent<TextMeshProUGUI>();
+            GameObject holder = new GameObject("Label");
+            RectTransform box = holder.AddComponent<RectTransform>();
+            box.SetParent(go.transform, false);
+            box.anchorMin = Vector2.zero;
+            box.anchorMax = Vector2.one;
+            box.offsetMin = Vector2.zero;
+            box.offsetMax = Vector2.zero;
+
+            TextMeshProUGUI made = holder.AddComponent<TextMeshProUGUI>();
             made.text = words;
             made.color = colour;
             made.fontSize = size;

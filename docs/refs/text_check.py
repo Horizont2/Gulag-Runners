@@ -160,6 +160,22 @@ def main():
             problems.append(
                 "UiType no longer runs itself on load, so the legacy labels are never "
                 "upgraded and MenuLabel cannot write into them.")
+        # The upgraded label must get an object of its own.
+        #
+        # A GameObject has ONE CanvasRenderer and a Graphic owns it. Putting the new
+        # TextMeshProUGUI beside the legacy Text it replaces looks tidy and is not:
+        # Destroy is deferred to the end of the frame, and when the old Text goes it
+        # clears that shared CanvasRenderer -- wiping the mesh the new label had just
+        # built. Every upgraded line comes out blank and stays blank, which is how it was
+        # reported: the texts still do not update, at least on the search panel. There is
+        # no exception, no warning and nothing in the scene to see.
+        if "SetParent(go.transform" not in source:
+            problems.append(
+                "UiType no longer gives the upgraded label a child object of its own, so "
+                "it shares a CanvasRenderer with the legacy Text it is replacing -- and "
+                "that Text clears the renderer when it is destroyed at the end of the "
+                "frame. Every upgraded line goes blank.")
+
         if "sceneLoaded" not in source:
             problems.append(
                 "UiType no longer listens for a scene load, so only the first scene's "
