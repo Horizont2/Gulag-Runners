@@ -1,0 +1,155 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>hit</title>
+<style>
+  body { margin:0; background:#0d0f12; font:12px ui-monospace,monospace; color:#8d949c; }
+  #strip { display:block; }
+  .t { position:absolute; }
+</style></head>
+<body>
+<canvas id="strip"></canvas>
+<script>
+// The same numbers that go into the Unity ParticleSystem. This file exists so the TIMING
+// and the COLOUR RAMP can be looked at before any of it is authored blind.
+
+const FRAMES = [0, 0.03, 0.07, 0.13, 0.22, 0.34, 0.50, 0.70];   // seconds
+const CELL = 220;
+
+const ACCENT = [255, 214, 120];   // a parry is not damage: gold, not red
+const SPARK  = [255, 246, 214];
+const RINGC  = [255, 236, 196];
+
+// ---- the effect, as data. Each layer is one Unity ParticleSystem.
+const SWING = -0.35;              // radians: the direction the blade was travelling
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+function ease(t,p){ return Math.pow(Math.min(1,Math.max(0,t)),p); }
+
+// deterministic, so every screenshot of the same design is the same picture
+let seed = 12345;
+function rnd(){ seed = (seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
+
+function sparks(n){
+  const out = [];
+  for (let i=0;i<n;i++){
+    // Alternating fans: half the sparks go the way the blade was travelling and half
+    // come back the other way. A parry is two weapons refusing each other, and one fan
+    // would read as an ordinary hit that happened to be yellow.
+    const side = (i % 2) ? 0 : Math.PI;
+    const a = SWING + side + (rnd()-0.5)*0.85;
+    out.push({ a, speed: lerp(13,19,rnd()), life: lerp(0.10,0.19,rnd()),
+               size: lerp(0.5,1.0,rnd()) });
+  }
+  return out;
+}
+function bits(n){
+  const out = [];
+  for (let i=0;i<n;i++){
+    out.push({ a: SWING + (rnd()-0.5)*1.8, speed: lerp(2.4,4.4,rnd()),
+               life: lerp(0.16,0.26,rnd()), size: lerp(0.12,0.22,rnd()) });
+  }
+  return out;
+}
+const SPARKS = sparks(14);
+const BITS = bits(4);
+
+const tex = {};
+function load(name){
+  return new Promise(r => { const i = new Image(); i.onload = () => { tex[name]=i; r(); };
+                            i.src = name + '.png'; });
+}
+
+function rgba(c, a){ return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
+
+function blob(ctx, img, x, y, w, h, rot, colour, alpha){
+  if (alpha <= 0.002) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  // tint: draw the white texture then multiply a colour over it, keeping the alpha
+  const c = document.createElement('canvas');
+  c.width = Math.max(1,Math.ceil(w)); c.height = Math.max(1,Math.ceil(h));
+  const cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0, c.width, c.height);
+  cx.globalCompositeOperation = 'source-in';
+  cx.fillStyle = `rgb(${colour[0]},${colour[1]},${colour[2]})`;
+  cx.fillRect(0,0,c.width,c.height);
+  ctx.drawImage(c, -w/2, -h/2, w, h);
+  ctx.restore();
+}
+
+function frame(ctx, cx, cy, t, px){
+  // Three jets out of the floor. docs/33: the gas ARRIVES, it does not fade in -- a slow
+  // dissolve reads as a bug, a burst reads as a valve opening.
+  const JETS = [-0.62, 0.05, 0.70];
+
+  ctx.globalCompositeOperation = 'source-over';
+  let sd = 4242;
+  const r = () => { sd = (sd*1103515245+12345)&0x7fffffff; return sd/0x7fffffff; };
+
+  for (const jx of JETS){
+    const delay = Math.abs(jx)*0.035;                 // the middle one first
+    for (let i=0;i<9;i++){
+      const life = 0.30 + r()*0.28, k = (t - delay - i*0.012) / life;
+      if (k <= 0 || k >= 1) continue;
+      // up fast, then it loses its push and spreads
+      const rise = (1 - Math.pow(1-k, 2.2));
+      const y = cy - rise * (0.95 + r()*0.5) * px;
+      const spread = (r()-0.5) * 0.55 * px * Math.pow(k, 0.7);
+      const x = cx + jx*px*0.55 + spread;
+      const s2 = (0.16 + 0.50*k) * (0.8 + r()*0.5) * px;
+      // white-green at the mouth, settling into the pool's own green
+      const g = 1 - k;
+      const col = [Math.round(120 + 110*g), Math.round(220 + 30*g), Math.round(120 + 90*g)];
+      blob(ctx, tex.puff, x, y, s2, s2, (r()-0.5)*2, col,
+           0.50 * Math.sin(Math.min(1,k*4)*Math.PI/2) * Math.pow(1-k, 1.2));
+    }
+  }
+
+  // The mouth of each vent: one hard flash as the valve lets go.
+  ctx.globalCompositeOperation = 'lighter';
+  for (const jx of JETS){
+    const delay = Math.abs(jx)*0.035, d = 0.075, k = (t-delay)/d;
+    if (k <= 0 || k >= 1) continue;
+    // A jet leaving the floor, not a lamp sitting on it. Tall and thin, and it grows
+    // upward: the first version drew a round blob that read as a glowing egg.
+    const h = (0.25 + 0.95*ease(k,0.45)) * px;
+    const w = (0.26 - 0.12*k) * px;
+    blob(ctx, tex.core, cx + jx*px*0.55, cy - h*0.42, w, h, 0,
+         [205, 255, 190], 0.8*Math.pow(1-k, 1.5));
+  }
+  // and a low shell along the floor, because a release pushes air sideways too
+  {
+    const d = 0.13, k = t/d;
+    if (k < 1){
+      const w = lerp(0.4, 3.0, ease(k,0.45)) * px;
+      blob(ctx, tex.ring, cx, cy, w, w*0.14, 0, [170, 240, 160],
+           0.30*Math.pow(1-k, 1.8));
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+Promise.all(['core','spark','ring','slash','puff'].map(load)).then(() => {
+  const c = document.getElementById('strip');
+  const n = FRAMES.length;
+  c.width = CELL*n; c.height = CELL + 26;
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = '#15181d';
+  ctx.fillRect(0,0,c.width,c.height);
+
+  FRAMES.forEach((t, i) => {
+    const x0 = i*CELL;
+    // a floor line and a body-coloured block, so the effect is judged against something
+    ctx.fillStyle = '#1b1f26'; ctx.fillRect(x0+1, 1, CELL-2, CELL-2);
+    ctx.fillStyle = '#2a3038'; ctx.fillRect(x0+CELL*0.36, CELL*0.30, CELL*0.28, CELL*0.56);
+    frame(ctx, x0+CELL*0.50, CELL*0.80, t, CELL*0.42);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#6f7780'; ctx.font = '13px ui-monospace,monospace';
+    ctx.fillText((t*1000).toFixed(0)+' ms', x0+8, CELL+18);
+  });
+  document.title = 'ready';
+});
+</script>
+</body></html>

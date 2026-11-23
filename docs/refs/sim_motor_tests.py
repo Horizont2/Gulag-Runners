@@ -1,0 +1,420 @@
+import sim_motor_mirror as T
+from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, JMP, DOD
+
+# ---- the exact arena baked into SetupScene -------------------------------------
+floors, rooms = 3, 3
+room_w, floor_h, slab, wall, door_h = 7.2, 3.0, 0.3, 0.4, 2.2
+ladder_w, hatch_w = 0.9, 1.6
+total_w, total_h = rooms*room_w, floors*floor_h
+left, right = -total_w/2, total_w/2
+ladder_x = left + room_w
+lintel = max(0.1, floor_h - door_h)
+
+pieces = []
+for f in range(floors):
+    y = f*floor_h
+    if f > 0:
+        hmin, hmax = ladder_x-hatch_w/2, ladder_x+hatch_w/2
+        lw = hmin-left
+        if lw > .05: pieces.append(((left+lw/2, y-slab/2), (lw, slab), 0))
+        rw = right-hmax
+        if rw > .05: pieces.append(((hmax+rw/2, y-slab/2), (rw, slab), 0))
+    else: pieces.append(((0, y-slab/2), (total_w, slab), 0))
+    for r in range(1, rooms):
+        x = left + r*room_w
+        if abs(x-ladder_x) < room_w/2: continue
+        pieces.append(((x, y+door_h+lintel/2), (wall, lintel), 0))
+pieces.append(((left-wall/2, total_h/2), (wall, total_h), 0))
+pieces.append(((right+wall/2, total_h/2), (wall, total_h), 0))
+for f in range(floors-1):
+    pieces.append(((ladder_x, f*floor_h+floor_h/2), (ladder_w, floor_h+slab), 2))
+pieces.append(((left+room_w*2.2, floor_h*0.6), (room_w/2, 0.2), 1))
+
+def aabb(c, s): return (X(c[0]-s[0]/2), X(c[1]-s[1]/2), X(c[0]+s[0]/2), X(c[1]+s[1]/2))
+W = {"solid": [aabb(c,s) for c,s,k in pieces if k==0],
+     "oneway":[aabb(c,s) for c,s,k in pieces if k==1],
+     "ladder":[aabb(c,s) for c,s,k in pieces if k==2]}
+print(f"world: {len(W['solid'])} solid, {len(W['oneway'])} one-way, {len(W['ladder'])} ladder\n")
+
+def run(s, inp, frames):
+    for _ in range(frames): step(s, inp, W)
+    return s
+
+def check(name, cond, detail=""):
+    print(f"  {'PASS' if cond else 'FAIL'}  {name}{('  ' + detail) if detail else ''}")
+    return cond
+
+ok = True
+print("1. spawn and settle")
+s = S(left+2.5, 0.5)
+run(s, 0, 60)
+ok &= check("rests on the floor", abs(F(s.y)) < 0.02, f"y={F(s.y):.3f} mode={s.mode}")
+ok &= check("does not fall through", s.mode == "ground")
+
+print("\n2. run right through the doorway")
+s = S(left+2.5, 0.0); run(s, R, 300)
+ok &= check("passes the door lintel", F(s.x) > 5.0, f"x={F(s.x):.2f}")
+ok &= check("stopped by the outer wall", F(s.x) < right, f"x={F(s.x):.2f}")
+
+print("\n3. jump height")
+s = S(0, 0.0); run(s, 0, 10)
+base = F(s.y); apex = base
+for i in range(120):
+    step(s, JMP, W); apex = max(apex, F(s.y))
+ok &= check("apex below a floor", apex-base < floor_h, f"apex={apex-base:.3f} floor={floor_h}")
+ok &= check("apex is usable indoors", apex-base > 0.7, f"apex={apex-base:.3f}")
+
+print("\n4. ladder to the floor above")
+s = S(ladder_x, 0.0); run(s, 0, 10)
+for _ in range(400):
+    step(s, UP, W)
+    if F(s.y) >= floor_h: break
+ok &= check("reached floor 1", F(s.y) > floor_h-0.1, f"y={F(s.y):.2f} mode={s.mode}")
+run(s, R, 90)
+ok &= check("stands on floor 1", s.mode == "ground" and F(s.y) > floor_h-0.1,
+            f"y={F(s.y):.2f} mode={s.mode}")
+
+print("\n5. walk back to the ladder and climb down")
+for _ in range(400):
+    step(s, L, W)
+    if abs(F(s.x) - ladder_x) < 0.25: break
+ok &= check("walked back to the ladder", abs(F(s.x)-ladder_x) < 0.3, f"x={F(s.x):.2f}")
+for _ in range(500):
+    step(s, DN, W)
+    if F(s.y) < 0.1: break
+ok &= check("back to floor 0", F(s.y) < 0.1, f"y={F(s.y):.2f}")
+
+print("\n6. one-way platform")
+ow = pieces[-1]
+s = S(ow[0][0], ow[0][1]+0.4); run(s, 0, 60)
+ok &= check("lands on the one-way", abs(F(s.y)-(ow[0][1]+0.1)) < 0.05, f"y={F(s.y):.3f}")
+for _ in range(30): step(s, DN | JMP, W)
+ok &= check("drops through with down+jump", F(s.y) < ow[0][1]-0.2, f"y={F(s.y):.2f}")
+
+print("\n7. dodge")
+s = S(0, 0.0); run(s, 0, 10)
+x0 = F(s.x); stam0 = s.stam
+for _ in range(21): step(s, DOD | R, W)
+ok &= check("dodge travels", abs(F(s.x)-x0) > 1.5, f"d={F(s.x)-x0:.2f} m")
+ok &= check("dodge costs stamina", s.stam == C["SMAX"] - C["DCOST"],
+      f"{C['SMAX']} -> {s.stam}, a dodge costs {C['DCOST']}")
+
+print("\n8. crouch under a lintel")
+wallx = left + 2*room_w
+s = S(wallx-1.0, 0.0); run(s, 0, 10)
+run(s, R, 120)
+ok &= check("walks under the lintel upright", F(s.x) > wallx+0.5, f"x={F(s.x):.2f}")
+
+print("\n9. falls down the hatch")
+s = S(ladder_x, floor_h+0.1); run(s, 0, 10)
+ok &= check("stands at the hatch edge", s.mode in ("ground","air"), f"mode={s.mode}")
+
+print("\n10. noise")
+s = S(0,0.0); run(s,0,10)
+noises=set()
+for _ in range(120): step(s, R, W); noises.add(s.noise)
+ok &= check("running is Loud", 3 in noises, f"levels={sorted(noises)}")
+s = S(0,0.0); run(s,0,10)
+noises=set()
+for _ in range(120): step(s, R|DN, W); noises.add(s.noise)
+ok &= check("crouch-walking is silent", noises == {0}, f"levels={sorted(noises)}")
+
+print("\n11a. the jump is one height, not a thumb measurement")
+peaks = []
+for hold in (3, 8, 20, 200):
+    s2 = S(-3.0, 0.9)
+    for _ in range(120):
+        step(s2, 0, W)
+        if s2.mode == "ground": break
+    top = F(s2.y)
+    for t in range(90):
+        step(s2, JMP if t < hold else 0, W)
+        top = max(top, F(s2.y))
+    peaks.append(round(top, 3))
+check("every tap gives the same jump", len(set(peaks)) == 1, f"apex {peaks} m for 3/8/20/200 frames held")
+
+print("\n10c. a slope made of boxes is walked up, a wall is not")
+# An AABB world has no slopes, only stairs. A step over the free 0.30 m is hauled up at the
+# cost of the speed carried into it, which is what turns a stack of crates into a ramp —
+# and the haul has to find the HIGHEST reachable surface, or a stack stops the body at its
+# first step with the second one sitting on top of the landing.
+STAIRS = {"solid": [(X(-6.0), X(-1.0), X(6.0), X(0.0))] +
+                   [(X(-1.0 + i), X(-1.0), X(6.0), X(i * 0.5)) for i in range(1, 5)] +
+                   [(X(4.0), X(-1.0), X(5.0), X(3.5))],
+          "oneway": [], "ladder": []}
+
+
+def walk(st, inp, cond, limit=600):
+    for _ in range(limit):
+        step(st, inp, STAIRS)
+        if cond(st):
+            return True
+    return False
+
+
+s2 = S(-3.0, 0.2)
+walk(s2, 0, lambda st: st.mode == "ground", 120)
+base = F(s2.y)
+check("four 0.50 m steps are walked up with no jump at all",
+      walk(s2, R, lambda st: F(st.y) > 1.95), f"{base:.2f} -> {F(s2.y):.2f} m")
+check("and the 1.5 m wall at the top is still a wall",
+      not walk(s2, R, lambda st: F(st.y) > 2.1, 240), f"y {F(s2.y):.2f}")
+
+s2 = S(-3.0, 0.2)
+walk(s2, 0, lambda st: st.mode == "ground", 120)
+walk(s2, R, lambda st: F(st.y) > 0.4)
+check("the haul costs most of the speed it was walked at", F(s2.vx) < 1.5,
+      f"{F(s2.vx):.2f} m/s of {F(T.C['RUN']):.2f} on the step up")
+
+print("\n11b. the dodge is rare and short")
+s2 = S(-3.0, 0.9)
+for _ in range(120):
+    step(s2, 0, W)
+    if s2.mode == "ground": break
+# back to back: a dodge is 21 frames plus 9 of recovery, so 30 is as fast as it can be asked for
+dodges = 0
+for t in range(95):
+    was = s2.mode
+    step(s2, (DOD | R) if t % 30 == 0 else 0, W)
+    if s2.mode == "dodge" and was != "dodge": dodges += 1
+check("the pool pays for two in a row and then makes you wait", dodges == 2,
+      f"{dodges} dodges in 1.6 s, stamina {s2.stam}/{C['SMAX']}")
+
+s2 = S(-3.0, 0.9)
+for _ in range(120):
+    step(s2, 0, W)
+    if s2.mode == "ground": break
+start = F(s2.x)
+for _ in range(23):
+    step(s2, DOD, W)
+travel = abs(F(s2.x) - start)
+check("and it is a step out of reach, not a teleport", 1.4 < travel < 2.0, f"{travel:.2f} m")
+
+print("\n11. facing")
+s = S(0, 0.0); run(s, 0, 10)
+run(s, R, 30)
+ok &= check("faces right when running right", s.facing == 1, f"facing={s.facing}")
+run(s, L, 30)
+ok &= check("faces left when running left", s.facing == -1, f"facing={s.facing}")
+run(s, 0, 60)
+ok &= check("keeps facing after stopping", s.facing == -1, f"facing={s.facing}")
+f0 = s.facing
+for _ in range(21): step(s, DOD, W)
+ok &= check("dodge keeps the current facing", s.facing == f0, f"facing={s.facing}")
+
+print("\n11c. being hit: the push is spent, not braked")
+# What a blow hands the body and what the body does with it. The shape matters more than
+# the distance here: a push that snaps to full speed on one tick AND stops dead at the end
+# of a flat drag jolts at both ends, and that is what "the knockback is too sharp to play
+# against" is describing. Hit stop holds the body still while the eye reads the blow, so
+# the one sudden number left is the one the blow itself set.
+FLOOR = {"solid": [(X(-30.0), X(-1.0), X(30.0), X(0.0))], "oneway": [], "ladder": []}
+
+
+def knocked(peak, stun, lift=0.0):
+    """One blow, then nothing but the decay: where the body ends up and how it got there."""
+    st = S(0.0, 0.0)
+    for _ in range(30):
+        step(st, 0, FLOOR)
+    st.vx = X(peak)
+    st.stun = stun
+    if lift:
+        st.vy = X(lift)
+        st.mode = "air"
+    x0, last, path = F(st.x), peak, []
+    during, after = [], []
+    for _ in range(240):
+        # Ticked down BEFORE the motor runs, as CombatMotor.Step does it, so "stunned"
+        # here means what the motor itself saw this tick.
+        if st.stun > 0:
+            st.stun -= 1
+        stunned = st.stun > 0
+        step(st, 0, FLOOR)
+        v = F(st.vx)
+        (during if stunned else after).append(abs(v - last))
+        last = v
+        path.append(F(st.x) - x0)
+        if abs(v) < 0.02:
+            break
+    return dict(distance=path[-1], ticks=len(path),
+                in_push=max(during[1:] or [0]), in_hand=max(after or [0]))
+
+
+light = knocked(2.8, 12)
+heavy = knocked(4.8, 28, lift=2.2)
+print(f"   light: {light['distance']:.2f} m over {light['ticks'] / 60:.2f} s")
+print(f"   heavy: {heavy['distance']:.2f} m over {heavy['ticks'] / 60:.2f} s")
+
+ok &= check("a light blow moves the body a third of a metre, not a whole one",
+            0.2 < light["distance"] < 0.5, f"{light['distance']:.2f} m")
+ok &= check("a heavy one is about a metre -- past a blade's reach, not across the room",
+            0.7 < heavy["distance"] < 1.3, f"{heavy['distance']:.2f} m")
+# Smooth where it is out of the player's hands, and never sharper than the body's own
+# braking once it is back in them. The game stops a walk at GroundDecel, so a push that
+# never exceeds that is a push the player cannot feel as a jolt -- the last of it is
+# 2 cm of slide, and holding the stick walks out of it.
+tick_brake = F(T.C["GDEC"]) / 60
+# A share of itself, which is what the decay MEANS: never more than (1 - keep) of what
+# the body is carrying, so the shape is the same at any peak and tuning the peak cannot
+# make it sharp.
+spend = 1.0 - C["PUSHKEEP"] / 1000.0
+ok &= check("the push eases while the body is not the player's to steer",
+            light["in_push"] <= 2.8 * spend + 0.01 and heavy["in_push"] <= 4.8 * spend + 0.01,
+            f"biggest change per tick: light {light['in_push']:.2f} of "
+            f"{2.8 * spend:.2f} allowed, heavy {heavy['in_push']:.2f} of "
+            f"{4.8 * spend:.2f}")
+ok &= check("and when control comes back it is never sharper than stopping a walk",
+            max(light["in_hand"], heavy["in_hand"]) <= tick_brake + 0.01,
+            f"{max(light['in_hand'], heavy['in_hand']):.2f} m/s against "
+            f"{tick_brake:.2f} the body brakes a walk at")
+
+# The flat drag it replaces, for the comparison that made the numbers: a constant slowing
+# travels further for the same peak and then stops dead.
+flat = S(0.0, 0.0)
+for _ in range(30):
+    step(flat, 0, FLOOR)
+flat.vx = X(6.0)
+flat.stun = 28
+flat.vy = X(1.6)
+flat.mode = "air"
+x0 = F(flat.x)
+keep = C["PUSHKEEP"]
+C["PUSHKEEP"] = 1000
+for _ in range(240):
+    if flat.stun > 0:
+        flat.stun -= 1
+    if flat.stun > 0:
+        flat.vx = T.move_towards(flat.vx, 0, T.mul(C["GDEC"] // 6, T.DT))
+    step(flat, 0, FLOOR)
+    if abs(F(flat.vx)) < 0.02:
+        break
+C["PUSHKEEP"] = keep
+ok &= check("the flat drag at 6 m/s was a launch across half a room",
+            F(flat.x) - x0 > 1.5,
+            f"{F(flat.x) - x0:.2f} m against {heavy['distance']:.2f} m now")
+
+print("\n12. jumping onto a cage that stands on its own slice")
+# Arena_Forest's cages are parkour, on purpose, and not one of them is on the floor's
+# lane: the hanging pair sits 1.66 m behind it, the standing ones about 1.2 m in front.
+# Two things therefore have to happen in the AIR.
+#
+# The lean has to be spent before the feet touch, or the rest of it is a slide across the
+# cage floor once you are standing on it -- which is what "jump on a cage and it slowly
+# sucks you inside" was.
+#
+# And the body has to be on the cage's slice by the time it arrives, because a box is only
+# solid to a body whose slice OVERLAPS it. Arriving with the slice you took off from is
+# arriving INSIDE the cage: the roof is not there to be landed on.
+HOME_WAS = C["HOME"]
+C["HOME"] = X(-3.16)                                   # the forest's fight plane
+FLOOR_Z, CAGE_Z = (X(-2.63), X(1.78)), (X(-3.90), X(-3.20))
+FLOOR_LANE, CAGE_LANE = F(T.lane_on(FLOOR_Z, X(-2.33))), F(T.lane_on(CAGE_Z, X(-2.33)))
+
+
+def cage_world(roof):
+    """A floor 4.4 m deep and a cage prop standing in front of it, as the forest has."""
+    return {"solid": [(X(-10.0), X(-1.0), X(10.0), X(0.0)),
+                      (X(2.0), X(0.0), X(2.68), X(roof))],
+            "solidz": [FLOOR_Z, CAGE_Z], "oneway": [], "onewayz": [],
+            "ladder": [], "ladderz": [], "ladderlean": [], "ladderleanz": []}
+
+
+def jump_onto_cage(roof):
+    """Run at the cage and jump it. Returns the state at touchdown and how many ticks
+    were spent standing where the cage is while the cage was not solid."""
+    w = cage_world(roof)
+    st = S(0.75, 0.0)
+    st.mode = "ground"
+    st.depth = X(FLOOR_LANE)
+    inside = 0
+    for t in range(120):
+        step(st, R | (JMP if 6 <= t <= 20 else 0), w)
+        x, y, z = F(st.x), F(st.y), F(st.depth)
+        if (1.85 < x < 2.83 and 0.0 < y < roof
+                and not (z + 0.3 > F(CAGE_Z[0]) and z - 0.3 < F(CAGE_Z[1]))):
+            inside += 1
+        if t > 25 and st.mode == "ground":
+            break
+    return st, inside
+
+
+ok &= check("the cage stands on a slice of its own", abs(CAGE_LANE - FLOOR_LANE) > 1.0,
+            f"floor {FLOOR_LANE:+.2f}, cage {CAGE_LANE:+.2f}")
+for roof in (0.6, 0.9, 1.2, 1.4):
+    st, inside = jump_onto_cage(roof)
+    left = abs(F(st.depth) - CAGE_LANE)
+    ok &= check(f"a {roof:.2f} m cage is landed ON, never passed through",
+                abs(F(st.y) - roof) < 0.05 and inside == 0,
+                f"y={F(st.y):+.2f} slice={F(st.depth):+.2f}, {inside} tick(s) inside it")
+    ok &= check(f"and the lean onto it is spent in the air", left < 0.15,
+                f"{left:.2f} m of it left to walk off on the cage")
+C["HOME"] = HOME_WAS
+
+print("\n13. knocked off a ladder half way through the floor it climbs")
+# THE REPORT: "while one player is on a ladder and the other hits him, the player can be
+# thrown off the map". Not an exaggeration -- measured on Arena_Forest it was 22 metres in
+# one tick, and then a fall with no floor under it.
+#
+# Nothing in the arena is wrong. A ladder here passes THROUGH the floor it serves: there is
+# no hatch cut in the slab, the hole is in depth, and climbing works because the ladder's
+# own shaft is exempt from collision while the rungs are held. So a climber half way up is
+# standing inside 29 metres of floor, legally.
+#
+# Take the ladder away mid-slab -- which is exactly what a hit does -- and the exemption
+# goes with it. The body is then inside a box it is not moving into, and the wall pass of
+# MoveX answered that with "the wall you are walking into is at its far face": 16 metres to
+# the left, past the end of every floor below. Hence the flight, hence the fall.
+#
+# The fix is the guard MoveY has always had, in the other axis. With it, the man falls down
+# the shaft he was climbing, which is what being knocked off a ladder should do.
+SLAB = {"solid": [(X(-16.0), X(-0.12), X(12.0), X(0.12)),      # the floor, 28 m of it
+                  (X(-13.0), X(-1.94), X(8.0), X(-1.70))],     # the storey below
+        "solidz": [(X(-2.63), X(1.78)), (X(-4.14), X(-2.46))],
+        "oneway": [], "onewayz": [],
+        "ladder": [], "ladderz": [], "ladderlean": [], "ladderleanz": []}
+
+st = S(-10.1, -0.61)                      # mid-slab, as a climber is
+st.mode = "air"
+st.depth = X(-2.80)                       # the stand-off in front of the rungs
+st.vx = X(2.8)                            # CombatConfig.KnockbackSpeed
+st.stun = 20
+flew = 0.0
+for t in range(240):
+    was = F(st.x)
+    step(st, 0, SLAB)
+    flew = max(flew, abs(F(st.x) - was))
+    if st.mode == "ground":
+        break
+
+ok &= check("one tick cannot move the body further than one tick of running",
+            flew < 0.2, f"worst single tick {flew * 100:.0f} cm")
+ok &= check("and he comes down the shaft onto the storey below",
+            st.mode == "ground" and abs(F(st.y) + 1.70) < 0.1 and abs(F(st.x) + 10.1) < 2.0,
+            f"ended x {F(st.x):+.2f} y {F(st.y):+.2f} z {F(st.depth):+.2f} ({st.mode})")
+
+# And the guard must not stop a wall being a wall. A body walking INTO one from outside it
+# is the case the wall pass exists for, and it still has to stop: the guard only declines to
+# answer for a body that was already overlapping the box before the step.
+WALL = {"solid": [(X(-10.0), X(-1.0), X(10.0), X(0.0)),       # floor
+                  (X(0.0), X(0.0), X(1.0), X(3.0))],          # a wall standing on it
+        "solidz": [(X(-2.63), X(1.78)), (X(-2.63), X(1.78))],
+        "oneway": [], "onewayz": [],
+        "ladder": [], "ladderz": [], "ladderlean": [], "ladderleanz": []}
+
+st = S(-3.0, 0.0)
+st.mode = "ground"
+st.depth = X(-2.33)
+for t in range(180):
+    step(st, R, WALL)
+ok &= check("a body walking into a wall is still stopped by its near face",
+            -0.2 < F(st.x) < -0.1, f"stopped at x {F(st.x):+.3f} (the wall starts at 0.00)")
+
+st = S(4.0, 0.0)
+st.mode = "ground"
+st.depth = X(-2.33)
+for t in range(180):
+    step(st, L, WALL)
+ok &= check("and from the other side too",
+            1.1 < F(st.x) < 1.2, f"stopped at x {F(st.x):+.3f} (the wall ends at 1.00)")
+
+print("\n" + ("ALL PASS" if ok else "SOME FAILED"))

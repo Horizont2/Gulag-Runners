@@ -1,0 +1,1224 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using GulagRunners.Sim;
+
+namespace GulagRunners.Game
+{
+    /// <summary>
+    /// Turns the colliders in the scene into one immutable <see cref="SimWorld"/>.
+    ///
+    /// The simulation does its own collision and never uses Unity physics, because PhysX is not
+    /// deterministic across devices and rollback needs bit-identical results (docs/06). Unity
+    /// colliders are therefore only an authoring surface: their world-space bounds are read once
+    /// and copied into the simulation.
+    ///
+    /// Any ordinary BoxCollider works — no special component is needed. Add a
+    /// <see cref="SimCollider"/> only to mark something as a one-way platform or a ladder, or use
+    /// the layer masks below.
+    ///
+    /// The scan walks the scene's root objects rather than calling FindObjectsByType. It is the
+    /// same result when everything is healthy, but it is explicit about what it looked at, which
+    /// is what makes the report below possible — and a bake that silently finds nothing is the
+    /// single most confusing failure in this project, because it looks exactly like broken
+    /// physics.
+    /// </summary>
+    [DefaultExecutionOrder(-100)]
+    [DisallowMultipleComponent]
+    public sealed class SimWorldBaker : MonoBehaviour
+    {
+        public static SimWorldBaker Instance { get; private set; }
+
+        [Header("What to bake")]
+        [Tooltip("Bake every ordinary Unity collider in the scene, not only objects carrying a " +
+                 "SimCollider. Leave this on unless you want to hand-pick every box.")]
+        public bool bakeUnityColliders = true;
+
+        [Tooltip("Colliders on these layers become solid walls and floors.")]
+        public LayerMask solidLayers = ~0;
+
+        [Tooltip("Colliders on these layers become one-way platforms. A SimCollider overrides it.")]
+        public LayerMask oneWayLayers = 0;
+
+        [Tooltip("Colliders on these layers become ladders. A SimCollider overrides it.")]
+        public LayerMask ladderLayers = 0;
+
+        [Tooltip("Trigger colliders are skipped by default: they are usually zones, not geometry.")]
+        public bool includeTriggers;
+
+        [Header("The gameplay plane")]
+        [Tooltip("Only bake colliders that reach the gameplay plane. docs/02: the arena is 3D, " +
+                 "the fight is not — depth is presentation. Without this, scenery standing five " +
+                 "metres behind the plane is flattened onto it and becomes a wall the player " +
+                 "walks into for no visible reason.")]
+        public bool restrictToPlane = true;
+
+        [Tooltip("Z of the gameplay plane. Match it to the players' Plane Z.")]
+        public float planeZ;
+
+        [Tooltip("How far either side of the plane still counts as being on it, in metres. " +
+                 "Wide enough for geometry authored a little off-centre, narrow enough to leave " +
+                 "the backdrop alone.")]
+        public float planeThickness = 1.5f;
+
+        [Tooltip("Hold objects marked with a SimCollider to the same depth band.\n\n" +
+                 "On by default. A marker says WHAT a box is — solid, one-way, a ladder — not " +
+                 "that it is on the gameplay plane, and the quickest way to author a location " +
+                 "is to mark everything in it. With this off, marking the whole level puts the " +
+                 "whole level on the plane, including the wall behind it, and the first " +
+                 "symptom is a fighter who spawns inside that wall and falls through the floor. " +
+                 "Ignore is still honoured either way: that is the escape hatch for something " +
+                 "that IS on the plane and still must not be solid.")]
+        public bool planeFiltersMarked = true;
+
+        [Tooltip("Drop whatever stands wholly behind the gameplay plane instead of baking it.\n\n" +
+                 "docs/02: the location is 3D, the fight is a flat lane through the front of it. " +
+                 "Everything behind that lane — the wall at the back, the pillars holding the " +
+                 "walkway up, the handrail — is there to be looked at. The depth band alone does " +
+                 "not settle it: the band is wide enough to catch geometry authored a little off " +
+                 "the plane, so the backdrop comes in too, and from then on it is only each box's " +
+                 "own depth span that keeps it out of the way. That holds exactly as long as the " +
+                 "fighter stays in their lane, and a fighter does not: they shift a lane to walk " +
+                 "up a ramp or onto a ladder, and the backdrop they were never meant to touch is " +
+                 "suddenly in front of them. Dropping it at the bake is the one answer no later " +
+                 "mistake can undo.")]
+        public bool dropBackdrop = true;
+
+        [Tooltip("How far behind the gameplay plane the backdrop starts, in metres.\n\n" +
+                 "A box counts as level, not backdrop, when its NEAREST face is in front of this " +
+                 "line — so anything the fight can see the front of is kept, including a slab " +
+                 "that starts on the plane and runs back into the scenery. Leave room for " +
+                 "geometry authored just behind the plane and still meant to be stood on.")]
+        public float backdropBehind = 0.5f;
+
+        [Header("Ladders")]
+        [Tooltip("Cut a hole in the baked floor wherever a ladder runs through it.\n\n" +
+                 "Off by default, and usually wants to stay off: the motor already treats a " +
+                 "ladder as its own shaft, so the climb is never stopped by a floor the ladder " +
+                 "passes through, and a ladder that ends inside its landing sets the fighter " +
+                 "down ON it rather than beside it. Cutting the floor as well leaves a real " +
+                 "hole the fighter can fall through, in a level whose art has no hole in it. " +
+                 "Turn it on only where the art DOES have one and you want the hole to be " +
+                 "walkable-into.")]
+        public bool ladderCutsHatch;
+
+        [Header("Slopes")]
+        [Tooltip("Step width when a tilted box is turned into a staircase, in metres.\n\n" +
+                 "An AABB world has no slopes. A plank leaning against a platform bakes as its " +
+                 "bounding box, which is a wall nobody can climb and a lip sticking out of the " +
+                 "level — so instead it is cut into steps that follow its top edge. 0.3 m of " +
+                 "run on a one-in-four slope is 0.08 m of rise, well under the free step, so a " +
+                 "ramp is walked up rather than climbed. 0 bakes the bounding box.")]
+        public float slopeStep = 0.2f;
+
+        [Tooltip("How far a box's top edge has to rise across its own width before it counts " +
+                 "as a slope rather than a box, in metres.")]
+        public float slopeMinRise = 0.12f;
+
+        [Tooltip("Extra clearance either side of the hatch, in metres.")]
+        public float hatchMargin = 0.1f;
+
+        [Tooltip("How far a ladder has to reach INTO a solid before that counts as passing " +
+                 "through it, in metres.\n\n" +
+                 "Without this, a ladder whose foot is modelled one centimetre inside the " +
+                 "platform it stands on punches a hole in that platform, and the fighter who " +
+                 "spawns there falls through the floor. A ladder resting on a slab wants the " +
+                 "slab, not a hatch; only one that runs through it wants a hatch.")]
+        public float hatchMinOverlap = 0.05f;
+
+        [Header("Options")]
+        [Tooltip("Rebake every frame. Editor convenience while dragging platforms about; " +
+                 "turn it off in a build.")]
+        public bool rebakeEveryFrame;
+
+        [Tooltip("Draw the baked boxes in the scene view, so what the simulation sees is visible " +
+                 "rather than assumed.")]
+        public bool drawBakedBoxes = true;
+
+        [Tooltip("Log a one-line summary of every bake. Worth leaving on until the arena is final.")]
+        public bool logBakeReport = true;
+
+        public SimWorld World { get; private set; }
+
+        /// <summary>
+        /// The Chest components behind World.Chests, in the same order. Presentation uses it to
+        /// find which baked chest it is drawing, which is a lookup rather than a guess.
+        /// </summary>
+        public Chest[] ChestSources { get; private set; } = System.Array.Empty<Chest>();
+
+        /// <summary>
+        /// The Z each baked ladder was modelled at, in the same order as World.Ladders.
+        ///
+        /// The simulation is flat and has no use for it. Presentation does: a ladder standing
+        /// in front of the platform it serves wants the body climbing at ITS depth, stepping
+        /// back onto the plane at the top, or the climb reads as a fighter swimming through
+        /// the floor.
+        /// </summary>
+        public float[] LadderDepths { get; private set; } = System.Array.Empty<float>();
+        public string LastReport { get; private set; } = "not baked yet";
+
+        readonly List<Rect> _gizmoSolid = new List<Rect>();
+        readonly List<Rect> _gizmoOneWay = new List<Rect>();
+        readonly List<Rect> _gizmoLadder = new List<Rect>();
+        readonly List<SimCollider> _markedBuffer = new List<SimCollider>();
+        readonly List<Collider> _colliderBuffer = new List<Collider>();
+        readonly List<Chest> _chestBuffer = new List<Chest>();
+        readonly List<Chest> _chestSources = new List<Chest>();
+        readonly List<Rect> _gizmoChest = new List<Rect>();
+        readonly List<float> _ladderDepth = new List<float>();
+        readonly List<ArenaGate> _gateBuffer = new List<ArenaGate>();
+        readonly List<ArenaGate> _gates = new List<ArenaGate>();
+        readonly List<List<Rect>> _gateRects = new List<List<Rect>>();
+        readonly List<List<Span>> _gateSpans = new List<List<Span>>();
+
+        /// <summary>Every object belonging to a closing wall, so the static pass skips them.</summary>
+        readonly HashSet<int> _wallOwners = new HashSet<int>();
+
+        /// <summary>
+        /// The same for the poison pool, and it matters more: a pool is a box of art, and the
+        /// box somebody drags in to make one is a Unity cube, which arrives with a BoxCollider
+        /// on it. Baked, that collider is a solid block filling the bottom of the arena — the
+        /// fighters stand on the poison, which is the single worst way this could fail,
+        /// because it looks like the pool working.
+        /// </summary>
+        readonly HashSet<int> _poolOwners = new HashSet<int>();
+        readonly List<Rect> _gizmoGate = new List<Rect>();
+
+        void Awake()
+        {
+            Instance = this;
+            Bake();
+        }
+
+        void OnEnable()
+        {
+            if (Instance == null) Instance = this;
+        }
+
+        void Start()
+        {
+            // Second chance. If anything about load order left the first bake empty, this catches
+            // it before the player has fallen anywhere, and the report says what was seen.
+            if (World == null || World.Solids.Length == 0) Bake();
+        }
+
+        void LateUpdate()
+        {
+            if (rebakeEveryFrame) Bake();
+        }
+
+        void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
+        [ContextMenu("Bake now")]
+        public SimWorld Bake()
+        {
+            List<Aabb> solids = new List<Aabb>();
+            List<Aabb> oneWay = new List<Aabb>();
+            List<Aabb> ladders = new List<Aabb>();
+            List<Span> solidZ = new List<Span>();
+            List<Span> oneWayZ = new List<Span>();
+            List<Span> ladderZ = new List<Span>();
+            List<Span> ladderLean = new List<Span>();
+            List<Span> ladderLeanZ = new List<Span>();
+            List<ChestDef> chests = new List<ChestDef>();
+
+            _gizmoSolid.Clear();
+            _gizmoOneWay.Clear();
+            _gizmoLadder.Clear();
+            _gizmoChest.Clear();
+            _gizmoGate.Clear();
+            _chestSources.Clear();
+            _ladderDepth.Clear();
+
+            // The gates first, and sorted, because the sort IS the shut order: gate n is bit n
+            // of one word, and the clock spreads them across docs/01's shutter window in array
+            // order. Collected before anything is baked so that every box found afterwards
+            // already knows which gate, if any, it belongs to.
+            CollectGates();
+            List<Aabb> gateBoxes = new List<Aabb>();
+
+            // The closing walls, before anything else looks at a collider: they are not part
+            // of the static arena, because they move, and a wall baked as a solid as well
+            // would be a wall that is also permanently where it ends up.
+            List<WallDef> walls = new List<WallDef>();
+            _wallOwners.Clear();
+            foreach (GameObject root in RootObjects())
+            {
+                foreach (ClosingWall w in root.GetComponentsInChildren<ClosingWall>(true))
+                {
+                    if (w == null || !w.enabled || !w.gameObject.activeInHierarchy) continue;
+
+                    w.Measure();
+                    walls.Add(w.ToDef());
+                    foreach (Transform t in w.GetComponentsInChildren<Transform>(true))
+                        _wallOwners.Add(t.gameObject.GetInstanceID());
+                }
+            }
+
+            // The poison, on the same terms and for a stronger reason: it is not collision at
+            // all. A pool is a level and a cost for being under it, so every object belonging
+            // to one is claimed here and never looked at again by the collision passes.
+            //
+            // One pool per arena. Two would be two surfaces, and the simulation holds ONE
+            // level — so a second one is said out loud rather than quietly ignored, which is
+            // how you end up wondering why half the poison does not hurt.
+            Aabb poison = default;
+            Span poisonZ = Span.Everywhere;
+            int pools = 0;
+            _poolOwners.Clear();
+            foreach (GameObject root in RootObjects())
+            {
+                foreach (PoisonPool p in root.GetComponentsInChildren<PoisonPool>(true))
+                {
+                    if (p == null || !p.enabled || !p.gameObject.activeInHierarchy) continue;
+
+                    p.Measure();
+                    pools++;
+                    if (pools == 1)
+                    {
+                        poison = p.ToBox();
+                        poisonZ = p.ToSpan();
+                    }
+                    foreach (Transform t in p.GetComponentsInChildren<Transform>(true))
+                        _poolOwners.Add(t.gameObject.GetInstanceID());
+                }
+            }
+
+            if (pools > 1)
+                Debug.LogWarning(
+                    $"{name}: {pools} PoisonPool(s) in this arena and the simulation holds one " +
+                    "level. The first one found is the poison; the rest are art that will " +
+                    "rise with it and bite nobody. Make one pool big enough instead.", this);
+
+            int roots = 0, slopes = 0, markedSeen = 0, markedSkipped = 0, markedIgnored = 0, markedOffPlane = 0,
+                chestsSeen = 0, chestsSkipped = 0;
+            List<string> rootNames = new List<string>();
+            int collidersSeen = 0, skippedTrigger = 0, skippedPlayer = 0, skippedLayer = 0,
+                skippedAlreadyMarked = 0, skippedInactive = 0, skippedChest = 0, skippedDepth = 0,
+                backdrop = 0, gated = 0;
+
+            HashSet<int> handled = new HashSet<int>();
+
+            // Everything the depth band threw away, kept to hand: a band that culls the whole
+            // arena is a band in the wrong place, not an empty arena, and handing the match a
+            // world with no floor is the worst of the two answers.
+            List<Aabb> culled = new List<Aabb>();
+
+            foreach (GameObject root in RootObjects())
+            {
+                roots++;
+                if (rootNames.Count < 12) rootNames.Add(root.name);
+
+                // 1. Objects explicitly marked with a SimCollider always win.
+                root.GetComponentsInChildren(true, _markedBuffer);
+                foreach (SimCollider c in _markedBuffer)
+                {
+                    markedSeen++;
+
+                    // Claimed before it is judged. A SimCollider says this object's collision
+                    // is described HERE, so switching the marker off has to mean the object has
+                    // no collision — not "fall back to whatever BoxCollider came with the art",
+                    // which is what claiming it afterwards did: turning off the markers on the
+                    // backdrop left every one of those boxes to be baked again by the ordinary
+                    // collider pass, on its layer, as a solid wall.
+                    handled.Add(c.gameObject.GetInstanceID());
+                    if (_wallOwners.Contains(c.gameObject.GetInstanceID())) continue;
+                    if (_poolOwners.Contains(c.gameObject.GetInstanceID())) continue;
+
+                    // enabled && activeInHierarchy, NOT isActiveAndEnabled. The two are not
+                    // the same here: isActiveAndEnabled is false for a component Unity has
+                    // not activated yet, and this bake runs in Awake at execution order -100,
+                    // which is to say before anything else in the scene has been activated.
+                    // It read every marker in a hand-marked location as inactive and baked an
+                    // arena of two boxes, and both fighters fell through the world.
+                    if (!c.enabled || !c.gameObject.activeInHierarchy)
+                    { markedSkipped++; continue; }
+                    if (c.kind == SimColliderKind.Ignore) { markedIgnored++; continue; }
+
+                    Bounds mb = c.WorldBounds;
+
+                    // Backdrop goes nowhere, not even to the rescue list below: a location with
+                    // no floor left is a band in the wrong place, and the backdrop is not the
+                    // floor it is missing.
+                    if (IsBackdrop(mb)) { backdrop++; continue; }
+
+                    if (planeFiltersMarked && restrictToPlane && !ReachesPlane(mb))
+                    {
+                        markedOffPlane++;
+                        if (c.kind == SimColliderKind.Solid)
+                            culled.Add(SimCollider.RectToAabb(
+                                new Rect(mb.min.x, mb.min.y, mb.size.x, mb.size.y)));
+                        continue;
+                    }
+
+                    Span mz = new Span(ToFix(mb.min.z), ToFix(mb.max.z));
+
+                    // A shutter is baked at the very end instead, so that nothing between here
+                    // and there — the hatch cutting especially — can shuffle the list the gate
+                    // numbers are parallel to.
+                    if (TakeForGate(c.gameObject, c.kind, in mb, mz)) { gated++; continue; }
+
+                    if (c.kind == SimColliderKind.Solid &&
+                        TrySlope(c.transform, c.GetComponent<Collider>(), solids))
+                        slopes++;
+                    else
+                        Add(c.kind, new Rect(mb.min.x, mb.min.y, mb.size.x, mb.size.y),
+                            solids, oneWay, ladders, mb.center.z);
+                    Fill(solidZ, solids.Count, mz);
+                    Fill(oneWayZ, oneWay.Count, mz);
+                    Fill(ladderZ, ladders.Count, mz);
+                    FillLean(ladderLean, ladderLeanZ, ladders.Count, c.transform,
+                             c.GetComponent<Collider>());
+                }
+
+                // 2. Chests. Collected before the ordinary colliders so that a chest's own
+                //    collider is never baked into a wall: you walk into a chest, not against it.
+                //    The order they are found in IS the chest order, and the round's chest states
+                //    are an array parallel to it, so it has to be the scene order on both devices.
+                root.GetComponentsInChildren(true, _chestBuffer);
+                foreach (Chest chest in _chestBuffer)
+                {
+                    chestsSeen++;
+                    handled.Add(chest.gameObject.GetInstanceID());
+                    if (!chest.enabled || !chest.gameObject.activeInHierarchy)
+                    { chestsSkipped++; continue; }
+                    chests.Add(chest.ToDef());
+                    _chestSources.Add(chest);
+                    _gizmoChest.Add(chest.ToRect());
+                }
+
+                if (!bakeUnityColliders) continue;
+
+                // 3. Then every ordinary collider not already handled.
+                root.GetComponentsInChildren(true, _colliderBuffer);
+                foreach (Collider col in _colliderBuffer)
+                {
+                    collidersSeen++;
+                    if (col == null || !col.enabled || !col.gameObject.activeInHierarchy)
+                    { skippedInactive++; continue; }
+                    if (col.isTrigger && !includeTriggers) { skippedTrigger++; continue; }
+                    if (handled.Contains(col.gameObject.GetInstanceID()))
+                    { skippedAlreadyMarked++; continue; }
+
+                    // A closing wall is held separately: it moves, so it cannot be one of
+                    // the immutable boxes. The poison is not collision at all.
+                    if (_wallOwners.Contains(col.gameObject.GetInstanceID())) continue;
+                    if (_poolOwners.Contains(col.gameObject.GetInstanceID())) continue;
+
+                    // Never bake a player's own body: it would become a wall it stands inside.
+                    if (col.GetComponentInParent<PlayerController>() != null)
+                    { skippedPlayer++; continue; }
+
+                    // Nor anything belonging to a chest, including whatever colliders came with
+                    // its model. You walk into a chest to open it; a chest you bump against is
+                    // one you can never reach.
+                    if (col.GetComponentInParent<Chest>() != null)
+                    { skippedChest++; continue; }
+
+                    Bounds cb = col.bounds;
+                    if (IsBackdrop(cb)) { backdrop++; continue; }
+                    if (restrictToPlane && !ReachesPlane(cb))
+                    {
+                        skippedDepth++;
+                        culled.Add(SimCollider.RectToAabb(
+                            new Rect(cb.min.x, cb.min.y, cb.size.x, cb.size.y)));
+                        continue;
+                    }
+
+                    int layerBit = 1 << col.gameObject.layer;
+                    SimColliderKind kind;
+                    if ((ladderLayers.value & layerBit) != 0) kind = SimColliderKind.Ladder;
+                    else if ((oneWayLayers.value & layerBit) != 0) kind = SimColliderKind.OneWay;
+                    else if ((solidLayers.value & layerBit) != 0) kind = SimColliderKind.Solid;
+                    else { skippedLayer++; continue; }
+
+                    Span cz = new Span(ToFix(cb.min.z), ToFix(cb.max.z));
+                    if (TakeForGate(col.gameObject, kind, in cb, cz)) { gated++; continue; }
+
+                    if (kind == SimColliderKind.Solid && TrySlope(col.transform, col, solids))
+                        slopes++;
+                    else
+                        Add(kind, new Rect(cb.min.x, cb.min.y, cb.size.x, cb.size.y),
+                            solids, oneWay, ladders, cb.center.z);
+                    Fill(solidZ, solids.Count, cz);
+                    Fill(oneWayZ, oneWay.Count, cz);
+                    Fill(ladderZ, ladders.Count, cz);
+                }
+            }
+
+            // The one failure this must not pass on: a band so far from the level that it
+            // leaves no floor at all. Take the band back rather than start a match nobody can
+            // stand up in, and say so with both numbers so it can be put right.
+            bool bandTookEverything = solids.Count == 0 && culled.Count > 0;
+            if (bandTookEverything)
+            {
+                solids.AddRange(culled);
+                Fill(solidZ, solids.Count, Span.Everywhere);
+            }
+
+            // The depths go THROUGH the cut with their own boxes. They are a parallel array
+            // by index, and the cut inserts, removes and reorders -- so padding the list
+            // afterwards, which is what this used to do, left every solid past the first
+            // hole wearing another solid's slice of the level. The walkway came out with
+            // the ground floor's depth and the ground floor with the back wall's, so a
+            // fighter dropping through a hatch met nothing he was on the same slice as and
+            // fell out of the arena. Which is presumably why ladderCutsHatch is switched
+            // off in Arena_Demo, and why there is no way down from the walkway at all.
+            // A LADDER HAS TO REACH THE FLOOR IT IS CLIMBED FROM, and two of the four
+            // arenas author ladders that do not.
+            //
+            // Measured by ladder_reach_check: in Egypt and in Mine, no ladder a body
+            // standing on the storey at y 1.12 can take hold of carries it above y 3.27.
+            // Their markers are 0.62 m stubs that straddle only the lip of the floor they
+            // LAND on, because neither arena ever went through LadderSetup -- the markers
+            // are whatever the prop's mesh bounds happened to be. Forest's, which did,
+            // measure 1.79 and 3.00 m: foot on the floor you leave, head above the floor
+            // you reach.
+            //
+            // The arenas were climbable only through a bug. A graze of seven centimetres
+            // used to count as a grab, and a ladder that runs through a solid turns that
+            // solid into a hole -- so the climb went up through solid stone. Tightening
+            // the grab to a quarter of a body closed that, and closed the only way up with
+            // it: six chests in those two arenas are now scenery nobody can reach.
+            //
+            // So the reach is a rule of the BAKE rather than a thing each arena has to
+            // remember. Every ladder's foot comes down to the top of the floor beneath it
+            // -- exactly to that top and never past it, because a solid counts as a hole
+            // only when its underside lies inside the ladder's span, and stopping flush
+            // leaves the floor you stand on solid while the slab overhead becomes the
+            // hatch it was always drawn as.
+            //
+            // It cannot lengthen a ladder that already reaches, and it does nothing at all
+            // where there is no floor underneath. The editor tool that fixes the markers
+            // themselves (Tools > Setup > "Make the ladders reach the floor below") is
+            // still the right thing to run -- this is what stops the arena being broken
+            // until somebody does.
+            int grown = GrowLaddersToTheFloor(ladders, ladderZ, solids, solidZ);
+
+            int hatches = ladderCutsHatch ? CutHatches(solids, solidZ, ladders) : 0;
+
+            // A safety net now rather than the mechanism: if these two ever disagree again
+            // the bake is wrong, and a silent pad is how that stays hidden for months.
+            if (solidZ.Count != solids.Count)
+            {
+                Debug.LogError($"Bake: {solids.Count} solid(s) but {solidZ.Count} depth(s). " +
+                               "Every box past the shorter list is on the wrong slice of " +
+                               "the level. This is a bug in the bake, not in the scene.");
+                while (solidZ.Count < solids.Count) solidZ.Add(Span.Everywhere);
+                if (solidZ.Count > solids.Count)
+                    solidZ.RemoveRange(solids.Count, solidZ.Count - solids.Count);
+            }
+
+            // The shutters go on last, after CutHatches has finished rewriting the solid list,
+            // and never through it: a ladder crossing a shutter is a level-authoring mistake,
+            // and cutting the shutter in half to make room for it would open the room the
+            // shutter exists to close.
+            GateDef[] gateDefs = new GateDef[_gates.Count];
+            List<int> gateOf = new List<int>(solids.Count + 8);
+            for (int i = 0; i < solids.Count; i++) gateOf.Add(-1);
+
+            for (int g = 0; g < _gates.Count; g++)
+            {
+                bool any = false;
+                Aabb box = default;
+                Span span = default;
+
+                for (int b = 0; b < _gateRects[g].Count; b++)
+                {
+                    Rect r = _gateRects[g][b];
+                    Aabb added = SimCollider.RectToAabb(r);
+
+                    solids.Add(added);
+                    solidZ.Add(_gateSpans[g][b]);
+                    gateOf.Add(g);
+                    _gizmoGate.Add(r);
+
+                    if (!any) { box = added; span = _gateSpans[g][b]; any = true; }
+                    else
+                    {
+                        box = Union(in box, in added);
+                        span = new Span(Fix.Min(span.Min, _gateSpans[g][b].Min),
+                                        Fix.Max(span.Max, _gateSpans[g][b].Max));
+                    }
+                }
+
+                gateDefs[g] = new GateDef
+                {
+                    Box = box,
+                    Span = any ? span : Span.Everywhere,
+                    Order = _gates[g].order,
+                    When = _gates[g].when,
+                    Toward = _gates[g].toward
+                };
+
+                _gates[g].Baked(g);
+
+                if (!any)
+                    Debug.LogWarning(
+                        $"{name}: the gate \"{_gates[g].name}\" baked no boxes, so it will shut " +
+                        "on nothing. It needs a SimCollider marked Solid, on itself or under " +
+                        "it, standing on the gameplay plane.", _gates[g]);
+            }
+
+            World = new SimWorld
+            {
+                Gates = gateDefs,
+                Walls = walls.ToArray(),
+                Poison = poison,
+                PoisonZ = poisonZ,
+                SolidGate = gateOf.ToArray(),
+                Solids = solids.ToArray(),
+                OneWay = oneWay.ToArray(),
+                Ladders = ladders.ToArray(),
+                Chests = chests.ToArray(),
+                SolidZ = solidZ.ToArray(),
+                OneWayZ = oneWayZ.ToArray(),
+                LadderZ = ladderZ.ToArray(),
+                LadderLean = ladderLean.ToArray(),
+                LadderLeanZ = ladderLeanZ.ToArray()
+            };
+            ChestSources = _chestSources.ToArray();
+            LadderDepths = _ladderDepth.ToArray();
+
+            LastReport =
+                $"{roots} roots [{string.Join(", ", rootNames)}]; {markedSeen} SimCollider " +
+                $"({markedSkipped} inactive, {markedIgnored} ignored, " +
+                $"{markedOffPlane} off the plane), {backdrop} backdrop, " +
+                $"{collidersSeen} Unity collider (skipped: {skippedAlreadyMarked} already marked, " +
+                $"{skippedTrigger} trigger, {skippedPlayer} on a player, {skippedChest} on a chest, " +
+                $"{skippedDepth} off the plane, {skippedLayer} wrong layer, " +
+                $"{skippedInactive} inactive) -> baked {World.Solids.Length} solid " +
+                $"({hatches} cut by ladders), " +
+                $"{World.OneWay.Length} one-way, {World.Ladders.Length} ladder " +
+                $"({grown} grown down to the floor below), " +
+                $"{World.Gates.Length} gate ({gated} box(es)), " +
+                (World.HasPoison
+                    ? $"poison from y {World.Poison.MinY} to y {World.Poison.MaxY}, "
+                    : "no poison, ") +
+                $"{slopes} slope(s) cut into steps, " +
+                $"{World.Chests.Length} chest ({chestsSkipped} inactive of {chestsSeen} seen)";
+
+            if (markedSeen > 0 && markedSkipped == markedSeen)
+                Debug.LogError(
+                    $"{name}: every one of the {markedSeen} SimColliders in this " +
+                    "scene was skipped as inactive, which is never a scene anybody " +
+                    "built on purpose. If they look active in the hierarchy then " +
+                    "the bake is asking at the wrong moment, not the scene being " +
+                    $"wrong.\n{LastReport}", this);
+
+            if (bandTookEverything)
+                Debug.LogError(
+                    $"{name}: the gameplay plane (z {planeZ} +-{planeThickness}) culled EVERY " +
+                    $"solid box in this scene, so the band is in the wrong place rather than " +
+                    $"the scene being empty. Baking all {culled.Count} of them anyway so the " +
+                    $"match is playable, which means the scenery is in the fight too. Move the " +
+                    $"band onto the level: the fighters' own Plane Z is where it belongs.\n" +
+                    $"{LastReport}", this);
+
+            if (Application.isPlaying)
+            {
+                if (World.Solids.Length == 0)
+                    Debug.LogError($"{name}: baked no solid boxes, so there is no floor and the " +
+                                   $"player will fall forever.\n{LastReport}\n" +
+                                   "If SimCollider count is 0, the arena objects are not in this " +
+                                   "scene or are inactive. If they were seen but skipped, the " +
+                                   "reason is in the list above.", this);
+                else if (World.Solids.Length < 4)
+                    Debug.LogWarning($"{name}: only {World.Solids.Length} solid boxes came out " +
+                                     $"of this scene, which is almost certainly not an arena.\n" +
+                                     $"{LastReport}", this);
+                else if (logBakeReport)
+                    Debug.Log($"{name}: {LastReport}", this);
+            }
+
+            return World;
+        }
+
+        static Fix ToFix(float metres) => Fix.FromMilli(Mathf.RoundToInt(metres * 1000f));
+
+        static Aabb Union(in Aabb a, in Aabb b) => new Aabb(
+            Fix.Min(a.MinX, b.MinX), Fix.Min(a.MinY, b.MinY),
+            Fix.Max(a.MaxX, b.MaxX), Fix.Max(a.MaxY, b.MaxY));
+
+        /// <summary>
+        /// Every gate in the scene, in the order they will shut.
+        ///
+        /// The sort is the schedule: the clock spreads the closing gates evenly across docs/01's
+        /// shutter window in array order, so this is where "outer rooms first" is decided. Name
+        /// breaks a tie, because two gates on the same order number must still come out in the
+        /// same order on both devices and the scene's own traversal order is not a promise.
+        /// </summary>
+        void CollectGates()
+        {
+            _gates.Clear();
+            _gateRects.Clear();
+            _gateSpans.Clear();
+
+            foreach (GameObject root in RootObjects())
+            {
+                root.GetComponentsInChildren(true, _gateBuffer);
+                foreach (ArenaGate g in _gateBuffer)
+                {
+                    if (g == null || !g.enabled || !g.gameObject.activeInHierarchy) continue;
+                    _gates.Add(g);
+                }
+            }
+
+            _gates.Sort((a, b) =>
+            {
+                int byWhen = ((byte)a.when).CompareTo((byte)b.when);
+                if (byWhen != 0) return byWhen;
+                int byOrder = a.order.CompareTo(b.order);
+                return byOrder != 0 ? byOrder : string.CompareOrdinal(a.name, b.name);
+            });
+
+            if (_gates.Count > MatchMotor.MaxGates)
+            {
+                Debug.LogWarning(
+                    $"{name}: {_gates.Count} gates in this scene and only {MatchMotor.MaxGates} " +
+                    "can be tracked, one bit each. The ones past that will never shut.", this);
+                _gates.RemoveRange(MatchMotor.MaxGates, _gates.Count - MatchMotor.MaxGates);
+            }
+
+            for (int i = 0; i < _gates.Count; i++)
+            {
+                _gateRects.Add(new List<Rect>());
+                _gateSpans.Add(new List<Span>());
+                _gates[i].Baked(-1);
+            }
+        }
+
+        /// <summary>
+        /// Is this box part of a gate? If it is, it is set aside for the end of the bake rather
+        /// than added to the arena now, and the caller skips it.
+        ///
+        /// Only solid boxes: a one-way platform or a ladder inside a shutter is not something
+        /// the closing phase has any meaning for, and silently making it gated would hide the
+        /// authoring mistake instead of leaving it visible.
+        /// </summary>
+        bool TakeForGate(GameObject owner, SimColliderKind kind, in Bounds box, Span z)
+        {
+            if (_gates.Count == 0 || kind != SimColliderKind.Solid) return false;
+
+            ArenaGate gate = owner.GetComponentInParent<ArenaGate>();
+            if (gate == null) return false;
+
+            int index = _gates.IndexOf(gate);
+            if (index < 0) return false;            // its own component is off
+
+            _gateRects[index].Add(new Rect(box.min.x, box.min.y, box.size.x, box.size.y));
+            _gateSpans[index].Add(z);
+            return true;
+        }
+
+        /// <summary>Gives every box added since the last call the depth it was modelled at.</summary>
+        static void Fill(List<Span> depths, int upTo, Span z)
+        {
+            while (depths.Count < upTo) depths.Add(z);
+        }
+
+        // Vector3, not Vector2: the lean of a ladder is a question about Z as much as X, and
+        // a ladder propped against a walkway leans in both.
+        static readonly Vector3[] _corners = new Vector3[8];
+
+        /// <summary>
+        /// Where a ladder's centre line sits at its foot and at its head. A ladder leaning
+        /// against a wall has a bounding box wider than itself, and climbing the middle of
+        /// that box is climbing the air beside the rungs.
+        /// </summary>
+        void FillLean(List<Span> leanX, List<Span> leanZ, int upTo, Transform t, Collider col)
+        {
+            while (leanX.Count < upTo)
+            {
+                Corners(t, col);
+                int[] order = { 0, 1, 2, 3, 4, 5, 6, 7 };
+                System.Array.Sort(order, (p, q) => _corners[p].y.CompareTo(_corners[q].y));
+
+                // The four lowest corners are the foot, the four highest are the head; the
+                // middle of each is where the centre line passes through it.
+                float bx = 0f, tx = 0f, bz = 0f, tz = 0f;
+                for (int i = 0; i < 4; i++) { bx += _corners[order[i]].x; bz += _corners[order[i]].z; }
+                for (int i = 4; i < 8; i++) { tx += _corners[order[i]].x; tz += _corners[order[i]].z; }
+                leanX.Add(new Span(ToFix(bx / 4f), ToFix(tx / 4f)));
+                leanZ.Add(new Span(ToFix(bz / 4f), ToFix(tz / 4f)));
+            }
+        }
+
+        /// <summary>The eight world corners of a box.</summary>
+        static void Corners(Transform t, Collider col)
+        {
+            // The same box the bake uses, so a staircase cut out of a tilted plank follows the
+            // plank and not a unit cube imagined at its pivot.
+            Bounds local = SimCollider.LocalBox(t, col);
+            Vector3 centre = local.center;
+            Vector3 e = local.extents;
+            int n = 0;
+            for (int i = -1; i <= 1; i += 2)
+            for (int j = -1; j <= 1; j += 2)
+            for (int k = -1; k <= 1; k += 2)
+            {
+                Vector3 w = t.TransformPoint(centre + new Vector3(e.x * i, e.y * j, e.z * k));
+                _corners[n++] = w;
+            }
+        }
+
+        /// <summary>
+        /// Cuts a tilted box into a staircase that follows its top edge, and says whether it
+        /// did. An AABB world has no slopes; a plank leaning against a platform would otherwise
+        /// bake as its bounding box, which is a wall nobody can climb.
+        /// </summary>
+        bool TrySlope(Transform t, Collider col, List<Aabb> solids)
+        {
+            if (slopeStep <= 0.01f) return false;
+
+            if (col != null && !(col is BoxCollider)) return false;
+            Corners(t, col);
+
+            float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue;
+            for (int i = 0; i < 8; i++)
+            {
+                if (_corners[i].x < minX) minX = _corners[i].x;
+                if (_corners[i].x > maxX) maxX = _corners[i].x;
+                if (_corners[i].y < minY) minY = _corners[i].y;
+            }
+            if (maxX - minX < slopeStep) return false;
+
+            float riseL = TopAt(minX), riseR = TopAt(maxX);
+            if (Mathf.Abs(riseL - riseR) < slopeMinRise) return false;   // flat enough to be a box
+
+            int steps = Mathf.Clamp(Mathf.CeilToInt((maxX - minX) / slopeStep), 1, 64);
+            float run = (maxX - minX) / steps;
+            for (int i = 0; i < steps; i++)
+            {
+                float a = minX + run * i, b = a + run;
+
+                // The surface at the MIDDLE of the step, not the higher of its two ends.
+                // Taking the high end puts every step above the board it is standing in for,
+                // and a fighter walking down the ramp walks down it through the air. The
+                // middle splits the error either way, and it is half a step's rise — four
+                // centimetres on this location's planks.
+                float top = TopAt((a + b) * 0.5f);
+                if (top - minY <= 0.001f) continue;
+
+                Rect r = new Rect(a, minY, b - a, top - minY);
+                solids.Add(SimCollider.RectToAabb(r));
+                _gizmoSolid.Add(r);
+            }
+            return true;
+        }
+
+        /// <summary>The highest the silhouette reaches at this x. Convex, so a scan is exact.</summary>
+        static float TopAt(float x)
+        {
+            float top = float.MinValue;
+            for (int i = 0; i < 8; i++)
+            for (int j = i + 1; j < 8; j++)
+            {
+                Vector2 p = _corners[i], q = _corners[j];
+                if (p.x == q.x) continue;
+                if (x < Mathf.Min(p.x, q.x) || x > Mathf.Max(p.x, q.x)) continue;
+                float y = p.y + (q.y - p.y) * (x - p.x) / (q.x - p.x);
+                if (y > top) top = y;
+            }
+            return top;
+        }
+
+        /// <summary>
+        /// Opens a hatch through every solid a ladder runs through, and returns how many it cut.
+        ///
+        /// A solid the ladder merely STANDS on is left alone — that is the floor it starts from,
+        /// not something in its way. That distinction is measured, not assumed: the ladder has to
+        /// reach <see cref="hatchMinOverlap"/> into the solid before it counts as running through
+        /// it, because hand-built levels have ladder feet a centimetre inside their own platform
+        /// and a hole there is a fighter falling out of the arena.
+        /// </summary>
+        /// <summary>
+        /// Brings every ladder's foot down to the top of the floor beneath it.
+        ///
+        /// The floor beneath is the HIGHEST solid that is under the ladder's foot and
+        /// stands where the ladder stands: overlapping it across, and on a slice of the
+        /// level the ladder is also on. Anything lower is a floor further down, and a
+        /// ladder that reached past one storey to the next would turn the slab between
+        /// them into a hole.
+        ///
+        /// Across is measured with an inset rather than at the lip, because a ladder
+        /// modelled flush against the end of a walkway touches the next platform along by
+        /// a millimetre, and that platform is not what it stands on.
+        ///
+        /// Returns how many were grown. Measured on the four arenas: Nordic 0, Forest 2
+        /// (0.72 and 0.75 m, feet that hung above their own floor), Mine 1 and Egypt 3
+        /// (about 1.83 m each, the stubs that made those storeys unreachable).
+        /// </summary>
+        /// <summary>
+        /// The highest floor top at or below a line, among the solids standing where the
+        /// ladder stands. Used twice: once to find the landing, once for the floor below
+        /// it.
+        /// </summary>
+        static Fix Highest(List<Aabb> solids, List<Span> solidZ, Fix left, Fix right,
+                           Span lane, Fix below, out bool found)
+        {
+            found = false;
+            Fix top = default;
+
+            for (int s = 0; s < solids.Count; s++)
+            {
+                Aabb floor = solids[s];
+                if (floor.MaxY > below) continue;
+                if (floor.MaxX <= left || floor.MinX >= right) continue;
+
+                Span fz = s < solidZ.Count ? solidZ[s] : Span.Everywhere;
+                if (fz.Max <= lane.Min || fz.Min >= lane.Max) continue;
+
+                if (!found || floor.MaxY > top) { top = floor.MaxY; found = true; }
+            }
+            return top;
+        }
+
+        /// <summary>
+        /// How much slack there is around a floor top. A ladder's foot or head modelled
+        /// within this of a slab is standing on it rather than beside it; wider than the
+        /// few centimetres hand-built levels miss by, and far narrower than a storey.
+        /// </summary>
+        static Fix Step => Fix.FromMilli(300);
+
+        static int GrowLaddersToTheFloor(List<Aabb> ladders, List<Span> ladderZ,
+                                         List<Aabb> solids, List<Span> solidZ)
+        {
+            if (ladders.Count == 0 || solids.Count == 0) return 0;
+
+            // A tenth of a metre in from each side. Narrower than any ladder and wider
+            // than the overlap a flush-modelled foot has with the platform next door.
+            Fix inset = Fix.FromMilli(100);
+            int grown = 0;
+
+            for (int i = 0; i < ladders.Count; i++)
+            {
+                Aabb ladder = ladders[i];
+                Span lane = i < ladderZ.Count ? ladderZ[i] : Span.Everywhere;
+
+                Fix left = ladder.MinX + inset;
+                Fix right = ladder.MaxX - inset;
+                if (right <= left) { left = ladder.MinX; right = ladder.MaxX; }
+
+                // TWO floors, not one, and the difference is a hole in a level.
+                //
+                // The first rule here was "the highest floor under the foot", and
+                // measured against the four arenas it moved Nordic's upper ladder from
+                // y 2.31 down to y 0.05: its foot sits two centimetres BELOW the landing
+                // it stands on, so that landing did not count as under it and the search
+                // fell through to the storey below. One ladder spanning two storeys turns
+                // the floor between them into a hatch, and a fighter standing there drops
+                // through it. The arena was fine before and would not have been after.
+                //
+                // So the floor is found from the ladder's TOP. The landing is the highest
+                // floor at or just below where the ladder ends; the floor it is climbed
+                // FROM is the highest one below that. A ladder already standing on it is
+                // left alone, which is every ladder in an arena that was authored through
+                // LadderSetup.
+                Fix landing = Highest(solids, solidZ, left, right, lane,
+                                      ladder.MaxY + Step, out bool haveLanding);
+                if (!haveLanding) continue;
+
+                Fix top = Highest(solids, solidZ, left, right, lane,
+                                  landing - Step, out bool haveFloor);
+                if (!haveFloor || top >= ladder.MinY) continue;
+
+                ladder.MinY = top;
+                ladders[i] = ladder;
+                grown++;
+            }
+
+            return grown;
+        }
+
+        int CutHatches(List<Aabb> solids, List<Span> depths, List<Aabb> ladders)
+        {
+            if (ladders.Count == 0 || solids.Count == 0) return 0;
+
+            Fix margin = Fix.FromMilli(Mathf.RoundToInt(Mathf.Max(0f, hatchMargin) * 1000f));
+            Fix minOverlap =
+                Fix.FromMilli(Mathf.RoundToInt(Mathf.Max(0f, hatchMinOverlap) * 1000f));
+            Fix sliver = Fix.FromMilli(50);
+            int cut = 0;
+
+            List<Aabb> working = new List<Aabb>(solids.Count + ladders.Count);
+            List<Span> workingZ = new List<Span>(solids.Count + ladders.Count);
+
+            foreach (Aabb ladder in ladders)
+            {
+                Fix holeMin = ladder.MinX - margin;
+                Fix holeMax = ladder.MaxX + margin;
+
+                working.Clear();
+                workingZ.Clear();
+                for (int s = 0; s < solids.Count; s++)
+                {
+                    Aabb solid = solids[s];
+
+                    // The box's own slice, carried across every rewrite below. Both halves
+                    // of a cut floor are the same floor and keep it.
+                    Span z = s < depths.Count ? depths[s] : Span.Everywhere;
+
+                    bool crossesX = solid.MinX < holeMax && solid.MaxX > holeMin;
+
+                    // How much of the solid's height the ladder actually occupies. A ladder
+                    // standing ON a slab shares an edge with it and no more; one running
+                    // THROUGH it covers the whole thickness.
+                    Fix overlapY = Fix.Min(solid.MaxY, ladder.MaxY)
+                                 - Fix.Max(solid.MinY, ladder.MinY);
+
+                    if (!crossesX || overlapY <= minOverlap)
+                    {
+                        working.Add(solid);
+                        workingZ.Add(z);
+                        continue;
+                    }
+
+                    cut++;
+
+                    if (holeMin - solid.MinX > sliver)
+                    {
+                        working.Add(new Aabb(solid.MinX, solid.MinY, holeMin, solid.MaxY));
+                        workingZ.Add(z);
+                    }
+
+                    if (solid.MaxX - holeMax > sliver)
+                    {
+                        working.Add(new Aabb(holeMax, solid.MinY, solid.MaxX, solid.MaxY));
+                        workingZ.Add(z);
+                    }
+                }
+
+                solids.Clear();
+                solids.AddRange(working);
+                depths.Clear();
+                depths.AddRange(workingZ);
+            }
+
+            return cut;
+        }
+
+        /// <summary>
+        /// Does this collider reach the gameplay plane. A level built in 3D has a foreground and
+        /// a background, and only the slab in the middle is the game.
+        /// </summary>
+        /// <summary>
+        /// Is this box behind the fight rather than part of it. Measured on the box's NEAREST
+        /// face, so a slab that starts on the plane and runs back into the scenery is level and
+        /// only something standing entirely behind the plane is backdrop.
+        /// </summary>
+        bool IsBackdrop(Bounds b) => dropBackdrop && b.min.z >= planeZ + backdropBehind;
+
+        bool ReachesPlane(Bounds b) =>
+            b.max.z >= planeZ - planeThickness && b.min.z <= planeZ + planeThickness;
+
+        /// <summary>
+        /// The scene's roots. Falls back to the active scene if this object's own scene is not
+        /// usable yet, which can happen very early in the load.
+        /// </summary>
+        IEnumerable<GameObject> RootObjects()
+        {
+            Scene scene = gameObject.scene;
+            if (!scene.IsValid() || !scene.isLoaded) scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid()) yield break;
+
+            foreach (GameObject go in scene.GetRootGameObjects()) yield return go;
+        }
+
+        void Add(SimColliderKind kind, Rect r,
+                 List<Aabb> solids, List<Aabb> oneWay, List<Aabb> ladders, float depth)
+        {
+            if (r.width <= 0f || r.height <= 0f) return;
+
+            Aabb box = SimCollider.RectToAabb(r);
+            switch (kind)
+            {
+                case SimColliderKind.OneWay: oneWay.Add(box); _gizmoOneWay.Add(r); break;
+                case SimColliderKind.Ladder:
+                    ladders.Add(box); _gizmoLadder.Add(r); _ladderDepth.Add(depth); break;
+                default: solids.Add(box); _gizmoSolid.Add(r); break;
+            }
+        }
+
+        /// <summary>
+        /// Which object in the scene a baked box came from.
+        ///
+        /// Written because the warning that needed it did not have it. Both fighters in the
+        /// Nordic arena were thrown 21 m into the air at the start of every round, and the
+        /// console said so precisely -- "spawned inside a baked solid (x -27.33..25.91,
+        /// y -1.65..21.72)" -- and then stopped, leaving four numbers and a scene with four
+        /// hundred objects in it. A box with no name is a hunt; a box with a name is a fix.
+        ///
+        /// Deliberately a SEARCH rather than a list kept alongside the boxes. A parallel
+        /// array is exactly what went wrong with the depth spans: CutHatches inserts,
+        /// removes and reorders, so anything kept by index drifts out of step and then lies
+        /// confidently. This re-measures the scene when something has already gone wrong, so
+        /// it costs nothing in a working build and cannot fall out of step with anything.
+        /// </summary>
+        public string Blame(Aabb box)
+        {
+            float x0 = box.MinX.ToMilli() / 1000f, x1 = box.MaxX.ToMilli() / 1000f;
+            float y0 = box.MinY.ToMilli() / 1000f, y1 = box.MaxY.ToMilli() / 1000f;
+
+            string best = null;
+            float bestMiss = float.MaxValue;
+
+            foreach (GameObject root in RootObjects())
+            {
+                root.GetComponentsInChildren(true, _markedBuffer);
+                foreach (SimCollider c in _markedBuffer)
+                {
+                    if (c == null) continue;
+                    Consider(c.name + " (marked " + c.kind + ")", c.WorldBounds,
+                             c.transform, ref best, ref bestMiss, x0, y0, x1, y1);
+                }
+
+                root.GetComponentsInChildren(true, _colliderBuffer);
+                foreach (Collider col in _colliderBuffer)
+                {
+                    if (col == null) continue;
+                    Consider(col.name + " (" + col.GetType().Name + " on the art)",
+                             col.bounds, col.transform, ref best, ref bestMiss, x0, y0, x1, y1);
+                }
+            }
+
+            if (best == null) return "nothing in the scene matches that box";
+            return bestMiss <= 0.02f
+                ? best
+                : best + $" — the nearest match, {bestMiss:0.00} m out, so the bake may have " +
+                  "cut or merged it (slopes become steps, ladders cut hatches)";
+        }
+
+        static void Consider(string what, Bounds b, Transform t,
+                             ref string best, ref float bestMiss,
+                             float x0, float y0, float x1, float y1)
+        {
+            float miss = Mathf.Abs(b.min.x - x0) + Mathf.Abs(b.max.x - x1)
+                       + Mathf.Abs(b.min.y - y0) + Mathf.Abs(b.max.y - y1);
+            if (miss >= bestMiss) return;
+            bestMiss = miss;
+            best = Path(t) + " — " + what +
+                   $", {b.size.x:0.00} x {b.size.y:0.00} x {b.size.z:0.00} m at z " +
+                   $"{b.min.z:0.00}..{b.max.z:0.00}";
+        }
+
+        /// <summary>Name fragments that mean somebody modelled a ladder. Lower case.</summary>
+        static readonly string[] LadderWords =
+            { "ladder", "rung", "драбин", "лестниц", "сходин" };
+
+        /// <summary>
+        /// What the scene MEANT versus what the bake made of it.
+        ///
+        /// Right-click the component header and pick it. One mistake accounts for most of the
+        /// ladders in this project that turned out not to be ladders: a plain collider is a
+        /// ladder only through a SimCollider set to Ladder, or through a layer in Ladder
+        /// Layers — and with neither, Solid Layers catches it and it bakes as a WALL. On
+        /// screen that is a ladder the fighter ignores and walks into, which is two separate
+        /// bug reports for one cause.
+        ///
+        /// So this does not re-derive anything: it bakes, then reads the names back, and says
+        /// where the name and the kind disagree.
+        /// </summary>
+        [ContextMenu("Audit the bake")]
+        public void AuditBake()
+        {
+            Bake();
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.Append(name).Append(" — bake audit\n");
+            sb.Append("  ").Append(LastReport).Append('\n');
+
+            bool anyLadderLayer = ladderLayers.value != 0;
+            sb.Append($"\n  Ladder Layers is {(anyLadderLayer ? "set" : "EMPTY")}, so a ladder " +
+                      (anyLadderLayer
+                          ? "can come from either a SimCollider or its layer.\n"
+                          : "can ONLY come from a SimCollider set to Ladder.\n"));
+
+            List<string> wrong = new List<string>();
+            List<string> right = new List<string>();
+            int unmarked = 0;
+
+            foreach (GameObject root in RootObjects())
+            {
+                root.GetComponentsInChildren(true, _colliderBuffer);
+                foreach (Collider col in _colliderBuffer)
+                {
+                    if (col == null) continue;
+
+                    SimCollider marker = col.GetComponent<SimCollider>();
+                    if (marker == null) unmarked++;
+                    if (!LooksLikeLadder(col.name)) continue;
+
+                    bool byMarker = marker != null && marker.kind == SimColliderKind.Ladder;
+                    bool byLayer = (ladderLayers.value & (1 << col.gameObject.layer)) != 0;
+
+                    if (byMarker || byLayer) right.Add(col.name);
+                    else wrong.Add($"{Path(col.transform)} — " +
+                                   (marker == null
+                                       ? "no SimCollider"
+                                       : $"SimCollider is {marker.kind}") +
+                                   $", layer {LayerMask.LayerToName(col.gameObject.layer)}");
+                }
+            }
+
+            sb.Append($"\n  {unmarked} collider(s) carry no SimCollider and bake by layer alone.\n");
+
+            if (wrong.Count == 0)
+                sb.Append($"\n  Nothing named like a ladder bakes as anything else. " +
+                          $"({right.Count} named ladder, {World.Ladders.Length} baked ladder.)\n");
+            else
+            {
+                sb.Append($"\n  {wrong.Count} object(s) NAMED like a ladder do not bake as one:\n");
+                foreach (string w in wrong) sb.Append("    ").Append(w).Append('\n');
+                sb.Append("  -> each of these is a solid wall in the simulation. Add a " +
+                          "SimCollider and set Kind = Ladder, or put them on a layer listed " +
+                          "in Ladder Layers.\n");
+            }
+
+            Debug.Log(sb.ToString(), this);
+        }
+
+        static bool LooksLikeLadder(string objectName)
+        {
+            string lower = objectName.ToLowerInvariant();
+            foreach (string word in LadderWords)
+                if (lower.Contains(word)) return true;
+            return false;
+        }
+
+        /// <summary>Hierarchy path, so a report names which of five "Ladder" objects it means.</summary>
+        static string Path(Transform t)
+        {
+            string path = t.name;
+            for (Transform p = t.parent; p != null; p = p.parent) path = p.name + "/" + path;
+            return path;
+        }
+
+        void OnDrawGizmosSelected()
+        {
+            if (!drawBakedBoxes) return;
+            if (!Application.isPlaying && World == null) Bake();
+
+            Draw(_gizmoSolid, new Color(0.2f, 0.9f, 1f, 0.8f));
+            Draw(_gizmoOneWay, new Color(1f, 0.85f, 0.2f, 0.8f));
+            Draw(_gizmoLadder, new Color(0.4f, 1f, 0.4f, 0.8f));
+            Draw(_gizmoChest, new Color(1f, 0.45f, 0.85f, 0.8f));
+
+            // The shutters in their own colour, because they are the boxes that are NOT in
+            // the way for most of the match: drawn like the rest, a gate reads as a wall the
+            // scavenge phase has to route around.
+            Draw(_gizmoGate, new Color(0.55f, 0.75f, 1f, 0.9f));
+        }
+
+        void Draw(List<Rect> rects, Color color)
+        {
+            Gizmos.color = color;
+            foreach (Rect r in rects)
+                Gizmos.DrawWireCube(new Vector3(r.center.x, r.center.y, 0f),
+                                    new Vector3(r.width, r.height, 0.05f));
+        }
+    }
+}

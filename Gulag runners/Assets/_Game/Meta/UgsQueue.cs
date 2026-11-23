@@ -1,0 +1,392 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using UnityEngine;
+using Unity.Services.Authentication;
+using Unity.Services.Core;
+using Unity.Services.Multiplayer;
+
+namespace GulagRunners.Meta
+{
+    /// <summary>
+    /// The real pool: Unity's matchmaker, with people in it.
+    ///
+    /// Everything about WHO MAY MEET WHOM stays where it was -- the band widening from
+    /// 60 to 400, Ladder.MayMeet refusing to hand a beginner to a professional, the bot
+    /// after twenty-five seconds. This only answers where the other player came from,
+    /// which is the whole reason <see cref="IMatchQueue"/> exists.
+    ///
+    /// Two things it does NOT ask the service for, because both devices can work them
+    /// out from what they already hold: which fighter this device drives, and the
+    /// number the arena is dealt from. See <see cref="MatchAgreement"/> -- a round trip
+    /// that can be deleted should be.
+    ///
+    /// Asynchronous underneath and polled on top. The service is awaited on background
+    /// tasks; everything a frame reads is a volatile field set by those tasks, and
+    /// <see cref="Poll"/> does almost nothing. That is deliberate: a search screen that
+    /// awaited would have to care about scenes unloading under it, and this way the
+    /// worst a lost task can do is leave the state at Looking.
+    /// </summary>
+    [DisallowMultipleComponent]
+    public sealed class UgsQueue : MonoBehaviour, IMatchQueue
+    {
+        [Header("The queue")]
+        [Tooltip("The queue's name on the Unity dashboard, exactly. A name that is not " +
+                 "there fails the ticket rather than falling back, which is correct: " +
+                 "silently matching in the wrong queue is worse than not matching.")]
+        public string queueName = "ranked-1v1";
+
+        [Tooltip("What the rating is called in the ticket. The dashboard's match rule " +
+                 "reads this same name, so the two have to agree or the rule compares " +
+                 "nothing and everybody matches everybody.")]
+        public string ratingAttribute = "rating";
+
+        [Header("Signing in")]
+        [Tooltip("Sign in anonymously when nobody is signed in yet.\n\n" +
+                 "Anonymous is a per-INSTALL identity: reinstall and it is a new player " +
+                 "on 1500. That is fine for testing and is a hole in a ranked ladder, " +
+                 "which is what a real provider — Google Play Games, Sign in with Apple " +
+                 "— is for before release.")]
+        public bool signInAnonymously = true;
+
+        [Header("Being matched")]
+        [Tooltip("Seconds to wait for the other player to actually BE in the session " +
+                 "before giving up on the pairing.\n\n" +
+                 "Matchmaking returning is not the other player having arrived: the " +
+                 "service hands back a session as soon as this device is in it, and the " +
+                 "opponent's join lands separately, a moment later. Everything that makes " +
+                 "two devices one match is worked out from their two player ids, so " +
+                 "deciding any of it before the second id exists decides it WRONG — and " +
+                 "identically wrong on both phones, which is the one failure that cannot " +
+                 "be noticed from the inside.\n\n" +
+                 "Generous, because this is one poll every quarter second against a " +
+                 "service that has already said yes -- and because giving up early is " +
+                 "the expensive mistake. The other player is then matched with somebody " +
+                 "who has walked away, which to them is a match that never starts: the " +
+                 "report behind this number was one phone pressing PLAY and the other " +
+                 "opening the build a minute later, which is exactly the pairing where " +
+                 "the second join lands last.")]
+        [Range(1f, 30f)] public float pairingTimeout = 20f;
+
+        [Header("Debug")]
+        public string state = "idle";
+
+        /// <summary>The session, while there is one. Named so the transport can find it.</summary>
+        public static ISession Current { get; private set; }
+
+        volatile int _state = (int)QueueState.Idle;
+        volatile string _status = "";
+        MatchFound _found;
+        bool _waiting;
+        CancellationTokenSource _cancel;
+
+        public QueueState State => (QueueState)_state;
+        public string Status => _status;
+
+        public void Begin(double rating, int matchesPlayed)
+        {
+            Cancel();
+            _cancel = new CancellationTokenSource();
+            Set(QueueState.Looking, "");
+            _ = Look(rating, _cancel.Token);
+        }
+
+        /// <summary>
+        /// Nothing to do: the task above is the search. Kept because the interface has
+        /// it and a pool that needed a heartbeat would get one here.
+        /// </summary>
+        public void Poll(float seconds)
+        {
+            state = $"{State}: {_status}";
+        }
+
+        public bool TryTake(out MatchFound found)
+        {
+            found = _found;
+            if (!_waiting) return false;
+            _waiting = false;
+            return true;
+        }
+
+        public void Cancel()
+        {
+            _waiting = false;
+
+            if (_cancel != null)
+            {
+                try { _cancel.Cancel(); } catch (Exception) { }
+                _cancel.Dispose();
+                _cancel = null;
+            }
+
+            // Leaving matters more than it looks. A ticket left in the pool keeps being
+            // matched, and the other player is then paired with somebody who walked
+            // away -- which to them is a match that never starts.
+            ISession session = Current;
+            Current = null;
+            if (session != null) _ = Leave(session);
+
+            Set(QueueState.Idle, "");
+        }
+
+        void OnDestroy() => Cancel();
+
+        // ------------------------------------------------------------ everything UGS
+        //
+        // The whole of this component's dependency on Unity Gaming Services is below
+        // this line, in three methods. That is on purpose: the shape of this API could
+        // not be read from the machine this was written on, so the part most likely to
+        // need correcting is the part easiest to find.
+
+        /// <summary>
+        /// Relies on Unity's synchronization context, which is worth writing down.
+        ///
+        /// Begin is called from a frame, so every continuation after an await here
+        /// resumes on the MAIN thread -- which is what makes it safe to touch `name`
+        /// and pass `this` to Debug below. If this is ever started from a worker, or
+        /// run somewhere Unity's context is not installed, those two lines are the
+        /// ones that will crash and they will not look like the reason.
+        /// </summary>
+        async Task Look(double rating, CancellationToken stop)
+        {
+            try
+            {
+                if (UnityServices.State != ServicesInitializationState.Initialized)
+                    await UnityServices.InitializeAsync();
+
+                if (signInAnonymously && !AuthenticationService.Instance.IsSignedIn)
+                    await AuthenticationService.Instance.SignInAnonymouslyAsync();
+
+                if (stop.IsCancellationRequested) return;
+
+                if (!AuthenticationService.Instance.IsSignedIn)
+                {
+                    Set(QueueState.Failed, "NOT SIGNED IN");
+                    return;
+                }
+
+                ISession session = await Matchmake(rating, stop);
+                if (stop.IsCancellationRequested || session == null) return;
+
+                Current = session;
+
+                // AND NOT A MOMENT SOONER. See WaitForOpponent: the pairing is worked out
+                // from the two player ids, so it cannot be worked out while there is one.
+                if (!await WaitForOpponent(session, stop))
+                {
+                    if (stop.IsCancellationRequested) return;
+                    Set(QueueState.Failed, "THE OTHER PLAYER NEVER ARRIVED");
+                    Debug.LogWarning(
+                        $"{name}: matched into session {session.Id}, but after "
+                        + $"{pairingTimeout:0.#}s it still holds only this player. "
+                        + "Nothing that makes two devices one match can be decided from "
+                        + "one id, so the pairing is refused rather than guessed.", this);
+                    return;
+                }
+
+                Took(session);
+            }
+            catch (OperationCanceledException)
+            {
+                // The player pressed the cross. Not a failure.
+            }
+            catch (Exception e)
+            {
+                Set(QueueState.Failed, Short(e));
+                Debug.LogWarning($"{name}: matchmaking failed -- {e.Message}\n" +
+                                 "Check the queue name against the dashboard, and that " +
+                                 "Matchmaker and Relay are both enabled.", this);
+            }
+        }
+
+        /// <summary>
+        /// The one call that joins the pool.
+        ///
+        /// The rating rides along as a ticket attribute so the dashboard's rule can
+        /// read it; its name has to match <see cref="ratingAttribute"/> and the rule,
+        /// or the rule compares nothing and the band does not exist.
+        /// </summary>
+        Task<ISession> Matchmake(double rating, CancellationToken stop)
+        {
+            MatchmakerOptions ticket = new MatchmakerOptions
+            {
+                QueueName = queueName,
+                PlayerProperties = new Dictionary<string, PlayerProperty>
+                {
+                    [ratingAttribute] =
+                        new PlayerProperty(rating.ToString("0.###",
+                            System.Globalization.CultureInfo.InvariantCulture),
+                            VisibilityPropertyOptions.Public),
+                },
+            };
+
+            // No network on the session, which is the deliberate part. SessionOptions
+            // offers WithRelayNetwork and it exists so the SDK can drive a netcode for
+            // you -- and this project already has one, whose entire wire format is six
+            // bytes of thumb. The session is a meeting place; RelayHandshake turns it
+            // into a relay afterwards, and nothing here opens a socket.
+            SessionOptions session = new SessionOptions { MaxPlayers = 2 };
+
+            return MultiplayerService.Instance.MatchmakeSessionAsync(ticket, session, stop);
+        }
+
+        static async Task Leave(ISession session)
+        {
+            try { await session.LeaveAsync(); } catch (Exception) { }
+        }
+
+        /// <summary>
+        /// Waits until the session actually holds somebody else.
+        ///
+        /// THE BUG THIS EXISTS FOR, because it reads like a race and behaves like a
+        /// design flaw. MatchmakeSessionAsync returns when THIS device is in a session;
+        /// the opponent's join is a separate event that lands a moment later, and their
+        /// rating property later still. So the session handed back can hold one player,
+        /// and it usually does on whichever device the service answered first.
+        ///
+        /// Everything that makes two devices one match is then computed from the ids
+        /// they both hold -- which fighter each drives, who allocates the relay -- and
+        /// MatchAgreement.LocalPlayer, asked about an opponent it has never heard of,
+        /// answers 0. Both phones therefore drive fighter one, both allocate a relay,
+        /// and they meet in neither. What the two players see is a match that connected,
+        /// counted down, and put each of them alone in an arena with a motionless
+        /// opponent -- each of them driving, as far as they can tell, the same fighter.
+        /// Nothing logs an error, because nothing went wrong: a question was asked a
+        /// moment too early and got a plausible answer.
+        ///
+        /// Polled rather than driven off the session's PlayerJoined event, for the same
+        /// reason RelayHandshake polls for its join code: an event can fire before this
+        /// is listening, and a wait that misses its own notification waits for ever.
+        /// Asking cannot miss what has already happened.
+        /// </summary>
+        async Task<bool> WaitForOpponent(ISession session, CancellationToken stop)
+        {
+            float waited = 0f;
+            while (true)
+            {
+                if (stop.IsCancellationRequested) return false;
+                if (!string.IsNullOrEmpty(Opponent(session, out _))) return true;
+                if (waited >= pairingTimeout) return false;
+
+                Set(QueueState.Looking, "PAIRING…");
+                await Task.Delay(250, stop);
+                waited += 0.25f;
+
+                try { await session.RefreshAsync(); } catch (Exception) { }
+            }
+        }
+
+        /// <summary>
+        /// The other player in the session: their id, and what they say their rating is.
+        ///
+        /// One reader for both the wait and the pairing, so the question "is the
+        /// opponent here" and the question "who is the opponent" cannot be answered by
+        /// two different pieces of code that disagree about what counts.
+        /// </summary>
+        string Opponent(ISession session, out double rating)
+        {
+            rating = 1500;
+            if (session == null) return "";
+
+            string mine = session.CurrentPlayer != null ? session.CurrentPlayer.Id : "";
+
+            IReadOnlyList<IReadOnlyPlayer> players = session.Players;
+            for (int i = 0; players != null && i < players.Count; i++)
+            {
+                IReadOnlyPlayer p = players[i];
+                if (p == null || string.IsNullOrEmpty(p.Id) || p.Id == mine) continue;
+
+                if (p.Properties != null &&
+                    p.Properties.TryGetValue(ratingAttribute, out PlayerProperty said) &&
+                    said != null &&
+                    double.TryParse(said.Value,
+                                    System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture,
+                                    out double got))
+                    rating = got;
+
+                return p.Id;
+            }
+            return "";
+        }
+
+        /// <summary>Turns a joined session into the pairing the search screen wants.</summary>
+        void Took(ISession session)
+        {
+            string mine = session.CurrentPlayer != null ? session.CurrentPlayer.Id : "";
+            string theirs = Opponent(session, out double theirRating);
+
+            // Two ids that are not two ids. MatchAgreement is a pure function and answers
+            // 0 for this rather than throwing, which is right for a pure function and
+            // wrong here: 0 on both devices is the both-drive-fighter-one match that has
+            // no symptom. Refused where there is somebody to tell.
+            if (string.IsNullOrEmpty(mine) || string.IsNullOrEmpty(theirs) || mine == theirs)
+            {
+                Set(QueueState.Failed, "THE SERVICE PAIRED NOBODY");
+                Debug.LogWarning(
+                    $"{name}: session {session.Id} names this player as \"{mine}\" and the "
+                    + $"opponent as \"{theirs}\". Which fighter each device drives is worked "
+                    + "out from those two, so a pair that is not a pair would put both "
+                    + "devices on fighter one.", this);
+                return;
+            }
+
+            _found = new MatchFound
+            {
+                // WHICH FIGHTER THIS DEVICE DRIVES IS THE SESSION'S HOST, and it used to be
+                // worked out from the two player ids instead (MatchAgreement.LocalPlayer:
+                // the lower one drives fighter one). Both devices did reach the same answer
+                // that way -- and the answer was unrelated to the one the SERVICE enforces.
+                // Only the session's host may write the relay's join code into a session
+                // property, so on any pairing where the host was the higher id the device
+                // that believed it was hosting was refused ("only the host can do this")
+                // while the real host waited out the handshake and reported that nobody had
+                // opened a relay.
+                //
+                // The service has already decided, both ends can read it, and it cannot
+                // disagree with itself. RelayHandshake.Open then confirms the role it
+                // actually took, which is what the arena follows.
+                LocalPlayer = session.IsHost ? 0 : 1,
+                Seed = MatchAgreement.Seed(session.Id),
+                OpponentName = Name(theirs),
+                OpponentRating = theirRating,
+                AgainstBot = false,
+                Join = session.Id,
+            };
+
+            _waiting = true;
+            Set(QueueState.Found, _found.OpponentName);
+        }
+
+        // --------------------------------------------------------------- the trimmings
+
+        /// <summary>
+        /// Something to show for a player with no name yet.
+        ///
+        /// A raw id is forty characters of hexadecimal and reads as a bug. Until there
+        /// is a real display name on the account, the last few characters are enough to
+        /// tell two opponents apart and short enough to look deliberate.
+        /// </summary>
+        static string Name(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return "AN OPPONENT";
+            string tail = id.Length <= 4 ? id : id.Substring(id.Length - 4);
+            return $"RUNNER_{tail.ToUpperInvariant()}";
+        }
+
+        static string Short(Exception e)
+        {
+            string said = e.Message ?? "";
+            if (said.Length > 60) said = said.Substring(0, 60) + "…";
+            return said.ToUpperInvariant();
+        }
+
+        void Set(QueueState next, string said)
+        {
+            _state = (int)next;
+            _status = said ?? "";
+            state = $"{next}: {_status}";
+        }
+    }
+}

@@ -1,0 +1,13 @@
+# TODO: Addressables UIView Loader
+
+Zgodnie z ustaleniami z architektury v3 (Faza 5), system korzysta na razie z `MemoryUIViewLoader`.
+
+Aby zapobiec ładowaniu wszystkich prefabrykatów UI do pamięci RAM przy starcie gry (Memory Bloat), docelowo należy wdrożyć paczkę Addressables.
+
+## Co trzeba zrobić:
+1. Zainstalować paczkę Addressables w Unity Registry.
+2. Stworzyć adapter `AddressablesUIViewLoader : IUIViewLoader`.
+3. W metodzie `LoadAsync` zamiast Instantiate używać: `Addressables.InstantiateAsync(definition.Address)`.
+4. W metodzie `Release` używać: `Addressables.ReleaseInstance(view.gameObject)`.
+
+Ten plik to przypominajka na przyszłość. NomadUI będzie działać bez tego, ale przed wydaniem gry warto to wdrożyć.

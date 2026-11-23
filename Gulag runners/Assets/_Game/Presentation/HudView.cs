@@ -1,0 +1,1067 @@
+using System;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+using GulagRunners.Sim;
+
+namespace GulagRunners.Game
+{
+    /// <summary>
+    /// Every colour the HUD is allowed to use, in one place.
+    ///
+    /// The rarity three are not typed in: <see cref="PullFromSimulation"/> copies them out
+    /// of <see cref="ItemModels.DefaultPalette"/>, which is the same ramp the loot on the
+    /// floor and the armour on the body already use. A HUD that disagrees with the world
+    /// about what "rare" looks like is worse than a HUD with no colour at all.
+    /// </summary>
+    [Serializable]
+    public sealed class HudPalette
+    {
+        [Header("Fighters")]
+        [Tooltip("The bar belonging to whoever is holding this phone. Blue on BOTH " +
+                 "screens.\n\n" +
+                 "The question a player asks the top of the screen, every match, in half " +
+                 "a second, is \"which one is me\". If the answer is the seat the server " +
+                 "happened to give them it has to be learned again every match, and under " +
+                 "pressure it is read wrong. Keyed to the viewer instead, it is never read " +
+                 "wrong, at the cost of the two players seeing mirrored colours -- which " +
+                 "neither of them can tell, because neither sees the other's screen.")]
+        public Color self = UiPalette.Self;
+
+        [Tooltip("The other fighter's bar. Red on both screens, for the same reason.\n\n" +
+                 "Deliberately a deeper red than Danger, so that an opponent dropping into " +
+                 "desperation still visibly BRIGHTENS rather than staying the red it " +
+                 "already was.")]
+        public Color enemy = UiPalette.Enemy;
+
+        [Header("Interface")]
+        [Tooltip("Every line of the interface. Alpha is carried here, not per element.")]
+        public Color line = UiPalette.Ink;
+
+        [Tooltip("A guard that cannot be raised, and anything else switched off.")]
+        [Range(0f, 1f)] public float disabledAlpha = 0.28f;
+
+        [Tooltip("A stamina charge already spent.")]
+        [Range(0f, 1f)] public float spentAlpha = 0.28f;
+
+        [Header("Rarity")]
+        public Color common = UiPalette.Common;
+        public Color rare = UiPalette.Rare;
+        public Color legendary = UiPalette.Legendary;
+        public Color empty = UiPalette.Empty;
+
+        [Header("Button glyphs")]
+        [Tooltip("The icon inside each ring. The RINGS stay white: they are interface, and " +
+                 "docs/26 keeps the interface to one colour so that a glow means rarity and " +
+                 "nothing else. The glyph inside is not interface, it is the verb — and a " +
+                 "verb is found faster by colour than by shape, especially under a thumb.")]
+        public Color attackGlyph = UiPalette.Attack;
+        public Color dodgeGlyph = UiPalette.Dodge;
+        public Color actionGlyph = UiPalette.Action;
+        public Color jumpGlyph = UiPalette.Jump;
+
+        [Header("How a button answers the thumb")]
+        [Tooltip("How far an available button sinks when pressed, as a fraction of its "
+                 + "size. Small on purpose: these rings are 130 units across and a thumb "
+                 + "covers most of one, so the movement is read at the EDGE. Anything "
+                 + "bigger looks like the button is falling over.")]
+        [Range(0f, 0.2f)] public float pressDepth = 0.07f;
+
+        [Tooltip("How far a REFUSED button sinks. Less than an available one, and it does "
+                 + "not brighten at all: the thumb is acknowledged, the action is not "
+                 + "promised. A refused press that moved as much as a working one would be "
+                 + "the control lying about what just happened.")]
+        [Range(0f, 0.2f)] public float refusedPress = 0.03f;
+
+        [Tooltip("How much an available button brightens while held. The lift IS the "
+                 + "promise that something happened, which is why only an available button "
+                 + "gets it.")]
+        [Range(0f, 0.5f)] public float pressLift = 0.18f;
+
+        [Header("Danger")]
+        [Tooltip("A weapon about to break, and health below the share where bare hands " +
+                 "start hitting harder. One colour for both, because both mean the same " +
+                 "thing to the player: this is about to be decided.")]
+        public Color danger = UiPalette.Danger;
+
+        /// <summary>How brightly the glow behind a slot burns, by rarity.</summary>
+        public float GlowAlpha(Rarity rarity) => rarity switch
+        {
+            Rarity.Legendary => 0.75f,
+            Rarity.Rare => 0.55f,
+            _ => 0.30f
+        };
+
+        public Color Of(Rarity rarity) => rarity switch
+        {
+            Rarity.Legendary => legendary,
+            Rarity.Rare => rare,
+            _ => common
+        };
+
+        public Color Of(ItemId item) =>
+            item == ItemId.None ? empty : Of(ItemTable.Get(item).Rarity);
+
+        /// <summary>
+        /// Takes the rarity ramp from the simulation's own palette, so the two cannot
+        /// drift. Run it after changing <see cref="ItemModels.DefaultPalette"/>.
+        /// </summary>
+        public void PullFromSimulation()
+        {
+            Color[] ramp = ItemModels.DefaultPalette();
+            if (ramp == null || ramp.Length < 4) return;
+            empty = ramp[0];
+            common = ramp[1];
+            rare = ramp[2];
+            legendary = ramp[3];
+        }
+    }
+
+    /// <summary>One fighter's health bar and stamina row.</summary>
+    [Serializable]
+    public sealed class HudBar
+    {
+        [Tooltip("The outline. Turns danger-red when the fighter drops into desperation.")]
+        public Graphic frame;
+
+        [Tooltip("The bar inside it.")]
+        public Graphic fill;
+
+        [Tooltip("Optional. Set it and the fill is scaled to the health left; leave it " +
+                 "empty and only the colour is driven, which is what a static mock wants.\n\n" +
+                 "Anchor it to the side health drains FROM: left for player one, right for " +
+                 "player two, so the two bars empty towards the middle of the screen.")]
+        public RectTransform fillRect;
+
+        [Tooltip("Stamina charges, in order. One per charge the fighter can hold.")]
+        public Graphic[] pips = Array.Empty<Graphic>();
+
+        /// <summary>
+        /// THE CHIP BAR: the damage just taken, still draining.
+        ///
+        /// Built at runtime from the fill rather than asked for in the scene, because it is
+        /// a copy of a thing that already exists and nobody should have to keep the two in
+        /// step by hand. Sits BEHIND the fill, in the danger colour, and follows the health
+        /// a good deal slower -- so a blow leaves a bright wound that closes over the next
+        /// half second, and the size of that wound is how hard you were hit.
+        ///
+        /// Every fighting game has this and it is the reason their bars read as damage
+        /// rather than as a number changing.
+        /// </summary>
+        [System.NonSerialized] public RectTransform chipRect;
+        [System.NonSerialized] public Graphic chip;
+
+        /// <summary>Where the drawn bar is now, as a share. Chased, not assigned.</summary>
+        [System.NonSerialized] public float shown = -1f;
+        [System.NonSerialized] public float chipShown = -1f;
+    }
+
+    /// <summary>One square of the equipment column, and which slot it is reading.</summary>
+    [Serializable]
+    public sealed class HudSlot
+    {
+        [Tooltip("Which inventory slot this square shows. Weapon, Helmet, Armour, Belt " +
+                 "or Utility — the five of docs/02.")]
+        public ItemKind slot = ItemKind.Weapon;
+
+        [Tooltip("The square itself.")]
+        public Graphic frame;
+
+        [Tooltip("The square drawn SOLID, for a slot with something in it.")]
+        public Sprite filled;
+
+        [Tooltip("And drawn DASHED, for an empty one.\n\n" +
+                 "The two together are the only thing on the column that says \"this is " +
+                 "where a belt would go\" rather than \"this is a belt\". Built, the " +
+                 "dashed square was hard-wired to the utility slot and the other four were " +
+                 "always solid, so the difference looked like decoration and meant nothing. " +
+                 "Leave either empty and the square simply keeps the sprite it has.")]
+        public Sprite dashed;
+
+        [Tooltip("Optional soft halo behind it. Its ALPHA is the rarity, not its colour.")]
+        public Graphic glow;
+
+        [Tooltip("Optional item silhouette. Hidden while the slot is empty.")]
+        public Graphic icon;
+
+        [Tooltip("Optional. Switched on while pressing ACTION would replace THIS slot, so " +
+                 "a swap is a decision rather than a surprise.")]
+        public GameObject swapArrow;
+    }
+
+    /// <summary>One touch control: a ring and a glyph that dim together.</summary>
+    [Serializable]
+    public sealed class HudButton
+    {
+        public Graphic ring;
+        public Graphic glyph;
+
+        /// <summary>
+        /// How far into its press this button is, nought to one, and which kind of press.
+        ///
+        /// Kept on the button and not in a dictionary somewhere because there are three of
+        /// them and they are already a serialized class: a parallel structure keyed by
+        /// button would be a second thing to keep in step with the first.
+        /// </summary>
+        [System.NonSerialized] public float press;
+        [System.NonSerialized] public bool refused;
+        [System.NonSerialized] public bool wasHeld;
+
+        /// <summary>The scale the ring is at. Cached so a frame that changes nothing writes nothing.</summary>
+        [System.NonSerialized] public float scale = 1f;
+    }
+
+    /// <summary>Which palette colour a button's glyph takes.</summary>
+    /// <summary>
+    /// Which palette colour a button's glyph takes.
+    ///
+    /// Dodge and not Block. The member was called Block from when there was a guard button,
+    /// and it has painted the DODGE button since docs/31 took the guard out -- so the one
+    /// place in the HUD that named the mechanic was naming it on the wrong control.
+    /// </summary>
+    public enum GlyphInk { Attack, Dodge, Action, Jump }
+
+    /// <summary>The ring and knob of a thumb stick, for painting.</summary>
+    [System.Serializable]
+    public class HudStick
+    {
+        public Graphic ring;
+        public Graphic knob;
+    }
+
+    /// <summary>
+    /// Paints the combat HUD from the simulation, and nothing else.
+    ///
+    /// It creates nothing, finds nothing and lays nothing out: every square, ring and bar
+    /// is already in the scene, wired into the fields below, where a designer can see what
+    /// is connected to what. All this does is decide what colour each of them is this
+    /// frame. docs/27 is the matching export sheet, and the reason every sprite on disk is
+    /// WHITE: colour is a decision taken here, once, against one palette — not twenty-nine
+    /// files that quietly disagree with the C# the day somebody changes a hue.
+    ///
+    /// It references exactly one uGUI type, <see cref="Graphic"/>, which is the base of
+    /// Image, RawImage, Text and TMP_Text alike — so one field accepts whichever of them
+    /// the interface is eventually drawn with. <see cref="MenuUI"/> avoids uGUI entirely
+    /// and routes its readouts through UnityEvents; that is right for a menu, where there
+    /// are six numbers. A HUD has forty coloured things and changes them every frame, and
+    /// forty UnityEvents wired by hand is not a design, it is a chore with a bug in it.
+    ///
+    /// Nothing here allocates per frame and nothing here is read by the simulation: this is
+    /// presentation, downstream of the tick, exactly like PlayerAnimator.
+    /// </summary>
+    [ExecuteAlways]
+    [DisallowMultipleComponent]
+    public sealed class HudView : MonoBehaviour
+    {
+        [Header("Who it is reading")]
+        [Tooltip("The fighter on the LEFT bar. Leave empty and the left bar is not driven.")]
+        public PlayerController player1;
+
+        [Tooltip("The fighter on the RIGHT bar.")]
+        public PlayerController player2;
+
+        [Tooltip("For the clock and the ground items a swap would take. Found through " +
+                 "MatchState.Instance when empty.")]
+        public MatchState matchState;
+
+        [Tooltip("Which fighter is holding THIS phone. 0 is player one.\n\n" +
+                 "Everything keyed to a point of view reads this: whose equipment column " +
+                 "is drawn, which bar is blue, and whose stamina is hidden.")]
+        [Range(0, 1)] public int localPlayer;
+
+        [Tooltip("Take the side from the match rather than from the number above.\n\n" +
+                 "On: whichever fighter this device is actually playing owns the blue bar, " +
+                 "every frame -- the one the wire named, or, with nobody on the wire, the " +
+                 "one nobody's brain is driving. Off: the number above is used as typed, " +
+                 "which is what a screenshot or a shop mock-up wants.\n\n" +
+                 "It is on by default because the number above was the bug: it is set once, " +
+                 "by the net layer, and a device whose link is adopted a frame late or " +
+                 "re-adopted after a drop keeps the scene's answer -- which is always " +
+                 "\"player one\". The player then watches the OTHER fighter's health bar " +
+                 "drain, and the only way to describe that is \"the bars are wrong\".")]
+        public bool followTheDevice = true;
+
+        [Tooltip("Hide the opponent's stamina charges. Their health is public -- a fight " +
+                 "where neither side can see the damage is not a fight -- but what they " +
+                 "have left to spend is not.\n\n" +
+                 "The pips stay in the scene and are painted to nothing, so switching this " +
+                 "off puts them straight back without rebuilding the HUD.")]
+        public bool hideOpponentStamina = true;
+
+        [Header("Palette")]
+        public HudPalette palette = new HudPalette();
+
+        [Header("Top bar")]
+        public HudBar bar1 = new HudBar();
+        public HudBar bar2 = new HudBar();
+
+        [Tooltip("Optional. Goes danger-red in sudden death, where bare hands hit twice " +
+                 "as hard and the match is about to be decided on health.")]
+        public Graphic clock;
+
+        [Header("Names and the series")]
+        [Tooltip("Optional. The fighter's name beside their bar. Which one is blue already " +
+                 "says who you are; the names say who the OTHER one is, which is the half " +
+                 "of a 1v1 the interface was not answering at all.")]
+        public Graphic name1;
+
+        [Tooltip("Optional. See Name 1.")]
+        public Graphic name2;
+
+        [Tooltip("What those labels read until there is an account to ask. Typed here so " +
+                 "they can be set per scene without a build.")]
+        public string player1Name = "RUNNER_1";
+        public string player2Name = "RUNNER_2";
+
+        [Tooltip("Optional. \"ROUND 1 / 3\", under the clock. A match is a series of " +
+                 "rounds and nothing on screen said which one this was.")]
+        public Graphic roundLabel;
+
+        [Tooltip("Optional. One mark per round a fighter has to take to win the match, " +
+                 "lit as they take them. MatchState.roundsToWin decides how many.")]
+        public Graphic[] wins1 = Array.Empty<Graphic>();
+
+        [Tooltip("Optional. See Wins 1.")]
+        public Graphic[] wins2 = Array.Empty<Graphic>();
+
+        [Header("Equipment column")]
+        [Tooltip("One entry per square. Order on screen is yours; which slot each reads " +
+                 "is the Slot field, not the position in this list.")]
+        public HudSlot[] slots = Array.Empty<HudSlot>();
+
+        [Tooltip("How faintly an EMPTY slot shows the icon of what belongs in it.\n\n" +
+                 "Zero -- which is what it was -- leaves five blank squares, and a blank " +
+                 "square does not say whether it is a helmet slot or a belt slot. A ghost " +
+                 "of the thing that goes there says it without claiming anything is worn.")]
+        [Range(0f, 1f)] public float emptyIconAlpha = 0.32f;
+
+        [Tooltip("Hits left in a weapon at which the slot starts pulsing danger-red. The " +
+                 "same number PlayerLoadoutView uses for the weapon in the hand, so the " +
+                 "square and the stick agree about when it is nearly spent.")]
+        public int wornAt = 3;
+
+        [Tooltip("Pulses per second while a weapon is nearly spent.")]
+        [Range(0.5f, 8f)] public float wornPulse = 3f;
+
+        [Header("Touch controls")]
+        /// <summary>
+        /// The attack stick (docs/31). There is no attack button any more: a blow is
+        /// the weapon's tip moving into somebody, so the right thumb POINTS THE ARM
+        /// rather than asking for an animation.
+        ///
+        /// The block button is gone with it. A weapon is stopped by another weapon, so
+        /// the guard is a place you hold this stick, not a ring you press.
+        /// </summary>
+        public HudStick aim = new HudStick();
+
+        /// <summary>The old block ring, now purely the dodge (docs/31).</summary>
+        public HudButton dodge = new HudButton();
+        public HudButton action = new HudButton();
+        public HudButton jump = new HudButton();
+
+        [Header("Off-screen cue")]
+        [Tooltip("The arc above the joystick, and the little chest at its point.\n\n" +
+                 "It is not decoration and it is not a joystick part: it is the answer to " +
+                 "\"the other one just found something — where?\". It stays INVISIBLE " +
+                 "until the opponent forces a chest, then points at it for a few seconds " +
+                 "and fades. Built, it was painted white and left on screen permanently, " +
+                 "which is why it read as a grey slab nobody could explain.\n\n" +
+                 "Optional: leave them empty and the HUD simply has no cue.")]
+        public Graphic cueArc;
+
+        [Tooltip("Optional. The little chest at the arc's point — WHAT happened, where the " +
+                 "arc is WHERE. It does not turn with the arc: a chest lying on its side " +
+                 "is not easier to read for it.")]
+        public Graphic cueIcon;
+
+        [Tooltip("Optional. The arc's rect, turned to point at what happened. Leave it " +
+                 "empty and the cue still appears, it just always points the way it was " +
+                 "drawn.")]
+        public RectTransform cuePivot;
+
+        [Tooltip("Seconds the cue stays up before it has faded away entirely.")]
+        [Range(0.5f, 8f)] public float cueSeconds = 2.5f;
+
+        [Header("Everything else on one colour")]
+        [Tooltip("Joystick, sound arc, mannequin, leader lines — anything that is simply " +
+                 "a white line and never changes meaning. Drag them all in here.")]
+        public Graphic[] lineArt = Array.Empty<Graphic>();
+
+        [Tooltip("How faint the joystick and the other passive lines sit, against the " +
+                 "palette's own line alpha.")]
+        [Range(0f, 1f)] public float lineArtAlpha = 0.75f;
+
+        [Header("Editing")]
+        [Tooltip("Keep the HUD painted while you lay it out, not only in play mode.\n\n" +
+                 "This is a live PREVIEW and nothing more: it writes colours without " +
+                 "marking the scene dirty, so they are not saved. The button in the " +
+                 "inspector is what commits them, with an undo step. Switch this off if " +
+                 "you ever want to set a colour by hand and have it stay.")]
+        public bool paintInEditMode = true;
+
+        // How much of the cue is left, and which way it points.
+        float _cue;
+        float _cueAngle;
+
+        void Reset() => matchState = MatchState.Instance;
+
+        void OnEnable()
+        {
+            if (matchState == null) matchState = MatchState.Instance;
+            if (matchState != null) matchState.ChestOpened += OnChestOpened;
+        }
+
+        void OnDisable()
+        {
+            if (matchState != null) matchState.ChestOpened -= OnChestOpened;
+        }
+
+        /// <summary>
+        /// The opponent forced a chest. Point at it and start the clock.
+        ///
+        /// Only the opponent's: a player watching his own hands does not need an arrow
+        /// telling him where they are, and an indicator that fires on everything is an
+        /// indicator nobody reads.
+        /// </summary>
+        void OnChestOpened(int playerIndex, int chestIndex)
+        {
+            if (playerIndex == localPlayer) return;
+
+            PlayerController me = localPlayer == 0 ? player1 : player2;
+            SimWorld world = me != null ? me.World : null;
+            if (world == null || chestIndex < 0 || chestIndex >= world.Chests.Length) return;
+
+            Aabb box = world.Chests[chestIndex].Box;
+            float cx = Mid(box.MinX, box.MaxX), cy = Mid(box.MinY, box.MaxY);
+            float dx = cx - Metres(me.State.Position.X);
+            float dy = cy - Metres(me.State.Position.Y);
+
+            // The arc is drawn pointing up and to the left, so that is its zero.
+            _cueAngle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg - 135f;
+            _cue = Mathf.Max(0.5f, cueSeconds);
+        }
+
+        void PaintCue()
+        {
+            if (cueArc == null && cueIcon == null) return;
+
+            if (_cue > 0f) _cue -= Time.deltaTime;
+            float left = Mathf.Max(0f, _cue);
+            // Full for the first half, then out: an indicator that starts fading the
+            // instant it appears is one that is never seen at full strength.
+            float alpha = Application.isPlaying
+                ? Mathf.Clamp01(left / Mathf.Max(0.01f, cueSeconds * 0.5f))
+                : 0f;
+
+            if (cuePivot != null && alpha > 0f)
+                cuePivot.localRotation = Quaternion.Euler(0f, 0f, _cueAngle);
+
+            Tint(cueArc, Fade(palette.line, lineArtAlpha * alpha));
+            Tint(cueIcon, Fade(palette.line, alpha));
+        }
+
+        static float Mid(Fix a, Fix b) => (Metres(a) + Metres(b)) * 0.5f;
+        static float Metres(Fix v) => v.ToMilli() / 1000f;
+
+        void LateUpdate()
+        {
+            if (!Application.isPlaying && !paintInEditMode) return;
+            if (matchState == null) matchState = MatchState.Instance;
+
+            // Whose bar is whose, from the match rather than from the inspector. One line
+            // and it is the fix for a whole class of complaint: the side is a fact about
+            // the device, it can change mid-match when a bot takes a dropped player's
+            // fighter, and nothing about painting a bar should outlive it.
+            if (followTheDevice && matchState != null && Application.isPlaying)
+                localPlayer = matchState.LocalFighter;
+
+            PaintBar(bar1, player1, localPlayer == 0);
+            PaintBar(bar2, player2, localPlayer == 1);
+            PaintClock();
+            PaintSeries();
+            PaintColumn();
+            PaintControls();
+            PaintCue();
+
+            foreach (Graphic g in lineArt) Tint(g, Fade(palette.line, lineArtAlpha));
+        }
+
+        // ---------------------------------------------------------------- the top bar
+
+        [Header("How the bars move")]
+        [Tooltip("Seconds for the health bar to cover the gap to its true value. Short: " +
+                 "it has to read as the blow landing, not as the bar making up its mind.")]
+        [Range(0.02f, 0.5f)] public float barCatchUp = 0.09f;
+
+        [Tooltip("Seconds for the chip behind it to catch up. Long enough that the wound " +
+                 "is still open while the exchange is being read, and gone before the " +
+                 "next one.")]
+        [Range(0.1f, 2f)] public float chipCatchUp = 0.55f;
+
+        /// <summary>
+        /// The chip bar, made from the fill the first time it is needed.
+        ///
+        /// A copy of the fill's own object, inserted as the sibling just before it so it
+        /// draws behind, with the same anchors -- which is what makes it drain from the
+        /// same side without anybody saying which side that is. Built here rather than in
+        /// HudBuilder so an already-built HUD gains it without being rebuilt.
+        /// </summary>
+        void Chip(HudBar bar)
+        {
+            if (bar.chipRect != null || bar.fillRect == null) return;
+            if (!Application.isPlaying) return;      // never leave one in a saved scene
+
+            Transform parent = bar.fillRect.parent;
+            if (parent == null) return;
+
+            GameObject made = Instantiate(bar.fillRect.gameObject, parent);
+            made.name = bar.fillRect.name + " / chip";
+            made.hideFlags = HideFlags.DontSave;
+
+            // Anything hanging off the fill -- a shine, a cap -- would be duplicated too.
+            foreach (Transform child in made.transform) Destroy(child.gameObject);
+
+            RectTransform rt = made.GetComponent<RectTransform>();
+            rt.SetSiblingIndex(bar.fillRect.GetSiblingIndex());   // behind the fill
+
+            bar.chipRect = rt;
+            bar.chip = made.GetComponent<Graphic>();
+            if (bar.chip != null) bar.chip.raycastTarget = false;
+        }
+
+        void PaintBar(HudBar bar, PlayerController player, bool mine)
+        {
+            if (bar == null) return;
+
+            Color accent = mine ? palette.self : palette.enemy;
+
+            int max = MaxHealth;
+            int health = max;
+            int charges = int.MaxValue;
+
+            if (player != null && Application.isPlaying)
+            {
+                PlayerSimState s = player.State;
+                health = Mathf.Clamp(s.Health, 0, max);
+                charges = s.StaminaCharges;
+            }
+
+            // Desperation is a MECHANIC, not a mood: below this share docs/02 makes bare
+            // hands hit 40% harder. A player who is not shown it finds out by losing.
+            bool critical = health * 1000 <= max * DesperationPermille;
+
+            // Pulsed rather than simply recoloured, because the enemy bar is ALREADY red
+            // and a red bar turning a different red says nothing. Movement does: whichever
+            // bar it is, the one that starts breathing is the one near the threshold.
+            Color barColour = accent;
+            if (critical)
+            {
+                float beat = 0.5f + 0.5f * Mathf.Sin(Time.time * wornPulse * Mathf.PI * 2f);
+                barColour = Color.Lerp(accent, palette.danger, Mathf.Lerp(0.45f, 1f, beat));
+            }
+
+            Tint(bar.frame, barColour);
+            Tint(bar.fill, barColour);
+
+            if (bar.fillRect != null && max > 0)
+            {
+                float share = Mathf.Clamp01(health / (float)max);
+                float dt = Application.isPlaying ? Time.deltaTime : 0f;
+
+                // First frame, or the editor: land on it. Easing from a bar that was never
+                // drawn would show it filling up from nothing every time the HUD appears.
+                if (bar.shown < 0f || dt <= 0f) { bar.shown = share; bar.chipShown = share; }
+
+                // The fill catches up quickly -- quickly enough to read as the hit landing
+                // rather than as a bar deciding -- and the chip behind it takes its time.
+                bar.shown = Ease.Towards(bar.shown, share, barCatchUp, dt);
+
+                // The chip only ever follows DOWNWARDS. Healing, or a new round dealing
+                // full health, should not leave a red band growing behind the bar.
+                bar.chipShown = share >= bar.chipShown
+                    ? share
+                    : Ease.Towards(bar.chipShown, share, chipCatchUp, dt);
+
+                Chip(bar);
+                if (bar.chipRect != null)
+                {
+                    Vector3 cs = bar.chipRect.localScale;
+                    bar.chipRect.localScale = new Vector3(bar.chipShown, cs.y, cs.z);
+                    if (bar.chip != null)
+                        Tint(bar.chip, Fade(palette.danger,
+                                            bar.chipShown - bar.shown > 0.004f ? 1f : 0f));
+                }
+
+                Vector3 scale = bar.fillRect.localScale;
+                if (!Mathf.Approximately(scale.x, bar.shown))
+                    bar.fillRect.localScale = new Vector3(bar.shown, scale.y, scale.z);
+            }
+
+            // What the opponent has left to spend is THEIR information. Shown, it turns
+            // every exchange into arithmetic: wait for the fourth pip to go and walk in.
+            // Hidden, the same read has to be made off their body and their mistakes,
+            // which is the fight docs/02 describes.
+            float visible = !mine && hideOpponentStamina ? 0f : 1f;
+            for (int i = 0; i < bar.pips.Length; i++)
+                Tint(bar.pips[i], Fade(i < charges ? accent : Fade(accent, palette.spentAlpha),
+                                       visible));
+        }
+
+        void PaintClock()
+        {
+            if (clock == null) return;
+            bool sudden = matchState != null && Application.isPlaying &&
+                          matchState.Match.Phase == MatchPhase.SuddenDeath;
+            Tint(clock, sudden ? palette.danger : palette.line);
+
+            // The NUMBER, which until now was the mock's painted-on "1:24" and never moved.
+            // A clock that does not move is worse than no clock: the whole of docs/01 is a
+            // match on a timer, and an interface that shows a stopped one is lying about
+            // the only thing on screen the player cannot work out for himself.
+            // Through the one writer, which knows both kinds. This used to test for a TMP
+            // label and do nothing otherwise, so in an arena whose HUD is legacy text the
+            // clock sat on the mock's painted-on 1:24 for the whole match.
+            Label(clock, ClockText());
+        }
+
+        /// <summary>
+        /// The names, the round, and how the match stands.
+        ///
+        /// All of it optional: a HUD with none of these wired paints nothing and costs
+        /// nothing, which is what lets the builder lay out a cut-down one.
+        /// </summary>
+        void PaintSeries()
+        {
+            Label(name1, player1Name);
+            Label(name2, player2Name);
+            Tint(name1, localPlayer == 0 ? palette.self : palette.enemy);
+            Tint(name2, localPlayer == 1 ? palette.self : palette.enemy);
+
+            int need = matchState != null ? Mathf.Max(1, matchState.roundsToWin) : 2;
+            int total = matchState != null ? matchState.RoundsInSeries : 3;
+            int round = matchState != null && Application.isPlaying
+                ? Mathf.Clamp(matchState.Match.Round, 1, total) : 1;
+
+            if (roundLabel != null)
+            {
+                Label(roundLabel, $"ROUND {round} / {total}");
+                Tint(roundLabel, palette.line);
+            }
+
+            PaintWins(wins1, 0, need);
+            PaintWins(wins2, 1, need);
+        }
+
+        void PaintWins(Graphic[] marks, int player, int need)
+        {
+            if (marks == null || marks.Length == 0) return;
+
+            int won = matchState != null && Application.isPlaying
+                ? matchState.Wins(player) : 0;
+            bool mine = player == localPlayer;
+            Color accent = mine ? palette.self : palette.enemy;
+
+            for (int i = 0; i < marks.Length; i++)
+            {
+                // A mark past what this match needs is not a round nobody has won yet, it
+                // is a mark that should not be on screen at all.
+                if (i >= need) { Tint(marks[i], Fade(accent, 0f)); continue; }
+                Tint(marks[i], i < won ? accent : Fade(accent, palette.spentAlpha));
+            }
+        }
+
+        /// <summary>
+        /// Writes a line, whichever kind of label it turns out to be.
+        ///
+        /// THE HUD WAS SPLIT DOWN THE MIDDLE AND NOBODY NOTICED. This handled only the
+        /// legacy Text; PaintClock, fifty lines up, handled only TMP. So in an arena
+        /// built with legacy labels the names and the round counter moved and the clock
+        /// did not, and in one built with TMP it was the other way round -- and in both
+        /// cases the half that did nothing did it silently, leaving the string the
+        /// builder had typed in. Reported from a device as the texts being dead, with the
+        /// clock stopped on the mock's own 1:24.
+        ///
+        /// One place that writes a line, and it knows about both. There is no third kind.
+        /// </summary>
+        static void Label(Graphic target, string text)
+        {
+            if (target is TMP_Text tmp)
+            {
+                if (tmp.text != text) tmp.text = text;
+                return;
+            }
+            if (target is Text label && label.text != text) label.text = text;
+        }
+
+        /// <summary>m:ss left of the match, or the mock's own number outside play mode.</summary>
+        string ClockText()
+        {
+            if (matchState == null || !Application.isPlaying) return "1:24";
+
+            int left = Mathf.Max(0, MatchMotor.TotalFrames(matchState.MatchRules) -
+                                    matchState.Match.Frame);
+            int seconds = Mathf.CeilToInt(left / (float)TicksPerSecond);
+            return $"{seconds / 60}:{seconds % 60:00}";
+        }
+
+        /// <summary>The simulation's fixed tick, which is what Match.Frame counts.</summary>
+        const int TicksPerSecond = 60;
+
+        // ---------------------------------------------------------------- the column
+
+        void PaintColumn()
+        {
+            PlayerController owner = localPlayer == 0 ? player1 : player2;
+            bool live = owner != null && Application.isPlaying;
+            Inventory inv = live ? owner.State.Inventory : default;
+            ItemKind offered = live ? OfferedKind(owner) : ItemKind.None;
+
+            foreach (HudSlot slot in slots)
+            {
+                if (slot == null) continue;
+
+                ItemId item = live ? inv.SlotContents(slot.slot) : ItemId.None;
+                Rarity rarity = item == ItemId.None
+                    ? Rarity.Common : ItemTable.Get(item).Rarity;
+
+                Color colour = item == ItemId.None ? palette.empty : palette.Of(rarity);
+                float glow = item == ItemId.None ? 0f : palette.GlowAlpha(rarity);
+
+                // A weapon on its last few swings outranks what it is worth. Lerped on the
+                // same sine PlayerLoadoutView pulses the stick with, so the square in the
+                // corner and the thing in his hand breathe together.
+                if (live && slot.slot == ItemKind.Weapon && item != ItemId.None &&
+                    inv.WeaponDurability > 0 && inv.WeaponDurability <= Mathf.Max(1, wornAt))
+                {
+                    float beat = 0.5f + 0.5f * Mathf.Sin(Time.time * wornPulse * Mathf.PI * 2f);
+                    colour = Color.Lerp(colour, palette.danger, Mathf.Lerp(0.5f, 1f, beat));
+                    glow = Mathf.Max(glow, 0.55f);
+                }
+
+                // Solid when something is in it, dashed when it is a place for something.
+                // Hard-wired to the utility row by the builder, the dashed square looked
+                // like a style nobody could account for; driven by what is IN the slot it
+                // is the one thing on the column that distinguishes a belt from a slot a
+                // belt would go in.
+                Sprite want = item == ItemId.None ? slot.dashed : slot.filled;
+                if (want != null && slot.frame is Image square && square.sprite != want)
+                    square.sprite = want;
+
+                Tint(slot.frame, colour);
+                Tint(slot.glow, Fade(colour, glow));
+                Tint(slot.icon, item == ItemId.None
+                                ? Fade(palette.line, emptyIconAlpha) : palette.line);
+
+                bool wouldSwap = live && offered != ItemKind.None && offered == slot.slot;
+                if (slot.swapArrow != null && slot.swapArrow.activeSelf != wouldSwap)
+                    slot.swapArrow.SetActive(wouldSwap);
+            }
+        }
+
+        /// <summary>
+        /// Which slot pressing ACTION would replace, or None.
+        ///
+        /// StandingOn is an index into the ground pool rather than a slot, because the
+        /// simulation has no opinion about the interface. Resolving it here keeps that
+        /// true and still lets the square say so.
+        /// </summary>
+        ItemKind OfferedKind(PlayerController owner)
+        {
+            if (matchState == null) return ItemKind.None;
+            int index = owner.State.StandingOn;
+            GroundItem[] pool = matchState.GroundItems;
+            if (pool == null || index < 0 || index >= pool.Length) return ItemKind.None;
+
+            GroundItem item = pool[index];
+            if (!item.Live || item.Item == ItemId.None) return ItemKind.None;
+            return ItemTable.KindOf(item.Item);
+        }
+
+        // ---------------------------------------------------------------- the controls
+
+        void PaintControls()
+        {
+            // The guard-break warning is gone with the guard button. A weapon is stopped
+            // by another weapon now (docs/31), and what used to flash here is a thing the
+            // player can simply SEE: their own blade knocked aside.
+            PaintStick(aim);
+
+            // The three buttons, each told whether the thumb is on it and whether pressing
+            // it would do anything.
+            //
+            // `disabled` used to be a hard-coded false on all three lines. The parameter was
+            // there, the painting honoured it, and nothing ever passed it a real value -- so
+            // a player tapping DODGE with no stamina got no dodge, no explanation, and a
+            // button that looked exactly as it always had. That is the difference between a
+            // game that is hard and a game that is broken, and from the thumb's side they
+            // are indistinguishable.
+            PlayerController me = Mine();
+            InputFlags held = Held(me);
+
+            PaintButton(dodge, GlyphInk.Dodge,
+                        (held & InputFlags.Dodge) != 0, CanDodge(me));
+            PaintButton(action, GlyphInk.Action,
+                        (held & InputFlags.Action) != 0, CanAct(me));
+            PaintButton(jump, GlyphInk.Jump,
+                        (held & InputFlags.Jump) != 0, CanJump(me));
+        }
+
+        /// <summary>This device's fighter, or null before the match has wired one.</summary>
+        PlayerController Mine() => localPlayer == 0 ? player1 : player2;
+
+        /// <summary>
+        /// What the thumb is doing RIGHT NOW, straight off the input source rather than out
+        /// of the simulation's last tick.
+        ///
+        /// It has to be the live read. The simulation runs at 60 Hz with rollback, and the
+        /// state a view sees can be a frame or two behind or briefly rewound -- which is
+        /// invisible everywhere else in this HUD, and would be the one thing a player could
+        /// feel here. A button that lights 30 ms after the finger lands does not read as
+        /// late; it reads as unresponsive, which is the single worst thing a touchscreen
+        /// control can be.
+        /// </summary>
+        static InputFlags Held(PlayerController me) =>
+            me != null && Application.isPlaying ? me.ReadLocalInput().Flags : InputFlags.None;
+
+        /// <summary>
+        /// Would a dodge happen if they pressed it?
+        ///
+        /// Asked with the simulation's OWN condition and the simulation's own number --
+        /// CombatMotor gates a dodge on `StaminaCharges >= move.DodgeStaminaCost` and the
+        /// cost comes off PlayerController.Config. A copy of that number in the HUD would be
+        /// a second source of truth for a rule, and the day somebody tuned the cost the
+        /// button would start lying.
+        /// </summary>
+        static bool CanDodge(PlayerController me)
+        {
+            if (me == null || !Application.isPlaying) return true;
+            return me.State.StaminaCharges >= me.Config.DodgeStaminaCost;
+        }
+
+        /// <summary>
+        /// Would the action button do anything?
+        ///
+        /// Always yes, and that is a DECISION rather than an oversight, which is why it is a
+        /// method with a reason in it and not a `true` at the call site. The two are the same
+        /// to the compiler and nothing like each other to the next person reading it: the
+        /// original bug on these three lines was a literal nobody had thought about.
+        ///
+        /// The reason: the action button is the game's catch-all -- pick up, open a chest,
+        /// grab a ladder, touch a lock -- and what is in reach is worked out inside
+        /// LootMotor and PlayerMotor as they run, not published anywhere a view can ask. Even
+        /// if it were, greying this one out would be wrong: reach changes as the fighter
+        /// walks, so the button would flicker on and off along a wall of crates, and a
+        /// control that flickers is worse than one that is merely optimistic.
+        ///
+        /// What would make it real: a `bool SomethingInReach` output on PlayerSimState, set
+        /// where the motors already know. Then this reads it and the lie ends.
+        /// </summary>
+        static bool CanAct(PlayerController me) => true;
+
+        /// <summary>
+        /// Would the jump button do anything?
+        ///
+        /// Always yes, and deliberately, for a reason docs/38 is proud of: there is coyote
+        /// time (6 frames) and a jump buffer (7 frames), so a jump pressed slightly before
+        /// landing or slightly after walking off an edge DOES happen. A button greyed out on
+        /// the frames the fighter is technically airborne would be telling the player their
+        /// input was refused at the exact moments the game goes out of its way to accept it.
+        ///
+        /// So this is not a gap to fill later. Greying the jump button would make the control
+        /// less honest, not more.
+        /// </summary>
+        static bool CanJump(PlayerController me) => true;
+
+        /// <summary>
+        /// The attack stick, tinted like the old attack ring was. Red, because it is
+        /// the thing that hurts people, and the one control a new player should find
+        /// first.
+        /// </summary>
+        void PaintStick(HudStick stick)
+        {
+            if (stick == null) return;
+            Tint(stick.ring, Fade(palette.line, lineArtAlpha));
+            Tint(stick.knob, Fade(palette.attackGlyph, 0.92f));
+        }
+
+        /// <summary>
+        /// A button, told whether the thumb is on it and whether pressing it does anything.
+        ///
+        /// Three states and not two, and the third is the one that matters. A press that
+        /// WORKED and a press that was REFUSED must not look the same, because the game's
+        /// answer to each is different and the player has no other way to tell them apart:
+        /// a dodge that did not happen for want of stamina looks, from the thumb, exactly
+        /// like a dodge the game failed to notice. One is information and the other is a
+        /// bug, and a control that cannot distinguish them trains the player to distrust it.
+        ///
+        ///   AVAILABLE, untouched   full ink, resting size
+        ///   AVAILABLE, held        brighter, pressed IN -- it took the input
+        ///   UNAVAILABLE, held      dimmed and pressed in, but it does NOT brighten: the
+        ///                          thumb is acknowledged, the action is not promised
+        ///
+        /// The press is instant on the way down and springs back on the way up. That
+        /// asymmetry is deliberate: a control must never lag behind the finger arriving,
+        /// and easing the release is what stops three buttons looking like a strobe during
+        /// a fast exchange.
+        /// </summary>
+        void PaintButton(HudButton button, GlyphInk ink, bool held, bool available)
+        {
+            if (button == null) return;
+
+            bool disabled = !available;
+
+            // Down at once, back over about an eighth of a second. unscaledDeltaTime,
+            // because hit stop freezes Time.deltaTime and a button that stops answering
+            // mid-freeze is a button that feels like a dropped input -- during the exact
+            // few frames after a blow lands, when the player is pressing hardest.
+            if (held) button.press = 1f;
+            else if (button.press > 0f)
+                button.press = Mathf.Max(0f, button.press - Time.unscaledDeltaTime / 0.12f);
+
+            // Which KIND of press this is, latched on the way down so that letting go of a
+            // refused button does not make it flash as it springs back.
+            if (held && !button.wasHeld) button.refused = disabled;
+            button.wasHeld = held;
+
+            float push = button.press
+                         * (button.refused ? palette.refusedPress : palette.pressDepth);
+
+            // The ring is interface and stays white; the glyph is the verb and is coloured.
+            Color ring = disabled ? Fade(palette.line, palette.disabledAlpha) : palette.line;
+            Color glyph = Ink(ink);
+            if (disabled) glyph = Fade(glyph, palette.disabledAlpha);
+
+            // Only an available button brightens. See the summary: the lift IS the promise.
+            if (!button.refused && button.press > 0f)
+            {
+                ring = Lift(ring, button.press * palette.pressLift);
+                glyph = Lift(glyph, button.press * palette.pressLift);
+            }
+
+            Tint(button.ring, ring);
+            Tint(button.glyph, glyph);
+
+            // Scale last, and only when it has actually moved. Writing a Transform every
+            // frame dirties the Canvas every frame, which on a mobile UI is a full rebuild
+            // of the batch for nothing.
+            float want = 1f - push;
+            if (!Mathf.Approximately(want, button.scale))
+            {
+                button.scale = want;
+                if (button.ring != null)
+                    button.ring.transform.localScale = new Vector3(want, want, 1f);
+            }
+        }
+
+        /// <summary>
+        /// Towards white without washing out, and without touching alpha.
+        ///
+        /// Lerping to white would take a saturated glyph grey on the way, which reads as the
+        /// button going OUT rather than lighting up. Adding to each channel keeps the hue
+        /// and just raises it.
+        /// </summary>
+        static Color Lift(Color c, float by) =>
+            new Color(Mathf.Min(1f, c.r + by), Mathf.Min(1f, c.g + by),
+                      Mathf.Min(1f, c.b + by), c.a);
+
+        Color Ink(GlyphInk ink) => ink switch
+        {
+            GlyphInk.Dodge => palette.dodgeGlyph,
+            GlyphInk.Action => palette.actionGlyph,
+            GlyphInk.Jump => palette.jumpGlyph,
+            _ => palette.attackGlyph
+        };
+
+        // ---------------------------------------------------------------- the reset button
+
+        /// <summary>
+        /// Paints every wired element the colour it has at the first frame of a match:
+        /// both fighters whole, every charge full, every slot empty, every button live.
+        ///
+        /// This is the setup tool. Wiring forty graphics and then picking a colour for
+        /// each one by hand is forty chances to use the wrong blue, and the wrong blue is
+        /// invisible until someone compares two screenshots. Drag them in, press this, and
+        /// the mock is correct by construction.
+        ///
+        /// Safe to run in play mode too — the next LateUpdate simply paints over it.
+        /// </summary>
+        [ContextMenu("Paint everything to the starting colours")]
+        public void PaintStartingColours()
+        {
+            PaintBarAtStart(bar1, localPlayer == 0);
+            PaintBarAtStart(bar2, localPlayer == 1);
+            Tint(clock, palette.line);
+
+            foreach (HudSlot slot in slots)
+            {
+                if (slot == null) continue;
+                if (slot.dashed != null && slot.frame is Image square)
+                    square.sprite = slot.dashed;
+                Tint(slot.frame, palette.empty);
+                Tint(slot.glow, Fade(palette.empty, 0f));
+                Tint(slot.icon, Fade(palette.line, emptyIconAlpha));
+                if (slot.swapArrow != null && slot.swapArrow.activeSelf)
+                    slot.swapArrow.SetActive(false);
+            }
+
+            PaintStick(aim);
+
+            // At rest, before a tick has run: nothing is held and everything is offered.
+            // Literals are right HERE and nowhere else -- there is no simulation yet to ask,
+            // and a button greyed out on the start screen would promise the player a
+            // restriction that does not exist.
+            PaintButton(dodge, GlyphInk.Dodge, false, true);
+            PaintButton(action, GlyphInk.Action, false, true);
+            PaintButton(jump, GlyphInk.Jump, false, true);
+
+            foreach (Graphic g in lineArt) Tint(g, Fade(palette.line, lineArtAlpha));
+        }
+
+        void PaintBarAtStart(HudBar bar, bool mine)
+        {
+            if (bar == null) return;
+            Color accent = mine ? palette.self : palette.enemy;
+            Tint(bar.frame, accent);
+            Tint(bar.fill, accent);
+            if (bar.fillRect != null)
+            {
+                Vector3 s = bar.fillRect.localScale;
+                bar.fillRect.localScale = new Vector3(1f, s.y, s.z);
+            }
+            float visible = !mine && hideOpponentStamina ? 0f : 1f;
+            foreach (Graphic pip in bar.pips) Tint(pip, Fade(accent, visible));
+        }
+
+        /// <summary>Copies the rarity ramp out of the simulation's own palette.</summary>
+        [ContextMenu("Pull the rarity ramp from the simulation")]
+        public void PullRarityRamp()
+        {
+            palette.PullFromSimulation();
+            PaintStartingColours();
+        }
+
+        // ---------------------------------------------------------------- plumbing
+
+        /// <summary>
+        /// Assigns a colour, and only when it actually changed.
+        ///
+        /// Writing Graphic.color marks the canvas dirty whether or not the value moved, and
+        /// a HUD that rebuilds its canvas sixty times a second for no reason is a frame
+        /// budget spent on nothing. Forty graphics, most of them constant: the compare is
+        /// free and the rebuild is not.
+        /// </summary>
+        static void Tint(Graphic target, Color colour)
+        {
+            if (target == null || target.color == colour) return;
+            target.color = colour;
+        }
+
+        static Color Fade(Color c, float alpha) => new Color(c.r, c.g, c.b, c.a * alpha);
+
+        int MaxHealth => matchState != null ? Mathf.Max(1, matchState.combat.maxHealth) : 100;
+
+        int DesperationPermille => matchState != null
+            ? Mathf.RoundToInt(Mathf.Clamp01(matchState.combat.desperationHealth) * 1000f)
+            : 300;
+    }
+}
