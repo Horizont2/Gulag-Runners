@@ -20,6 +20,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Arena_Egypt.unity
     guid: 01a0849a1ebc1ac45a85239a6c22bc6e
+  - enabled: 0
+    path: Assets/Scenes/Arena_Sawmill.unity
+    guid: 0dd930a2fe21afc44b5e9f82c77220ef
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
