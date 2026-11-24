@@ -348,6 +348,49 @@ def measure(points):
                 box=[hi[i] - lo[i] for i in range(3)])
 
 
+
+# ItemModels.SteelPastTip: how far past the hitbox tip the drawn steel may reach.
+STEEL_PAST_TIP = 1.05
+
+
+def narrowed(points, grip, far):
+    """How far the steel reaches once ItemModels.Narrow has had its go, mirrored.
+
+    The length along the blade is never touched -- it is the hitbox -- so only the one
+    across axis carrying the overhang is squeezed, and only as far as the cap. Every weapon
+    already inside the cap comes back unchanged, which is nine of the eleven.
+    """
+    if far <= grip["reach"] * STEEL_PAST_TIP:
+        return far
+
+    blade = grip["blade"]
+    axis = max(range(3), key=lambda i: abs(blade[i]))
+    a, b = (axis + 1) % 3, (axis + 2) % 3
+
+    tip = max(points, key=lambda p: sum(c * c for c in p))
+    along = dot(tip, blade)
+    wide, thin = (a, b) if abs(tip[a]) >= abs(tip[b]) else (b, a)
+    big, small = abs(tip[wide]), abs(tip[thin])
+    if big <= 1e-9:
+        return far
+
+    cap = grip["reach"] * STEEL_PAST_TIP
+    room = cap * cap - along * along - small * small
+    if room <= 0.0:
+        return far
+
+    squeeze = max(0.2, min(1.0, math.sqrt(room) / big))
+
+    # The whole cloud through that one squeeze, because the furthest vertex BEFORE the
+    # squeeze need not be the furthest one after it.
+    out = 0.0
+    for p in points:
+        q = list(p)
+        q[wide] *= squeeze
+        out = max(out, math.sqrt(sum(c * c for c in q)))
+    return out
+
+
 def dot(a, b):
     return sum(x * y for x, y in zip(a, b))
 
@@ -610,7 +653,14 @@ def main(argv):
         # hitbox, so every other length is a ratio against grip["reach"].
         far = max(math.sqrt(sum(c * c for c in p)) for p in points)
         butt = grip["behind"] / grip["reach"]
-        tip = far / grip["reach"]
+
+        # AFTER THE NARROWING, because that is what the game draws. ItemModels.Narrow
+        # squeezes the one across axis the overhang is on until the furthest corner sits on
+        # SteelPastTip, and until it existed the axe was drawn at 125% of its own hitbox and
+        # the scythe at 108%. Measuring the raw model would now report a fault the fit has
+        # already dealt with -- and, worse, would stop reporting one if the narrowing were
+        # ever removed.
+        tip = narrowed(points, grip, far) / grip["reach"]
         apart = angle(grip["blade"], principal(points))
         was = grip["reach"] / max(grip["box"])              # the old fit, for the record
 
@@ -645,7 +695,10 @@ def main(argv):
                 f"{item}'s steel stops at {tip * 100:.0f}% of the hitbox. The player reads "
                 f"the distance off the picture and the picture is short, which is the "
                 f"whole complaint: they step to just-out-of-range and get hit.")
-        if tip > TIP_PAST:
+        # A hair of slack, because a weapon the fit has squeezed lands exactly ON the cap
+        # and floating point puts it a thousandth either side. Reporting a model for
+        # arriving at the number it was aimed at is noise.
+        if tip > TIP_PAST + 0.005:
             problems.append(
                 f"{item} is drawn {tip * 100:.0f}% as long as the segment that hits, so "
                 f"there is steel on the screen that touches nobody.")

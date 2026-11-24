@@ -222,7 +222,17 @@ namespace GulagRunners.Sim
                 Tier = 2,
                 Damage = Fix.FromMilli(11000),
                 AttackFrames = 29,                  // 0.48 s
-                Reach = Fix.FromMilli(1850),
+                // 1850 -> 1750, and it is still the longest weapon in the table: the spear
+                // is 1700, and the note above makes out-ranging the spear the scythe's whole
+                // reason to exist, so that ordering is the floor on this number.
+                //
+                // What it buys is a weapon that fits the man holding it. The blade is drawn
+                // at ArmMotor.BladeLength, which at 1850 is 77 cm out of the fist on a 91 cm
+                // fighter -- and the pack's model carries 26 cm of snath BEHIND the hand, so
+                // the whole thing came to 1.04 m: longer than the fighter, swinging from the
+                // middle of him. At 1750 it is 73 cm and 98 cm over all, which reads as a
+                // long weapon rather than as a scaling mistake.
+                Reach = Fix.FromMilli(1750),
                 Durability = 8,
                 PrySpeed = Fix.FromMilli(1200)
             };

@@ -143,6 +143,98 @@ namespace GulagRunners.Game
             if (drawn <= 0.0001f) return;
 
             root.transform.localScale *= want / drawn;
+
+            // After the multiply, never before: Narrow reads the scale the model is
+            // ACTUALLY drawn at, and that is the one the line above just changed.
+            Narrow(root, in grip, want);
+        }
+
+        /// <summary>
+        /// How far past the hitbox tip the drawn steel may reach, as a multiple of it.
+        ///
+        /// A segment hitbox and a model with a head on it cannot agree exactly: an axe's
+        /// blade corner hangs off the side of its haft, so the furthest point of the model
+        /// is diagonally further from the hand than the tip of the segment it is drawn
+        /// along. Some overhang is honest. A QUARTER is not: measured on the pack this game
+        /// ships, the axe reaches 125% of its own hitbox and the scythe 108%, which is steel
+        /// on the screen that touches nobody -- the player sees the blade land and takes no
+        /// damage, which is the one kind of wrong practice does not fix.
+        ///
+        /// 1.05 is socket_check's own line, so the rule and the check that polices it are
+        /// one number. Raise it if an axe head comes out too thin for the art; nothing about
+        /// the fight changes either way, because the hitbox was never the thing moving.
+        /// </summary>
+        public const float SteelPastTip = 1.05f;
+
+        /// <summary>
+        /// Squeezes the head ACROSS the blade until the steel stops overhanging the hitbox.
+        ///
+        /// The alternative was to scale the whole model down until its furthest corner sat
+        /// on the tip, and that is the trade the wrong way round: it shortens the HAFT, so
+        /// the weapon is drawn shorter than the segment it swings -- which is the exact
+        /// fault FitBlade above was written to kill, and a worse one, because a weapon that
+        /// looks short gets you hit from a distance you thought was safe.
+        ///
+        /// So the length stays exact and the width gives way. Only the across axis the
+        /// overhang is actually ON, never both: the axe's head hangs out in X and its
+        /// thickness is Z, and squeezing both would have thinned the haft as well as
+        /// narrowed the head for no reason. Of the eleven weapons in the pack this touches
+        /// two -- the axe, whose head goes from 46 cm to 20 cm on a 91 cm fighter, and the
+        /// scythe, 77 to 71 -- and leaves the other nine at exactly the size they were.
+        ///
+        /// Nothing here moves the hitbox. The segment is ArmMotor's and is built from the
+        /// item's reach; this only stops the picture claiming more of it than there is.
+        /// </summary>
+        static void Narrow(GameObject root, in ModelShape.Grip grip, float want)
+        {
+            if (SteelPastTip <= 1f || want <= 0.0001f) return;
+            if (grip.Corner.sqrMagnitude <= 1e-12f) return;
+
+            // The corner as it is drawn now, split into the part along the blade and the
+            // two across it. Along is what the hitbox covers and may not be touched.
+            //
+            // In WORLD metres, through the whole chain above the model, for the same reason
+            // FitBlade measures its reach that way: the fighter is scaled to a half and the
+            // model hangs off a hand bone beneath him, so a length in the model's own space
+            // is not a length anybody sees.
+            Vector3 drawn = Vector3.Scale(grip.Corner, Abs(root.transform.lossyScale));
+            float along = Vector3.Dot(drawn, grip.Blade);
+            Vector3 across = drawn - grip.Blade * along;
+            if (across.sqrMagnitude <= 1e-10f) return;
+
+            float cap = want * SteelPastTip;
+            if (drawn.magnitude <= cap) return;
+
+            // Which of the two across axes carries the overhang. Blade is one of the
+            // model's own axes, so the other two are axes as well and "the dominant one"
+            // is simply the larger component.
+            int blade = Longest(grip.Blade);
+            int a = (blade + 1) % 3, b = (blade + 2) % 3;
+            int wide = Mathf.Abs(across[a]) >= Mathf.Abs(across[b]) ? a : b;
+            int thin = wide == a ? b : a;
+
+            float big = Mathf.Abs(across[wide]);
+            float small = Mathf.Abs(across[thin]);
+            if (big <= 1e-6f) return;
+
+            // What the wide component has to come down to for the corner to sit on the cap,
+            // with the other two left exactly as they are.
+            float room = cap * cap - along * along - small * small;
+            if (room <= 0f) return;        // the cap is inside the haft; nothing to squeeze
+
+            float squeeze = Mathf.Clamp(Mathf.Sqrt(room) / big, 0.2f, 1f);
+            if (squeeze >= 0.999f) return;
+
+            Vector3 local = root.transform.localScale;
+            local[wide] *= squeeze;
+            root.transform.localScale = local;
+        }
+
+        /// <summary>Which component of an axis-aligned unit vector is the non-zero one.</summary>
+        static int Longest(Vector3 v)
+        {
+            float x = Mathf.Abs(v.x), y = Mathf.Abs(v.y), z = Mathf.Abs(v.z);
+            return x >= y && x >= z ? 0 : (y >= z ? 1 : 2);
         }
 
         /// <summary>Scales a model's longest axis to <paramref name="want"/> world metres.</summary>

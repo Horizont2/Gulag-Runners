@@ -121,6 +121,24 @@ namespace GulagRunners.Game
 
             /// <summary>And the thinnest, which is the flat if it has one.</summary>
             public float Thick;
+
+            /// <summary>
+            /// Where the steel actually ENDS: the offset from the grip to the model's
+            /// furthest vertex, in the model root's own space.
+            ///
+            /// Not the same thing as <see cref="Blade"/> times <see cref="Reach"/>, and the
+            /// difference is the whole reason this is here. Blade is the axis the weapon is
+            /// gripped along and Reach is how far it goes along it -- which is what the
+            /// hitbox is, so it is what the fit matches. A head that hangs off the side
+            /// reaches FURTHER than that, diagonally, and on the pack's axe it reaches a
+            /// quarter further: 54 cm of drawn steel on a 43.5 cm segment. The player sees
+            /// the axe connect and nothing happens.
+            ///
+            /// From the vertices when the importer kept them, and from the box's furthest
+            /// corner when it did not -- which over-states it, and over-stating is the safe
+            /// direction for a number whose only job is to be squeezed under a cap.
+            /// </summary>
+            public Vector3 Corner;
         }
 
         /// <summary>The model's extent in its own root's space, meshes and all.</summary>
@@ -214,6 +232,14 @@ namespace GulagRunners.Game
             grip.Reach = reach[far];
             grip.Behind = Mathf.Max(0f, reach[far ^ 1]);
 
+            // The box's own furthest corner, as the fallback. Spread overwrites it with the
+            // real furthest vertex whenever the mesh can be read, which is every weapon
+            // this game ships.
+            grip.Corner = new Vector3(
+                Mathf.Abs(hi.x) >= Mathf.Abs(lo.x) ? hi.x : lo.x,
+                Mathf.Abs(hi.y) >= Mathf.Abs(lo.y) ? hi.y : lo.y,
+                Mathf.Abs(hi.z) >= Mathf.Abs(lo.z) ? hi.z : lo.z);
+
             // The cross section about that line, from the vertices when the importer kept
             // them and from the box when it did not. Past the grip, which is where the
             // steel is -- see BladeFrom.
@@ -265,6 +291,7 @@ namespace GulagRunners.Game
             float uu = 0f, vv = 0f, uv = 0f;
             int n = 0;
             int all = 0;
+            Vector3 corner = Vector3.zero;
 
             // Twice over when it has to be: once past the grip, and -- only if that left
             // too little to measure -- over the whole model, which is what this did before.
@@ -282,7 +309,15 @@ namespace GulagRunners.Game
                     for (int i = 0; i < points.Length; i++)
                     {
                         Vector3 p = m.MultiplyPoint3x4(points[i]);
-                        if (pass == 0) all++;
+                        if (pass == 0)
+                        {
+                            all++;
+
+                            // The furthest vertex, over the WHOLE model and not just the
+                            // blade region: it is where the drawn steel ends, which is a
+                            // question about the model and not about the grip.
+                            if (p.sqrMagnitude > corner.sqrMagnitude) corner = p;
+                        }
                         if (pass == 0 && Vector3.Dot(p, blade) < from) continue;
 
                         float a = Vector3.Dot(p, u), b = Vector3.Dot(p, v);
@@ -313,6 +348,8 @@ namespace GulagRunners.Game
             }
 
             if (n == 0) return false;
+
+            if (corner.sqrMagnitude > 1e-12f) grip.Corner = corner;
 
             float wide = uMax - uMin, thin = vMax - vMin;
             grip.Across = Mathf.Max(wide, thin);
