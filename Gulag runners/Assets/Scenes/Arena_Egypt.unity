@@ -135625,6 +135625,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Pillar_Large_Middle
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: f5c3d09c7936d7e4cb8ba185a333327f, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:
     - {fileID: -8603339840771121511, guid: f5c3d09c7936d7e4cb8ba185a333327f, type: 3}
