@@ -175,6 +175,11 @@ namespace GulagRunners.Game
         /// <summary>Which numeral, and how far through its own beat.</summary>
         void Show(MatchSimState m)
         {
+            // A player who lagged and came back must see the match as it IS, rather than
+            // count down into a round the other end started long ago. See
+            // MatchState.ShowTheOpening.
+            if (!matchState.ShowTheOpening) { label.text = string.Empty; return; }
+
             float through = Mathf.Clamp01(
                 m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne);
 

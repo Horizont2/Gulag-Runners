@@ -82,13 +82,13 @@ namespace GulagRunners.Game
         /// reader of it then has to work around. Here a field can only be set by name.
         /// </summary>
         enum F { Kind, When, Arena, Round, Seconds, Winner, Local, Ended,
-                 Chests, PickedLocks, ForcedLocks, WrongTouches, Substituted,
+                 Chests, PickedLocks, ForcedLocks, WrongTouches,
                  Weapon0, Armour0, Weapon1, Armour1, Count }
 
         static readonly string[] Names =
         {
             "kind", "when", "arena", "round", "seconds", "winner", "local", "ended",
-            "chests", "pickedLocks", "forcedLocks", "wrongTouches", "substituted",
+            "chests", "pickedLocks", "forcedLocks", "wrongTouches",
             "weaponTier0", "armour0", "weaponTier1", "armour1"
         };
 
@@ -152,7 +152,6 @@ namespace GulagRunners.Game
             Set(row, F.PickedLocks, tally.locksPicked);
             Set(row, F.ForcedLocks, tally.locksForced);
             Set(row, F.WrongTouches, tally.wrongTouches);
-            Set(row, F.Substituted, tally.substituted ? 1 : 0);
 
             // What each side was holding when it ended, which is what docs/07's second
             // criterion is actually about. It says "win rate vs the LOOT BUDGET within
@@ -184,7 +183,6 @@ namespace GulagRunners.Game
             string[] row = Row("series");
             Set(row, F.Winner, Side(winner));
             Set(row, F.Local, matchState.LocalFighter);
-            if (tally != null) Set(row, F.Substituted, tally.substituted ? 1 : 0);
             Write(row);
         }
 

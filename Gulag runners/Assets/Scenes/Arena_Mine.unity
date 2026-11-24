@@ -15173,12 +15173,6 @@ MonoBehaviour:
   substituteAfter: 2.5
   firstContactSeconds: 12
   waitingFor: "OPPONENT NOT RESPONDING\u2026 {0}"
-  WaitingChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  Substituted:
-    m_PersistentCalls:
-      m_Calls: []
   tick: 0
   state: not connected
   stalledFrames: 0

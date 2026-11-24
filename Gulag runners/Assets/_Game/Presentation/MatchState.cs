@@ -216,6 +216,52 @@ namespace GulagRunners.Game
         bool _wiredLocal;
 
         /// <summary>
+        /// Is the round's opening still worth drawing?
+        ///
+        /// THE PROBLEM THIS ANSWERS IS A LOCKSTEP ONE and it has no fix in the
+        /// simulation. Both devices run the same ticks in the same order; a player whose
+        /// phone was away for ten seconds has six hundred ticks to run before they are
+        /// level, and skipping them would put the two matches in different worlds. So
+        /// the ticks ARE run, as fast as the frame allows.
+        ///
+        /// What must not happen is that they are WATCHED. The round opening -- the cage,
+        /// the smoke, the crane shot, the countdown -- is drawn from
+        /// MatchSimState.CageProgress, which is exactly right while the match is live and
+        /// is a replay of ten-second-old news during a catch-up. The player comes back
+        /// and sits through the start of a round everybody else finished long ago.
+        ///
+        /// So the simulation catches up underneath and the presentation does not follow
+        /// it. Every part of the opening asks this first, and <see cref="SnapToNow"/>
+        /// holds it false while the catch-up runs.
+        /// </summary>
+        public bool ShowTheOpening => Time.unscaledTime >= _liveFrom;
+
+        float _liveFrom;
+
+        /// <summary>
+        /// The simulation is behind and running hard to catch up: show the match as it
+        /// IS, not as it was.
+        ///
+        /// Called by NetMatch when a player who stopped answering comes back, and again
+        /// on every frame that runs more than one tick. The hold is short and refreshed,
+        /// so it covers a replay of any length and lifts by itself the moment the ticks
+        /// are live again -- there is no state to leave set and nothing to clear on the
+        /// next round.
+        ///
+        /// The cameras are snapped rather than eased for the same reason: a camera that
+        /// smooth-damps across ten seconds of catch-up arrives after the player has
+        /// already been hit.
+        /// </summary>
+        public void SnapToNow(float holdSeconds = 0.35f)
+        {
+            _liveFrom = Mathf.Max(_liveFrom, Time.unscaledTime + holdSeconds);
+
+            foreach (SideViewCamera cam in FindObjectsByType<SideViewCamera>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+                cam.SnapToTarget();
+        }
+
+        /// <summary>
         /// Has a wire said which side this device is?
         ///
         /// Read by <see cref="LocalCamera"/>, and the question it answers there is not
@@ -360,67 +406,6 @@ namespace GulagRunners.Game
             // empty on Awake is a stale bake, not an arena without chests.
             if (ChestStates.Length == 0) ResetRound();
 
-            HandTheOpponentToABot();
-        }
-
-        /// <summary>
-        /// A practice match has to have a practice opponent in it.
-        ///
-        /// NOTHING DID THIS, AND IT IS THE WHOLE OF "IT STARTED ME ON MY OWN". The search
-        /// screen pairs you, puts the pairing in MatchHandover and loads the arena; the
-        /// pairing carries AgainstBot, and three things read it -- MatchRecorder, to keep
-        /// a practice win off the ladder; OnlineMatch, to skip opening a relay; and
-        /// MatchSearch, for an event. None of them is the fighter. So the second body
-        /// stood in its cage for the whole match and the player fought a statue.
-        ///
-        /// takeOver and not enabled, for the reason FighterBrain.TakingOver gives: it is
-        /// `takeOver &amp;&amp; isActiveAndEnabled &amp;&amp; self != null`, every arena
-        /// ships the brains present and enabled with takeOver off, and NetMatch spent a
-        /// release writing enabled = true and wondering why the dropped opponent froze.
-        ///
-        /// It runs in Start rather than Awake because the fighters fill their own indices
-        /// and find their own brains in Awake, and it reads MatchHandover WITHOUT
-        /// forgetting it -- MatchRecorder needs the same pairing at the end of the match.
-        ///
-        /// At the shipped SearchRules this never fires: both bot deadlines are zero,
-        /// which means never, because the pool keeps looking instead of standing somebody
-        /// in. It is here so that a build which DOES want a practice opponent -- one
-        /// handed to playtesters with no servers behind it -- gets one rather than a
-        /// statue, and so the next person to set that number is not debugging this.
-        /// </summary>
-        void HandTheOpponentToABot()
-        {
-            if (!MatchHandover.Waiting) return;
-            if (!MatchHandover.Current.AgainstBot) return;
-
-            int me = LocalFighter;
-            int said = 0;
-
-            for (int i = 0; i < fighters.Count; i++)
-            {
-                if (i == me) continue;
-                PlayerController f = fighters[i];
-                if (f == null) continue;
-
-                FighterBrain brain = f.GetComponentInChildren<FighterBrain>(true);
-                if (brain == null)
-                {
-                    Debug.LogWarning(
-                        $"{name}: this is a practice match and fighter {i + 1} has no "
-                        + "FighterBrain, so nothing will drive it. Tools > Gulag Runners "
-                        + "> Setup > Add practice opponent puts one on both fighters.",
-                        this);
-                    continue;
-                }
-
-                brain.enabled = true;
-                brain.takeOver = true;
-                said++;
-            }
-
-            if (logMatch && said > 0)
-                Debug.Log($"{name}: practice match -- fighter {(me == 0 ? 2 : 1)} handed "
-                          + "to its own brain.", this);
         }
 
         /// <summary>

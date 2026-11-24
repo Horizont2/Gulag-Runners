@@ -4,36 +4,30 @@ using UnityEngine;
 namespace GulagRunners.Game
 {
     /// <summary>
-    /// The one line on the HUD that speaks for the NETWORK.
+    /// The one line on the HUD that speaks for the NETWORK, and it no longer reports on
+    /// the other player's connection.
     ///
-    /// <see cref="GulagRunners.Net.NetMatch"/> has told the world two things since it was
-    /// written and nothing has ever drawn either of them: that the other player has stopped
-    /// answering, and that a bot has taken their fighter for good. A match where the screen
-    /// freezes and says nothing is a hang; the same freeze with a line on it is a wait, and
-    /// those are different experiences of the same two seconds.
+    /// IT USED TO SAY TWO MORE THINGS and both are gone: a countdown while the opponent
+    /// stopped answering, and the news that a bot had taken their fighter. Neither is
+    /// this player's business. A hiccup on somebody else's Wi-Fi is theirs to own, and
+    /// all a countdown does to the person who can still play is tell them to expect the
+    /// match to go wrong -- while the thing it was counting down TO does not happen any
+    /// more either. A fighter who stops answering simply stops moving.
     ///
-    /// Both go through one label on purpose. They are the same subject -- what the other end
-    /// of the wire is doing -- and they never need to be read at once: the substitution is
-    /// what the wait turns INTO.
+    /// What is left is the two things that are about whether THIS player has a match at
+    /// all:
     ///
-    /// Which is also the one piece of ordering that matters here. The bot takes over and the
-    /// wait ends on the same beat, so NetMatch raises Substituted and then clears the waiting
-    /// line, and a naive label would show the news for a single frame before wiping it. So a
-    /// held line wins: nothing may overwrite it until its time is up.
+    ///   the refusal   the link will not connect, usually because the two devices do not
+    ///                 agree on the arena. Caught at the handshake, the reason lands in
+    ///                 LanLink.Desync -- a field with no event behind it, so it is read
+    ///                 rather than listened for, and it outranks everything because it is
+    ///                 news that there is no match.
+    ///   the rematch   the other player asked for another round.
     ///
-    /// IT INSTALLS ITSELF WHEN THE SCENE HAS NOT GOT ONE. HudBuilder makes this label and
-    /// wires both events, and has done since it was written -- and ui_check still reports
-    /// WaitingChanged and Substituted going nowhere in all four arenas, because the scenes
-    /// are older than the tool and nobody has re-run it. That is the same drift that left
-    /// seventeen labels unable to write a word (see UiType), and it is worth closing the
-    /// same way: if a scene has a network match and no notice, one is built on load and
-    /// subscribed in code. A scene that WAS built properly keeps its own, untouched --
-    /// the test is whether the event already has a listener, not whether it looks wired.
-    ///
-    /// The third thing it says is newer than either: the link refusing to connect. An
-    /// arena the two devices do not agree on is caught at the handshake now
-    /// (LanLink.WorldFingerprint), and the reason lands in Desync -- which is a field, with
-    /// no event behind it, so it is read rather than listened for.
+    /// IT STILL INSTALLS ITSELF WHEN THE SCENE HAS NOT GOT ONE, and the reason has not
+    /// changed: HudBuilder makes this label and the scenes are older than the tool. The
+    /// one wire that matters is the result screen's Again button, which silently does
+    /// nothing when nobody has attached NetMatch.AskRematch to it.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class NetNotice : MonoBehaviour
@@ -41,19 +35,12 @@ namespace GulagRunners.Game
         [Tooltip("The line. Leave empty to use the TMP_Text on this object.")]
         public TMP_Text target;
 
-        [Tooltip("What to say when a bot takes the other fighter over. No countdown and no "
-                 + "apology: it is a fact about whose match this now is.")]
-        public string substitutedLine = "OPPONENT LEFT — A BOT HAS THEIR FIGHTER";
-
-        [Tooltip("How long that stays up, in seconds. Long enough to read twice, short "
+        [Tooltip("How long a line stays up, in seconds. Long enough to read twice, short "
                  + "enough that it is gone before the next fight starts.")]
         [Range(1f, 12f)] public float holdSeconds = 4.5f;
 
         [Header("Colours")]
-        [Tooltip("A wait: something is wrong and may yet come right.")]
-        public Color waiting = new Color(0.95f, 0.66f, 0.23f);
-
-        [Tooltip("The substitution: not a warning any more, just how things now are.")]
+        [Tooltip("News to live with rather than a warning.")]
         public Color settled = new Color(0.93f, 0.95f, 0.97f);
 
         [Tooltip("The link refusing to connect. Not a wait and not a fact to live with: "
@@ -83,36 +70,23 @@ namespace GulagRunners.Game
             if (link == null)
                 link = FindFirstObjectByType<GulagRunners.Net.LanLink>(
                     FindObjectsInactive.Include);
-            Write("", waiting);
+            Write("", settled);
             Attach();
         }
 
         /// <summary>
         /// Listens for whatever the scene is not already carrying.
         ///
-        /// Per event, not all or nothing, because the three are wired by two different
-        /// tools and a scene can easily have one and not the others.
-        ///
-        ///   WaitingChanged, Substituted   HudBuilder wires both to this component. Added
-        ///       here only when NOTHING is on them, or a built scene would write every
-        ///       line twice.
-        ///   RematchAsked                  NetSetup wires it to NetMatch.AskRematch, which
-        ///       is the request and not the caption, so this is added whatever is there.
-        ///       The request itself is added only if the event is bare -- see below, where
-        ///       an unwired Again is a button that silently does nothing.
+        /// One event now rather than three: NetSetup wires RematchAsked to
+        /// NetMatch.AskRematch, which is the request and not the caption, so the caption
+        /// is added whatever is there. The request itself is added only when the event is
+        /// bare -- see below, where an unwired Again is a button that silently does
+        /// nothing.
         /// </summary>
         void Attach()
         {
             GulagRunners.Net.NetMatch net =
                 FindFirstObjectByType<GulagRunners.Net.NetMatch>(FindObjectsInactive.Include);
-
-            if (net != null)
-            {
-                if (net.WaitingChanged.GetPersistentEventCount() == 0)
-                    net.WaitingChanged.AddListener(Say);
-                if (net.Substituted.GetPersistentEventCount() == 0)
-                    net.Substituted.AddListener(Substituted);
-            }
 
             MatchResultView result =
                 FindFirstObjectByType<MatchResultView>(FindObjectsInactive.Include);
@@ -149,7 +123,7 @@ namespace GulagRunners.Game
 
             if (_hold <= 0f) return;
             _hold -= Time.unscaledDeltaTime;     // a held line outlives a hit stop
-            if (_hold <= 0f) Write("", waiting);
+            if (_hold <= 0f) Write("", settled);
         }
 
         /// <summary>The other player has asked for another round. MatchResultView.RematchAsked.</summary>
@@ -173,20 +147,6 @@ namespace GulagRunners.Game
             if (stop < 0) stop = reason.IndexOf('.');
             string first = stop > 0 ? reason.Substring(0, stop) : reason;
             return first.ToUpperInvariant();
-        }
-
-        /// <summary>The waiting line, or empty when the wait is over. NetMatch.WaitingChanged.</summary>
-        public void Say(string line)
-        {
-            if (_hold > 0f) return;              // the held line wins; see the summary
-            Write(line, waiting);
-        }
-
-        /// <summary>A bot has the other fighter from here. NetMatch.Substituted.</summary>
-        public void Substituted()
-        {
-            _hold = holdSeconds;
-            Write(substitutedLine, settled);
         }
 
         void Write(string line, Color colour)
@@ -238,7 +198,6 @@ namespace GulagRunners.Game
 
             NetNotice notice = holder.AddComponent<NetNotice>();
             notice.target = line;
-            notice.waiting = UiPalette.Amber;
             notice.settled = UiPalette.Ink;
             notice.refused = UiPalette.Danger;
 

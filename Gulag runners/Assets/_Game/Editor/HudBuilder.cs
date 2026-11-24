@@ -817,15 +817,11 @@ namespace GulagRunners.GameEditor
                 Undo.RecordObject(net, "Build HUD");
                 net.hud = view;
 
-                // And the two things it has always said out loud now have somewhere to
-                // land. Found rather than carried down through four method calls: there
-                // is one of these on a HUD and it is built eight lines up.
-                NetNotice speaks = rootGo.GetComponentInChildren<NetNotice>(true);
-                if (speaks != null)
-                {
-                    Wire(net.WaitingChanged, new UnityAction<string>(speaks.Say));
-                    Wire(net.Substituted, new UnityAction(speaks.Substituted));
-                }
+                // The notice itself is built eight lines up and wires what it needs in
+                // its own Attach. There is nothing to connect here any more: the two
+                // events this used to wire -- the opponent's silence and a bot taking
+                // their fighter -- are both gone, because neither is this player's
+                // business and the second does not happen at all now.
 
                 EditorUtility.SetDirty(net);
                 PrefabUtility.RecordPrefabInstancePropertyModifications(net);

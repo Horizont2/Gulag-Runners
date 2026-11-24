@@ -44,8 +44,6 @@ namespace GulagRunners.Game
         public int seriesLocksPicked;
         public int seriesRoundsWon0;
         public int seriesRoundsWon1;
-        [Tooltip("A bot took a fighter over at some point in this series.")]
-        public bool substituted;
 
         /// <summary>
         /// The highest weapon tier each fighter has HELD at any point in the series, taken
@@ -92,10 +90,6 @@ namespace GulagRunners.Game
             matchState.SeriesEnded += OnSeriesEnded;
             matchState.ChestOpened += OnChestOpened;
 
-            GulagRunners.Net.NetMatch net = FindFirstObjectByType<GulagRunners.Net.NetMatch>();
-            if (net != null && net.Substituted != null)
-                net.Substituted.AddListener(OnSubstituted);
-
             NewSeries();
         }
 
@@ -106,10 +100,6 @@ namespace GulagRunners.Game
             matchState.Ended -= OnRoundEnded;
             matchState.SeriesEnded -= OnSeriesEnded;
             matchState.ChestOpened -= OnChestOpened;
-
-            GulagRunners.Net.NetMatch net = FindFirstObjectByType<GulagRunners.Net.NetMatch>();
-            if (net != null && net.Substituted != null)
-                net.Substituted.RemoveListener(OnSubstituted);
         }
 
         // ----------------------------------------------------------------- the round
@@ -154,11 +144,9 @@ namespace GulagRunners.Game
         {
             seriesLocksPicked = 0;
             seriesRoundsWon0 = seriesRoundsWon1 = 0;
-            substituted = false;
             for (int i = 0; i < 2; i++) _topTier[i] = 0;
         }
 
-        void OnSubstituted() => substituted = true;
 
         void OnSeriesEnded(int winner) { }
 

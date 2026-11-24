@@ -289,6 +289,12 @@ namespace GulagRunners.Game
             // not alternatives.
             if (m.Round > firstRoundOnly) return;
 
+            // A player who lagged and came back must see the match as it IS, not sit
+            // through a round opening the other end finished long ago. MatchState.
+            // ShowTheOpening is false while the simulation is catching up, and lifts
+            // by itself once the ticks are live again.
+            if (!matchState.ShowTheOpening) return;
+
             float t = m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne;
             bool crane = style == IntroStyle.Crane;
             bool shaft = style == IntroStyle.Shaft;

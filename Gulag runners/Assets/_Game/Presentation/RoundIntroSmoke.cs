@@ -139,7 +139,13 @@ namespace GulagRunners.Game
             if (_done) return;
             if (!_built) BuildLayers();
 
-            float held = m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne;
+            // A player who lagged and came back must see the match as it IS, not sit
+            // through a round opening the other end finished long ago.
+            // MatchState.ShowTheOpening is false while the simulation is catching
+            // up, and lifts by itself once the ticks are live again.
+            float held = matchState.ShowTheOpening
+                ? m.CageProgress(matchState.MatchRules).Raw / (float)Fix.RawOne
+                : 1f;
             float t = Mathf.Clamp01(held / Mathf.Max(0.01f, clearBy));
 
             if (t >= 1f) { Clear(); _done = true; return; }
