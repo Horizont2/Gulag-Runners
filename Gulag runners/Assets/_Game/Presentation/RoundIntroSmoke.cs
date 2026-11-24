@@ -92,7 +92,21 @@ namespace GulagRunners.Game
         [Tooltip("Only on rounds up to this one. 1 is the round that arrives in the arena.")]
         [Range(0, 5)] public int firstRoundOnly = 1;
 
+        [Header("How it leaves")]
+        [Tooltip("How much wider a layer is by the time it is gone. 1 is no swell.\n\n" +
+                 "A bank that only slides sideways reads as a backdrop on a conveyor. One " +
+                 "that grows as it goes reads as the camera coming out of it, which is the " +
+                 "shot this is.")]
+        [Range(1f, 1.5f)] public float swellBy = 1.12f;
+
+        [Tooltip("Share of a layer's own travel at which it starts to dissolve. 1 never " +
+                 "dissolves, which is what this did when it was drawn as a cutout: the " +
+                 "last bank was simply switched off, in one frame.")]
+        [Range(0.3f, 1f)] public float fadeFrom = 0.62f;
+
         readonly List<Transform> _layers = new List<Transform>();
+        readonly List<Vector3> _rest = new List<Vector3>();
+        readonly List<Color> _tones = new List<Color>();
         Shader _shader;
         readonly List<Material> _skins = new List<Material>();
         bool _built;
@@ -187,6 +201,31 @@ namespace GulagRunners.Game
                 float lift = eased * frame * 0.10f * ((i % 4 < 2) ? 1f : -1f);
 
                 _layers[i].localPosition = new Vector3(gone, lift, depth);
+
+                // AND IT SWELLS AS IT GOES, which is the half of this that says the camera
+                // is coming OUT of the bank rather than the bank going past it. A thing
+                // that passes the lens grows; a thing on a conveyor belt does not.
+                //
+                // Small, and only on the way out: at 1.12 the near layer is a tenth wider
+                // by the time it leaves, which nobody can name and everybody feels.
+                float swell = 1f + (swellBy - 1f) * eased;
+                if (i < _rest.Count)
+                    _layers[i].localScale = _rest[i] * swell;
+
+                // And it DISSOLVES over its last stretch. The cutout this used to be could
+                // not: its alpha was a yes or a no, so the only way to finish was to switch
+                // the layer off, and the far bank -- which finishes exactly at the end of
+                // the window -- had nothing between being there and being gone. One frame
+                // of cloud, then none.
+                if (i < _skins.Count && _skins[i] != null)
+                {
+                    float out01 = Mathf.InverseLerp(fadeFrom, 1f, own);
+                    float a = 1f - out01 * out01 * (3f - 2f * out01);
+                    Color c = _tones[i];
+                    c.a = a;
+                    if (_skins[i].HasProperty("_BaseColor")) _skins[i].SetColor("_BaseColor", c);
+                    if (_skins[i].HasProperty("_Color")) _skins[i].SetColor("_Color", c);
+                }
             }
         }
 
@@ -211,7 +250,13 @@ namespace GulagRunners.Game
                 _done = true;
                 return;
             }
-            Shader shader = Shader.Find("Gulag Runners / Backdrop");
+            // The cloud shader, which blends. It used to borrow the BACKDROP's, which
+            // clips -- and a clip is why this was a paper cut-out for as long as it was:
+            // every edge a hard line, and a layer that could only be switched off rather
+            // than dissolved, because a cutout at 49% alpha is not a faint cloud, it is no
+            // cloud. Cloud.shader carries the whole argument.
+            Shader shader = Shader.Find("Gulag Runners / Cloud");
+            if (shader == null) shader = Shader.Find("Gulag Runners / Backdrop");
             if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
             if (shader == null)
             {
@@ -244,7 +289,13 @@ namespace GulagRunners.Game
                 // Wider than the frame, because it has to still be covering it after it has
                 // started moving, and taller because the ends are ragged.
                 go.transform.localPosition = new Vector3(0f, 0f, depth);
-                go.transform.localScale = new Vector3(wide * coverWide, high * coverHigh, 1f);
+                Vector3 rest = new Vector3(wide * coverWide, high * coverHigh, 1f);
+                go.transform.localScale = rest;
+
+                // The size it was built at, kept, because the swell multiplies it every
+                // frame. Reading the live scale back and multiplying again would compound:
+                // twelve per cent a frame is a layer the size of the arena inside a second.
+                _rest.Add(rest);
 
                 go.AddComponent<MeshFilter>().sharedMesh = quad;
                 MeshRenderer r = go.AddComponent<MeshRenderer>();
@@ -274,9 +325,13 @@ namespace GulagRunners.Game
 
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
             if (m.HasProperty("_Color")) m.SetColor("_Color", c);
+
+            // Only meaningful on the fallback shaders. Cloud.shader has no cutoff: it
+            // blends, which is the whole point of it.
             if (m.HasProperty("_Cutoff")) m.SetFloat("_Cutoff", 0.5f);
 
             _skins.Add(m);
+            _tones.Add(c);
             return m;
         }
 
@@ -286,6 +341,8 @@ namespace GulagRunners.Game
             foreach (Transform t in _layers)
                 if (t != null) Destroy(t.gameObject);
             _layers.Clear();
+            _rest.Clear();
+            _tones.Clear();
             foreach (Material m in _skins)
                 if (m != null) Destroy(m);
             _skins.Clear();

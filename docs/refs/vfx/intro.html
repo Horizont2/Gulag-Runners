@@ -26,6 +26,7 @@
 const DEPTHS = [1.1, 1.9, 3.0, 4.6];
 const NEAR_DONE_BY = 0.55, STAGGER = 0.06, COVER = 1.35, COVER_HIGH = 3.2, NEAR_SHADE = 0.55;
 const CLEAR_BY = 0.95, ASPECT = 4.5, CAGE = 3.0;
+const SWELL_BY = 1.12, FADE_FROM = 0.62;   // RoundIntroSmoke's own two
 const TINT = { mine:'#453e39', forest:'#5c7378', nordic:'#707fa0', temple:'#705c85' };
 
 const band = new Image();
@@ -63,15 +64,38 @@ function draw(c, theme, held) {
     const x = W / 2 + gone * W - qw / 2;
     const y = H / 2 - (lift + camDrift) * (W / ASPECT) - qh / 2;
 
-    g.save();
-    g.drawImage(band, x, y, qw, qh);
-    g.globalCompositeOperation = 'source-atop';
+    // TINTED IN AN OFFSCREEN COPY, which is what the comment above has always said and
+    // what the code did not do. It drew the band and then filled the whole quad with flat
+    // colour under 'source-atop' -- and source-atop keeps the DESTINATION's alpha, which
+    // at that point was the opaque arena behind it. So the fill landed on everything,
+    // every layer came out a flat rectangle with hard vertical ends, and the preview has
+    // been showing sliding blocks of colour rather than the band it was drawing.
+    //
+    // Cloud.shader does `cloud.rgb * tint, cloud.a`: a multiply that keeps the texture's
+    // own shading and its own alpha. That is two operations on a scratch canvas.
     const far = i / (DEPTHS.length - 1);
     const shade = NEAR_SHADE + (1 - NEAR_SHADE) * far;
     const c = TINT[theme];
     const rgb = [1,3,5].map(k => Math.round(parseInt(c.substr(k,2),16) * shade));
-    g.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-    g.fillRect(x, y, qw, qh);
+
+    const fade = own <= FADE_FROM ? 1
+               : 1 - (x => x * x * (3 - 2 * x))((own - FADE_FROM) / (1 - FADE_FROM));
+    const swell = 1 + (SWELL_BY - 1) * eased;
+
+    const pad = document.createElement('canvas');
+    pad.width = Math.max(1, Math.round(qw * swell));
+    pad.height = Math.max(1, Math.round(qh * swell));
+    const pg = pad.getContext('2d');
+    pg.drawImage(band, 0, 0, pad.width, pad.height);
+    pg.globalCompositeOperation = 'multiply';
+    pg.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    pg.fillRect(0, 0, pad.width, pad.height);
+    pg.globalCompositeOperation = 'destination-in';
+    pg.drawImage(band, 0, 0, pad.width, pad.height);
+
+    g.save();
+    g.globalAlpha = Math.max(0, Math.min(1, fade));
+    g.drawImage(pad, x - (pad.width - qw) / 2, y - (pad.height - qh) / 2);
     g.restore();
   }
 }
