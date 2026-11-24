@@ -15,7 +15,6 @@ AACC, ADEC = milli(22000), milli(10000)
 GRAV, MAXFALL = milli(28000), milli(18000)
 JUMP, CUT = milli(9500), milli(450)
 CLIMB_UP, CLIMB_DN = milli(2000), milli(2600)
-DODGE_SPEED, DODGE_FRAMES = milli(7000), 21
 FLOOR_H, ROOM_W = 2.5, 7.2
 
 def move_towards(cur, tgt, maxd):
@@ -66,11 +65,6 @@ print(f"{f2/60:.3f} s")
 # --- climb one floor -------------------------------------------------------------
 print(f"climb {FLOOR_H} m   = {FLOOR_H/to_f(CLIMB_UP):.2f} s up, {FLOOR_H/to_f(CLIMB_DN):.2f} s down"
       f"   (docs/03 budget ~1.5 s incl. mounting)")
-
-# --- dodge distance --------------------------------------------------------------
-x = 0
-for _ in range(DODGE_FRAMES): x = x + mul_csharp(DODGE_SPEED, DT)
-print(f"dodge distance = {to_f(x):.2f} m over {DODGE_FRAMES/60:.2f} s")
 
 # --- overflow safety: worst-case multiply in the motor ----------------------------
 worst = max(abs(GRAV), abs(MAXFALL), abs(GDEC), abs(JUMP), abs(RUN))

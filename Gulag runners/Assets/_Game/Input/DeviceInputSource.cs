@@ -16,9 +16,9 @@ namespace GulagRunners.Game
     {
         public enum Scheme
         {
-            /// <summary>WASD, Space, Left Shift (block / dodge), E, J.</summary>
+            /// <summary>WASD, Space, E, J.</summary>
             Primary = 0,
-            /// <summary>Arrows, Right Ctrl, Right Shift (block / dodge), Numpad 0, Numpad 1.</summary>
+            /// <summary>Arrows, Right Ctrl, Numpad 0, Numpad 1.</summary>
             Secondary = 1
         }
 
@@ -47,7 +47,6 @@ namespace GulagRunners.Game
                     if (k.wKey.isPressed) flags |= InputFlags.Up;
                     if (k.sKey.isPressed) flags |= InputFlags.Down;
                     if (k.spaceKey.isPressed) flags |= InputFlags.Jump;
-                    if (k.leftShiftKey.isPressed) flags |= InputFlags.Dodge;
                     if (k.eKey.isPressed) flags |= InputFlags.Action;
 
                     // The attack stick, on a desk. Eight directions off IJKL, because a
@@ -65,7 +64,6 @@ namespace GulagRunners.Game
                     if (k.upArrowKey.isPressed) flags |= InputFlags.Up;
                     if (k.downArrowKey.isPressed) flags |= InputFlags.Down;
                     if (k.rightCtrlKey.isPressed) flags |= InputFlags.Jump;
-                    if (k.rightShiftKey.isPressed) flags |= InputFlags.Dodge;
                     if (k.numpad0Key.isPressed) flags |= InputFlags.Action;
                     if (k.numpad4Key.isPressed) aimX -= 1000;
                     if (k.numpad6Key.isPressed) aimX += 1000;
@@ -87,7 +85,6 @@ namespace GulagRunners.Game
                 if (stick.y > dead) flags |= InputFlags.Up;
                 if (stick.y < -dead) flags |= InputFlags.Down;
                 if (pad.buttonSouth.isPressed) flags |= InputFlags.Jump;
-                if (pad.rightShoulder.isPressed || pad.buttonEast.isPressed) flags |= InputFlags.Dodge;
                 if (pad.buttonNorth.isPressed) flags |= InputFlags.Action;
 
                 // The RIGHT stick IS the weapon now -- the pad's version of the second

@@ -82,9 +82,6 @@ namespace GulagRunners.Game
         public string armedCrouchIdleState = "Crouch Idle Armed";
         public string armedCrouchMoveState = "Crouch Walk";
         public string armedAirState = "Jump Armed";
-        public string armedDodgeState = "Sprint Armed";
-        [Tooltip("The dodge dash. There is no sprint: the game has one ground speed.")]
-        public string dodgeState = "Run Fast";
         [Tooltip("In the air, rising or falling.")]        public string airState = "Jumping Up";
         [Tooltip("Climbing up a ladder.")]      public string climbUpState = "Ladder Up";
         [Tooltip("Climbing down a ladder.")]    public string climbDownState = "Ladder Down";
@@ -107,12 +104,8 @@ namespace GulagRunners.Game
         [Tooltip("Crouching and still.")]                  public string crouchIdleState = "Sitting";
         [Tooltip("Crouch-walking.")]                       public string crouchMoveState = "Walk";
 
-        [Tooltip("Guard up and standing. Leave empty until there is a clip for it — the state " +
-                 "then falls back to idle, and the only thing the player can see of a raised " +
-                 "guard is that they have gone slow, which reads as a bug rather than a brace.")]
-        public string blockIdleState = "Block Idle";
-        [Tooltip("Guard up and walking. Empty falls back to the walk.")]
-        public string blockMoveState = "";
+        // Block Idle and Block Move were here. docs/31 made the weapon the defence, so
+        // there is no raised guard to pose and nothing ever asked for either state.
 
         [Header("Searching a chest")]
         [Tooltip("Working at a chest: prying, forcing, rummaging. Held for exactly as long as " +
@@ -174,10 +167,9 @@ namespace GulagRunners.Game
                  "visibly costs more.")]
         public string hitState = "Hit";
 
-        [Tooltip("A hit absorbed on the guard. Empty falls back to the block pose, which still " +
-                 "reads better than the hit clip: the point of blocking is that you did not " +
-                 "take it.")]
-        public string blockImpactState = "Block Hit";
+        // Block Hit was here, for a hit absorbed on the guard. With no guard to absorb
+        // one, a hit that lands plays hitState and a hit stopped by the other weapon
+        // plays the parry, both of which are posed elsewhere.
 
         [Tooltip("Guard broken, or a parry taken: open, off-balance and about to be punished. " +
                  "Empty falls back to the hit clip.")]
@@ -432,7 +424,7 @@ namespace GulagRunners.Game
         /// fight has nothing to say this frame and the body should be left alone.
         ///
         /// Only the states that are PURELY an arm action live here. A fighter who is reeling,
-        /// staggered, dead, climbing or mid-dodge is doing that with all of him, and splitting
+        /// staggered, dead or climbing is doing that with all of him, and splitting
         /// those across two layers would draw half a man taking a hit.
         /// </summary>
         string Fight(in PlayerSimState s, out float scrub)
@@ -651,10 +643,6 @@ namespace GulagRunners.Game
                     playback = Scale(Mathf.Abs(vy), referenceClimbSpeed);
                     return vy > 0f ? climbUpState : climbDownState;
                 }
-
-                case MoveMode.Dodging:
-                    playback = maxPlaybackSpeed;
-                    return Stance(in s, dodgeState, armedDodgeState);
 
                 case MoveMode.Mantling:
                     if (poseLadderByProgress) { scrub = ScriptProgress(in s); playback = 0f; }

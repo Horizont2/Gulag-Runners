@@ -122,7 +122,7 @@ namespace GulagRunners.Game
         [Range(0f, 0.2f)] public float soleLift = 0.02f;
 
         [Tooltip("The most a foot may be moved. Past this the clip is doing something the " +
-                 "ground cannot explain — a jump, a dodge — and pinning it would look worse.")]
+                 "ground cannot explain — a jump, a fall — and pinning it would look worse.")]
         [Range(0f, 1f)] public float maxFootShift = 0.3f;
 
         [Range(0f, 1f)] public float groundWeight = 0.8f;

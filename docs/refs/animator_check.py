@@ -93,12 +93,16 @@ def by_guid():
 #
 # Everything else is a one-shot or is POSED frame by frame (the jump, the attacks, the
 # ladder transitions), and looping those would be wrong.
+#
+# The dodge and the two guard poses were in this list. The guard became the weapon's
+# job (docs/31) and the dodge went with the stamina that paid for it, so PlayerAnimator
+# has no field for any of them and there is no held state left to check.
 MUST_LOOP = (
-    "idleState walkState runState walkBackState runBackState dodgeState "
+    "idleState walkState runState walkBackState runBackState "
     "crouchIdleState crouchMoveState climbUpState climbDownState climbIdleState "
-    "blockIdleState blockMoveState searchState "
+    "searchState "
     "armedIdleState armedWalkState armedRunState armedWalkBackState armedRunBackState "
-    "armedCrouchIdleState armedCrouchMoveState armedDodgeState"
+    "armedCrouchIdleState armedCrouchMoveState"
 ).split()
 
 

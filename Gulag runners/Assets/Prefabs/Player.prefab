@@ -148,11 +148,6 @@ MonoBehaviour:
     jumpBufferFrames: 7
     climbUpSpeed: 2
     climbDownSpeed: 2.6
-    dodgeSpeed: 7
-    dodgeFrames: 21
-    dodgeRecoverFrames: 9
-    staminaMax: 3
-    staminaRecoverFrames: 72
     bodyWidth: 0.6
     bodyHeight: 1.8
     crouchHeight: 1.1
@@ -211,6 +206,5 @@ MonoBehaviour:
   stick: {fileID: 0}
   attackButton: {fileID: 0}
   jumpButton: {fileID: 0}
-  dodgeButton: {fileID: 0}
   actionButton: {fileID: 0}
   verticalThreshold: 0.5

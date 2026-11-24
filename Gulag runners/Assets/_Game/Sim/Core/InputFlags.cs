@@ -24,13 +24,11 @@ namespace GulagRunners.Sim
         Up     = 1 << 2,   // climb / mount ladder
         Down   = 1 << 3,   // crouch / descend / drop through a one-way platform
         Jump   = 1 << 4,
-        /// <summary>
-        /// The one defensive button, and now it only has one job. It used to carry both
-        /// the dodge and the guard; the guard is the weapon's job now -- a blade is
-        /// stopped by another blade -- so this is purely the dodge, and the dodge is
-        /// switched on, which it had not been since the movement pass.
-        /// </summary>
-        Dodge  = 1 << 5,
+        // 1 << 5 was Dodge, the one defensive button. The guard became the weapon's job
+        // -- a blade is stopped by another blade -- and the dodge that was left on the
+        // button has gone with the stamina that paid for it. The bit is left empty rather
+        // than closed up: Action and the Choice bits keep the values they have always
+        // had, so a packet does not change meaning across this cut.
         Action = 1 << 6,   // pick up, open a chest, grab
 
         /// <summary>

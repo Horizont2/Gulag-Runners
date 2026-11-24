@@ -121,13 +121,14 @@ namespace GulagRunners.Game
             "A TOOL HALVES THE PRY,\n2.5 S TO 1.25 — AND COSTS\nTWO SWINGS AND THE NOISE.",
             "BELOW 30% HEALTH\nYOUR BLOWS HIT 40% HARDER.\nSO DO HIS.",
             "A PARRY IS TWELVE FRAMES\nWIDE AND STAGGERS HIM\nFOR EIGHT TENTHS.",
-            // These three used to teach the guard. docs/31 took the guard button out --
-            // the weapon is the defence now -- and the tips outlived it, so the search
-            // screen spent weeks explaining a button the player does not have. They are
-            // about the dodge, which is what replaced it.
-            "A DODGE COSTS TWO\nOF FOUR CHARGES. TWO DODGES\nAND YOU HAVE NONE.",
-            "A CHARGE RETURNS EVERY\n1.2 S. A SPENT DODGE\nIS BACK IN 2.4.",
-            "A DODGE IS 0.35 S\nUNTOUCHABLE, THEN 0.15 S\nYOU CANNOT ANSWER.",
+            // Three tips stood here and taught, in turn, a guard button and then a
+            // dodge -- and each time the mechanic went and the tip stayed, so the search
+            // screen spent weeks explaining a control the player does not have. These
+            // three teach what is actually there: one ground speed, a blade that defends
+            // by being in the way, and a body that is always hittable.
+            "THERE IS NO GUARD AND NO\nROLL. YOUR BLADE IS THE ONLY\nTHING THAT STOPS HIS.",
+            "ONE GROUND SPEED, ALWAYS.\nDISTANCE IS SOMETHING YOU\nWALK, NOT SOMETHING YOU SPEND.",
+            "NOTHING MAKES YOU\nUNTOUCHABLE. IF THE BLADE\nREACHES YOU, IT LANDS.",
             // This used to say that three blows chain and the window between them is a
             // third of a second, off MaxCombo and ComboWindowFrames -- and both fields are
             // still in CombatConfig and are read by NOTHING. The three-hit string went with

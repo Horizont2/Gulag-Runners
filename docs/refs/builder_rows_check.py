@@ -4,7 +4,7 @@ The four builder windows are the only tools in this project a person FILLS IN ra
 presses: twenty-eight rows for the HUD, sixteen for the menu, eight for the result screen,
 five for the search panel. Each row is a named place to drag a sprite into, and the name is
 a filing path -- `hud/bar/fill`, `search/scrim`, `menu/plate`. A path is not an explanation.
-Is `bar/fill` the health bar or the stamina bar? Does it include the frame? Which end does it
+Is `bar/fill` the health bar or something else? Does it include the frame? Which end does it
 empty from? Is it stretched or nine-sliced?
 
 Whoever drags the art in cannot answer those from the key, and a wrong guess builds a screen

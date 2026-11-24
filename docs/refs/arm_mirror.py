@@ -96,7 +96,6 @@ class Fighter:
         self.hitstop = 0
         self.stun_stack = 0
         self.stun_stack_timer = 0
-        self.dodge = 0
         self.armour = 0
         self.was_hit = False
         self.damage_taken = 0
@@ -467,7 +466,7 @@ def strike(att, vic, sudden=False):
         return
     if att.hit_lock > 0 or att.clash_lock > 0:
         return
-    if att.hitstop > 0 or att.dodge > 0 or vic.dodge > 0:
+    if att.hitstop > 0:
         return
 
     share = swing_permille(att)
@@ -543,8 +542,6 @@ def tick(fighters, aims, sudden=False):
             f.stun_stack_timer -= 1
             if f.stun_stack_timer == 0:
                 f.stun_stack = 0
-        if f.dodge > 0:
-            f.dodge -= 1
 
     for i, (f, aim) in enumerate(zip(fighters, aims)):
         if f.hitstop > 0:

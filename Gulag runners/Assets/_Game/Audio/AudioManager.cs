@@ -116,10 +116,10 @@ namespace GulagRunners.Game
         ///
         /// This mapped the level straight to a sound -- Quiet to a quiet footstep, Loud to
         /// a loud one, and Medium to LandSoft. But the motor raises Medium for a soft
-        /// landing, for a dodge AND for prying a chest bare-handed, and Loud for a hard
-        /// landing, a hit landing, a chest coming open and the round starting. So a dodge
-        /// played a landing, and a hard landing played a footstep while the LandHard clip
-        /// sat in the table unused.
+        /// landing AND for prying a chest bare-handed, and Loud for a hard landing, a hit
+        /// landing, a chest coming open and the round starting. So prying a chest played a
+        /// landing, and a hard landing played a footstep while the LandHard clip sat in the
+        /// table unused.
         ///
         /// Those events now post their own sounds from PlayerEffects, which knows WHICH of
         /// them happened. What is left here is the pair only this knows: footfalls, and

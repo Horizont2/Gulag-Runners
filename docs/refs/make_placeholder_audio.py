@@ -18,7 +18,8 @@ THE COMBAT PASS
 The first sixteen files covered walking, landing, chests and the room. The FIGHT had nothing:
 audio_check read 24 rows in the table with a clip in 12, and the twelve without one were
 AttackSwingLight, AttackSwingHeavy, AttackHit, AttackHitArmoured, BlockImpact, Parry, Stagger,
-Death, Jump, Dodge, LadderGrab and LadderOut — that is, everything a fighter does. docs/38 § 1
+Death, Jump, LadderGrab and LadderOut — that is, everything a fighter does. (Dodge was in
+that list too; the move has since gone with the stamina that paid for it.) docs/38 § 1
 is the whole argument and it comes to this: the three other layers of a blow are already built
 (hitstop, camera trauma, the weapon trail; docs/20) and all three of them are playing to a
 sound that does not exist. A hit with no sound does not land. Added here with the two the gas
@@ -55,8 +56,8 @@ learn twice.
 Levels are set, not hoped for: every new file is normalised to a stated peak (`make`), so the
 mix is a column of numbers in `main` that can be argued with rather than whatever the synthesis
 happened to produce. Nothing reaches full scale — a clipping placeholder teaches everybody the
-wrong level, and placeholder_audio_check fails on one. Jump and Dodge sit at a fifth of full
-scale on purpose: they fire constantly and the job of a constant sound is to not be noticed.
+wrong level, and placeholder_audio_check fails on one. Jump sits at a fifth of full scale on
+purpose: it fires constantly and the job of a constant sound is to not be noticed.
 """
 
 import sys
@@ -297,7 +298,7 @@ def level(samples, peak):
     Shape is untouched — it is one multiply — so this decides the MIX and nothing else. Worth
     doing rather than tuning coefficients until the numbers come out right: the levels then sit
     in one column in `main` where they can be compared with each other, which is the only way
-    to answer "is the dodge quieter than the kill" without being able to hear either.
+    to answer "is the footstep quieter than the kill" without being able to hear either.
     """
     buf = list(samples)
     high = max((abs(v) for v in buf), default=0.0)

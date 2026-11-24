@@ -22,7 +22,8 @@ namespace GulagRunners.Sim
     ///
     /// Blocking by button is gone too. A weapon is stopped by another weapon, which is settled
     /// in ArmMotor before any damage is, so holding yours in the way works because of where it
-    /// IS. The one defensive button left is the dodge, and it is switched on.
+    /// IS. There is no defensive button at all now: the guard is the weapon's job and
+    /// the dodge is gone.
     ///
     /// Pure and engine-free like the rest of the simulation (docs/06).
     /// </summary>
@@ -46,10 +47,6 @@ namespace GulagRunners.Sim
 
             if (s.Dead) return InputFlags.None;
 
-            bool dodgeHeld = input.Has(InputFlags.Dodge);
-            bool dodgePressed = dodgeHeld && !s.DodgeHeldLastTick;
-            s.DodgeHeldLastTick = dodgeHeld;
-
             if (s.Reeling)
             {
                 s.SpeedPermille = 0;
@@ -58,17 +55,13 @@ namespace GulagRunners.Sim
 
             TakeTheFall(ref s, in cfg);
 
-            // The whole defensive button, now that the guard is the weapon's job. Pressed
-            // with a direction held it is a dodge; pressed standing still it is nothing,
-            // which is honest -- there is no longer a posture to adopt, only somewhere to
-            // be. Not in the air: a fighter off the ground has committed.
-            bool wantsDodge = move.AllowDodge &&
-                              dodgePressed && input.MoveX() != 0 &&
-                              s.Mode == MoveMode.Grounded && s.DodgeRecoverTimer <= 0 &&
-                              s.StaminaCharges >= move.DodgeStaminaCost;
-
+            // THERE IS NO DEFENSIVE BUTTON LEFT. The guard became the weapon's job in
+            // docs/31 -- a blade is stopped by another blade -- and the dodge that was
+            // left on the button has been taken out with the stamina that paid for it.
+            // A fighter answers an attack by moving, by striking first, or by being
+            // somewhere else; nothing is spent and nothing is held.
             s.SpeedPermille = SpeedCap(in s, in move, in arm, in cfg);
-            return MaskInput(in s, input, wantsDodge, in cfg);
+            return MaskInput(in s, input, in cfg);
         }
 
         /// <summary>
@@ -157,14 +150,14 @@ namespace GulagRunners.Sim
             return (short)cap;
         }
 
-        static InputFlags MaskInput(in PlayerSimState s, InputFlags input, bool wantsDodge,
+        static InputFlags MaskInput(in PlayerSimState s, InputFlags input,
                                     in CombatConfig cfg)
         {
-            // Only the press that was read as a dodge reaches the motor as one. Nothing
-            // else is taken away any more: there is no committed state to protect, and
+            // Nothing is taken away any more. There is no committed state to protect, and
             // taking the jump off somebody mid-swing would mean taking it off them most
-            // of the match, since the arm is always doing something now.
-            return wantsDodge ? input : input & ~InputFlags.Dodge;
+            // of the match, since the arm is always doing something now. The one bit this
+            // used to strip was the dodge's, and the dodge is gone.
+            return input;
         }
 
         /// <summary>

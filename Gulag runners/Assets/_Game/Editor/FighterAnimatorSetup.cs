@@ -94,7 +94,6 @@ namespace GulagRunners.GameEditor
             ("Run Armed",         "1Hand_Up_Run_A_F_InPlace"),
             ("Walk Back",         "1Hand_Up_Walk_A_B_InPlace"),
             ("Run Back",          "1Hand_Up_Run_A_B_InPlace"),
-            ("Sprint Armed",      "1Hand_Up_Sprint_A_F_InPlace"),
             ("Jump Armed",        "1Hand_Up_Jump_B_InPlace"),
             ("Crouch Idle Armed", "1Hand_Up_Crouch_Idle_1"),
             ("Crouch Walk",       "1Hand_Up_Crouch_F_InPlace"),

@@ -39,7 +39,7 @@ BRAIN_SCRIPT = "a96a27f0eefc27e7b188c1594a03a03d"       # FighterBrain
 # The touch controls, which are the one group with a hard rule rather than a comparison:
 # the HUD drives whoever is holding the phone, so SOME fighter in the scene has to be
 # holding it. None, and the controls are furniture.
-CONTROLS = ("stick", "aimStick", "jumpButton", "dodgeButton", "actionButton")
+CONTROLS = ("stick", "aimStick", "jumpButton", "actionButton")
 
 # Overrides that say nothing about wiring.
 BORING = re.compile(r"^(m_Local|m_Name|m_RootOrder|m_IsActive|m_Constrain|m_Layer)")

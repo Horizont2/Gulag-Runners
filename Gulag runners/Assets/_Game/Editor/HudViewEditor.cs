@@ -92,7 +92,6 @@ namespace GulagRunners.GameEditor
             {
                 if (bar == null) continue;
                 Add(bar.frame); Add(bar.fill);
-                if (bar.pips != null) foreach (Graphic p in bar.pips) Add(p);
             }
             Add(v.clock);
 
@@ -103,7 +102,7 @@ namespace GulagRunners.GameEditor
                     Add(s.frame); Add(s.glow); Add(s.icon);
                 }
 
-            foreach (HudButton b in new[] { v.dodge, v.action, v.jump })
+            foreach (HudButton b in new[] { v.action, v.jump })
             {
                 if (b == null) continue;
                 Add(b.ring); Add(b.glyph);
@@ -140,10 +139,6 @@ namespace GulagRunners.GameEditor
                 if (who == null || bar == null) continue;
                 if (bar.frame == null && bar.fill == null)
                     gaps.Add($"Player {i + 1} has a fighter but no health bar.");
-                int pips = bar.pips == null ? 0 : bar.pips.Count(p => p != null);
-                int want = who.tuning != null ? who.tuning.staminaMax : 0;
-                if (want > 0 && pips != want)
-                    gaps.Add($"Player {i + 1}: {pips} pip(s) for {want} stamina charge(s).");
             }
 
             if (v.slots == null || v.slots.Length == 0)
@@ -172,8 +167,6 @@ namespace GulagRunners.GameEditor
                 gaps.Add("The attack stick is not wired. It is the whole of the fight " +
                          "(docs/31): without it the right thumb does nothing at all.");
 
-            if (v.dodge != null && v.dodge.ring == null && v.dodge.glyph == null)
-                gaps.Add("The dodge button is not wired, so there is no way to roll.");
 
             return gaps;
         }

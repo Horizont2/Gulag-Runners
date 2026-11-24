@@ -162,7 +162,6 @@ namespace GulagRunners.Sim
             {
                 // Too far: close, and do not swing at the air on the way in.
                 flags |= towards > 0 ? InputFlags.Right : InputFlags.Left;
-                if (Roll(ref bot, cfg.GuardPermille / 2)) flags |= InputFlags.Dodge;
                 return flags;
             }
 
@@ -195,15 +194,6 @@ namespace GulagRunners.Sim
                 bot.SwingHold = 0;
                 bot.GuardHold = cfg.ReactionFrames * 2;
                 return InputFlags.None;
-            }
-
-            if (Roll(ref bot, cfg.DodgePermille) && self.StaminaCharges > 1)
-            {
-                // Pressed WITH a direction it is a roll, which is the only way out of a
-                // corner it has.
-                flags |= towards > 0 ? InputFlags.Left : InputFlags.Right;
-                flags |= InputFlags.Dodge;
-                return flags;
             }
 
             if (Roll(ref bot, cfg.AggressionPermille))

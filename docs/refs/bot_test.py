@@ -16,7 +16,7 @@ import bot_mirror as B
 import arm_combat as K
 import sim_motor_mirror as M
 from bot_mirror import Bot, config, decide, DUMMY, SPARRING, HUNTER
-from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, DOD
+from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN
 from loot_mirror import Inv, NONE, CLUB, SPEAR, CHAINMAIL
 from arm_combat import combat_step, resolve, init, aim_of
 from arena_geometry import world

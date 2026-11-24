@@ -7,7 +7,7 @@ on a phone, with the volume down, nobody notices for weeks.
 
   the simulation posts a sound   PlayerController raises Noise, Landed, PickedUp and
       Dropped; AudioManager subscribes to those four itself. Every other event -- a hit,
-      a block, a parry, a death, a chest being forced, a jump, a dodge, a ladder -- is
+      a parry, a death, a chest being forced, a jump, a ladder -- is
       detected by PlayerEffects for its particles, and NONE of them was posted. So a
       fight could be had in silence while somebody walking across the room was announced.
   the table has a clip for it   SoundTable, filled in on the AudioManager, one row per

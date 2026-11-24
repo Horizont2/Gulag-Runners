@@ -10,7 +10,6 @@ namespace GulagRunners.Sim
     /// It implements the movement described in docs/02-combat-and-controls.md:
     ///   - one flat gameplay plane, depth is presentation only
     ///   - stick left/right to move, up/down to climb ladders and hatches, a small jump button
-    ///   - a dodge with invulnerability frames, paid for with stamina
     ///   - ledge assist so nobody falls because of the thickness of a thumb
     ///   - noise as simulation state, because during the scavenge phase sound is the only way
     ///     to know where the other player is (docs/01)
@@ -410,18 +409,6 @@ namespace GulagRunners.Sim
                 return;
             }
 
-            if (s.Mode == MoveMode.Dodging)
-            {
-                StepDodge(ref s, world, cfg);
-                return;
-            }
-
-            if (TryStartDodge(ref s, input, wishX, cfg))
-            {
-                StepDodge(ref s, world, cfg);
-                return;
-            }
-
             if (s.Mode == MoveMode.Climbing)
             {
                 StepClimb(ref s, wishX, wishY, world, cfg);
@@ -447,26 +434,9 @@ namespace GulagRunners.Sim
         {
             if (s.CoyoteTimer > 0) s.CoyoteTimer--;
             if (s.JumpBufferTimer > 0) s.JumpBufferTimer--;
-            if (s.DodgeRecoverTimer > 0) s.DodgeRecoverTimer--;
             if (s.FallThroughTimer > 0) s.FallThroughTimer--;
             if (s.LadderCooldownTimer > 0) s.LadderCooldownTimer--;
             if (s.StepNoiseTimer > 0) s.StepNoiseTimer--;
-
-            // Nothing comes back while the guard is up: a brace you can hold and recover
-            // through is a brace you never have to drop.
-            if (s.StaminaCharges < cfg.StaminaMax )
-            {
-                s.StaminaTimer++;
-                if (s.StaminaTimer >= cfg.StaminaRecoverFrames)
-                {
-                    s.StaminaTimer = 0;
-                    s.StaminaCharges++;
-                }
-            }
-            else
-            {
-                s.StaminaTimer = 0;
-            }
         }
 
         // ---------------------------------------------------------------- walking
@@ -634,52 +604,6 @@ namespace GulagRunners.Sim
                 s.Noise = speed >= cfg.LoudSpeed ? NoiseLevel.Loud : NoiseLevel.Quiet;
                 s.StepNoiseTimer = cfg.StepNoiseFrames;
             }
-        }
-
-        // ---------------------------------------------------------------- dodge
-
-        static bool TryStartDodge(ref PlayerSimState s, InputFlags input, int wishX, in MoveConfig cfg)
-        {
-            if (!input.Has(InputFlags.Dodge)) return false;
-            if (s.DodgeRecoverTimer > 0) return false;
-
-            // Feet on the floor or it does not happen. A dodge in the air is a second jump
-            // with invulnerability on it, which is a different game from the one docs/02
-            // describes — there the ground is where you answer an attack.
-            if (s.Mode != MoveMode.Grounded) return false;
-
-            int cost = cfg.DodgeStaminaCost > 0 ? cfg.DodgeStaminaCost : 1;
-            if (s.StaminaCharges < cost) return false;
-
-            s.StaminaCharges -= cost;
-            s.Mode = MoveMode.Dodging;
-            s.DodgeTimer = cfg.DodgeFrames;
-            s.Crouching = false;
-            s.LadderIndex = -1;
-
-            // A dodge with no direction goes the way the body was already going — not the
-            // way the blade points. Rolling backwards out of your own swing is a dodge
-            // backwards, and it must not turn you round on the way.
-            int dir = wishX != 0 ? wishX : s.Travel;
-            if (dir == 0) dir = s.Facing;
-            s.Travel = (sbyte)dir;
-            s.Velocity = new FixVec2(cfg.DodgeSpeed * dir, Fix.Zero);
-            s.Noise = NoiseLevel.Medium;
-            return true;
-        }
-
-        static void StepDodge(ref PlayerSimState s, SimWorld world, in MoveConfig cfg)
-        {
-            MoveX(ref s, s.Velocity.X * Dt, world, cfg);
-
-            // The dodge visually steps into the background, so it ignores gravity for its
-            // duration. Keeping it on one plane is what keeps the hit reads honest (docs/02).
-            s.DodgeTimer--;
-            if (s.DodgeTimer > 0) return;
-
-            s.DodgeRecoverTimer = cfg.DodgeRecoverFrames;
-            s.Velocity.X = s.Velocity.X / 2;
-            s.Mode = Grounded(ref s, world, cfg) ? MoveMode.Grounded : MoveMode.Airborne;
         }
 
         // ---------------------------------------------------------------- ladders

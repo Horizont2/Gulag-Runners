@@ -14,18 +14,22 @@ GROUND_STICK = M(200)
 C = dict(RUN=M(3000), CROUCH=M(1600), GACC=M(40000), GDEC=M(50000),
          AACC=M(22000), ADEC=M(10000), GRAV=M(28000), MAXFALL=M(18000),
          JUMP=M(9500), VARJUMP=False, CUT=M(200), COYOTE=6, BUF=7,
-         CUP=M(2000), CDN=M(2600), DODGE=M(4800), DF=21, DR=9, DCOST=2,
+         CUP=M(2000), CDN=M(2600),
          LSNAP=M(2000), LTOP=M(60), MREACH=M(1600),
          SSPD=M(2400), SMINF=10, SMAXF=30, LREGRAB=12,
-         SMAX=4, SREC=72, W=M(300), H=M(910), CH=M(682),
+         W=M(300), H=M(910), CH=M(682),
          STEP=M(300), CLAMBER=M(550), CLAMBER_SPD=400,
          PUSHKEEP=930,
          BODYZ=M(600), DEPTHSPD=M(4000), AIRDEPTH=M(3000), LOOKAHEAD=M(1200), LANEREACH=M(2000),
-         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=32, RISEMARGIN=M(120), ALLOW_DODGE=True, MANTLE_RISE=M(450), LADDER_JUMP=False,
+         LSTANDOFF=M(80), AIMLOCK=24, MANTLE_MINF=32, RISEMARGIN=M(120), MANTLE_RISE=M(450), LADDER_JUMP=False,
          CORNER=M(250), FALLTHRU=18, HOME=0,
          LOUD=M(2500), STEPN=18, HARD=M(8000))
 
-L, R, UP, DN, JMP, DOD, ACTION, ATTACK = 1, 2, 4, 8, 16, 32, 64, 128
+# 32 was DOD, the dodge. It has gone with the stamina that paid for it, and the bit is
+# left empty rather than handed to the next control: a packet from an older build still
+# has whatever it had in bit 5, and reading that as an Action would make the fighter open
+# a chest every time the other player dodged.
+L, R, UP, DN, JMP, ACTION, ATTACK = 1, 2, 4, 8, 16, 64, 128
 # The ninth and tenth bits: where the blow is aimed, which is not where the feet go.
 AIM_L, AIM_R = 256, 512
 
@@ -35,7 +39,7 @@ class S:
         s.vx = s.vy = 0
         s.mode = "air"; s.facing = 1; s.travel = 1; s.aim_lock = 0
         s.crouch = False; s.jump_held = False
-        s.coyote = s.buf = s.dodge = s.dodge_rec = s.fallthru = s.stepn = 0
+        s.coyote = s.buf = s.fallthru = s.stepn = 0
         s.ladder_cd = 0
         s.hitstop = 0; s.recoil_t = 0
         s.script_t = 0; s.script_frames = 0; s.script_dir = 1; s.script_rises = False
@@ -43,7 +47,7 @@ class S:
         s.script_from = (0,0); s.script_to = (0,0)
         s.script_from_depth = s.script_to_depth = 0
         s.script_forward = False
-        s.stam = C["SMAX"]; s.stam_t = 0; s.ladder = -1; s.noise = 0
+        s.ladder = -1; s.noise = 0
         # loot (LootMotor): three slots, the chest claim, and the per-tick outputs
         s.landed_speed = 0
         s.depth = 0
@@ -51,7 +55,7 @@ class S:
         s.dropped = 0; s.standing_on = -1; s.action_held = False
         # combat (CombatMotor)
         s.health = 100; s.attack = 0; s.attack_t = 0; s.combo = 0; s.combo_t = 0
-        s.swing_spent = False; s.blocking = False; s.guard_t = 0; s.guard_break = 0
+        s.swing_spent = False; s.guard_break = 0
         s.stun = 0; s.stagger = 0; s.dead = False; s.guard_held = False
         s.speed_permille = 0; s.damage_taken = 0
         s.was_hit = s.was_blocked = s.was_parried = s.swing_started = s.just_died = False
@@ -490,13 +494,9 @@ def floor_lane(s, w):
 
 def step_flat(s, inp, w):
     s.noise = 0
-    for a in ("coyote", "buf", "dodge_rec", "fallthru", "stepn", "ladder_cd"):
+    for a in ("coyote", "buf", "fallthru", "stepn", "ladder_cd"):
         if getattr(s, a) > 0: setattr(s, a, getattr(s, a) - 1)
-    # Nothing comes back while the guard is up.
-    if s.stam < C["SMAX"] and not s.blocking:
-        s.stam_t += 1
-        if s.stam_t >= C["SREC"]: s.stam_t = 0; s.stam += 1
-    else: s.stam_t = 0
+    # The stamina clock was here. There is no stamina and nothing that spent it.
 
     wx = (1 if inp & R else 0) - (1 if inp & L else 0)
     wy = (1 if inp & UP else 0) - (1 if inp & DN else 0)
@@ -508,20 +508,9 @@ def step_flat(s, inp, w):
     if s.mode in ("mantle", "mount"):
         return step_scripted(s, w)
 
-    if s.mode == "dodge":
-        move_x(s, mul(s.vx, DT), w); s.dodge -= 1
-        if s.dodge <= 0:
-            s.dodge_rec = C["DR"]; s.vx //= 2
-            s.mode = "ground" if grounded(s, w) else "air"
-        return
-    # Feet on the floor or it does not happen: a dodge in the air is a second jump with
-    # invulnerability on it.
-    if (inp & DOD) and s.dodge_rec == 0 and s.mode == "ground" and s.stam >= C["DCOST"]:
-        s.stam -= C["DCOST"]; s.mode = "dodge"; s.dodge = C["DF"]; s.crouch = False; s.ladder = -1
-        d = wx or s.travel or s.facing
-        s.travel = d; s.vx = C["DODGE"] * d; s.vy = 0; s.noise = 2
-        move_x(s, mul(s.vx, DT), w); s.dodge -= 1
-        return
+    # MoveMode.Dodging was handled here, and the press that entered it just below. Both
+    # are gone from PlayerMotor; the mode number is left as a gap there for the same
+    # reason the input bit is left as one here.
 
     if s.mode == "ladder":
         return climb(s, wx, wy, w)

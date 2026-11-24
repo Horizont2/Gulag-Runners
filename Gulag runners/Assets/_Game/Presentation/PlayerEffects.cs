@@ -118,10 +118,6 @@ namespace GulagRunners.Game
         public ActionEffect jump = new ActionEffect
             { sound = SoundId.Jump, level = NoiseLevel.Medium };
 
-        [Tooltip("The dodge. Reads as the one movement that costs stamina.")]
-        public ActionEffect dodge = new ActionEffect
-            { sound = SoundId.Dodge, level = NoiseLevel.Medium };
-
         [Header("Fight")]
         [Tooltip("The swing leaving the hand, on the frame the hitbox goes live.")]
         public ActionEffect swing = new ActionEffect
@@ -276,7 +272,6 @@ namespace GulagRunners.Game
                     s.Velocity.Y > Fix.Zero)
                     Fire(jump, "jump");
 
-                if (s.Mode == MoveMode.Dodging) Fire(dodge, "dodge");
                 if (s.Mode == MoveMode.Climbing) Fire(ladderGrab, "ladder grab");
                 if (s.Mode == MoveMode.Mantling) Fire(mantle, "mantle");
 

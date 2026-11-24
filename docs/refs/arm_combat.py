@@ -340,8 +340,9 @@ def _strike(att, vic, sudden):
         return
     if att.hit_lock > 0 or att.clash_lock > 0 or att.hitstop > 0:
         return
-    if att.dodge > 0 or vic.dodge > 0:
-        return
+    # Invulnerable frames were tested here, on both sides. ArmMotor has none left: the
+    # dodge that owned them has gone with the stamina that paid for it, and a body that
+    # is in the way is hit.
 
     share = swing_permille(att)
     if share <= 0:

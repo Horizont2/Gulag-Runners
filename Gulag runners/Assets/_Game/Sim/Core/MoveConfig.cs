@@ -12,8 +12,6 @@ namespace GulagRunners.Sim
     ///                 2.5 m floor height. That is a design decision, not a leftover: if a
     ///                 jump cleared a floor, ladders and hatches would be pointless and the
     ///                 fog-of-war topology of docs/05 would collapse.
-    ///   Dodge         0.35 s of invulnerability, straight from docs/02.
-    ///   Stamina       3 charges, 1.2 s each, straight from docs/02.
     /// </summary>
     public struct MoveConfig
     {
@@ -84,19 +82,7 @@ namespace GulagRunners.Sim
         /// </summary>
         public int LadderRegrabFrames;
 
-        public Fix DodgeSpeed;
-        public int DodgeFrames;
-        public int DodgeRecoverFrames;
-        /// <summary>Charges one dodge costs. More than one is what makes dodges rare.</summary>
-        public int DodgeStaminaCost;
 
-        /// <summary>
-        /// Stamina is a pool of small charges rather than a count of dodges, because docs/02
-        /// spends it on two things at once — the dodge and holding a guard — and those two cannot
-        /// share a resource sensibly unless one of them can cost more than the other.
-        /// </summary>
-        public int StaminaMax;
-        public int StaminaRecoverFrames;
 
         public Fix BodyWidth;
 
@@ -201,18 +187,6 @@ namespace GulagRunners.Sim
         public Fix ScriptRiseMargin;
 
         /// <summary>
-        /// Whether the defensive button can also dash.
-        ///
-        /// OFF. docs/02 gives the medieval fighter one defensive button and lets a
-        /// direction turn it into a dodge, but the dodge is a burst of speed, and this
-        /// game has one ground speed on purpose: a fighter who can suddenly travel faster
-        /// than he runs reads as the character accelerating for no reason the player
-        /// asked for. With it off the same button raises the guard whatever is held, and
-        /// the guard's 42% is the only thing that changes how fast anybody moves.
-        /// </summary>
-        public bool AllowDodge;
-
-        /// <summary>
         /// How far below the top of a ladder the climb-out may begin.
         ///
         /// Because the top of a ladder box sits ABOVE the floor it serves -- measured on
@@ -305,15 +279,6 @@ namespace GulagRunners.Sim
             c.ScriptMaxFrames = 30;       // 0.50 s
             c.LadderRegrabFrames = 12;    // 0.20 s
 
-            c.DodgeSpeed         = Fix.FromMilli(4800);   // 1.68 m, down from 2.45
-            c.DodgeFrames        = 21;  // 0.35 s of invulnerability, straight from docs/02
-            c.DodgeRecoverFrames = 9;
-            c.DodgeStaminaCost   = 2;      // two dodges back to back, then 2.4 s of waiting
-
-            c.StaminaMax            = 4;   // docs/02 says 3; 4 so a block can cost 1 and a
-                                           // dodge 2, which is the "two in a row" the dodge
-                                           // was retuned to in the movement pass
-            c.StaminaRecoverFrames  = 72;  // 1.2 s a charge, straight from docs/02
 
             // The fighter who actually ships, read off Player 1.prefab and Player 2.prefab.
             //
@@ -336,7 +301,6 @@ namespace GulagRunners.Sim
             c.LadderStandOff = Fix.FromMilli(80);    // half a stick figure
             c.MantleMinFrames = 40;                  // 0.67 s: the two phases no longer share, so each needs its own
             c.ScriptRiseMargin = Fix.FromMilli(120);   // 12 cm: a step, not a storey
-            c.AllowDodge = true;     // docs/31: the one defensive button, and it works now
             c.MantleRise = Fix.FromMilli(450);
             c.AllowLadderJump = false;
 

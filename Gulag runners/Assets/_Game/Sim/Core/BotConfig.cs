@@ -63,9 +63,6 @@ namespace GulagRunners.Sim
         /// <summary>Chance per decision of putting the guard up, in thousandths.</summary>
         public int GuardPermille;
 
-        /// <summary>Chance per decision of rolling, when it has the stamina, in thousandths.</summary>
-        public int DodgePermille;
-
         /// <summary>
         /// Chance per decision that a backing-off bot keeps its blade on you rather than
         /// turning to run, in thousandths.
@@ -98,7 +95,6 @@ namespace GulagRunners.Sim
 
             c.AggressionPermille = 550;
             c.GuardPermille = 220;
-            c.DodgePermille = 90;
             c.FightingWithdrawalPermille = 700;
 
             c.FloorGap = Fix.FromMilli(1200);
@@ -116,7 +112,6 @@ namespace GulagRunners.Sim
             {
                 case BotSkill.Dummy:
                     c.AggressionPermille = 0;
-                    c.DodgePermille = 0;
                     c.GuardPermille = 250;
                     c.FightingWithdrawalPermille = 0;
                     break;
@@ -125,7 +120,6 @@ namespace GulagRunners.Sim
                     c.ReactionFrames = 9;        // 0.15 s
                     c.ReactionJitter = 5;
                     c.AggressionPermille = 700;
-                    c.DodgePermille = 160;
                     c.GuardPermille = 300;
                     break;
             }

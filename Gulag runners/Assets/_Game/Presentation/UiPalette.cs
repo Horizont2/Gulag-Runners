@@ -98,7 +98,6 @@ namespace GulagRunners.Game
         /// </summary>
         public static readonly Color Attack = new Color(0.95f, 0.35f, 0.26f, 1f);
 
-        public static readonly Color Dodge = new Color(0.40f, 0.68f, 1.00f, 1f);
         public static readonly Color Action = new Color(0.93f, 0.84f, 0.62f, 1f);
         public static readonly Color Jump = new Color(0.55f, 0.86f, 0.96f, 1f);
 

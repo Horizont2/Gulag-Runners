@@ -159,7 +159,7 @@ namespace GulagRunners.GameEditor
         /// field, for whoever is filling the tool in.
         ///
         /// The note is not decoration. "hud/bar/fill" is obvious to the person who wrote
-        /// the builder and a guess to everybody else: is it the health bar or the stamina
+        /// the builder and a guess to everybody else: is it the health bar or the round
         /// bar, does it include the frame, is it drawn stretched or nine-sliced, and which
         /// end does it empty from. Somebody dragging twenty-eight sprites in should not
         /// have to open the source to find out, and a wrong guess here is a screen that

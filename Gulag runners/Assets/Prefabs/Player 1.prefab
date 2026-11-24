@@ -208,13 +208,6 @@ MonoBehaviour:
     scriptMinFrames: 10
     scriptMaxFrames: 30
     ladderRegrabFrames: 12
-    allowDodge: 1
-    dodgeSpeed: 4.8
-    dodgeFrames: 21
-    dodgeRecoverFrames: 9
-    dodgeStaminaCost: 2
-    staminaMax: 4
-    staminaRecoverFrames: 72
     bodyWidth: 0.3
     bodyHeight: 0.91
     crouchHeight: 0.682
@@ -367,8 +360,6 @@ MonoBehaviour:
   armedCrouchIdleState: Crouch Idle Armed
   armedCrouchMoveState: Crouch Walk
   armedAirState: Jump Armed
-  armedDodgeState: Sprint Armed
-  dodgeState: Run Fast
   airState: Jumping Up
   climbUpState: Ladder Up
   climbDownState: Ladder Down
@@ -380,8 +371,6 @@ MonoBehaviour:
   ladderExitState: Ladder Down End
   crouchIdleState: Sitting
   crouchMoveState: Walk
-  blockIdleState: Block Idle
-  blockMoveState: 
   searchState: 
   scaleSearchByPrySpeed: 1
   attackState: Attack
@@ -395,7 +384,6 @@ MonoBehaviour:
   attackContactStart: 0.4
   attackContactEnd: 0.6
   hitState: Hit
-  blockImpactState: Block Hit
   staggerState: Stagger
   deathState: 
   splitUpperBody: 1
@@ -460,7 +448,6 @@ MonoBehaviour:
   stick: {fileID: 0}
   aimStick: {fileID: 0}
   jumpButton: {fileID: 0}
-  dodgeButton: {fileID: 0}
   actionButton: {fileID: 0}
   verticalThreshold: 0.5
 --- !u!114 &2977951454544065635

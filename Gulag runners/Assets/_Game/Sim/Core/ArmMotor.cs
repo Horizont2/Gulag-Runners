@@ -625,8 +625,10 @@ namespace GulagRunners.Sim
             // body twice for one stroke, however long the stroke lies across it.
             if (attacker.SpentOn == attacker.SwingId) return;
             if (attacker.HitLock > 0 || attacker.ClashLock > 0) return;
-            if (attacker.HitStopTimer > 0 || attacker.DodgeTimer > 0) return;
-            if (victim.DodgeTimer > 0) return;          // the dodge's invulnerable frames
+            if (attacker.HitStopTimer > 0) return;
+
+            // There are no invulnerable frames any more: the dodge that owned them has
+            // gone with the stamina that paid for it. A body that is in the way is hit.
 
             int share = SwingPermille(in attacker, in move, in cfg);
             if (share <= 0) return;

@@ -2,7 +2,7 @@ import re
 import os
 import io
 import sim_motor_mirror as T
-from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, JMP, DOD
+from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, JMP
 
 
 def crouching_exists():
@@ -129,13 +129,10 @@ ok &= check("lands on the one-way", abs(F(s.y)-(ow[0][1]+0.1)) < 0.05, f"y={F(s.
 for _ in range(30): step(s, DN | JMP, W)
 ok &= check("drops through with down+jump", F(s.y) < ow[0][1]-0.2, f"y={F(s.y):.2f}")
 
-print("\n7. dodge")
-s = S(0, 0.0); run(s, 0, 10)
-x0 = F(s.x); stam0 = s.stam
-for _ in range(21): step(s, DOD | R, W)
-ok &= check("dodge travels", abs(F(s.x)-x0) > 1.5, f"d={F(s.x)-x0:.2f} m")
-ok &= check("dodge costs stamina", s.stam == C["SMAX"] - C["DCOST"],
-      f"{C['SMAX']} -> {s.stam}, a dodge costs {C['DCOST']}")
+# 7 was the dodge: that it travelled about a metre and a half, and that it cost two of
+# the four stamina charges. Neither the move nor the pool exists, so there is nothing left
+# to measure. The number is left unused rather than shuffled up, so a run of this file
+# against an older one still lines the sections up.
 
 print("\n8. crouch under a lintel")
 wallx = left + 2*room_w
@@ -207,30 +204,6 @@ walk(s2, R, lambda st: F(st.y) > 0.4)
 check("the haul costs most of the speed it was walked at", F(s2.vx) < 1.5,
       f"{F(s2.vx):.2f} m/s of {F(T.C['RUN']):.2f} on the step up")
 
-print("\n11b. the dodge is rare and short")
-s2 = S(-3.0, 0.9)
-for _ in range(120):
-    step(s2, 0, W)
-    if s2.mode == "ground": break
-# back to back: a dodge is 21 frames plus 9 of recovery, so 30 is as fast as it can be asked for
-dodges = 0
-for t in range(95):
-    was = s2.mode
-    step(s2, (DOD | R) if t % 30 == 0 else 0, W)
-    if s2.mode == "dodge" and was != "dodge": dodges += 1
-check("the pool pays for two in a row and then makes you wait", dodges == 2,
-      f"{dodges} dodges in 1.6 s, stamina {s2.stam}/{C['SMAX']}")
-
-s2 = S(-3.0, 0.9)
-for _ in range(120):
-    step(s2, 0, W)
-    if s2.mode == "ground": break
-start = F(s2.x)
-for _ in range(23):
-    step(s2, DOD, W)
-travel = abs(F(s2.x) - start)
-check("and it is a step out of reach, not a teleport", 1.4 < travel < 2.0, f"{travel:.2f} m")
-
 print("\n11. facing")
 s = S(0, 0.0); run(s, 0, 10)
 run(s, R, 30)
@@ -239,10 +212,6 @@ run(s, L, 30)
 ok &= check("faces left when running left", s.facing == -1, f"facing={s.facing}")
 run(s, 0, 60)
 ok &= check("keeps facing after stopping", s.facing == -1, f"facing={s.facing}")
-f0 = s.facing
-for _ in range(21): step(s, DOD, W)
-ok &= check("dodge keeps the current facing", s.facing == f0, f"facing={s.facing}")
-
 print("\n11c. being hit: the push is spent, not braked")
 # What a blow hands the body and what the body does with it. The shape matters more than
 # the distance here: a push that snaps to full speed on one tick AND stops dead at the end

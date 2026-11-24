@@ -28,7 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import arena_demo_geometry as geometry                       # noqa: E402
-from sim_motor_mirror import S, step, X, F, C, L, R, JMP, DOD  # noqa: E402
+from sim_motor_mirror import S, step, X, F, C, L, R, JMP  # noqa: E402
 
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
 
@@ -135,7 +135,10 @@ def main(argv):
 
         for storey in floors:
             for side, toward in (("left", L), ("right", R)):
-                for label, extra in (("running", 0), ("jumping", JMP), ("dodging", DOD)):
+                # The dodge was the third way out of an arena and the fastest; it has
+                # gone with the stamina that paid for it, so a wall only has to hold a
+                # body that is running or jumping at it.
+                for label, extra in (("running", 0), ("jumping", JMP)):
                     got = escapes(w, storey, toward, extra, label)
                     if got is None:
                         continue

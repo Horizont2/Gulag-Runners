@@ -6,7 +6,7 @@ spot, and no amount of tuning the choices fixes it, because the fault is the rat
 not something you can see reliably by eye in a fight, and it is trivial to count here.
 
 Mirrors Gulag runners/Assets/_Game/Sim/Core/BotBrain.cs and BotConfig.cs."""
-from sim_motor_mirror import M, F, C, L, R, UP, DN, JMP, DOD
+from sim_motor_mirror import M, F, C, L, R, UP, DN, JMP
 from loot_mirror import Rng, ITEMS
 import arm_combat as AC
 
@@ -21,13 +21,13 @@ def config(skill=SPARRING):
     c = dict(skill=skill,
              react=14, jitter=8,
              range_pm=850, close_pm=450,
-             aggression=550, guard=220, dodge=90, withdraw=700,
+             aggression=550, guard=220, withdraw=700,
              floor_gap=M(1200), ladder_seek=M(14000))
 
     if skill == DUMMY:
-        c.update(aggression=0, dodge=0, guard=250, withdraw=0)
+        c.update(aggression=0, guard=250, withdraw=0)
     elif skill == HUNTER:
-        c.update(react=9, jitter=5, aggression=700, dodge=160, guard=300)
+        c.update(react=9, jitter=5, aggression=700, guard=300)
     return c
 
 
@@ -152,10 +152,10 @@ def think(bot, me, foe, w, cfg):
 
     flags = 0
 
+    # Too far: close, and do not swing at the air on the way in. A roll for a sideways
+    # hop used to sit here; there is no such move to press.
     if flat > want:
         flags |= R if towards > 0 else L
-        if roll(bot, cfg["guard"] // 2):
-            flags |= DOD
         return flags
 
     if flat < too_close:
@@ -169,11 +169,6 @@ def think(bot, me, foe, w, cfg):
         bot.swing_hold = 0
         bot.guard_hold = cfg["react"] * 2
         return 0
-
-    if roll(bot, cfg["dodge"]) and me.stam > 1:
-        flags |= L if towards > 0 else R
-        flags |= DOD
-        return flags
 
     if roll(bot, cfg["aggression"]):
         swing(bot, me)

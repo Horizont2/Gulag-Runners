@@ -207,7 +207,7 @@ namespace GulagRunners.GameEditor
                            + "Tools > Gulag Runners > Setup > Build hit effects");
 
             if (Object.FindFirstObjectByType<HudView>() == null)
-                faults.Add("no HudView, so there is no health, no stamina and no controls. "
+                faults.Add("no HudView, so there is no health, no clock and no controls. "
                            + "Tools > Gulag Runners > Build the combat HUD");
             else
                 foreach (TouchInputSource touch in

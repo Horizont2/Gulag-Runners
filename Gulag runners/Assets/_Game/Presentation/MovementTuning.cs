@@ -73,52 +73,6 @@ namespace GulagRunners.Game
                  "Without it, jumping off while still holding up re-grabs the ladder at once.")]
         public int ladderRegrabFrames = 12;
 
-        [Header("Dodge")]
-        [Tooltip("The dodge. There is no longer anything else in the Off branch, which is " +
-                 "why this now defaults on.\n\n" +
-                 "IT DEFAULTED OFF, and the tooltip here explained why: the same button " +
-                 "raised the guard instead, and one ground speed everywhere is worth more " +
-                 "than a dash. Both halves of that were true when it was written and docs/31 " +
-                 "then took the guard out -- the weapon is the defence now -- and this field " +
-                 "was not revisited. MoveConfig.Default() was: it says AllowDodge = true and " +
-                 "comments that it works. ToConfig below overwrites it from here, so false " +
-                 "won, in both fighter prefabs, in every arena.\n\n" +
-                 "What that shipped is a fight with no defensive action at all. The HUD " +
-                 "draws a dodge button, TouchInputSource reads it, HudView lights it up " +
-                 "whenever there is stamina for it, three of the ten loading tips teach it " +
-                 "-- and CombatMotor gates the whole move on this one bool, so pressing it " +
-                 "did nothing, MoveMode.Dodging was never entered, PlayerEffects.dodge never " +
-                 "fired, and the stamina charges were spent on nothing and therefore always " +
-                 "full.\n\n" +
-                 "Off is still a legitimate choice -- the dash really is the only thing in " +
-                 "the game that changes a fighter's speed. It is no longer a SILENT one: " +
-                 "HudView greys the button out when this is off, so a build that does not " +
-                 "have the dodge does not advertise it.")]
-        public bool allowDodge = true;
-
-        [Tooltip("Travel is speed x duration: 4.8 m/s over 0.35 s is 1.68 m — about two body " +
-                 "widths. Only used while Allow Dodge is on.")]
-        public float dodgeSpeed = 4.8f;
-        [Tooltip("0.35 s of invulnerability, from docs/02. This is the window, not the distance.")]
-        public int dodgeFrames = 21;
-        public int dodgeRecoverFrames = 9;
-        [Tooltip("Charges one dodge costs. Raising this against the pool below is what makes " +
-                 "dodges rare: two of four means two in a row and no more.\n\n" +
-                 "Three was the guard-era number, against a pool of six. Both fighter " +
-                 "prefabs carry two out of four, MoveConfig.Default() says two out of four, " +
-                 "and the loading tip quotes two out of four -- so the C# default here was " +
-                 "the only copy that disagreed, and it is the one a fighter added to a new " +
-                 "scene would have got.")]
-        public int dodgeStaminaCost = 2;
-
-        [Header("Stamina")]
-        [Tooltip("A pool of small charges, not a count of dodges: docs/02 spends stamina on the " +
-                 "dodge AND on holding a guard, and those two cannot share a resource unless one " +
-                 "of them can cost more.")]
-        public int staminaMax = 4;
-        [Tooltip("Frames per charge. At 72 a spent dodge is back in 2.4 s, which is the " +
-                 "figure the loading tip quotes and the number both prefabs carry.")]
-        public int staminaRecoverFrames = 72;
 
         [Header("Body")]
         [Tooltip("Collision width. Match it to the character's silhouette, not to its T-pose " +
@@ -230,13 +184,6 @@ namespace GulagRunners.Game
             c.ScriptMinFrames = scriptMinFrames;
             c.ScriptMaxFrames = Mathf.Max(scriptMinFrames, scriptMaxFrames);
             c.LadderRegrabFrames = ladderRegrabFrames;
-            c.AllowDodge = allowDodge;
-            c.DodgeSpeed = M(dodgeSpeed);
-            c.DodgeFrames = dodgeFrames;
-            c.DodgeRecoverFrames = dodgeRecoverFrames;
-            c.DodgeStaminaCost = Mathf.Max(1, dodgeStaminaCost);
-            c.StaminaMax = staminaMax;
-            c.StaminaRecoverFrames = staminaRecoverFrames;
             c.BodyWidth = M(bodyWidth);
             c.BodyHeight = M(bodyHeight);
             c.CrouchHeight = M(Mathf.Min(crouchHeight, bodyHeight * 0.75f));

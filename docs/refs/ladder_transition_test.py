@@ -2,12 +2,13 @@
 
 A "jerk" is not a feeling here, it is two numbers.
 
-How far the body moves in a single 60 Hz tick. Walking covers 0.050 m, climbing 0.033 m, a dodge
-0.117 m. A dodge is the fastest the game ever moves a body deliberately, so no scripted move may
-beat it. The old ladder grab moved up to half a metre in one tick -- twenty-seven metres a second,
-four times a dodge -- and the old fixed-length climb-out peaked at ten metres a second. Free fall
-and the jump arc are exempt: they are driven by gravity, which is continuous by construction and
-faster than anything on foot by design.
+How far the body moves in a single 60 Hz tick. Walking covers 0.050 m and climbing 0.033 m, and
+walking is now the fastest the game moves a body deliberately on the flat -- the dodge that used to
+hold that title, at 0.117 m a tick, has gone with the stamina that paid for it. So no scripted move
+may beat a walk by much. The old ladder grab moved up to half a metre in one tick -- twenty-seven
+metres a second, ten times a walking step -- and the old fixed-length climb-out peaked at ten metres
+a second. Free fall and the jump arc are exempt: they are driven by gravity, which is continuous by
+construction and faster than anything on foot by design.
 
 And how smoothly that speed changes. Both scripted moves start and end at rest, so an easing curve
 that is flat at both ends makes continuity structural rather than something to tune: it is enough
@@ -64,10 +65,9 @@ def skip_crouch(what, *rest):
 
 W = world()
 RUN_STEP = F(M.mul(C["RUN"], M.DT))          # the body's own top walking step
-DODGE_STEP = F(M.mul(C["DODGE"], M.DT))      # the fastest deliberate move in the game
-# Twice a walking step. A dodge is the absolute ceiling -- nothing deliberate may beat the
-# fastest deliberate move in the game -- but on a ladder there is no reason to come near it, so the
-# bound here is the stricter one the motor can actually hold.
+# Twice a walking step. The ceiling used to be quoted as the dodge, which was the fastest
+# deliberate move there was; with that gone the walk IS the fastest, and this bound is now the
+# plain statement of the rule rather than a stricter stand-in for it.
 JERK = RUN_STEP * 2
 FREE = ("air",)                              # gravity's business, not the ladder's
 
@@ -119,8 +119,8 @@ def embedded(s):
     return M.any_solid(W, (s.x - half, s.y, s.x + half, s.y + h))
 
 
-print(f"a walking step is {RUN_STEP:.3f} m/tick and a dodge {DODGE_STEP:.3f}; "
-      f"nothing on foot here may pass {JERK:.3f}\n")
+print(f"a walking step is {RUN_STEP:.3f} m/tick, the fastest the game moves a body on foot; "
+      f"nothing here may pass {JERK:.3f}\n")
 
 print("1. grabbing a ladder from the ground")
 s = settle(ladder_x(0) + 0.45, 0.9)          # off to one side, as a player arriving will be

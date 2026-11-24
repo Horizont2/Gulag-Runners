@@ -13,8 +13,9 @@ namespace GulagRunners.Game
     /// measured was the half second between the request and anything happening.
     ///
     /// What is left of the buttons is jump and action. The guard is gone because a weapon
-    /// is stopped by another weapon, and the dodge moved onto the right stick's shoulder
-    /// as a tap -- see <see cref="dodgeButton"/>.
+    /// is stopped by another weapon. The dodge that was left on that button has gone
+    /// with the stamina that paid for it, so there is no defensive control at all: a
+    /// fighter answers an attack by moving, by striking first, or by being elsewhere.
     ///
     /// Leave a reference empty and that control is simply absent.
     /// </summary>
@@ -37,9 +38,6 @@ namespace GulagRunners.Game
         [Tooltip("Optional. See Stick.")]
         public VirtualButton jumpButton;
 
-        [Tooltip("Optional. Dodge: a roll with invulnerable frames, for two stamina.")]
-        public VirtualButton dodgeButton;
-
         [Tooltip("Optional. Pick up, open a chest.")]
         public VirtualButton actionButton;
 
@@ -60,7 +58,6 @@ namespace GulagRunners.Game
             }
 
             if (jumpButton != null && jumpButton.Pressed) flags |= InputFlags.Jump;
-            if (dodgeButton != null && dodgeButton.Pressed) flags |= InputFlags.Dodge;
             if (actionButton != null && actionButton.Pressed) flags |= InputFlags.Action;
 
             int aimX = 0, aimY = 0;

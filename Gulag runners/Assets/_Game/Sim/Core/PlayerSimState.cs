@@ -5,7 +5,10 @@ namespace GulagRunners.Sim
         Airborne = 0,
         Grounded = 1,
         Climbing = 2,
-        Dodging  = 3,
+        // 3 was Dodging. The dodge is gone and the number is left empty rather than
+        // closed up: Mantling and Mounting keep the values they have always had, so a
+        // rollback buffer or a saved state from either side of this change still means
+        // the same thing.
         /// <summary>Climbing out at the top of a ladder onto the floor beside it.</summary>
         Mantling = 4,
         /// <summary>Reaching for a ladder: the short move that puts the body onto the rungs.</summary>
@@ -49,13 +52,8 @@ namespace GulagRunners.Sim
 
         public int CoyoteTimer;
         public int JumpBufferTimer;
-        public int DodgeTimer;
-        public int DodgeRecoverTimer;
         public int FallThroughTimer;
         public int StepNoiseTimer;
-
-        public int StaminaCharges;
-        public int StaminaTimer;
 
         // ----------------------------------------------------------------- the arm
         // Direct-aim combat (docs/31). The arm is not a state machine any more, it is a
@@ -232,12 +230,11 @@ namespace GulagRunners.Sim
 
         public bool Dead;
         public int DeathTimer;
-        public bool DodgeHeldLastTick;
 
         /// <summary>
         /// Ground speed cap as a fraction of the run speed, in thousandths. Zero means no cap —
-        /// the combat layer sets it so that a raised guard slows the body without the movement
-        /// motor needing to know what a guard is.
+        /// the combat layer sets it so a swing slows the body without the movement motor
+        /// needing to know what a swing is.
         /// </summary>
         public short SpeedPermille;
 
@@ -269,9 +266,6 @@ namespace GulagRunners.Sim
         /// to hold your weapon.
         /// </summary>
         public bool WasParried;
-
-        /// <summary>The dodge's invulnerable frames (docs/02).</summary>
-        public bool Invulnerable => DodgeTimer > 0;
 
         /// <summary>Hurt, staggered or dead: not steering, not swinging.</summary>
         public bool Reeling => HitstunTimer > 0 || StaggerTimer > 0 || Dead;
@@ -349,7 +343,6 @@ namespace GulagRunners.Sim
             s.StandingOn = -1;
             s.PickedUp = ItemId.None;
             s.Dropped = ItemId.None;
-            s.StaminaCharges = config.StaminaMax;
             s.Health = 100;
             s.KilledBy = DeathCause.None;
             s.Noise = NoiseLevel.Silent;

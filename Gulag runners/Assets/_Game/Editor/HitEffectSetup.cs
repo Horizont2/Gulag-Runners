@@ -117,10 +117,6 @@ namespace GulagRunners.GameEditor
                   new Color(0.76f, 0.72f, 0.64f, 0.3f), new Color(0.76f, 0.72f, 0.64f, 0f),
                   h * 0.06f);
 
-            ParticleSystem dodgePuff = System_(feet, "Dodge Puff", material, made);
-            Burst(dodgePuff, 12, 0.25f, 0.40f, 1.4f, 3.0f, h * 0.055f, h * 0.20f, 0.1f,
-                  new Color(0.82f, 0.80f, 0.74f, 0.4f), new Color(0.82f, 0.80f, 0.74f, 0f),
-                  h * 0.07f);
 
             ParticleSystem died = System_(body, "Death Burst", material, made);
             Burst(died, 26, 0.45f, 0.80f, 1.2f, 3.2f, h * 0.090f, h * 0.030f, 0.9f,
@@ -140,7 +136,7 @@ namespace GulagRunners.GameEditor
             TrailRenderer trail = Trail(fighter, material, h);
 
             Wire(fighter, sparks, blood, parry, quiet, loud, landSoft, landHard,
-                 jumpPuff, dodgePuff, died, working, opened, trail, feet, body);
+                 jumpPuff, died, working, opened, trail, feet, body);
 
             // And anything an imported pack does better. Nothing happens if none is
             // installed, which is why this is a pass rather than a second menu item.
@@ -171,7 +167,7 @@ namespace GulagRunners.GameEditor
                          ParticleSystem sparks, ParticleSystem blood,
                          ParticleSystem parry, ParticleSystem quiet, ParticleSystem loud,
                          ParticleSystem landSoft, ParticleSystem landHard,
-                         ParticleSystem jumpPuff, ParticleSystem dodgePuff,
+                         ParticleSystem jumpPuff,
                          ParticleSystem died, ParticleSystem working, ParticleSystem opened,
                          TrailRenderer trail, Transform feet, Transform body)
         {
@@ -190,7 +186,6 @@ namespace GulagRunners.GameEditor
             fx.landSoft.particles = landSoft;
             fx.landHard.particles = landHard;
             fx.jump.particles = jumpPuff;
-            fx.dodge.particles = dodgePuff;
             fx.hurt.particles = sparks;
             fx.parried.particles = parry;
             fx.death.particles = died;

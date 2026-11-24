@@ -100,29 +100,55 @@ def clock(mmss):
 # carries crouchSpeed and crouchHeight, and a config field nothing sets is not a mechanic.
 # What makes a mechanic real is the motor entering it.
 LIVE = [
-    ("CROUCH", "Sim/Core/PlayerMotor.cs", r"Crouching\s*=\s*(?!false)\w",
+    (("CROUCH",), "Sim/Core/PlayerMotor.cs", r"Crouching\s*=\s*(?!false)\w",
      "the motor only ever sets Crouching to false, so nothing can crouch"),
-    ("GUARD", "Sim/Core/PlayerMotor.cs", r"\bGuard(ing)?\s*=\s*(?!false)\w",
+    (("GUARD",), "Sim/Core/PlayerMotor.cs", r"\bGuard(ing)?\s*=\s*(?!false)\w",
      "docs/31 took the guard out; the weapon is the defence"),
-    ("BLOCK", "Sim/Core/CombatMotor.cs", r"\bBlock(ing)?\s*=\s*(?!false)\w",
+    (("BLOCK",), "Sim/Core/CombatMotor.cs", r"\bBlock(ing)?\s*=\s*(?!false)\w",
      "docs/31 took the block out with the guard"),
+    (("DODGE", "ROLL"), "Sim/Core/PlayerMotor.cs", r"MoveMode\.Dodging",
+     "the dodge is gone: the motor has no Dodging mode to enter"),
+    (("STAMINA", "CHARGE"), "Sim/Core/PlayerMotor.cs", r"StaminaCharges\s*[-+]?=",
+     "stamina is gone: nothing spends a charge and nothing recovers one"),
 ]
 
 
 def dead(pool):
-    """Tips naming a mechanic the simulation never enters."""
+    """Tips that disagree with the simulation about whether a mechanic exists.
+
+    BOTH WAYS ROUND, which is the half this was missing. It used to catch only a tip
+    teaching something the motor no longer does -- and three tips in a row have been
+    rewritten for a mechanic that was itself removed a few weeks later, each time leaving
+    the search screen explaining a control the player does not have.
+
+    So a tip may NAME a dead mechanic, as long as it names it as absent: "THERE IS NO
+    GUARD AND NO ROLL" is the correct tip to write once the guard and the roll are gone.
+    And the reverse is now a fault too -- a tip saying there is no dodge, on a build where
+    the motor enters MoveMode.Dodging, is exactly as wrong and twice as confusing.
+    """
     out = []
-    for word, where, proof, why in LIVE:
+    for words, where, proof, why in LIVE:
         src = read(os.path.join(GAME, where))
         if src is None:
             continue
-        if re.search(proof, src):
-            continue                      # the mechanic is alive; nothing to say
+        alive = re.search(proof, src) is not None
         for tip in pool:
-            if word in tip:
-                out.append(f"a tip still teaches {word}: {tip!r}. But {why}. Rewrite it "
-                           f"for whatever replaced it, as the guard tips were rewritten "
-                           f"for the dodge")
+            for word in words:
+                if word not in tip:
+                    continue
+                # Flattened first: a tip is laid out across three lines and the break
+                # falls wherever it fits, so "NO\nROLL" is the same denial as "NO ROLL".
+                flat = " ".join(tip.replace("\\n", " ").split())
+                denied = f"NO {word}" in flat or f"NOTHING {word}" in flat
+                if alive and denied:
+                    out.append(f"a tip says there is no {word}: {tip!r}. But there is -- "
+                               f"{where} still matches {proof!r}. One of the two is wrong, "
+                               f"and the tip is the cheaper one to fix")
+                elif not alive and not denied:
+                    out.append(f"a tip still teaches {word}: {tip!r}. But {why}. Rewrite "
+                               f"it for whatever replaced it, or say plainly that the "
+                               f"mechanic is gone -- a tip may name it as absent")
+                break
     return out
 
 
@@ -158,11 +184,6 @@ def main():
     desp_hp = number(combat, "DesperationHealthPermille", "CombatConfig")
     desp_dmg = number(combat, "DesperationDamagePermille", "CombatConfig")
 
-    charges = number(move, "StaminaMax", "MoveConfig")
-    dodge_cost = number(move, "DodgeStaminaCost", "MoveConfig")
-    dodge_frames = number(move, "DodgeFrames", "MoveConfig")
-    dodge_recover = number(move, "DodgeRecoverFrames", "MoveConfig")
-    recover = number(move, "StaminaRecoverFrames", "MoveConfig")
     bare = number(chest, "BareFrames", "ChestConfig")
     wear = number(chest, "ToolWear", "ChestConfig")
 
@@ -195,16 +216,12 @@ def main():
         ("PARRY", [words[parry] + " FRAMES", seconds(stagger, 1).replace("0.8", "EIGHT TENTHS")],
          "ParryFrames, and Parry() setting StaggerTimer to StaggerFrames"),
 
-        # The guard is gone (docs/31 -- the weapon is the defence), so these three are
-        # about the dodge, which is what the player reaches for instead.
-        ("DODGE COSTS", [words[dodge_cost], words[charges]],
-         "MoveConfig.DodgeStaminaCost out of StaminaMax"),
-
-        ("CHARGE RETURNS", [seconds(recover) + " S", seconds(recover * dodge_cost)],
-         "MoveConfig.StaminaRecoverFrames, times DodgeStaminaCost for a whole dodge"),
-
-        ("DODGE IS", [seconds(dodge_frames) + " S", seconds(dodge_recover) + " S"],
-         "MoveConfig.DodgeFrames (invulnerable) and DodgeRecoverFrames"),
+        # Three tips stood here and taught, in turn, a guard button and then a dodge.
+        # Each time the mechanic went and the tip stayed, so the search screen spent
+        # weeks explaining a control the player does not have. The replacements teach
+        # the ABSENCE of all three, which is why they are checked below by ABSENT rather
+        # than pinned to a number -- there is no number left to pin them to, and the way
+        # they can go wrong is for one of those mechanics to come back.
 
         ("HOLDS HIM", [f"{(1000 - decay) // 10}%"],
          "ComboStunDecayPermille: every blow after the first is worth this much less "

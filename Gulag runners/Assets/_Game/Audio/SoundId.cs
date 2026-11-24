@@ -24,7 +24,10 @@ namespace GulagRunners.Game
         Climb = 15,
         LadderGrab = 16,
         LadderOut = 17,
-        Dodge = 18,
+        // 18 was Dodge. The dodge has gone with the stamina that paid for it, so
+        // there is no such moment to be heard. The number is left as a gap rather
+        // than reused, for the same reason as 55 and 56 below: a saved sound table
+        // in a scene stores the value, not the name.
 
         // ---- loot (docs/03: the chest table is a noise table)
         ChestPryQuiet = 30,

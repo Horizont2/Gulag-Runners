@@ -56,8 +56,6 @@ namespace GulagRunners.GameEditor
                 EditorGUILayout.Vector2Field("Feet", pc.FeetPosition);
                 EditorGUILayout.TextField("Velocity", $"{s.Velocity.X}, {s.Velocity.Y}");
                 EditorGUILayout.Toggle("Crouching", s.Crouching);
-                EditorGUILayout.Toggle("Invulnerable", s.Invulnerable);
-                EditorGUILayout.IntField("Stamina", s.StaminaCharges);
                 EditorGUILayout.EnumPopup("Noise this tick", s.Noise);
             }
 

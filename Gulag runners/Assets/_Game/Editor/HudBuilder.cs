@@ -105,7 +105,7 @@ namespace GulagRunners.GameEditor
             /// What this piece IS, in English, shown under its row in the window.
             ///
             /// The key is a path and the path is a filing system, not an explanation:
-            /// "hud/bar/fill" does not say whether it is the health bar or the stamina
+            /// "hud/bar/fill" does not say whether it is the health bar or the round
             /// bar, whether the frame is part of it, which end it empties from, or that
             /// it is stretched rather than nine-sliced. Somebody dragging twenty-eight
             /// sprites in should not have to read this file to find out, and a wrong
@@ -176,23 +176,24 @@ namespace GulagRunners.GameEditor
                       + "builder shortens it from the right by setting the rect, so any "
                       + "pattern along it will be cut off rather than squashed."),
             // 36, where the sheet said 20. A lamp 1.6 mm across is read at a glance by
-            // nobody, and these are read at a glance or not at all: they are the only
-            // thing on screen that says how much stamina is left.
+            // nobody, and this one is read at a glance or not at all: it is the only thing
+            // on screen that says how far along the series is.
             new Asset("hud/pip", 36, 36,
                       "One round counter -- the little lamp that lights up for each round a "
-                      + "fighter has won, and the same mark again for each point of "
-                      + "stamina, in a row between the two health bars. Drawn LIT and "
-                      + "filling its own file; the builder dims it for a round nobody has "
-                      + "won yet, so do not draw an empty version."),
+                      + "fighter has won, in a row between the two health bars. Drawn LIT "
+                      + "and filling its own file; the builder dims it for a round nobody "
+                      + "has won yet, so do not draw an empty version."),
             new Asset("hud/button/ring-154", 154, 154,
                       "The biggest round button face, 154 px at 1x: the attack stick's ring "
                       + "on the right of the screen. Just the ring and whatever sits behind "
                       + "it -- the glyph is a separate row -- and transparent in the middle, "
                       + "because the thumb has to see where it is pushing."),
             new Asset("hud/button/ring-130", 130, 130,
-                      "The middle round button face, for block and dodge. Same drawing as "
-                      + "the big ring, one size down; the builder picks which ring each "
-                      + "button gets, so these three are sizes rather than roles."),
+                      "The middle round button face. Same drawing as the big ring, one size "
+                      + "down; the builder picks which ring each button gets, so these "
+                      + "three are sizes rather than roles. Nothing claims this one since "
+                      + "the guard and the dodge went -- it is kept so a later control has "
+                      + "a middle size to take."),
             // 116, not 101: docs/23 wants 9 mm under a thumb and 101 units is 7.9 mm. The
             // name is the row's, not a measurement -- the three rings stay a set of three
             // sizes, and this is still the smallest of them.
@@ -315,7 +316,7 @@ namespace GulagRunners.GameEditor
                 "pinned to, so nothing walks off the edge.",
                 EditorStyles.wordWrappedMiniLabel);
             _readoutScale = EditorGUILayout.Slider(
-                new GUIContent("Readouts", "Health bars, stamina, clock, sound arc."),
+                new GUIContent("Readouts", "Health bars, round marks, clock, sound arc."),
                 _readoutScale, 0.4f, 1.25f);
             _slotScale = EditorGUILayout.Slider(
                 new GUIContent("Equipment slots",
@@ -732,7 +733,7 @@ namespace GulagRunners.GameEditor
                 // and there the sheet wins, because the layout has rows underneath: the
                 // white bar frame is 5.6:1 against the row's 13.75:1, and letting the art
                 // decide would make it 79 units tall where 32 was planned, swallowing the
-                // stamina charges at 80 and the names at 104. A squashed frame is a thing
+                // band at 80 and the names at 104. A squashed frame is a thing
                 // somebody can see and redraw; a HUD that has quietly eaten two of its own
                 // rows is not.
                 bool disagrees = a.H > 0f && Mathf.Abs(native.y - a.H) > a.H * 0.25f;
@@ -901,11 +902,9 @@ namespace GulagRunners.GameEditor
 
             view.bar1 = Bar(bar, sprites, "Health / P1", 134, 36, 0f, out RectTransform fill1);
             view.bar1.fillRect = fill1;
-            view.bar1.pips = Pips(bar, sprites, "Stamina / P1", 134, 80, 0f);
 
             view.bar2 = Bar(bar, sprites, "Health / P2", 1346, 36, 1f, out RectTransform fill2);
             view.bar2.fillRect = fill2;
-            view.bar2.pips = Pips(bar, sprites, "Stamina / P2", 1346 + barWidth, 80, 1f);
 
             view.clock = Label(bar, "Round Clock", "1:24", 840, 30, 240, 50,
                                0.5f, TextAnchor.UpperCenter, 40);
@@ -913,9 +912,10 @@ namespace GulagRunners.GameEditor
             // The names, outside each bar and pushed against the same edge it is. Which
             // bar is blue already says who you are; the names say who the other one is.
             //
-            // 124 from the top, not 104: the stamina row above them is 36 units tall now
-            // rather than 20, and a name at 104 would have the last pip drawn through it.
-            // The band is the bar at 36, the pips at 80 and the name under both.
+            // 124 from the top, which is where the stamina row used to sit. The row is
+            // gone with the mechanic and the names have not moved up into the gap: the
+            // round marks are drawn in that band and a name at 104 would run through
+            // them.
             view.name1 = Label(bar, "Name / P1", "RUNNER_1", 134, 124, 320, 30,
                                0f, TextAnchor.UpperLeft, 24);
             view.name2 = Label(bar, "Name / P2", "RUNNER_2", 1920 - 134 - 320, 124, 320, 30,
@@ -983,7 +983,7 @@ namespace GulagRunners.GameEditor
         }
 
         /// <summary>
-        /// Rounds taken, as a short row of the same mark the stamina uses.
+        /// Rounds taken, as a short row of the one pip mark.
         ///
         /// Built at the longest a series can be rather than at what this match needs, so
         /// changing MatchState.roundsToWin does not need the HUD rebuilding -- HudView
@@ -1244,12 +1244,11 @@ namespace GulagRunners.GameEditor
             view.action = Button(controls, sprites, "Button / Action", "hud/button/ring-101",
                                  "hud/button/glyph-action", 1430, 540);
 
-            // The old block ring, doing the one job that survived. docs/02 gave the
-            // fighter a single defensive button carrying both the guard and the dodge;
-            // the guard is the weapon's job now, so this is purely the dodge -- and the
-            // dodge is switched on for the first time since the movement pass.
-            view.dodge = Button(controls, sprites, "Button / Dodge", "hud/button/ring-130",
-                                "hud/button/glyph-block", 1430, 390);
+            // AND NO THIRD RING. docs/02 gave the fighter a single defensive button
+            // carrying both the guard and the dodge. The guard became the weapon's job
+            // (docs/31) and the dodge has gone with the stamina that paid for it, so the
+            // button went too rather than sitting there wearing a shield and doing
+            // nothing -- which is what it had been doing.
         }
 
         /// <summary>
@@ -1354,9 +1353,6 @@ namespace GulagRunners.GameEditor
             touch.stick = Stick(ring, knob);
             touch.aimStick = Stick(aimRing, aimKnob);
 
-            // The dodge is the action ring's neighbour now rather than the block ring,
-            // because there is no block ring: a weapon is stopped by another weapon.
-            touch.dodgeButton = Hit(view.dodge);
             touch.actionButton = Hit(view.action);
             touch.jumpButton = Hit(view.jump);
             EditorUtility.SetDirty(touch);
@@ -1368,7 +1364,6 @@ namespace GulagRunners.GameEditor
             List<string> dead = new List<string>();
             (touch.stick != null ? live : dead).Add("move stick");
             (touch.aimStick != null ? live : dead).Add("attack stick");
-            (touch.dodgeButton != null ? live : dead).Add("dodge");
             (touch.actionButton != null ? live : dead).Add("action");
             (touch.jumpButton != null ? live : dead).Add("jump");
 

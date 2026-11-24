@@ -38,12 +38,11 @@ namespace GulagRunners.Game
         [Tooltip("Every line of the interface. Alpha is carried here, not per element.")]
         public Color line = UiPalette.Ink;
 
-        [Tooltip("A guard that cannot be raised, and anything else switched off.")]
+        [Tooltip("A control that cannot do anything, and anything else switched off.")]
         [Range(0f, 1f)] public float disabledAlpha = 0.28f;
 
-        [Tooltip("A stamina charge already spent.")]
+        [Tooltip("A round not won yet: the empty half of the round marks beside a name.")]
         [Range(0f, 1f)] public float spentAlpha = 0.28f;
-
         [Header("Rarity")]
         public Color common = UiPalette.Common;
         public Color rare = UiPalette.Rare;
@@ -56,7 +55,6 @@ namespace GulagRunners.Game
                  "nothing else. The glyph inside is not interface, it is the verb — and a " +
                  "verb is found faster by colour than by shape, especially under a thumb.")]
         public Color attackGlyph = UiPalette.Attack;
-        public Color dodgeGlyph = UiPalette.Dodge;
         public Color actionGlyph = UiPalette.Action;
         public Color jumpGlyph = UiPalette.Jump;
 
@@ -117,7 +115,7 @@ namespace GulagRunners.Game
         }
     }
 
-    /// <summary>One fighter's health bar and stamina row.</summary>
+    /// <summary>One fighter's health bar.</summary>
     [Serializable]
     public sealed class HudBar
     {
@@ -132,9 +130,6 @@ namespace GulagRunners.Game
                  "Anchor it to the side health drains FROM: left for player one, right for " +
                  "player two, so the two bars empty towards the middle of the screen.")]
         public RectTransform fillRect;
-
-        [Tooltip("Stamina charges, in order. One per charge the fighter can hold.")]
-        public Graphic[] pips = Array.Empty<Graphic>();
 
         /// <summary>
         /// THE CHIP BAR: the damage just taken, still draining.
@@ -215,11 +210,11 @@ namespace GulagRunners.Game
     /// <summary>
     /// Which palette colour a button's glyph takes.
     ///
-    /// Dodge and not Block. The member was called Block from when there was a guard button,
-    /// and it has painted the DODGE button since docs/31 took the guard out -- so the one
-    /// place in the HUD that named the mechanic was naming it on the wrong control.
+    /// Two buttons now. The ring that wore a shield is gone with the mechanics behind it:
+    /// the guard became the weapon's job in docs/31, and the dodge that was left on the
+    /// button has gone with the stamina that paid for it.
     /// </summary>
-    public enum GlyphInk { Attack, Dodge, Action, Jump }
+    public enum GlyphInk { Attack, Action, Jump }
 
     /// <summary>The ring and knob of a thumb stick, for painting.</summary>
     [System.Serializable]
@@ -266,7 +261,7 @@ namespace GulagRunners.Game
 
         [Tooltip("Which fighter is holding THIS phone. 0 is player one.\n\n" +
                  "Everything keyed to a point of view reads this: whose equipment column " +
-                 "is drawn, which bar is blue, and whose stamina is hidden.")]
+                 "is drawn and which bar is blue.")]
         [Range(0, 1)] public int localPlayer;
 
         [Tooltip("Take the side from the match rather than from the number above.\n\n" +
@@ -280,13 +275,6 @@ namespace GulagRunners.Game
                  "\"player one\". The player then watches the OTHER fighter's health bar " +
                  "drain, and the only way to describe that is \"the bars are wrong\".")]
         public bool followTheDevice = true;
-
-        [Tooltip("Hide the opponent's stamina charges. Their health is public -- a fight " +
-                 "where neither side can see the damage is not a fight -- but what they " +
-                 "have left to spend is not.\n\n" +
-                 "The pips stay in the scene and are painted to nothing, so switching this " +
-                 "off puts them straight back without rebuilding the HUD.")]
-        public bool hideOpponentStamina = true;
 
         [Header("Palette")]
         public HudPalette palette = new HudPalette();
@@ -367,8 +355,10 @@ namespace GulagRunners.Game
         /// </summary>
         public HudStick aim = new HudStick();
 
-        /// <summary>The old block ring, now purely the dodge (docs/31).</summary>
-        public HudButton dodge = new HudButton();
+        // The ring that used to sit here wore a shield, raised no guard and fired a
+        // dodge. Both mechanics are gone -- the guard became the weapon's job in docs/31,
+        // the dodge went with the stamina that paid for it -- so the control went with
+        // them rather than being left on screen doing nothing.
         public HudButton action = new HudButton();
         public HudButton jump = new HudButton();
 
@@ -550,14 +540,9 @@ namespace GulagRunners.Game
 
             int max = MaxHealth;
             int health = max;
-            int charges = int.MaxValue;
 
             if (player != null && Application.isPlaying)
-            {
-                PlayerSimState s = player.State;
-                health = Mathf.Clamp(s.Health, 0, max);
-                charges = s.StaminaCharges;
-            }
+                health = Mathf.Clamp(player.State.Health, 0, max);
 
             // Desperation is a MECHANIC, not a mood: below this share docs/02 makes bare
             // hands hit 40% harder. A player who is not shown it finds out by losing.
@@ -609,15 +594,6 @@ namespace GulagRunners.Game
                 if (!Mathf.Approximately(scale.x, bar.shown))
                     bar.fillRect.localScale = new Vector3(bar.shown, scale.y, scale.z);
             }
-
-            // What the opponent has left to spend is THEIR information. Shown, it turns
-            // every exchange into arithmetic: wait for the fourth pip to go and walk in.
-            // Hidden, the same read has to be made off their body and their mistakes,
-            // which is the fight docs/02 describes.
-            float visible = !mine && hideOpponentStamina ? 0f : 1f;
-            for (int i = 0; i < bar.pips.Length; i++)
-                Tint(bar.pips[i], Fade(i < charges ? accent : Fade(accent, palette.spentAlpha),
-                                       visible));
         }
 
         void PaintClock()
@@ -836,17 +812,14 @@ namespace GulagRunners.Game
             // The three buttons, each told whether the thumb is on it and whether pressing
             // it would do anything.
             //
-            // `disabled` used to be a hard-coded false on all three lines. The parameter was
-            // there, the painting honoured it, and nothing ever passed it a real value -- so
-            // a player tapping DODGE with no stamina got no dodge, no explanation, and a
-            // button that looked exactly as it always had. That is the difference between a
-            // game that is hard and a game that is broken, and from the thumb's side they
-            // are indistinguishable.
+            // `disabled` used to be a hard-coded false on every line. The parameter was
+            // there, the painting honoured it, and nothing ever passed it a real value, so
+            // a button that could do nothing looked exactly as it always had. That is the
+            // difference between a game that is hard and a game that is broken, and from
+            // the thumb's side they are indistinguishable.
             PlayerController me = Mine();
             InputFlags held = Held(me);
 
-            PaintButton(dodge, GlyphInk.Dodge,
-                        (held & InputFlags.Dodge) != 0, CanDodge(me));
             PaintButton(action, GlyphInk.Action,
                         (held & InputFlags.Action) != 0, CanAct(me));
             PaintButton(jump, GlyphInk.Jump,
@@ -869,33 +842,6 @@ namespace GulagRunners.Game
         /// </summary>
         static InputFlags Held(PlayerController me) =>
             me != null && Application.isPlaying ? me.ReadLocalInput().Flags : InputFlags.None;
-
-        /// <summary>
-        /// Would a dodge happen if they pressed it?
-        ///
-        /// Asked with the simulation's OWN condition and the simulation's own number --
-        /// CombatMotor gates a dodge on `StaminaCharges >= move.DodgeStaminaCost` and the
-        /// cost comes off PlayerController.Config. A copy of that number in the HUD would be
-        /// a second source of truth for a rule, and the day somebody tuned the cost the
-        /// button would start lying.
-        /// </summary>
-        static bool CanDodge(PlayerController me)
-        {
-            if (me == null || !Application.isPlaying) return true;
-
-            // AllowDodge first, and it is the half that was missing. CombatMotor's gate opens
-            // with `move.AllowDodge &&`, and that bool was false in both fighter prefabs for
-            // however long it took to notice -- so this method answered "yes, there is
-            // stamina for it", the ring lit up, the thumb pressed it, and nothing happened.
-            // Four charges that nothing could spend therefore sat permanently full beside it.
-            //
-            // Off is a legitimate setting; advertising a button that is off is not. The whole
-            // defence against that shipping again is this one term: with the dodge switched
-            // off the ring is drawn refused, like a weapon with no swings left in it.
-            if (!me.Config.AllowDodge) return false;
-
-            return me.State.StaminaCharges >= me.Config.DodgeStaminaCost;
-        }
 
         /// <summary>
         /// Would the action button do anything?
@@ -949,8 +895,8 @@ namespace GulagRunners.Game
         /// Three states and not two, and the third is the one that matters. A press that
         /// WORKED and a press that was REFUSED must not look the same, because the game's
         /// answer to each is different and the player has no other way to tell them apart:
-        /// a dodge that did not happen for want of stamina looks, from the thumb, exactly
-        /// like a dodge the game failed to notice. One is information and the other is a
+        /// a grab that found nothing looks, from the thumb, exactly like a grab the game
+        /// failed to notice. One is information and the other is a
         /// bug, and a control that cannot distinguish them trains the player to distrust it.
         ///
         ///   AVAILABLE, untouched   full ink, resting size
@@ -1025,7 +971,6 @@ namespace GulagRunners.Game
 
         Color Ink(GlyphInk ink) => ink switch
         {
-            GlyphInk.Dodge => palette.dodgeGlyph,
             GlyphInk.Action => palette.actionGlyph,
             GlyphInk.Jump => palette.jumpGlyph,
             _ => palette.attackGlyph
@@ -1069,7 +1014,6 @@ namespace GulagRunners.Game
             // Literals are right HERE and nowhere else -- there is no simulation yet to ask,
             // and a button greyed out on the start screen would promise the player a
             // restriction that does not exist.
-            PaintButton(dodge, GlyphInk.Dodge, false, true);
             PaintButton(action, GlyphInk.Action, false, true);
             PaintButton(jump, GlyphInk.Jump, false, true);
 
@@ -1087,8 +1031,6 @@ namespace GulagRunners.Game
                 Vector3 s = bar.fillRect.localScale;
                 bar.fillRect.localScale = new Vector3(1f, s.y, s.z);
             }
-            float visible = !mine && hideOpponentStamina ? 0f : 1f;
-            foreach (Graphic pip in bar.pips) Tint(pip, Fade(accent, visible));
         }
 
         /// <summary>Copies the rarity ramp out of the simulation's own palette.</summary>
