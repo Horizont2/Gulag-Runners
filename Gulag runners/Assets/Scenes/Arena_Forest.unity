@@ -148151,7 +148151,8 @@ MonoBehaviour:
   cameras:
   - {fileID: 1900000135}
   - {fileID: 1900000139}
-  splitForTwoLocalHumans: 1
+  splitInTheEditor: 0
+  logChanges: 1
   showing: 
 --- !u!114 &1900009600
 MonoBehaviour:

@@ -330,7 +330,7 @@ namespace GulagRunners.Game
             // the only thing that has happened.
             string said = _pool != null ? _pool.Status : "";
             Say(string.IsNullOrEmpty(said)
-                    ? Matchmaker.Detail(rating, elapsed, played) : said);
+                    ? Matchmaker.Detail(rules, rating, elapsed, played) : said);
             Fill(Matchmaker.Cast(rules, elapsed));
 
             // The bar above is this screen's: it measures how far the net has been cast

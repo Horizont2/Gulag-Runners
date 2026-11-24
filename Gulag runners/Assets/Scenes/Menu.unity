@@ -11215,8 +11215,8 @@ MonoBehaviour:
     StartBand: 60
     WidenPerSecond: 25
     MaxBand: 400
-    BotAfterSeconds: 25
-    TrainingBotAfterSeconds: 10
+    BotAfterSeconds: 0
+    TrainingBotAfterSeconds: 0
   foundSeconds: 1.1
   waitingForThem: "{0} IS STILL LOADING\u2026 {1}"
   tips:

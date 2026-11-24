@@ -24,6 +24,7 @@ overtakes the thing it frames is the thing people call a jerk.
     python3 camera_check.py
 """
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +35,7 @@ from sim_motor_mirror import S, step, X, F, C, JMP, R   # noqa: E402
 
 CAM = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game",
                    "Presentation", "SideViewCamera.cs")
+GAME = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game")
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
 
 FPS = 60.0
@@ -237,6 +239,44 @@ def worst(bounded):
     return worst_ratio, where
 
 
+
+def one_writer():
+    """Does anything but LocalCamera decide which camera draws?
+
+    THIS CHECK EXISTS BECAUSE THE ANSWER WAS NO TWICE OVER. Every arena authors two
+    cameras into split-screen rects with applyViewportRect ticked on both, and for a
+    while two components fought over undoing that: NetMatch, from the point a network
+    LINK took the clock, and LocalCamera, from who was driving. A match against a bot
+    never reached NetMatch's half, so it kept the split -- two letterboxed strips on a
+    phone -- and NetMatch's partner call put the split back on release, which LocalCamera
+    never noticed because it only wrote when its own inputs had changed.
+
+    A fact with two owners goes stale. So: exactly one runtime file may write
+    Camera.enabled, a camera's rect or SideViewCamera.applyViewportRect, and it is
+    LocalCamera. SideViewCamera is allowed its own rect, which is the field it exists to
+    apply, and anything under Editor/ is allowed because a tool runs with somebody
+    looking at it.
+    """
+    allowed = {"LocalCamera.cs", "SideViewCamera.cs"}
+    writes = re.compile(r"(?:\.enabled\s*=|\.rect\s*=|applyViewportRect\s*=)")
+    found = []
+    for base, dirs, files in os.walk(GAME):
+        dirs[:] = [d for d in dirs if d not in ("Editor", "obj")]
+        for f in sorted(files):
+            if not f.endswith(".cs") or f in allowed:
+                continue
+            src = open(os.path.join(base, f), encoding="utf-8", errors="ignore").read()
+            # Comments are allowed to name the old code; only statements count.
+            src = re.sub(r"^\s*(//|///).*$", "", src, flags=re.M)
+            for line in src.splitlines():
+                if not writes.search(line):
+                    continue
+                if not re.search(r"[Cc]am|[Vv]iewport|\brect\b", line):
+                    continue
+                found.append((f, line.strip()))
+    return found
+
+
 def main():
     # The camera's own numbers have to be the ones measured, or this measures a fiction.
     text = open(CAM, encoding="utf-8").read()
@@ -283,6 +323,17 @@ def main():
             f"{where[3]:.1f} m/s). That is the sharp movement at the top of a jump: a window "
             f"that overtakes what it frames. The anchor must be MOVED at the body's own "
             f"speed, never assigned, and the follow time eased rather than switched.")
+
+    others = one_writer()
+    if others:
+        for f, line in others[:6]:
+            problems.append(f"{f} writes a camera: {line!r}. LocalCamera is the only "
+                            "thing that decides which camera draws and how much of the "
+                            "screen it gets -- see its own summary for what two owners "
+                            "cost.")
+    else:
+        print("  one writer: LocalCamera, and nothing else touches a camera's enabled "
+              "flag, its rect or applyViewportRect")
 
     for p in problems:
         print("  " + p)

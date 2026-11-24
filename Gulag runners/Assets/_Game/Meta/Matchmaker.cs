@@ -62,11 +62,12 @@ namespace GulagRunners.Meta
             WidenPerSecond = 25,
             // 400 is two leagues. Past that the match is not a match, it is a lesson.
             MaxBand = 400,
-            // docs/07 is honest about the online being small at the start. Twenty-five
-            // seconds of nothing is a player deciding the game is dead, and a bot they
-            // were told about is better than a queue they were not.
-            BotAfterSeconds = 25,
-            TrainingBotAfterSeconds = 10,
+            // ZERO IS NEVER, for both of these, and that is the whole of "it must not
+            // start me on my own". See OfferBot. The band above goes on opening instead,
+            // so an empty pool is answered by looking further up and down the ladder
+            // rather than by a stand-in.
+            BotAfterSeconds = 0,
+            TrainingBotAfterSeconds = 0,
         };
     }
 
@@ -89,10 +90,19 @@ namespace GulagRunners.Meta
         public static int Band(in SearchRules rules, float seconds)
         {
             int start = Mathf.Max(0, rules.StartBand);
-            int max = Mathf.Max(start, rules.MaxBand);
-            int widened = start + Mathf.RoundToInt(Mathf.Max(0f, seconds) *
-                                                   Mathf.Max(0, rules.WidenPerSecond));
-            return Mathf.Min(max, widened);
+
+            // AND IT IS NOT CAPPED. MaxBand used to be a ceiling, and a band that stops
+            // growing is a queue that refuses the only other person in it: two players
+            // 500 points apart, alone in the pool, waited for each other for ever while
+            // the search told them both it was still looking.
+            //
+            // MaxBand is now the point at which the net counts as FULLY CAST -- what
+            // Cast() reports and the bar fills to -- and past it the band keeps opening,
+            // which is what "if there is nobody, look higher and lower" means. The hard
+            // rule is still Ladder.MayMeet's and it is untouched: nobody inside their
+            // first twenty matches is shown a Platinum, however empty the queue is.
+            return start + Mathf.RoundToInt(Mathf.Max(0f, seconds) *
+                                            Mathf.Max(0, rules.WidenPerSecond));
         }
 
         /// <summary>
@@ -100,8 +110,9 @@ namespace GulagRunners.Meta
         ///
         /// Not a guess at how long this will take. A search has no length, and a bar that
         /// crawls to nine tenths and stops is the oldest lie on a loading screen. This is
-        /// a real measurement of a real thing: at 0 only your own rating is accepted, at 1
-        /// the net is as wide as it will ever go and the next step is a bot.
+        /// a real measurement of a real thing: at 0 only your own rating is accepted,
+        /// and at 1 the net is as wide as the ladder calls meaningful -- two leagues --
+        /// after which it goes on opening and this stays at 1.
         /// </summary>
         public static float Cast(in SearchRules rules, float seconds)
         {
@@ -127,34 +138,55 @@ namespace GulagRunners.Meta
         }
 
         /// <summary>
-        /// Stop waiting and put a bot in.
+        /// Stop waiting and put a bot in -- which, at the shipped numbers, never happens.
         ///
-        /// Immediately for the first five matches, because docs/09 makes those bots by
-        /// design and says so to the player's face -- there is nobody to wait for. After
-        /// that, only once the net is as wide as it goes AND the clock has run out, so a
+        /// BOTH DEADLINES DEFAULT TO ZERO, AND ZERO MEANS NEVER. Starting a player alone
+        /// against a bot they did not ask for is the one thing the search must not do:
+        /// it reads as a match, it counts as a match, and the player cannot tell it from
+        /// the real thing until the opponent does something no person would. If the pool
+        /// is empty the answer is to keep looking, higher and lower by rating, which is
+        /// what the uncapped band in Band() is for.
+        ///
+        /// The code stays because the deadline is a number somebody may want: a build
+        /// handed to playtesters with no servers behind it is a build where a practice
+        /// opponent after thirty seconds is kinder than a spinner. Set the number and it
+        /// comes back.
+        ///
+        /// This is NOT the substitution in NetMatch. An opponent who drops in the middle
+        /// of a round is a match already in progress, and finishing it against a bot is
+        /// better than abandoning it; that one is untouched.
+        ///
+        /// Below: the training pool on its own clock, and otherwise only once the net is
+        /// as wide as MaxBand calls cast AND the clock has run out, so a
         /// bot is never the answer to a search that simply had not finished looking.
         /// </summary>
         public static bool OfferBot(in SearchRules rules, int matchesPlayed, float seconds)
         {
-            // The training pool waits too, just less. See TrainingBotAfterSeconds for
-            // what returning true here unconditionally used to cost.
-            //
-            // No band test on this one. Cast() asks whether the net has been let out as
-            // far as it goes, which is the right question for somebody with a rating to
-            // protect; a player on four matches has no rating worth the name and nothing
-            // to widen towards, so the clock is the whole of it.
+            // Zero is never, and it is the shipped value for both.
             if (Ladder.PoolFor(matchesPlayed) == Pool.Training)
-                return seconds >= Mathf.Max(1, rules.TrainingBotAfterSeconds);
+                return rules.TrainingBotAfterSeconds > 0 &&
+                       seconds >= rules.TrainingBotAfterSeconds;
 
-            return seconds >= Mathf.Max(1, rules.BotAfterSeconds) &&
+            return rules.BotAfterSeconds > 0 &&
+                   seconds >= rules.BotAfterSeconds &&
                    Cast(rules, seconds) >= 1f;
         }
 
         /// <summary>What the line under the phase says while searching.</summary>
-        public static string Detail(double rating, float seconds, int matchesPlayed)
+        public static string Detail(in SearchRules rules, double rating,
+                                   float seconds, int matchesPlayed)
         {
-            if (Ladder.PoolFor(matchesPlayed) == Pool.Training) return "TRAINING";
-            return $"{Ladder.Name(rating).ToUpperInvariant()}  ·  {Mathf.FloorToInt(seconds)} S";
+            // The band, because that is the thing that is actually happening. A player
+            // watching a search wants to know it is still doing something, and "plus or
+            // minus three hundred points" says what "still looking" does not: it is
+            // looking FURTHER than it was a moment ago.
+            string band = $"±{Band(rules, seconds)}";
+
+            if (Ladder.PoolFor(matchesPlayed) == Pool.Training)
+                return $"TRAINING  ·  {band}  ·  {Mathf.FloorToInt(seconds)} S";
+
+            return $"{Ladder.Name(rating).ToUpperInvariant()}  ·  {band}  ·  "
+                   + $"{Mathf.FloorToInt(seconds)} S";
         }
     }
 }

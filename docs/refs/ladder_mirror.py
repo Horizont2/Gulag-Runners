@@ -218,16 +218,26 @@ def play_days(days, day_of=day_number, streak=advance_streak):
 
 # ---------------------------------------------------------------- the search
 # Mirrors Assets/_Game/Meta/Matchmaker.cs.
-START_BAND, WIDEN_PER_SECOND, MAX_BAND, BOT_AFTER = 60, 25, 400, 25
+START_BAND, WIDEN_PER_SECOND, MAX_BAND, BOT_AFTER = 60, 25, 400, 0
 
-# The same, for somebody inside their first five matches. It was effectively zero --
-# offer_bot returned True on the first frame for the training pool -- which is what
-# docs/29 asks for and is also why two fresh installs could never be put together.
-TRAINING_BOT_AFTER = 10
+# BOTH DEADLINES ARE ZERO AND ZERO MEANS NEVER. Starting a player alone against a bot
+# they did not ask for is the one thing the search must not do: it reads as a match, it
+# counts as a match, and they cannot tell it from the real thing until the opponent does
+# something no person would. An empty pool is answered by looking further up and down the
+# ladder, which is what the uncapped band() below is for.
+TRAINING_BOT_AFTER = 0
 
 
 def band(seconds, start=START_BAND, widen=WIDEN_PER_SECOND, top=MAX_BAND):
-    return min(max(start, top), start + round(max(0.0, seconds) * widen))
+    """Mirrors Matchmaker.Band, and it is NOT capped.
+
+    MAX_BAND used to be a ceiling, and a band that stops growing is a queue that refuses
+    the only other person in it: two players 500 points apart, alone in the pool, waited
+    for each other for ever while the search told them both it was still looking. It is
+    the point at which the net counts as fully cast now -- what cast() reports -- and past
+    it the band goes on opening. The hard rule is still may_meet's.
+    """
+    return start + round(max(0.0, seconds) * max(0, widen))
 
 
 def cast(seconds, start=START_BAND, widen=WIDEN_PER_SECOND, top=MAX_BAND):
@@ -246,12 +256,10 @@ def accepts(seconds, matches_a, rating_a, matches_b, rating_b, **kw):
 
 def offer_bot(matches_played, seconds, bot_after=BOT_AFTER,
               training_bot_after=TRAINING_BOT_AFTER, **kw):
-    # No band test for the training pool: cast() asks whether the net is all the way out,
-    # which is the right question for somebody with a rating to protect, and a player on
-    # four matches has nothing to widen towards.
+    # Zero is never, for both, and that is the shipped value.
     if pool_for(matches_played) == "Training":
-        return seconds >= max(1, training_bot_after)
-    return seconds >= max(1, bot_after) and cast(seconds, **kw) >= 1.0
+        return training_bot_after > 0 and seconds >= training_bot_after
+    return bot_after > 0 and seconds >= bot_after and cast(seconds, **kw) >= 1.0
 
 
 # ------------------------------------------------------------------- the pool
@@ -267,7 +275,12 @@ class BotQueue:
     dead. This floor stays under every real pool that is ever put above it.
     """
 
-    def __init__(self, seed=0x5EED):
+    def __init__(self, seed=0x5EED, bot_after=BOT_AFTER,
+                 training_bot_after=TRAINING_BOT_AFTER):
+        # The deadlines are arguments so a test can switch the floor on. They ship at
+        # zero, which is never -- see TRAINING_BOT_AFTER.
+        self.bot_after = bot_after
+        self.training_bot_after = training_bot_after
         self.state = IDLE
         self.seed = seed
         self._waiting = False
@@ -282,7 +295,8 @@ class BotQueue:
     def poll(self, seconds):
         if self.state != LOOKING or self._waiting:
             return
-        if not offer_bot(self._played, seconds):
+        if not offer_bot(self._played, seconds, bot_after=self.bot_after,
+                         training_bot_after=self.training_bot_after):
             return
         self.found = dict(local_player=0, seed=self.seed, against_bot=True,
                           opponent_rating=1500,

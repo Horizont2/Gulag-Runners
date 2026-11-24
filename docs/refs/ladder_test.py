@@ -177,8 +177,14 @@ check("and never more unsure than a brand new player", away["deviation"] <= 350.
 
 print("\nthe search: the net widens, and never past what the ladder allows")
 check("the net starts at 60 points either side", m.band(0) == 60, str(m.band(0)))
-check("it is fully cast at 14 seconds (400)", m.band(14) == 400, str(m.band(14)))
-check("and never goes wider", m.band(600) == 400, str(m.band(600)))
+check("it is fully cast at 13.6 seconds (400)", m.band(13.6) == 400, str(m.band(13.6)))
+# This used to assert that the band NEVER goes wider than 400, and that assertion is
+# what left two players 500 points apart waiting for each other for ever in an empty
+# pool. MAX_BAND is the point at which the net counts as cast -- what the bar fills to
+# -- and past it the search goes on looking further up and down the ladder.
+check("and keeps opening past it", m.band(600) > 400, str(m.band(600)))
+check("so two players 500 apart do meet, once the queue has been thin a while",
+      m.accepts(20, 40, 1200.0, 40, 1700.0))
 check("the bar runs 0 to 1 across that",
       m.cast(0) == 0.0 and m.cast(14) == 1.0,
       "%.2f..%.2f" % (m.cast(0), m.cast(14)))
@@ -212,18 +218,20 @@ check("a trainee is given a human of their own rating", peer, "accepted at no wa
 pro = [s for s in range(0, 121) if m.accepts(s, 2, 1500, 400, 1750)]
 check("a trainee is never given a Platinum, at ANY wait (121 s)", not pro, str(pro[:3]))
 
-print("\nand when it gives up, it gives up to a bot rather than to a spinner")
-# Not from the first second any more: ten, which is long enough for a ticket to find
-# somebody already in the queue and short enough that a first-time player alone in it
-# still gets a match before they wonder whether the button worked.
-check("a trainee is not fobbed off at nine seconds", not m.offer_bot(2, 9))
-check("but is at ten", m.offer_bot(2, 10))
-check("a veteran is not fobbed off at twenty seconds", not m.offer_bot(40, 20))
-check("but is at thirty", m.offer_bot(40, 30))
-early = [s for s in range(0, 25) if m.offer_bot(40, s)]
-check("never before the net is fully cast AND the clock has run", not early, str(early[:3]))
-check("the net being wide is not enough on its own",
-      not m.offer_bot(40, 14) and m.cast(14) >= 1.0)
+print("\nand it does not give up at all: nobody is started on their own")
+# Both deadlines ship at zero and zero means never. Starting a player alone against a
+# bot they did not ask for reads as a match, counts as a match, and cannot be told from
+# the real thing until the opponent does something no person would.
+never = [t for t in range(0, 601) if m.offer_bot(2, t) or m.offer_bot(40, t)]
+check("no bot at any wait up to ten minutes, in either pool", not never, str(never[:3]))
+check("and the band is still opening out there", m.band(600) > m.band(60))
+
+# The deadline is a number somebody may want -- a build handed to playtesters with no
+# servers behind it -- so it still works when it is set.
+check("set the deadline and it comes back", m.offer_bot(40, 30, bot_after=25))
+check("and not before the clock has run", not m.offer_bot(40, 20, bot_after=25))
+check("nor before the net is fully cast",
+      not m.offer_bot(40, 10, bot_after=5) and m.cast(10) < 1.0)
 
 print("\nthe weekly streak, which until now nothing in the game could earn")
 # docs/09 lists it at 150 gold "for retention" and does not define the week. Days in a
@@ -276,30 +284,27 @@ print("\nthe pool, as the search screen actually drives it")
 # moving it broke the one thing docs/09 is most specific about.
 
 at, got = m.search(m.BotQueue(), played=2)
-check("somebody placing is given a practice opponent at ten seconds",
-      at is not None and 9.9 <= at <= 10.2, "%.2f s" % (at if at is not None else -1))
-check("and told that is what it is", got and got["name"] == "TRAINING OPPONENT", str(got))
+check("the floor never fires for somebody placing", at is None and got is None,
+      "%.2f s" % (at if at is not None else -1))
 
 at, got = m.search(m.BotQueue(), played=40)
-check("a veteran waits the full twenty-five seconds", at is not None and 24.9 <= at <= 25.2,
+check("nor for a veteran, however long the queue is empty", at is None and got is None,
       "%.2f s" % (at if at is not None else -1))
-check("and is told the queue was thin, not that they were placing",
-      got and got["name"].startswith("A BOT"), str(got))
-check("the net is fully cast by the time it happens", m.cast(at) >= 1.0)
 
 q = m.BotQueue()
 m.search(q, played=2)
 check("a pairing is handed over exactly once", q.try_take() is None,
       "a screen that read it twice would load two matches")
 
-q = m.BotQueue()
+q = m.BotQueue(bot_after=25)
 q.begin(1500, 40)
 q.poll(30.0)
 q.cancel()
 check("cancelling clears a pairing that was waiting", q.try_take() is None)
 check("and leaves the pool idle", q.state == m.IDLE)
 
-at, got = m.search(m.BotQueue(seed=0), played=2)
+# With the floor switched on, which is the only way it ever runs now.
+at, got = m.search(m.BotQueue(seed=0, training_bot_after=10), played=2)
 check("even a bot match is dealt from a number",
       got is not None and "seed" in got,
       "the arena is dealt, not sent -- a match with no seed is two different arenas")

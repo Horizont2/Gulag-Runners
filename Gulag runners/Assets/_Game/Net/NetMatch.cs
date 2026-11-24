@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using GulagRunners.Game;
@@ -412,12 +411,18 @@ namespace GulagRunners.Net
                 // -- harmlessly, since its answer is now discarded -- but a bot still
                 // running behind a human-controlled body is the kind of thing somebody
                 // spends an afternoon on when the fighter does something unexplained.
+                //
+                // takeOver, not enabled. FighterBrain.TakingOver is `takeOver &&
+                // isActiveAndEnabled && self != null`, so switching the COMPONENT off is
+                // one of three ways to stop it and the wrong one: docs/22 makes enabled
+                // the tick box a person uses and takeOver the thing that hands a body to
+                // the computer, and a tool that switches the component off leaves the
+                // scene looking as though somebody did that on purpose.
                 FighterBrain brain = f.GetComponentInChildren<FighterBrain>(true);
-                if (brain != null) brain.enabled = false;
+                if (brain != null) brain.takeOver = false;
             }
 
             BeMe(link.LocalPlayer);
-            OneCamera(true);
 
             // Both devices throw away whatever match they were in the middle of and deal
             // the same one, from the number the host chose. Without this the two phones
@@ -479,12 +484,19 @@ namespace GulagRunners.Net
             Say("");
 
             // Their brain back on, and only theirs: the human's fighter keeps its
-            // controls. TakeClock switched every brain off; this undoes exactly one.
+            // controls. TakeClock cleared both; this undoes exactly one.
+            //
+            // AND IT SETS takeOver, WHICH IS THE BUG THIS LINE USED TO BE. It wrote
+            // brain.enabled = true, and TakingOver is `takeOver && isActiveAndEnabled &&
+            // self != null` -- so with takeOver 0, which is what every arena ships with,
+            // re-enabling the component changed nothing at all. The dropped opponent's
+            // fighter simply stopped moving, while the log line below said a bot had it
+            // and the match played on against a statue.
             PlayerController left = At(link != null ? link.RemotePlayer : 1);
             if (left != null)
             {
                 FighterBrain brain = left.GetComponentInChildren<FighterBrain>(true);
-                if (brain != null) brain.enabled = true;
+                if (brain != null) { brain.enabled = true; brain.takeOver = true; }
             }
 
             if (link != null) link.Stop();
@@ -550,49 +562,18 @@ namespace GulagRunners.Net
         /// The guest is player two, and until this runs the guest is watching player one's
         /// camera, reading player one's health bar, and about to bank player one's win.
         /// </summary>
-        /// <summary>
-        /// One screen, one camera.
-        ///
-        /// The arena is built for one phone with two people on it, so it carries a
-        /// camera per fighter stacked half a screen each. That is right there and
-        /// wrong the moment there are two phones: this player owns the whole screen
-        /// and the other fighter's camera is rendering a second view of a match
-        /// nobody on this device is watching, over the top half of it.
-        ///
-        /// The Camera component rather than the object, because the object also
-        /// carries the round intro and outro shots, and switching those off would
-        /// take the opening of the match with it.
-        ///
-        /// Put back on release, so disconnecting hands the scene back the way it was
-        /// found and a one-phone match still has both halves.
-        /// </summary>
-        void OneCamera(bool alone)
-        {
-            foreach (SideViewCamera cam in FindObjectsByType<SideViewCamera>(
-                         FindObjectsInactive.Include, FindObjectsSortMode.None))
-            {
-                Camera drawn = cam.GetComponent<Camera>();
-                bool mine = cam == view;
-
-                if (!alone)
-                {
-                    if (drawn != null) drawn.enabled = true;
-                    cam.viewportRect = _splitScreen.TryGetValue(cam, out Rect was)
-                        ? was : cam.viewportRect;
-                    continue;
-                }
-
-                if (drawn != null) drawn.enabled = mine;
-                if (!mine) continue;
-
-                if (!_splitScreen.ContainsKey(cam)) _splitScreen[cam] = cam.viewportRect;
-                cam.applyViewportRect = true;
-                cam.viewportRect = new Rect(0f, 0f, 1f, 1f);
-            }
-        }
-
-        readonly Dictionary<SideViewCamera, Rect> _splitScreen =
-            new Dictionary<SideViewCamera, Rect>();
+        // ONE SCREEN, ONE CAMERA USED TO LIVE HERE, in a OneCamera method, and it
+        // was right about what to do and wrong about when. It ran from the point this
+        // device's LINK took the clock, so a match against a bot -- which is most of a
+        // player's first games -- never called it, and the arena kept its authored
+        // split-screen rects: two letterboxed strips on a phone. The partner call then
+        // put the split back on release, so this and LocalCamera took turns undoing each
+        // other, and LocalCamera never noticed because it only wrote when its own inputs
+        // had changed.
+        //
+        // LocalCamera owns it now, on the Cameras object of every arena, and asserts it
+        // every frame from MatchState.LocalFighter -- which is the same answer BeMe below
+        // sets, so there is one answer and one writer.
 
         void BeMe(int player)
         {
@@ -606,7 +587,7 @@ namespace GulagRunners.Net
             // SAME arbitrary camera and point it at their own fighter, which works right
             // up until it does not: the two cameras are not interchangeable, they carry
             // their own framing, shake and opening shot, and the one that is left is the
-            // one OneCamera keeps. Choosing by the fighter makes it this player's shot on
+            // one LocalCamera keeps. Choosing by the fighter makes it this player's shot on
             // both phones, whatever the field was left at.
             if (mine != null)
             {
@@ -667,7 +648,6 @@ namespace GulagRunners.Net
             _substituted = false;
             _wasPaused = false;
             _controls = null;
-            OneCamera(false);
             Say("");
             if (result != null) result.someoneElseRestarts = false;
             if (match == null) return;
@@ -676,8 +656,14 @@ namespace GulagRunners.Net
                 PlayerController f = match.fighters[i];
                 if (f == null) continue;
                 f.ExternallyClocked = false;
+
+                // Back to the authored state, which BrainSetup writes and docs/22
+                // describes: the component on and present, takeOver off until somebody
+                // or something hands that body to the computer. Leaving takeOver set
+                // here would mean a disconnect turned the local player's own fighter
+                // into a bot the moment the link dropped.
                 FighterBrain brain = f.GetComponentInChildren<FighterBrain>(true);
-                if (brain != null) brain.enabled = true;
+                if (brain != null) { brain.enabled = true; brain.takeOver = false; }
             }
         }
 

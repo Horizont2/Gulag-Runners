@@ -1,4 +1,5 @@
 using UnityEngine;
+using GulagRunners.Meta;
 using GulagRunners.Sim;
 
 namespace GulagRunners.Game
@@ -358,6 +359,68 @@ namespace GulagRunners.Game
             // The baker gets a second chance at Start, so take one too: a chest list that was
             // empty on Awake is a stale bake, not an arena without chests.
             if (ChestStates.Length == 0) ResetRound();
+
+            HandTheOpponentToABot();
+        }
+
+        /// <summary>
+        /// A practice match has to have a practice opponent in it.
+        ///
+        /// NOTHING DID THIS, AND IT IS THE WHOLE OF "IT STARTED ME ON MY OWN". The search
+        /// screen pairs you, puts the pairing in MatchHandover and loads the arena; the
+        /// pairing carries AgainstBot, and three things read it -- MatchRecorder, to keep
+        /// a practice win off the ladder; OnlineMatch, to skip opening a relay; and
+        /// MatchSearch, for an event. None of them is the fighter. So the second body
+        /// stood in its cage for the whole match and the player fought a statue.
+        ///
+        /// takeOver and not enabled, for the reason FighterBrain.TakingOver gives: it is
+        /// `takeOver &amp;&amp; isActiveAndEnabled &amp;&amp; self != null`, every arena
+        /// ships the brains present and enabled with takeOver off, and NetMatch spent a
+        /// release writing enabled = true and wondering why the dropped opponent froze.
+        ///
+        /// It runs in Start rather than Awake because the fighters fill their own indices
+        /// and find their own brains in Awake, and it reads MatchHandover WITHOUT
+        /// forgetting it -- MatchRecorder needs the same pairing at the end of the match.
+        ///
+        /// At the shipped SearchRules this never fires: both bot deadlines are zero,
+        /// which means never, because the pool keeps looking instead of standing somebody
+        /// in. It is here so that a build which DOES want a practice opponent -- one
+        /// handed to playtesters with no servers behind it -- gets one rather than a
+        /// statue, and so the next person to set that number is not debugging this.
+        /// </summary>
+        void HandTheOpponentToABot()
+        {
+            if (!MatchHandover.Waiting) return;
+            if (!MatchHandover.Current.AgainstBot) return;
+
+            int me = LocalFighter;
+            int said = 0;
+
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                if (i == me) continue;
+                PlayerController f = fighters[i];
+                if (f == null) continue;
+
+                FighterBrain brain = f.GetComponentInChildren<FighterBrain>(true);
+                if (brain == null)
+                {
+                    Debug.LogWarning(
+                        $"{name}: this is a practice match and fighter {i + 1} has no "
+                        + "FighterBrain, so nothing will drive it. Tools > Gulag Runners "
+                        + "> Setup > Add practice opponent puts one on both fighters.",
+                        this);
+                    continue;
+                }
+
+                brain.enabled = true;
+                brain.takeOver = true;
+                said++;
+            }
+
+            if (logMatch && said > 0)
+                Debug.Log($"{name}: practice match -- fighter {(me == 0 ? 2 : 1)} handed "
+                          + "to its own brain.", this);
         }
 
         /// <summary>

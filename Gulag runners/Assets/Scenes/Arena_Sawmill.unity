@@ -595487,5 +595487,6 @@ MonoBehaviour:
   cameras:
   - {fileID: 1830965423}
   - {fileID: 662971669}
-  splitForTwoLocalHumans: 1
+  splitInTheEditor: 0
+  logChanges: 1
   showing: 

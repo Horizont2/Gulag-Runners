@@ -140,16 +140,40 @@ namespace GulagRunners.Game
             if (t == null) return new Bounds(Vector3.zero, Vector3.one);
 
             Bounds local = LocalBox(t, collider);
-            Vector3 s = Vector3.Scale(local.extents, t.lossyScale);
-            Vector3 x = t.right * s.x, y = t.up * s.y, z = t.forward * s.z;
-            Vector3 extents = new Vector3(
-                Mathf.Abs(x.x) + Mathf.Abs(y.x) + Mathf.Abs(z.x),
-                Mathf.Abs(x.y) + Mathf.Abs(y.y) + Mathf.Abs(z.y),
-                Mathf.Abs(x.z) + Mathf.Abs(y.z) + Mathf.Abs(z.z));
 
-            // TransformPoint, not t.position: a mesh whose pivot is not its centre sits beside
-            // its own transform, and the box has to sit on the mesh.
-            return new Bounds(t.TransformPoint(local.center), extents * 2f);
+            // ALL EIGHT CORNERS THROUGH THE MATRIX, and nothing else will do.
+            //
+            // The first version of this scaled the extents by lossyScale and summed them
+            // along t.right, t.up and t.forward, which is the usual shorthand and is
+            // wrong here for the reason the code it replaced wrote down: lossyScale is
+            // not rotation-aware, and under a parent turned ninety degrees -- which is
+            // exactly how a level laid out along Z is made to run along X, and how
+            // Arena_Forest's floors are built -- it hands back the depth as the width. A
+            // 29 m floor bakes as 4 m of floor and 29 m of wall, so the arena fills with
+            // collision nothing is drawn at and the fighters cannot walk.
+            //
+            // TransformPoint is the same call SimWorldBaker.Corners already uses to cut a
+            // slope out of a tilted plank, for the same reason. Eight points and a
+            // min/max is exact for any rotation, any nesting and any non-uniform scale,
+            // and it is what Collider.bounds was doing before PhysX stopped being asked.
+            Vector3 c = local.center, e = local.extents;
+            Vector3 min = default, max = default;
+            bool first = true;
+
+            for (int i = -1; i <= 1; i += 2)
+            for (int j = -1; j <= 1; j += 2)
+            for (int k = -1; k <= 1; k += 2)
+            {
+                Vector3 w = t.TransformPoint(
+                    c + new Vector3(e.x * i, e.y * j, e.z * k));
+                if (first) { min = max = w; first = false; continue; }
+                min = Vector3.Min(min, w);
+                max = Vector3.Max(max, w);
+            }
+
+            Bounds box = new Bounds();
+            box.SetMinMax(min, max);
+            return box;
         }
 
 
