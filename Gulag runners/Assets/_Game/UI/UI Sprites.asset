@@ -16,7 +16,7 @@ MonoBehaviour:
   - key: shop/scrim
     sprite: {fileID: 21300000, guid: 09a64ec4f9ffbd74e8e7b364060c80fa, type: 3}
   - key: shop/panel
-    sprite: {fileID: 21300000, guid: a828dae7d8f36884ba62bd3936296e97, type: 3}
+    sprite: {fileID: 21300000, guid: 659317e3ac319d748b9db0c8571d75f0, type: 3}
   - key: shop/tab
     sprite: {fileID: 21300000, guid: dfc368bd2af92b046ad9114e4e34876a, type: 3}
   - key: shop/tab-on
