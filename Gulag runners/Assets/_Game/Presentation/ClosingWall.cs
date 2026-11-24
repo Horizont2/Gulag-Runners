@@ -54,8 +54,11 @@ namespace GulagRunners.Game
         {
             get
             {
+                // Computed rather than asked of PhysX -- see SimCollider.WorldBox. This
+                // one decides how far the wall travels, so a box that has never been
+                // moved is a wall that closes to the wrong place or not at all.
                 Collider c = GetComponent<Collider>();
-                if (c != null) return c.bounds;
+                if (c != null) return SimCollider.WorldBox(c.transform, c);
 
                 Renderer r = GetComponent<Renderer>();
                 if (r != null) return r.bounds;

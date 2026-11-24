@@ -53,7 +53,18 @@ namespace GulagRunners.Game
                  "walks into for no visible reason.")]
         public bool restrictToPlane = true;
 
-        [Tooltip("Z of the gameplay plane. Match it to the players' Plane Z.")]
+        [Tooltip("Centre of the depth band that gets flattened onto the plane.\n\n" +
+                 "NOT the fighters' Plane Z, which is what this used to say and what it is " +
+                 "worth being exact about, because matching them breaks every arena. In a " +
+                 "2.5D location the floors sit at SEVERAL depths -- Forest's fighters stand " +
+                 "on the lower floor at z -3.3 while its main floor is at z -0.4 -- and " +
+                 "what this number has to do is sit where the level is, so that Drop " +
+                 "Backdrop keeps the level and drops the scenery. Moved onto the fighters, " +
+                 "Forest bakes 5 solids instead of 33 and loses two of its four ladders, " +
+                 "because everything more than Backdrop Behind past the plane is then read " +
+                 "as backdrop.\n\n" +
+                 "Set it by looking at the report this prints, and at the gizmo: the band " +
+                 "should hold every floor a fighter stands on and nothing behind them.")]
         public float planeZ;
 
         [Tooltip("How far either side of the plane still counts as being on it, in metres. " +
@@ -215,6 +226,13 @@ namespace GulagRunners.Game
         [ContextMenu("Bake now")]
         public SimWorld Bake()
         {
+            // Belt as well as braces. Nothing below asks PhysX for a box any more, but a
+            // scene can hold something that does, and this costs one call once per bake.
+            // With m_AutoSyncTransforms off, a player's physics scene is empty until the
+            // first step; in the editor it never is, which is exactly what made every
+            // fault of this shape invisible until somebody made a build.
+            Physics.SyncTransforms();
+
             List<Aabb> solids = new List<Aabb>();
             List<Aabb> oneWay = new List<Aabb>();
             List<Aabb> ladders = new List<Aabb>();
@@ -418,7 +436,12 @@ namespace GulagRunners.Game
                     if (col.GetComponentInParent<Chest>() != null)
                     { skippedChest++; continue; }
 
-                    Bounds cb = col.bounds;
+                    // NOT col.bounds. See SimCollider.WorldBox: that is a number PhysX
+                    // holds, this project has m_AutoSyncTransforms off, and this bake runs
+                    // in Awake before the first physics step -- so in a player it reads a
+                    // box that has never been moved. It is the whole of "the build is a
+                    // different game from the editor".
+                    Bounds cb = SimCollider.WorldBox(col.transform, col);
                     if (IsBackdrop(cb)) { backdrop++; continue; }
                     if (restrictToPlane && !ReachesPlane(cb))
                     {
@@ -1081,7 +1104,8 @@ namespace GulagRunners.Game
                 {
                     if (col == null) continue;
                     Consider(col.name + " (" + col.GetType().Name + " on the art)",
-                             col.bounds, col.transform, ref best, ref bestMiss, x0, y0, x1, y1);
+                             SimCollider.WorldBox(col.transform, col), col.transform,
+                             ref best, ref bestMiss, x0, y0, x1, y1);
                 }
             }
 

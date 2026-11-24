@@ -153,8 +153,10 @@ namespace GulagRunners.Game
                     if (art != null && art.enabled) return art.bounds;
                 }
 
+                // Computed rather than asked of PhysX -- see SimCollider.WorldBox. The
+                // mesh and Renderer branches above are safe either way; this one was not.
                 Collider c = GetComponent<Collider>();
-                if (c != null) return c.bounds;
+                if (c != null) return SimCollider.WorldBox(c.transform, c);
 
                 Renderer r = GetComponent<Renderer>();
                 if (r != null) return r.bounds;

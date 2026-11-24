@@ -68,8 +68,11 @@ namespace GulagRunners.Game
             // while the shutter is still being placed.
             foreach (Collider col in GetComponentsInChildren<Collider>(true))
             {
-                if (!any) { box = col.bounds; any = true; }
-                else box.Encapsulate(col.bounds);
+                // SimCollider.WorldBox, not col.bounds: see its own summary. A gate read
+                // on the first frame of a player reads a box PhysX has never moved.
+                Bounds cb = SimCollider.WorldBox(col.transform, col);
+                if (!any) { box = cb; any = true; }
+                else box.Encapsulate(cb);
             }
 
             return box;

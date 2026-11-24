@@ -44,14 +44,7 @@ namespace GulagRunners.Game
         /// there is one, and the transform's own box when there is not. A level can be marked
         /// up with no Unity colliders at all, which is the cheaper way to author one.
         /// </summary>
-        public Bounds WorldBounds
-        {
-            get
-            {
-                Collider c = GetComponent<Collider>();
-                return c != null ? c.bounds : RotatedBounds(transform);
-            }
-        }
+        public Bounds WorldBounds => WorldBox(transform, GetComponent<Collider>());
 
         /// <summary>
         /// The box this object occupies in its OWN space: the BoxCollider's if it has one, the
@@ -68,6 +61,22 @@ namespace GulagRunners.Game
         public static Bounds LocalBox(Component owner, Collider collider)
         {
             if (collider is BoxCollider box) return new Bounds(box.center, box.size);
+
+            if (collider is SphereCollider ball)
+                return new Bounds(ball.center, Vector3.one * (ball.radius * 2f));
+
+            if (collider is CapsuleCollider capsule)
+            {
+                float d = capsule.radius * 2f;
+                Vector3 size = new Vector3(d, d, d);
+                // 0, 1, 2 is x, y, z -- and the height is the WHOLE capsule including both
+                // caps, so it is never less than the diameter.
+                float along = Mathf.Max(capsule.height, d);
+                if (capsule.direction == 0) size.x = along;
+                else if (capsule.direction == 2) size.z = along;
+                else size.y = along;
+                return new Bounds(capsule.center, size);
+            }
 
             MeshFilter mf = owner != null ? owner.GetComponent<MeshFilter>() : null;
             if (mf != null && mf.sharedMesh != null) return mf.sharedMesh.bounds;
@@ -89,24 +98,48 @@ namespace GulagRunners.Game
 
         /// <summary>
         /// World-space X/Y footprint of a marked object.
-        ///
-        /// Taken from the collider's own world bounds when there is one, because lossyScale is
-        /// not rotation-aware: under a parent turned ninety degrees — which is how a level laid
-        /// out along Z is made to run along X — it hands back the depth as the width.
         /// </summary>
         public static Rect WorldRect(Component owner, Collider collider)
         {
-            Bounds b = collider != null
-                ? collider.bounds
-                : RotatedBounds(owner.transform);
-
+            Bounds b = WorldBox(owner != null ? owner.transform : null, collider);
             return new Rect(b.min.x, b.min.y, b.size.x, b.size.y);
         }
 
-        /// <summary>This object's own box, turned and scaled the way the transform is.</summary>
-        static Bounds RotatedBounds(Transform t)
+        /// <summary>
+        /// Where this object's box is in the world, WITHOUT asking the physics engine.
+        ///
+        /// THIS USED TO BE Collider.bounds WHEN THERE WAS A COLLIDER, and that is why a
+        /// build did not agree with the editor.
+        ///
+        /// Collider.bounds is not geometry, it is a number PhysX holds, computed from the
+        /// last transform it was told about -- and this project ships with
+        /// m_AutoSyncTransforms: 0 in DynamicsManager, so it is told about transforms
+        /// when the simulation steps and at no other time. SimWorldBaker bakes in Awake,
+        /// at execution order -100, which is before the first physics step has ever run.
+        /// In the editor that is harmless: the editor keeps the physics scene in step
+        /// with the scene you are looking at, so by the time you press Play every
+        /// collider's bounds are already right. In a player there is no editor doing
+        /// that, and the first thing that reads Collider.bounds reads a box that has
+        /// never been moved, rotated or scaled -- a unit box at the origin for anything
+        /// built out of a prefab.
+        ///
+        /// The symptoms are the ones you cannot debug from a screenshot: invisible walls
+        /// in the middle of an arena where nothing is drawn, floors that are not there, a
+        /// fighter pushed out of a solid he is standing inside and landing behind the
+        /// level. All of it in the build and none of it in the editor, which makes the
+        /// build look like a different game.
+        ///
+        /// So it is computed here instead, from the collider's own local box and the
+        /// transform -- the same arithmetic PhysX would do, done where this project can
+        /// see it. The simulation's whole premise is that Unity colliders are an
+        /// authoring surface and nothing more (docs/06); asking the physics engine to
+        /// agree about anything was the one place that premise was broken.
+        /// </summary>
+        public static Bounds WorldBox(Transform t, Collider collider)
         {
-            Bounds local = LocalBox(t, null);
+            if (t == null) return new Bounds(Vector3.zero, Vector3.one);
+
+            Bounds local = LocalBox(t, collider);
             Vector3 s = Vector3.Scale(local.extents, t.lossyScale);
             Vector3 x = t.right * s.x, y = t.up * s.y, z = t.forward * s.z;
             Vector3 extents = new Vector3(
@@ -118,6 +151,7 @@ namespace GulagRunners.Game
             // its own transform, and the box has to sit on the mesh.
             return new Bounds(t.TransformPoint(local.center), extents * 2f);
         }
+
 
         public Aabb ToAabb() => RectToAabb(ToRect());
 
