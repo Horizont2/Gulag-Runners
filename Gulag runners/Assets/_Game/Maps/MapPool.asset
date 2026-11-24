@@ -29,4 +29,8 @@ MonoBehaviour:
     shown: THE TEMPLE
     enabled: 1
     weight: 3
+  - scene: Arena_Sawmill
+    shown: THE SAWMILL
+    enabled: 0
+    weight: 3
   fallback: Arena_Forest

@@ -68,6 +68,36 @@ namespace GulagRunners.GameEditor
             typeof(LanLink),
             typeof(NetMatch),
             typeof(AudioManager),
+
+            // THESE SIX WERE MISSING FROM THE LIST, and Arena_Sawmill is what that cost:
+            // every one of the nine above is in it, so this tool reported it finished
+            // while six things that every shipped arena has were simply absent.
+            //
+            // None of them stops a match STARTING, which is why the list got away with
+            // it. What they stop is the match being the same game:
+            //
+            //   LootView       chests open and nothing comes out of them that a fighter
+            //                  can pick up. docs/03 and docs/13 are most of the match.
+            //   PoisonPool     the closing phase does nothing: the arena never narrows,
+            //                  so docs/33's last minute is a clock running down.
+            //   PoisonWarning  and nothing tells the player it is coming.
+            //   SceneLighting  no fog and no ambient of its own, so the background is as
+            //                  sharp as the fight and the arena is lit by whatever
+            //                  skybox happens to be on it.
+            //   LocalCamera    both cameras render, in the authored split-screen rects.
+            //                  On a phone that is two letterboxed strips.
+            //   MatchTally     the chest and lock counters never reach the result.
+            //
+            // A list of what an arena needs is only as good as the last thing somebody
+            // noticed. docs/refs/arena_ready_check.py asks for the same set, so the two
+            // of them have to be changed together -- and the check is the one that will
+            // tell you, because it runs without the editor open.
+            typeof(LootView),
+            typeof(PoisonPool),
+            typeof(PoisonWarning),
+            typeof(SceneLighting),
+            typeof(LocalCamera),
+            typeof(MatchTally),
         };
 
         [MenuItem("Tools/Gulag Runners/Setup/List what this scene needs to be playable")]

@@ -48,6 +48,26 @@ REQUIRED = {
     "LanLink.cs": (1, "nothing to play a second phone through"),
     "NetMatch.cs": (1, "the clock two devices share"),
     "AudioManager.cs": (1, "no sound at all"),
+
+    # THE SECOND HALF OF THE LIST, and it exists because the first half let
+    # Arena_Sawmill through. Every one of the nine above is in that scene, so this check
+    # and ArenaSceneSetup both called it finished while six things that all four shipped
+    # arenas have were simply absent. None of them stops a match STARTING, which is how
+    # they got away with it; what they stop is the match being the same game.
+    "LootView.cs": (1, "chests open and nothing comes out of them a fighter can pick "
+                       "up -- docs/03 and docs/13 are most of the match"),
+    "GroundItemView.cs": (6, "six is what the other arenas carry, one per item the "
+                             "floor can hold at once; fewer and a drop is swallowed"),
+    "PoisonPool.cs": (1, "the closing phase does nothing: the arena never narrows, so "
+                         "docs/33's last minute is only a clock running down"),
+    "PoisonWarning.cs": (1, "and nothing tells the player the water is coming"),
+    "SceneLighting.cs": (1, "no fog, so the background is as sharp as the fight, and no "
+                            "ambient of its own, so the arena is lit by whatever skybox "
+                            "happens to be on it"),
+    "LocalCamera.cs": (1, "both cameras render in their authored split-screen rects, "
+                          "which on a phone is two letterboxed strips and one of them "
+                          "is somebody else's fight"),
+    "MatchTally.cs": (1, "the chest and lock counters never reach the result screen"),
 }
 
 # Not a script: a marked floor. A scene can have every component above and still be
