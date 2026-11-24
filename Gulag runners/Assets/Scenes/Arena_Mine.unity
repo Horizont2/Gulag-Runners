@@ -413,6 +413,7 @@ GameObject:
   - component: {fileID: 36510892}
   - component: {fileID: 36510891}
   - component: {fileID: 36510890}
+  - component: {fileID: 960009700}
   m_Layer: 0
   m_Name: Button / Rematch
   m_TagString: Untagged
@@ -14183,6 +14184,7 @@ GameObject:
   - component: {fileID: 934907629}
   - component: {fileID: 934907628}
   - component: {fileID: 934907627}
+  - component: {fileID: 960009701}
   m_Layer: 0
   m_Name: Button / Menu
   m_TagString: Untagged
@@ -132059,6 +132061,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1029375624}
   - component: {fileID: 1029375625}
+  - component: {fileID: 960009702}
   m_Layer: 0
   m_Name: Result
   m_TagString: Untagged
@@ -152036,3 +152039,50 @@ MonoBehaviour:
   - {fileID: 960000781}
   splitForTwoLocalHumans: 1
   showing: 
+--- !u!114 &960009700
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 36510888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc5d2c8d8bc04ca6987e70464ab577e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.UiPress
+  sink: 0.045
+  down: 0.045
+  up: 0.12
+  target: {fileID: 0}
+--- !u!114 &960009701
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 934907625}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc5d2c8d8bc04ca6987e70464ab577e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.UiPress
+  sink: 0.045
+  down: 0.045
+  up: 0.12
+  target: {fileID: 0}
+--- !u!114 &960009702
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1029375623}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba1403a85cf9b4245be3297b9a9f7e48, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.PanelRise
+  seconds: 0.17
+  rise: 28
+  from: 0.985

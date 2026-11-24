@@ -134912,6 +134912,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1994619514}
   - component: {fileID: 1994619513}
+  - component: {fileID: 1900009600}
   m_Layer: 0
   m_Name: Match record
   m_TagString: Untagged
@@ -134934,7 +134935,7 @@ MonoBehaviour:
   match: {fileID: 1900000400}
   progress: {fileID: 0}
   localPlayer: 0
-  tally: {fileID: 0}
+  tally: {fileID: 1900009600}
   opponentRating: 1500
   opponentDeviation: 80
   practiceCountsOnTheLadder: 0
@@ -148150,3 +148151,24 @@ MonoBehaviour:
   - {fileID: 1900000139}
   splitForTwoLocalHumans: 1
   showing: 
+--- !u!114 &1900009600
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1994619512}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 217b939720e342438251b4623c555589, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.MatchTally
+  matchState: {fileID: 1900000400}
+  chestsOpened: 0
+  locksPicked: 0
+  locksForced: 0
+  wrongTouches: 0
+  seriesLocksPicked: 0
+  seriesRoundsWon0: 0
+  seriesRoundsWon1: 0
+  substituted: 0

@@ -354,6 +354,12 @@ def build_scenes():
     return out
 
 
+def _owner_of(body):
+    """The fileID of the GameObject a component is on."""
+    m = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+    return m.group(1) if m else None
+
+
 def owner_names(docs):
     """component fileID -> the GameObject's name, for readable messages."""
     go_name = {}
@@ -415,6 +421,7 @@ def main():
 
         # --- every Button, and every UnityEvent on one of our own components
         buttons = 0
+        pressable, answering = {}, set()
         for fid, (cls, body) in sorted(docs.items(), key=lambda kv: int(kv[0])):
             if cls != "114":
                 continue
@@ -429,6 +436,7 @@ def main():
                 # Unity's own UI components. The only one with wiring is Button.
                 if "m_OnClick:" in body:
                     buttons += 1
+                    pressable[_owner_of(body)] = where
                     got = calls_in(body, "m_OnClick")
                     if not got:
                         problems.append(f"{here}: the button on '{where}' has no "
@@ -440,6 +448,8 @@ def main():
                 continue
 
             cls_name, cs = by_guid[g]
+            if cls_name == "UiPress":
+                answering.add(_owner_of(body))
 
             # A slot left empty on purpose, whose Awake goes looking -- but only if the
             # thing it looks for is in this scene at all.
@@ -475,6 +485,37 @@ def main():
 
         if buttons == 0 and scene == "Menu.unity":
             problems.append(f"{here}: no uGUI Button in the scene at all")
+
+        # --- THE INTERFACE POLISH, IN EVERY SCENE RATHER THAN IN MOST OF THEM
+        #
+        # Twice now one arena has been left out of a pass over all of them, and both
+        # times it was invisible: the mine's result panel appeared without rising and
+        # its two buttons did not move under a thumb, while the other four did. Nothing
+        # was broken, nothing was logged, and the only way to see it was to play that
+        # one arena and know what the others felt like.
+        #
+        # So it is counted. Tools > Gulag Runners > Setup > Make the interface answer
+        # is what puts these in, and this is the same three questions it asks.
+        bare = sorted(w for go, w in pressable.items() if go not in answering)
+        if bare:
+            problems.append(
+                f"{here}: {len(bare)} button(s) with no UiPress -- "
+                + ", ".join(f"'{w}'" for w in bare[:4])
+                + ". On a dark interface Unity's own colour tint is a few per cent "
+                "nobody sees on a phone in daylight, so these are the buttons that "
+                "read as not having taken the press.")
+
+        if "MatchState" in present and "SafeArea" not in present:
+            problems.append(
+                f"{here}: a match runs in this scene and no canvas has a SafeArea, so "
+                "the health bars and the clock sit under the notch and the stick and "
+                "the four buttons sit on the home indicator -- where the system "
+                "swallows the touch.")
+
+        if "MatchResultView" in present and "PanelRise" not in present:
+            problems.append(
+                f"{here}: the result panel has no PanelRise, so it appears rather than "
+                "arrives. Every other arena's rises.")
 
         # A scene a match runs in has to have an END to the match.
         #
