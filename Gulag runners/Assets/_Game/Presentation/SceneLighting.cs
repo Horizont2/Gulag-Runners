@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace GulagRunners.Game
 {
@@ -18,6 +19,16 @@ namespace GulagRunners.Game
     /// perspective is how every side-on game has solved that since parallax scrolling, and it
     /// costs one draw-state change.
     /// </summary>
+    /// <summary>Where an arena's fill light comes from. See SceneLighting.ambientFrom.</summary>
+    public enum AmbientSource
+    {
+        /// <summary>Unity averages the scene's skybox. Right for an arena that has a sky.</summary>
+        Skybox = 0,
+
+        /// <summary>A colour chosen here. Right for a cave, and for night.</summary>
+        Colour = 1,
+    }
+
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(-50)]            // before the cameras read anything
     public sealed class SceneLighting : MonoBehaviour
@@ -93,8 +104,36 @@ namespace GulagRunners.Game
         [Range(2f, 60f)] public float fogDepth = 12f;
 
         [Header("Ambient")]
+        [Tooltip("Where the light the sun does not provide comes from.\n\n" +
+                 "Skybox hands it to Unity: the ambient is whatever the scene's skybox " +
+                 "averages out to, scaled by the intensity below. Right for the two " +
+                 "daylight arenas and WRONG for the other two, which is what this field " +
+                 "is here to fix.\n\n" +
+                 "Measured, the five arenas were on 0.38, 0.35, 0.10, 0.10 and 0.32 of " +
+                 "ambient luma. The mine's 0.10 is a cave taking its light from a rainy " +
+                 "daylight panoramic -- the wrong colour as well as the wrong amount -- " +
+                 "and the temple's is a flat night blue. Both are a third of what the " +
+                 "forest and the fortress get, and the tooltip below says what a third " +
+                 "of very little costs: the shadowed side of a fighter is this and " +
+                 "nothing else.\n\n" +
+                 "Colour takes it from Ambient Colour instead, which is how an arena lit " +
+                 "by lanterns gets lantern-coloured fill rather than overcast grey.")]
+        public AmbientSource ambientFrom = AmbientSource.Skybox;
+
+        [Tooltip("The fill light, when Ambient From is Colour. Pick it from what is " +
+                 "actually lighting the place -- the mine's lanterns are (1, 0.78, 0.45), " +
+                 "so its ambient is a dark warm brown, and the temple's moon is " +
+                 "(0.64, 0.74, 1), so its ambient is a dark blue.\n\n" +
+                 "Keep it dark. The point is not to brighten a night arena into a day " +
+                 "one, it is that a fighter's unlit side should be legible: a little " +
+                 "over half what the daylight arenas get reads as night and still shows " +
+                 "a body.")]
+        [ColorUsage(false, true)] public Color ambientColour = new Color(0.2f, 0.2f, 0.2f, 1f);
+
         [Tooltip("How much the sky lights what the sun does not. The shadowed side of a " +
-                 "fighter is this and nothing else, so at 0 half of every body is black.")]
+                 "fighter is this and nothing else, so at 0 half of every body is black." +
+                 "\n\nSkybox ambient only: Unity ignores it when the ambient is a flat " +
+                 "colour, so with Ambient From on Colour the colour above IS the level.")]
         [Range(0f, 3f)] public float ambientIntensity = 1f;
 
         [Header("Sun")]
@@ -156,6 +195,19 @@ namespace GulagRunners.Game
             RenderSettings.fogColor = fogColour;
             RenderSettings.fogStartDistance = start;
             RenderSettings.fogEndDistance = Mathf.Max(start + 1f, end);
+            // Mode first: Unity reads ambientIntensity only in Skybox mode, and
+            // ambientLight only in Flat, so writing them in the other order sets a field
+            // whose mode has not arrived yet.
+            if (ambientFrom == AmbientSource.Colour)
+            {
+                RenderSettings.ambientMode = AmbientMode.Flat;
+                RenderSettings.ambientLight = ambientColour;
+            }
+            else
+            {
+                RenderSettings.ambientMode = AmbientMode.Skybox;
+            }
+
             RenderSettings.ambientIntensity = ambientIntensity;
 
             if (sun != null)
@@ -167,7 +219,10 @@ namespace GulagRunners.Game
             }
 
             if (logOnApply)
-                Debug.Log($"{name}: fog {start:0.0}..{RenderSettings.fogEndDistance:0.0} m" +
+                Debug.Log($"{name}: ambient {ambientFrom}" +
+                          (ambientFrom == AmbientSource.Colour
+                               ? $" {ambientColour}" : $" x{ambientIntensity:0.00}") +
+                          $", fog {start:0.0}..{RenderSettings.fogEndDistance:0.0} m" +
                           (sun != null ? $", sun {sunIntensity:0.00}" : ", no sun wired"), this);
         }
     }

@@ -20,7 +20,7 @@ RenderSettings:
   m_FogDensity: 0.01
   m_LinearFogStart: 8.16
   m_LinearFogEnd: 20.16
-  m_AmbientSkyColor: {r: 0.08, g: 0.1, b: 0.16, a: 1}
+  m_AmbientSkyColor: {r: 0.15, g: 0.19, b: 0.28, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
   m_AmbientIntensity: 1
@@ -8673,6 +8673,8 @@ MonoBehaviour:
   fogStart: 8.16
   fogEnd: 20.16
   fogDepth: 12
+  ambientFrom: 1
+  ambientColour: {r: 0.15, g: 0.19, b: 0.28, a: 1}
   ambientIntensity: 1
   sun: {fileID: 1528419290}
   sunIntensity: 1.5

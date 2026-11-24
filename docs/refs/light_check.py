@@ -40,6 +40,19 @@ CLEAR_BEHIND = 1.0
 # Fog that ends before this much is in front of the fight is just a grey screen.
 MIN_DEPTH = 6.0
 
+# The least ambient an arena may have, as luma.
+#
+# SceneLighting says what this number is: the shadowed side of a fighter is the ambient
+# and nothing else, so at 0 half of every body is black. Measured, the five arenas ran
+# 0.38, 0.35, 0.10, 0.10 and 0.32 -- the mine on a rainy daylight panoramic in a cave and
+# the temple on a flat night blue, both a third of what the daylight pair get. The
+# fighters are bright, 0.62 cyan and 0.59 orange, and at 0.10 ambient their unlit side
+# comes out at 0.06: a silhouette rather than a body.
+#
+# 0.15 is a floor rather than a target. A night arena is meant to be dark; what it is not
+# meant to be is unreadable.
+MIN_AMBIENT = 0.15
+
 
 def field(body, name, cast=float, default=None):
     m = re.search(r"^\s*%s: (.+?)\s*$" % re.escape(name), body, re.M)
@@ -460,6 +473,31 @@ def main(argv):
         to_fight = abs(plane - camera_z)
         notes.append(f"{name}: camera at z {camera_z:.2f}, fight at z {plane:.2f} "
                      f"-- {to_fight:.2f} m apart")
+
+        # --- is there enough fill to see a fighter's shadowed side?
+        #
+        # Only for a flat ambient, which is the one this harness can measure. Skybox
+        # ambient is whatever Unity averages the cubemap to, and reading that properly
+        # means decoding the panoramic; a scene on Skybox gets a note with its skybox's
+        # name instead, which is enough to spot a cave wearing a daylight sky.
+        ambient_mode = field(render, "m_AmbientMode", int, 0)
+        sky = re.search(r"m_AmbientSkyColor: \{r: ([-\d.e+]+), g: ([-\d.e+]+), "
+                        r"b: ([-\d.e+]+)", render)
+        if ambient_mode == 3 and sky:
+            r, g, b = (float(v) for v in sky.groups())
+            luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            notes.append(f"  ambient: a flat colour at {luma:.3f} luma")
+            if luma < MIN_AMBIENT:
+                problems.append(
+                    f"{name}: the ambient is a flat {luma:.3f} luma, under "
+                    f"{MIN_AMBIENT:.2f}. SceneLighting's own note is that the shadowed "
+                    f"side of a fighter is the ambient and nothing else, and the "
+                    f"fighters sit at 0.62 and 0.59 -- so their unlit halves come out "
+                    f"at {0.62 * luma:.2f} and {0.59 * luma:.2f}, which is a "
+                    f"silhouette rather than a body. Raise Ambient Colour on this "
+                    f"arena's Scene Lighting, in the colour of whatever is lighting it.")
+        elif ambient_mode == 0:
+            notes.append("  ambient: from the skybox, so not measured here")
 
         if not on:
             problems.append(
