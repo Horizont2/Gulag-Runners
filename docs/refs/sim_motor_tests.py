@@ -1,5 +1,43 @@
+import re
+import os
+import io
 import sim_motor_mirror as T
 from sim_motor_mirror import S, step, X, F, C, L, R, UP, DN, JMP, DOD
+
+
+def crouching_exists():
+    """Does the simulation still have a crouch to test?
+
+    Not "is there a crouchHeight field": MovementTuning still carries crouchSpeed and
+    crouchHeight, and a config field nothing sets is not a mechanic. What makes a crouch
+    real is PlayerMotor setting Crouching to something other than false, which is the same
+    rule tips_check uses to catch a loading tip that has outlived its mechanic.
+
+    THE TESTS BELOW ARE NOT DELETED, and that is the point of asking rather than removing
+    them. Crouching was taken out of the motor; whether it comes back is an open design
+    question -- there is geometry in the test worlds built for it, and docs/02 still
+    describes it. A deleted test is a question nobody will ever be reminded of again. One
+    that stands down with a reason comes back by itself the day the motor sets the flag.
+
+    What it buys right now is quiet. Four assertions across three files were reporting FAIL
+    every run, and a suite with a standing count of failures nobody reads is a suite that
+    hides the next real one -- which is exactly what texture_budget's own note says about
+    standing error counts.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    motor = os.path.join(here, "..", "..", "Gulag runners", "Assets", "_Game",
+                         "Sim", "Core", "PlayerMotor.cs")
+    try:
+        with io.open(motor, encoding="utf-8", errors="replace") as fh:
+            src = fh.read()
+    except OSError:
+        return True                     # cannot tell: test it rather than skip it
+    return re.search(r"Crouching\s*=\s*(?!false)\w", src) is not None
+
+
+CROUCHES = crouching_exists()
+SKIPPED_CROUCH = not CROUCHES
+GONE_WHY = "the motor never enters it; this stands down rather than being deleted, and comes back by itself the day PlayerMotor sets Crouching again"
 
 # ---- the exact arena baked into SetupScene -------------------------------------
 floors, rooms = 3, 3
@@ -117,7 +155,10 @@ ok &= check("running is Loud", 3 in noises, f"levels={sorted(noises)}")
 s = S(0,0.0); run(s,0,10)
 noises=set()
 for _ in range(120): step(s, R|DN, W); noises.add(s.noise)
-ok &= check("crouch-walking is silent", noises == {0}, f"levels={sorted(noises)}")
+if CROUCHES:
+    ok &= check("crouch-walking is silent", noises == {0}, f"levels={sorted(noises)}")
+else:
+    print("  skip  crouch-walking is silent -- %s" % GONE_WHY)
 
 print("\n11a. the jump is one height, not a thumb measurement")
 peaks = []
