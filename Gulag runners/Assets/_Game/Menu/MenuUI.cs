@@ -294,10 +294,20 @@ namespace GulagRunners.Game
 
             CloseAll();
 
-            // Every panel in this menu came up with a cut. One component fixes all five,
-            // and adding it here rather than in the scene means a panel built later gets
-            // it too -- which is the half that always gets forgotten.
-            if (panel.GetComponent<PanelRise>() == null) panel.AddComponent<PanelRise>();
+            // Every panel in this menu came up with a cut, and PanelRise is what fixes it.
+            // IT IS NOT ADDED HERE ANY MORE. This used to do it, on the reasoning that a
+            // panel built later would get one for free -- and the cost of that convenience
+            // is a component nobody can see: it was in no scene, in no inspector, and its
+            // two numbers could not be tuned without editing the C#. Nothing in this
+            // project is built at play time for exactly that reason.
+            //
+            // Said out loud rather than fixed silently, because the panel still opens
+            // either way and a cut is a thing somebody has to notice to report.
+            if (panel.GetComponent<PanelRise>() == null)
+                Debug.LogWarning($"{name}: \"{panel.name}\" has no PanelRise, so it "
+                                 + "appears with a cut. Add one to it in the scene -- or "
+                                 + "run Tools > Gulag Runners > Setup > Make the interface "
+                                 + "answer, which puts one on every panel it finds.", panel);
 
             panel.SetActive(true);
             if (homePanel != null) homePanel.SetActive(false);

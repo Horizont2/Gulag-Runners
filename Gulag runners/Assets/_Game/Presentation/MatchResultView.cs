@@ -151,8 +151,14 @@ namespace GulagRunners.Game
             if (panel != null)
             {
                 // The end of a round is the most felt moment in a match and it was a cut.
+                // PanelRise fixes it, and it belongs IN THE SCENE: this used to add one
+                // here, which is a component with two tunable numbers that no inspector
+                // ever showed and no designer could reach.
                 if (panel.GetComponent<PanelRise>() == null)
-                    panel.AddComponent<PanelRise>();
+                    Debug.LogWarning($"{name}: the result panel has no PanelRise, so the "
+                                     + "end of a round arrives as a cut. Add one to it, or "
+                                     + "run Tools > Gulag Runners > Setup > Make the "
+                                     + "interface answer.", panel);
                 panel.SetActive(true);
             }
             HeadlineChanged?.Invoke(headline);

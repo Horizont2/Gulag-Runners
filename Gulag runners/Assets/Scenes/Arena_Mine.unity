@@ -128214,6 +128214,7 @@ GameObject:
   - component: {fileID: 962777041}
   - component: {fileID: 962777040}
   - component: {fileID: 962777039}
+  - component: {fileID: 1153876702}
   m_Layer: 0
   m_Name: HUD
   m_TagString: Untagged
@@ -149989,3 +149990,20 @@ MonoBehaviour:
   suddenWeight: 1
   desperateBeat: 0.9
   state: 
+--- !u!114 &1153876702
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 962777038}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6eb7b761bf0a4820a83fb757d5161a99, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  left: 1
+  right: 1
+  top: 1
+  bottom: 1
+  inset: 
