@@ -72,6 +72,27 @@ namespace GulagRunners.Net
                  "a lossy link, it is an absent player.")]
         [Range(0.5f, 15f)] public float substituteAfter = 2.5f;
 
+        [Tooltip("Seconds of silence tolerated BEFORE the other player's first input has " +
+                 "ever arrived. Longer than the number above, and that is the whole point " +
+                 "of it being a separate number.\n\n" +
+                 "THE ONE ABOVE USED TO COVER BOTH, and the arithmetic of the two gates " +
+                 "either side is what made that a bug rather than a tuning choice. " +
+                 "OnlineMatch.readyTimeout lets the search screen through after six " +
+                 "seconds whether or not the other phone has said its arena is up -- " +
+                 "deliberately, because one lost datagram must not hang a match. So this " +
+                 "clock starts at tick zero on a device whose opponent is, quite normally, " +
+                 "still loading a four-megabyte scene; two and a half seconds later their " +
+                 "fighter was handed to a bot AND THE LINK DROPPED FOR GOOD. The other " +
+                 "player then finished loading into a match that had already replaced " +
+                 "them. Both halves of \"my opponent left immediately\" and \"I was put in " +
+                 "an arena against a statue\" are this number.\n\n" +
+                 "Nothing is lost by being patient here: lockstep has not run a tick yet, " +
+                 "so the wait costs no simulation and no divergence. Once the first input " +
+                 "HAS arrived the link is proven and the short number above takes over, " +
+                 "which is the one that keeps a mid-match disconnect from freezing the " +
+                 "screen.")]
+        [Range(1f, 30f)] public float firstContactSeconds = 12f;
+
         [Tooltip("What to say while waiting, with {0} as the seconds left. A frozen " +
                  "screen that explains itself is a wait; one that does not is a hang.")]
         public string waitingFor = "OPPONENT NOT RESPONDING… {0}";
@@ -105,6 +126,16 @@ namespace GulagRunners.Net
         int _sentTo = -1;
         float _silent;
         bool _substituted;
+
+        /// <summary>
+        /// The other player's input has arrived at least once, so the link is PROVEN.
+        ///
+        /// Until it has, silence means "they have not got here yet" and not "they have
+        /// gone", and those two want very different patience -- see
+        /// <see cref="firstContactSeconds"/>. Cleared only by ReleaseClock, because a link
+        /// that worked once and then stopped is a disconnect however long ago the once was.
+        /// </summary>
+        bool _everHeard;
         bool _wasPaused;
         string _said = "";
         TickInput _queued;
@@ -238,9 +269,16 @@ namespace GulagRunners.Net
                     stalledFrames++;
                     _silent += Time.unscaledDeltaTime;
 
-                    if (_silent >= substituteAfter) { Substitute(); return; }
+                    // Two patiences, and which one applies is whether this link has ever
+                    // carried anything. Before first contact the opponent is still arriving;
+                    // after it, they have gone.
+                    float patience = _everHeard
+                        ? substituteAfter
+                        : Mathf.Max(substituteAfter, firstContactSeconds);
 
-                    int left = Mathf.CeilToInt(substituteAfter - _silent);
+                    if (_silent >= patience) { Substitute(); return; }
+
+                    int left = Mathf.CeilToInt(patience - _silent);
                     Say(string.Format(waitingFor, left));
                     state = $"tick {tick}: no answer for {_silent:0.0}s";
 
@@ -265,6 +303,7 @@ namespace GulagRunners.Net
                 }
 
                 _silent = 0f;
+                _everHeard = true;
                 Say("");
 
                 _accumulator -= PlayerController.SecondsPerTick;
@@ -624,6 +663,7 @@ namespace GulagRunners.Net
             _takenFor = -1;
             _sentTo = -1;
             _silent = 0f;
+            _everHeard = false;
             _substituted = false;
             _wasPaused = false;
             _controls = null;

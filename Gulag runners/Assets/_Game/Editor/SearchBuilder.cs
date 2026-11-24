@@ -496,6 +496,17 @@ namespace GulagRunners.GameEditor
 
             screen.gameObject.SetActive(false);
             EditorUtility.SetDirty(search);
+
+            // And the live pool back on, because the canvas destroyed at the top of this
+            // method is the one it was wired to. UgsQueue and OnlineMatch were put on the
+            // search canvas by hand and nothing here knew about them, so every rebuild of
+            // this screen quietly took online play out of the game: the Queue slot came up
+            // empty, MatchSearch fell back to the practice opponent exactly as designed,
+            // every match still worked, and nothing said the only thing left in the queue
+            // was a bot. OnlineSetup is additive and safe to run twice.
+            OnlineSetup.Setup();
+            wired.Add("the live pool");
+
             Selection.activeGameObject = rootGo;
 
             string made = drew.Count > 0 ? $" Drew {string.Join(", ", drew)}." : "";

@@ -44,8 +44,28 @@ namespace GulagRunners.Net
         /// </summary>
         const string Protocol = "udp";
 
-        /// <summary>How long to wait for the other end to leave its code.</summary>
-        const float Patience = 20f;
+        /// <summary>
+        /// How long one attempt waits for the other end to leave its code, and how long the
+        /// whole handshake is allowed to take.
+        ///
+        /// IT USED TO BE TWENTY SECONDS, FLAT, PER ATTEMPT, and there are three attempts --
+        /// so the worst case was a minute of a search screen saying "waiting for the other
+        /// runner" with a full, still bar and no countdown anywhere, which is the one state
+        /// on that screen a player cannot tell from a crash. Nothing above was giving up
+        /// either: OnlineMatch's own patience only starts once a relay is OPEN, so the whole
+        /// of this ran with no deadline over it at all.
+        ///
+        /// The budget is now the caller's and the per-attempt patience is a third of it, so
+        /// all three alternating attempts fit inside the number somebody set in the
+        /// inspector. Five seconds is plenty for a code that is written the instant the host
+        /// allocates: this is a poll against a service that has already said yes, and the
+        /// case it covers is the host still signing in, not a slow network.
+        /// </summary>
+        public const float DefaultBudget = 18f;
+
+        const float MinPatience = 3f;
+        const float MaxPatience = 20f;
+        const int Attempts = 3;
 
         public struct Opened
         {
@@ -88,9 +108,11 @@ namespace GulagRunners.Net
         /// service enforces it. The role taken comes back in <see cref="Opened.Host"/> so
         /// that the transport and the fighter index are the same fact and cannot drift.
         /// </summary>
-        public static async Task<Opened> Open(ISession session, CancellationToken stop)
+        public static async Task<Opened> Open(ISession session, CancellationToken stop,
+                                              float budgetSeconds = DefaultBudget)
         {
             bool host = session != null && session.IsHost;
+            float patience = Mathf.Clamp(budgetSeconds / Attempts, MinPatience, MaxPatience);
 
             try
             {
@@ -110,9 +132,9 @@ namespace GulagRunners.Net
                 Opened last = new Opened { Ok = false, Said = "nothing attempted" };
                 string first = null;
 
-                for (int attempt = 0; attempt < 3; attempt++)
+                for (int attempt = 0; attempt < Attempts; attempt++)
                 {
-                    last = await Try(session, asHost, stop);
+                    last = await Try(session, asHost, patience, stop);
                     if (last.Ok)
                     {
                         if (attempt > 0)
@@ -151,11 +173,13 @@ namespace GulagRunners.Net
         /// One end of the handshake, with its failure returned rather than thrown, so the
         /// caller can try the other end without unwinding.
         /// </summary>
-        static async Task<Opened> Try(ISession session, bool asHost, CancellationToken stop)
+        static async Task<Opened> Try(ISession session, bool asHost, float patience,
+                                      CancellationToken stop)
         {
             try
             {
-                return asHost ? await Allocate(session, stop) : await Join(session, stop);
+                return asHost ? await Allocate(session, stop)
+                              : await Join(session, patience, stop);
             }
             catch (OperationCanceledException)
             {
@@ -188,9 +212,10 @@ namespace GulagRunners.Net
             };
         }
 
-        static async Task<Opened> Join(ISession session, CancellationToken stop)
+        static async Task<Opened> Join(ISession session, float patience,
+                                       CancellationToken stop)
         {
-            string code = await WaitForCode(session, stop);
+            string code = await WaitForCode(session, patience, stop);
             if (string.IsNullOrEmpty(code))
                 return Gave("the other player never opened a relay");
 
@@ -211,12 +236,14 @@ namespace GulagRunners.Net
         /// listening -- the host may well have written the code while the guest was
         /// still signing in -- and a handshake that misses its own notification waits
         /// for ever with nothing to show. Asking every half second cannot miss anything
-        /// that has already happened, and twenty seconds of it is forty requests.
+        /// that has already happened, and the whole patience of it is a handful of
+        /// requests.
         /// </summary>
-        static async Task<string> WaitForCode(ISession session, CancellationToken stop)
+        static async Task<string> WaitForCode(ISession session, float patience,
+                                              CancellationToken stop)
         {
             float waited = 0f;
-            while (waited < Patience)
+            while (waited < patience)
             {
                 if (stop.IsCancellationRequested) return null;
 

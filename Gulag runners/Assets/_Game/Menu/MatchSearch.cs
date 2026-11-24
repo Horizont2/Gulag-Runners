@@ -128,7 +128,18 @@ namespace GulagRunners.Game
             "A DODGE COSTS TWO\nOF FOUR CHARGES. TWO DODGES\nAND YOU HAVE NONE.",
             "A CHARGE RETURNS EVERY\n1.2 S. A SPENT DODGE\nIS BACK IN 2.4.",
             "A DODGE IS 0.35 S\nUNTOUCHABLE, THEN 0.15 S\nYOU CANNOT ANSWER.",
-            "THREE BLOWS CHAIN.\nTHE WINDOW BETWEEN THEM\nIS A THIRD OF A SECOND.",
+            // This used to say that three blows chain and the window between them is a
+            // third of a second, off MaxCombo and ComboWindowFrames -- and both fields are
+            // still in CombatConfig and are read by NOTHING. The three-hit string went with
+            // the phase machine (docs/30), so the tip outlived its mechanic the same way the
+            // guard tips did, and the pin in tips_check could not see it because the fields
+            // it quotes had not been deleted, only orphaned.
+            //
+            // What actually happens now is the stun stack: the first blow of a string is
+            // floored so that landing always buys the next move, and every one after it is
+            // worth ComboStunDecayPermille of the last -- 620, so 38% less each time. A
+            // string ends after ComboStackFrames without being hit.
+            "THE FIRST BLOW BUYS\nYOUR NEXT. EVERY ONE AFTER\nHOLDS HIM 38% LESS.",
             "THE ROOMS START SHUTTING\nAT 1:00. THE CEILING\nCOMES LATER, AND LOWER.",
         };
 
@@ -167,6 +178,13 @@ namespace GulagRunners.Game
 
         IMatchGate _gate;
         IMatchQueue _queue;
+
+        /// <summary>
+        /// The same object as <see cref="_queue"/>, kept typed so the screen can ask the
+        /// one question only the composed pool can answer: why the service was given up on.
+        /// </summary>
+        MatchPool _pool;
+
         MatchFound _opponent;
         bool _running;
 
@@ -200,17 +218,23 @@ namespace GulagRunners.Game
                                  "Opponent Gate slot but does not implement IMatchGate, so " +
                                  "nothing is being waited for.", this);
 
-            _queue = queueSource as IMatchQueue;
+            IMatchQueue live = queueSource as IMatchQueue;
 
-            if (queueSource != null && _queue == null)
+            if (queueSource != null && live == null)
                 Debug.LogWarning($"{name}: {queueSource.GetType().Name} is in the Queue " +
                                  "slot but does not implement IMatchQueue, so the search " +
                                  "will fall back to practice opponents.", this);
 
-            // No pool wired is not an error and not a stub: it is the floor docs/09
-            // describes, where everybody gets the practice opponent, immediately while
-            // they are placing and once the net is fully cast after that.
-            if (_queue == null) _queue = new BotQueue(rules);
+            // WHATEVER IS IN THE SLOT, THE FLOOR GOES UNDER IT. An empty slot is not an
+            // error and not a stub -- it is the floor docs/09 describes, where everybody
+            // gets the practice opponent -- and a slot with a service in it does not
+            // REPLACE that floor, which is what it used to do and is the whole of the
+            // matchmaking fault. MatchPool's own summary has the account: with a service
+            // in the slot, OfferBot, BotAfterSeconds and Ladder.PoolFor were never
+            // reached, so an empty pool searched for ever and a failed one ended on a
+            // dead screen.
+            _pool = new MatchPool(live, rules);
+            _queue = _pool;
 
             shownChanged?.Invoke(false);
         }
@@ -255,6 +279,16 @@ namespace GulagRunners.Game
             _running = false;
             _queue.Cancel();
 
+            // AND THE RELAY, which nothing was letting go of. The cross is live through the
+            // Found beat, and Paired has already fired by then -- so OnlineMatch is part way
+            // through a handshake that carries on after the player has walked away: it
+            // allocates a relay nobody will join, writes a join code into a session that
+            // UgsQueue.Cancel has just left, and parks the result in the statics it hands to
+            // whatever loads an arena next. Drop cancels the task, closes the wire and
+            // clears those statics, which is all four problems.
+            if (_gate is OnlineMatch online) online.Drop();
+            else if (OnlineMatch.Live != null) OnlineMatch.Live.Drop();
+
             // The cross puts the load back (Rewind, below) and the pairing goes back with
             // it. Nothing is waiting this early as the code stands -- the handover is made
             // in Found(), after the beat, and the cross is dead from that moment on -- but
@@ -290,7 +324,13 @@ namespace GulagRunners.Game
             int played = progress != null ? progress.matchesPlayed : 0;
             double rating = progress != null ? progress.rating : 1500.0;
 
-            Say(Matchmaker.Detail(rating, elapsed, played));
+            // The pool's own line wins when it has one. That is the gap between the service
+            // giving up and the practice opponent coming due -- up to twenty-five seconds in
+            // which the league-and-seconds line is technically true and says nothing about
+            // the only thing that has happened.
+            string said = _pool != null ? _pool.Status : "";
+            Say(string.IsNullOrEmpty(said)
+                    ? Matchmaker.Detail(rating, elapsed, played) : said);
             Fill(Matchmaker.Cast(rules, elapsed));
 
             // The bar above is this screen's: it measures how far the net has been cast
@@ -299,6 +339,10 @@ namespace GulagRunners.Game
             // or the bot floor docs/09 promises -- it asks the same question either way.
             _queue.Poll(elapsed);
 
+            // Kept although MatchPool never answers Failed any more: a pool put here by
+            // hand, or a later one, may. A screen that stops dead on a failure it was not
+            // told how to recover from is still better than one that hands an arena over
+            // to nobody.
             if (_queue.State == QueueState.Failed)
             {
                 Say(string.IsNullOrEmpty(_queue.Status) ? "NO CONNECTION" : _queue.Status);
@@ -429,9 +473,12 @@ namespace GulagRunners.Game
             string who = string.IsNullOrEmpty(_opponent.OpponentName)
                 ? "THE OTHER RUNNER" : _opponent.OpponentName.ToUpperInvariant();
 
-            float left = _gate is OnlineMatch online && online.readyTimeout > 0f
-                ? online.readyTimeout - online.WaitedFor
-                : 0f;
+            // Whichever deadline is actually in force -- the relay opening, or the other
+            // phone saying its arena is up. This used to read readyTimeout only, which has
+            // not started yet while the relay is still being opened: the count sat on zero
+            // for however long the handshake took, which was up to a minute and read as a
+            // hang. OnlineMatch.SecondsLeft has the account.
+            float left = _gate is OnlineMatch online ? online.SecondsLeft : 0f;
 
             Say(left > 0f
                 ? string.Format(waitingForThem, who, Mathf.CeilToInt(left))

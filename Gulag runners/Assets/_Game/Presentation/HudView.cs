@@ -835,6 +835,18 @@ namespace GulagRunners.Game
         static bool CanDodge(PlayerController me)
         {
             if (me == null || !Application.isPlaying) return true;
+
+            // AllowDodge first, and it is the half that was missing. CombatMotor's gate opens
+            // with `move.AllowDodge &&`, and that bool was false in both fighter prefabs for
+            // however long it took to notice -- so this method answered "yes, there is
+            // stamina for it", the ring lit up, the thumb pressed it, and nothing happened.
+            // Four charges that nothing could spend therefore sat permanently full beside it.
+            //
+            // Off is a legitimate setting; advertising a button that is off is not. The whole
+            // defence against that shipping again is this one term: with the dodge switched
+            // off the ring is drawn refused, like a weapon with no swings left in it.
+            if (!me.Config.AllowDodge) return false;
+
             return me.State.StaminaCharges >= me.Config.DodgeStaminaCost;
         }
 

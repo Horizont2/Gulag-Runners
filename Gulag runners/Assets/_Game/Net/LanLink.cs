@@ -118,8 +118,36 @@ namespace GulagRunners.Net
         public int LocalPlayer => _role == LinkRole.Guest ? 1 : 0;
         public int RemotePlayer => 1 - LocalPlayer;
 
-        /// <summary>True once both ends have said hello.</summary>
-        public bool Connected => _adopted ? _wire != null && _wire.Ready : _connected;
+        /// <summary>
+        /// True once both ends have said hello -- or, on a match somebody else arranged,
+        /// once the wire is up and the greeting has either happened or had its chance.
+        ///
+        /// IT USED TO BE THE WIRE ALONE on an arranged match, on the reasoning in
+        /// <see cref="Adopt"/>: a queue has already introduced these two, so there is
+        /// nothing to greet. The reasoning is right and the consequence was not. A relay
+        /// GUEST reports Ready the instant Connect() is called, which is before the relay
+        /// has actually connected it to anything -- so the clock above took the match,
+        /// dealt the arena and started counting silence against an opponent it had no
+        /// route to yet.
+        ///
+        /// The greeting is also what sets <see cref="_connected"/>, and that is what lets
+        /// <see cref="Ping"/> run: without it the round trip is never measured, so
+        /// <see cref="SuggestedDelay"/> falls back to the inspector's four ticks -- a 67 ms
+        /// budget on a relay that is rarely under a hundred. Lockstep then waits on nearly
+        /// every tick, which is the stutter that reads as "the other player is lagging".
+        ///
+        /// Waiting for it is therefore worth two frames, and waiting for it FOR EVER is
+        /// not: one lost byte must not cost the match. So the greeting is given a short
+        /// patience and then the wire is taken at its word.
+        /// </summary>
+        public bool Connected =>
+            _adopted
+                ? _wire != null && _wire.Ready &&
+                  (_connected || Time.unscaledTime - _adoptedAt > GreetingPatience)
+                : _connected;
+
+        /// <summary>Seconds an arranged match waits for the greeting before going anyway.</summary>
+        const float GreetingPatience = 2f;
 
         /// <summary>
         /// True when somebody else arranged this match -- a queue found the player and
@@ -236,6 +264,16 @@ namespace GulagRunners.Net
         float _nextPing;
         float _nextHello;
         float _askedAt;
+        float _adoptedAt;
+
+        /// <summary>
+        /// This match was arranged by a queue, so nothing on this device is waiting to be
+        /// told an address. Read only to keep the LAN's own advice off an online screen --
+        /// "is the other phone on this Wi-Fi?" is the wrong question to be asked about a
+        /// stranger behind two routers, and it was being asked, because the guest's
+        /// knock-until-answered branch is shared by both.
+        /// </summary>
+        bool OnALocalNetwork => !_adopted;
 
         // ----------------------------------------------------------------- opening up
 
@@ -359,6 +397,15 @@ namespace GulagRunners.Net
             _seed = dealtFrom;
             Hold(wire);
             _adopted = true;
+            _adoptedAt = Time.unscaledTime;
+
+            // From NOW, not from whenever the app started. The guest's knocking branch
+            // below says "no answer -- is the other phone on this Wi-Fi?" once this is eight
+            // seconds old, and _askedAt is only ever set by Join() -- so on an arranged
+            // match it was still zero, the test was true from the eighth second the app had
+            // been running, and every online match said the one thing that is certainly not
+            // the problem.
+            _askedAt = _adoptedAt;
             state = $"matched, as player {LocalPlayer + 1}";
         }
 
@@ -630,7 +677,7 @@ namespace GulagRunners.Net
                 _nextHello = Time.unscaledTime + 0.5f;
                 Say(PacketHello);
 
-                if (Time.unscaledTime - _askedAt > 8f)
+                if (OnALocalNetwork && Time.unscaledTime - _askedAt > 8f)
                     state = "no answer. Is the other phone hosting, and on this Wi-Fi?";
             }
         }

@@ -86,10 +86,23 @@ namespace GulagRunners.Net
                  "of in the menu.")]
         [Range(0f, 30f)] public float readyTimeout = 6f;
 
+        [Tooltip("Seconds to spend getting a relay open before giving up on the pairing.\n\n" +
+                 "THERE WAS NO DEADLINE HERE AT ALL, and that is a worse hole than it " +
+                 "sounds. Ready Timeout above only starts once a relay IS open, so a " +
+                 "handshake that never finished was never given up on: RelayHandshake " +
+                 "alternated three attempts at twenty seconds of patience each, and the " +
+                 "search screen spent up to a minute on a full, still bar saying the other " +
+                 "runner was still loading. Nothing was loading. Nobody was coming.\n\n" +
+                 "It is also the handshake's own budget — its per-attempt patience is a " +
+                 "third of this — so lowering it makes the whole thing give up sooner " +
+                 "rather than get cut off mid-attempt.")]
+        [Range(6f, 45f)] public float handshakeTimeout = RelayHandshake.DefaultBudget;
+
         RelayTransport _wire;
         readonly byte[] _loaded = { PacketLoaded };
         float _nextSay;
         float _loadedAt;
+        float _openingSince;
         CancellationTokenSource _cancel;
         MatchFound _pairing;
         bool _have;
@@ -187,6 +200,18 @@ namespace GulagRunners.Net
         /// </summary>
         void Update()
         {
+            // The handshake's deadline, watched from a frame because the task itself may be
+            // sitting inside a Task.Delay and cannot time itself out. Cancelling the token
+            // is what actually stops it; the line below is what the player is told.
+            if (_wire == null && relayOpen == false && _have && !_pairing.AgainstBot &&
+                _cancel != null && string.IsNullOrEmpty(Broken) &&
+                handshakeTimeout > 0f &&
+                Time.unscaledTime - _openingSince > handshakeTimeout)
+            {
+                _cancel.Cancel();
+                Fail("COULD NOT REACH THE OTHER PLAYER");
+            }
+
             if (_wire == null) return;
             _wire.Pump();
 
@@ -251,8 +276,34 @@ namespace GulagRunners.Net
             }
 
             _cancel = new CancellationTokenSource();
+            _openingSince = Time.unscaledTime;
             Say("opening the relay…");
             _ = Open(_cancel.Token);
+        }
+
+        /// <summary>
+        /// Seconds left on whichever deadline is actually in force, for the screen to count
+        /// down. Zero when nothing is being waited for.
+        ///
+        /// Two deadlines, one after the other: getting the relay open, and then waiting for
+        /// the other phone to say its arena is up. The screen showed only the second, so
+        /// while the first was running it counted down from a number that had not started
+        /// and sat on zero -- which is how a sixty-second handshake read as a hang.
+        /// </summary>
+        public float SecondsLeft
+        {
+            get
+            {
+                if (!_have || _pairing.AgainstBot) return 0f;
+
+                if (!relayOpen)
+                    return handshakeTimeout <= 0f ? 0f
+                        : Mathf.Max(0f, handshakeTimeout -
+                                        (Time.unscaledTime - _openingSince));
+
+                if (!weAreLoaded || readyTimeout <= 0f) return 0f;
+                return Mathf.Max(0f, readyTimeout - WaitedFor);
+            }
         }
 
         async System.Threading.Tasks.Task Open(CancellationToken stop)
@@ -263,7 +314,7 @@ namespace GulagRunners.Net
             // and a twenty-second wait for a code on the other. RelayHandshake.Open has the
             // whole account of it.
             RelayHandshake.Opened opened =
-                await RelayHandshake.Open(UgsQueue.Current, stop);
+                await RelayHandshake.Open(UgsQueue.Current, stop, handshakeTimeout);
 
             if (stop.IsCancellationRequested) return;
 

@@ -144,8 +144,17 @@ def main():
 
     parry = number(combat, "ParryFrames", "CombatConfig")
     stagger = number(combat, "StaggerFrames", "CombatConfig")
-    combo = number(combat, "MaxCombo", "CombatConfig")
-    window = number(combat, "ComboWindowFrames", "CombatConfig")
+    # MaxCombo and ComboWindowFrames used to be read here, for the "THREE BLOWS CHAIN"
+    # tip. They are still fields in CombatConfig and are read by NOTHING in the simulation
+    # -- the three-hit string went with the phase machine (docs/30) -- so a pin on them was
+    # a pin on a mechanic the player does not have. That is the exact failure this file
+    # exists to catch, and it could not: a field that is orphaned rather than deleted never
+    # reaches GONE.
+    #
+    # The chaining that DOES happen is the stun stack, so the tip and the pin are both on
+    # that now. If somebody ever brings the string back, bring the pin back with it.
+    decay = number(combat, "ComboStunDecayPermille", "CombatConfig")
+    stack = number(combat, "ComboStackFrames", "CombatConfig")
     desp_hp = number(combat, "DesperationHealthPermille", "CombatConfig")
     desp_dmg = number(combat, "DesperationDamagePermille", "CombatConfig")
 
@@ -197,8 +206,9 @@ def main():
         ("DODGE IS", [seconds(dodge_frames) + " S", seconds(dodge_recover) + " S"],
          "MoveConfig.DodgeFrames (invulnerable) and DodgeRecoverFrames"),
 
-        ("CHAIN", [words[combo] + " BLOWS"],
-         "MaxCombo; ComboWindowFrames is a third of a second at " + seconds(window, 2)),
+        ("HOLDS HIM", [f"{(1000 - decay) // 10}%"],
+         "ComboStunDecayPermille: every blow after the first is worth this much less "
+         f"stun, and a string ends after {seconds(stack)} s without being hit"),
 
         ("ROOMS", [clock(rooms_at)],
          "the four phases before Closing add up to this"),
@@ -229,10 +239,14 @@ def main():
                 problems.append(f"{key}: the config now says {must!r}, which is not in "
                                 f"{tip!r}. Source: {why}")
 
-    # The combo window, written as a fraction rather than a figure.
-    if abs(window / 60.0 - 1 / 3.0) > 0.02:
-        problems.append(f"ComboWindowFrames is {window} ({seconds(window, 3)} s), which is "
-                        "no longer 'a third of a second' as the chain tip claims")
+    # And the claim the tip makes that is not its own number: that the FIRST blow is
+    # guaranteed to buy the next move. CombatMotor does that with a floor on the first hit
+    # of a string, so the tip is true only while that floor is there.
+    motor = read(os.path.join(SIM, "CombatMotor.cs"))
+    if motor is not None and "HitAdvantageFrames" not in motor:
+        problems.append("CombatMotor no longer floors the first hit of a string on "
+                        "HitAdvantageFrames, so the tip saying the first blow buys your "
+                        "next one is no longer true")
 
     # And the one claim that is a comparison, not a number: the ceiling comes AFTER the
     # rooms. This is the pair I got backwards, so it is pinned as an order, not a figure.
