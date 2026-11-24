@@ -201,6 +201,36 @@ namespace GulagRunners.Game
         [Tooltip("Trauma lost per second. Shake falls off as trauma squared, so it ends softly.")]
         public float traumaDecay = 1.8f;
 
+        [Header("Impact punch")]
+        [Tooltip("How much TIGHTER the shot snaps on a blow, as a fraction of the view " +
+                 "height, at a full-health hit.\n\n" +
+                 "The other half of what the shake above was doing on its own. Shake moves " +
+                 "the room and a punch moves the LENS, and the two read as completely " +
+                 "different things: shake alone is a camera being jostled, and a camera that " +
+                 "jumps a few percent closer on the frame of contact is a blow landing. " +
+                 "MatchOutcomeView already proved the mechanism on the finishing hit -- it " +
+                 "tightens the framing by a third and it is the best-feeling second in the " +
+                 "game -- and nothing was doing the small version of it sixty times a match.\n\n" +
+                 "Small on purpose. Four or five percent is under the threshold where anybody " +
+                 "could tell you the camera moved, which is exactly where it wants to be: " +
+                 "past about a tenth it stops being weight and starts being a zoom.\n\n" +
+                 "0 switches the whole thing off.")]
+        [Range(0f, 0.2f)] public float hitPunch = 0.055f;
+
+        [Tooltip("The punch when this fighter LANDS a blow. The one that matters most: a " +
+                 "swing that connects is the thing the player did, and it is the hit they " +
+                 "are owed the feeling of.")]
+        [Range(0f, 0.2f)] public float landedPunch = 0.05f;
+
+        [Tooltip("The punch on a clash. Biggest of the three, like the trauma above it: two " +
+                 "blades meeting is the one moment the fight should look like it stopped.")]
+        [Range(0f, 0.2f)] public float parryPunch = 0.08f;
+
+        [Tooltip("How fast the punch lets go, as a share per second. 5 is about two tenths " +
+                 "of a second, which is roughly a long hit stop -- so the lens is still " +
+                 "coming back as the bodies start moving again.")]
+        [Range(1f, 20f)] public float punchDecay = 5f;
+
         [Header("Split screen (local testing only)")]
         [Tooltip("Apply the rect below. On a device each player owns the whole screen.")]
         public bool applyViewportRect;
@@ -229,6 +259,15 @@ namespace GulagRunners.Game
         float _zoomVelocity;
         bool _fastFall;
         float _trauma;
+
+        /// <summary>
+        /// How far into an impact punch the lens is, 0 to 1. Decays like trauma and faster.
+        ///
+        /// Kept separate from trauma rather than driven off it, because the two want
+        /// different curves and different lengths: shake is noise that should rattle for a
+        /// while, and a punch is a single movement that has to be over before the next blow.
+        /// </summary>
+        float _punch;
         float _shakeSeed;
         PlayerController _subscribed;
 
@@ -396,9 +435,25 @@ namespace GulagRunners.Game
             return full > 0 ? Mathf.Clamp01(damage / (float)full) : 0f;
         }
 
-        void OnHurt(int damage) => AddTrauma(hitTrauma * Mathf.Sqrt(Share(damage)));
-        void OnParried() => AddTrauma(parryTrauma);
-        void OnOpponentHurt(int damage) => AddTrauma(landedTrauma * Mathf.Sqrt(Share(damage)));
+        void OnHurt(int damage)
+        {
+            float big = Mathf.Sqrt(Share(damage));
+            AddTrauma(hitTrauma * big);
+            AddPunch(hitPunch * big);
+        }
+
+        void OnParried()
+        {
+            AddTrauma(parryTrauma);
+            AddPunch(parryPunch);
+        }
+
+        void OnOpponentHurt(int damage)
+        {
+            float big = Mathf.Sqrt(Share(damage));
+            AddTrauma(landedTrauma * big);
+            AddPunch(landedPunch * big);
+        }
 
         void OnLanded(float impactSpeed)
         {
@@ -412,6 +467,21 @@ namespace GulagRunners.Game
 
         /// <summary>Adds shake. Call it from hits and explosions too; it accumulates and decays.</summary>
         public void AddTrauma(float amount) => _trauma = Mathf.Clamp01(_trauma + amount);
+
+        /// <summary>
+        /// Snaps the shot tighter by this fraction of the view height, and lets it back out.
+        ///
+        /// Takes a FRACTION rather than a 0-to-1 strength, so the three fields above are
+        /// each the number they describe and a caller from outside can ask for a punch in
+        /// the same units. Capped at a quarter: past that it is a cut, and a cut in a game
+        /// with one camera reads as a bug -- which is the note MatchOutcomeView already
+        /// carries about the big version of this.
+        /// </summary>
+        public void AddPunch(float fraction)
+        {
+            if (fraction <= 0f) return;
+            _punch = Mathf.Min(0.25f, _punch + fraction);
+        }
 
         void OnValidate()
         {
@@ -496,7 +566,14 @@ namespace GulagRunners.Game
             _focus = ClampToBorders(_focus, _zoom);
 
             _trauma = Mathf.Max(0f, _trauma - traumaDecay * dt);
-            Place(_focus, _zoom, Shake(dt));
+            _punch = Mathf.Max(0f, _punch - punchDecay * dt);
+
+            // The punch rides on top of the zoom rather than inside it, and that is the
+            // whole reason it works. _zoom is SmoothDamped towards the two-target framing
+            // and clamped to minZoom..maxZoom -- so a kick written into it would be fought
+            // by the damping on the next frame and swallowed by the clamp at the extremes,
+            // which is the same mistake MatchOutcomeView made by writing the transform.
+            Place(_focus, _zoom * Mathf.Max(0.1f, 1f - _punch), Shake(dt));
         }
 
         static float SoftTarget(float focus, float aim, float dead)
@@ -690,6 +767,7 @@ namespace GulagRunners.Game
             _lookAheadVelocity = 0f;
             _focusVelocity = Vector2.zero;
             _trauma = 0f;
+            _punch = 0f;
             _fastFall = false;
             _anchorY = target.position.y;
 

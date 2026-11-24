@@ -343,6 +343,19 @@ namespace GulagRunners.Game
         [Tooltip("Pulses per second while a weapon is nearly spent.")]
         [Range(0.5f, 8f)] public float wornPulse = 3f;
 
+        [Tooltip("Seconds left on the match clock at which the clock itself starts " +
+                 "breathing. 0 never does it.\n\n" +
+                 "The clock went danger-red in sudden death and that is the ONE phase where " +
+                 "the colour is redundant -- by then the rooms have shut, the ceiling is " +
+                 "down and the player can see perfectly well that the match is ending. The " +
+                 "moment worth marking is the ten seconds BEFORE that, when the arena still " +
+                 "looks normal and the only thing that has changed is a number nobody is " +
+                 "reading while they fight.\n\n" +
+                 "Breathing rather than recoloured, for the same reason the health bar " +
+                 "breathes: movement is the only thing on a busy screen that gets noticed " +
+                 "without being looked at.")]
+        [Range(0f, 30f)] public float clockUrgentSeconds = 12f;
+
         [Header("Touch controls")]
         /// <summary>
         /// The attack stick (docs/31). There is no attack button any more: a blow is
@@ -612,7 +625,28 @@ namespace GulagRunners.Game
             if (clock == null) return;
             bool sudden = matchState != null && Application.isPlaying &&
                           matchState.Match.Phase == MatchPhase.SuddenDeath;
-            Tint(clock, sudden ? palette.danger : palette.line);
+
+            Color ink = sudden ? palette.danger : palette.line;
+
+            // And the run-up to it, which is the part that was not being said. Sudden death
+            // announces itself -- the rooms are shut and the ceiling is coming down -- and
+            // the twelve seconds before it look like any other twelve seconds of the match.
+            if (!sudden && clockUrgentSeconds > 0f)
+            {
+                float left = SecondsLeft();
+                if (left > 0f && left <= clockUrgentSeconds)
+                {
+                    // Faster as it runs out, so the beat itself is the readout: at the
+                    // threshold it is a slow breath and on the last second it is a flicker.
+                    // One Lerp, and no second number for a designer to keep in step.
+                    float near = 1f - Mathf.Clamp01(left / clockUrgentSeconds);
+                    float rate = wornPulse * Mathf.Lerp(0.5f, 1.6f, near);
+                    float beat = 0.5f + 0.5f * Mathf.Sin(Time.time * rate * Mathf.PI * 2f);
+                    ink = Color.Lerp(ink, palette.danger, Mathf.Lerp(0.25f, 1f, beat) * near);
+                }
+            }
+
+            Tint(clock, ink);
 
             // The NUMBER, which until now was the mock's painted-on "1:24" and never moved.
             // A clock that does not move is worse than no clock: the whole of docs/01 is a
@@ -698,10 +732,23 @@ namespace GulagRunners.Game
         {
             if (matchState == null || !Application.isPlaying) return "1:24";
 
-            int left = Mathf.Max(0, MatchMotor.TotalFrames(matchState.MatchRules) -
-                                    matchState.Match.Frame);
-            int seconds = Mathf.CeilToInt(left / (float)TicksPerSecond);
+            int seconds = Mathf.CeilToInt(SecondsLeft());
             return $"{seconds / 60}:{seconds % 60:00}";
+        }
+
+        /// <summary>
+        /// Seconds left of the match, and 0 outside play mode.
+        ///
+        /// One reader for the number and for the urgency, so the clock cannot say nine
+        /// seconds while the thing deciding whether to pulse thinks there are eleven.
+        /// </summary>
+        float SecondsLeft()
+        {
+            if (matchState == null || !Application.isPlaying) return 0f;
+
+            int frames = Mathf.Max(0, MatchMotor.TotalFrames(matchState.MatchRules) -
+                                      matchState.Match.Frame);
+            return frames / (float)TicksPerSecond;
         }
 
         /// <summary>The simulation's fixed tick, which is what Match.Frame counts.</summary>

@@ -135,6 +135,20 @@ namespace GulagRunners.Game
                  "renderer makes the tail vanish instead of fading, which looks like a bug.")]
         public TrailRenderer swingTrail;
 
+        [Tooltip("How wide the trail is at the LIGHTEST blow that can still hurt somebody, " +
+                 "as a share of the width authored on the renderer. 1 keeps it the same " +
+                 "width whatever the swing, which is how it behaved.\n\n" +
+                 "Emitting was the only thing this trail knew -- on or off -- and the " +
+                 "simulation has had a far better number than that since docs/31 took the " +
+                 "phase machine out: SwingShare is how dangerous the blade is RIGHT NOW, in " +
+                 "thousandths of a full-power blow, and it is the number the damage itself is " +
+                 "made of. A fighter carrying a weapon into somebody and a fighter committing " +
+                 "to a full arc differ by a factor of four in what they will do, and the arc " +
+                 "through the air said nothing about it. Now the thing the player can see " +
+                 "from across the arena is the thing that is going to hurt them.\n\n" +
+                 "Costs one float a frame and no asset.")]
+        [Range(0.05f, 1f)] public float swingTrailFloor = 0.3f;
+
         [Tooltip("A hit that got through: this fighter is hurt.")]
         public ActionEffect hurt = new ActionEffect
             { sound = SoundId.AttackHit, level = NoiseLevel.Loud };
@@ -195,6 +209,16 @@ namespace GulagRunners.Game
         bool _subscribed;
         float _pried = -999f;
 
+        /// <summary>
+        /// The width authored on the renderer, read once and never written back.
+        ///
+        /// Read once because the thing below multiplies it: taking it fresh each frame would
+        /// read back the scaled value and compound, so the trail would narrow to nothing
+        /// over a couple of swings. Captured in OnEnable rather than Awake so a trail swapped
+        /// in by the weapon wiring is measured as it actually ships.
+        /// </summary>
+        float _trailWidth = -1f;
+
         void Reset()
         {
             player = GetComponentInParent<PlayerController>();
@@ -203,6 +227,9 @@ namespace GulagRunners.Game
 
         void OnEnable()
         {
+            if (swingTrail != null && _trailWidth < 0f)
+                _trailWidth = swingTrail.widthMultiplier;
+
             if (player == null) player = GetComponentInParent<PlayerController>();
             if (player == null || _subscribed) return;
 
@@ -271,9 +298,20 @@ namespace GulagRunners.Game
             _swinging = swinging;
 
             // The trail runs for as long as the blade is live, which is now a real
-            // statement about the weapon rather than a window around an animation.
+            // statement about the weapon rather than a window around an animation -- and it
+            // is as WIDE as the blade is dangerous, which is the same statement with the one
+            // number in it that the player is directly moving.
             if (swingTrail != null)
+            {
                 swingTrail.emitting = swinging && s.HitStopTimer == 0;
+
+                if (_trailWidth > 0f)
+                {
+                    float share = Mathf.Clamp01(s.SwingShare * 0.001f);
+                    swingTrail.widthMultiplier =
+                        _trailWidth * Mathf.Lerp(Mathf.Clamp01(swingTrailFloor), 1f, share);
+                }
+            }
 
             // A clash: two blades met. The old guard-break sound is the right one for it.
             if (s.WasParried) Fire(clashed, "weapons clashed");
