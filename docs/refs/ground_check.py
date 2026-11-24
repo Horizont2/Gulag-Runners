@@ -44,9 +44,13 @@ NORMAL_SLOTS = ("_BumpMap", "_NormalMap", "_DetailNormalMap",
 
 # Which texture set each material caps and skirts itself with -- the same pairs
 # ArenaGroundSetup hangs on the three materials it builds.
+#
+# This feeds the tile-spread test and nothing else now. The cap-against-side contrast
+# used to read it too, which is how a retextured material went on being measured as
+# whatever it was built as; that one reads the materials themselves.
 TEXTURE_SETS = {
     "ground": ("Forest_Ground_38", "Rocky_Dirt_2"),
-    "rock": ("Forest_Ground_38", "Rocky_Dirt_2"),
+    "rock": ("Rocky_Dirt_2", "Cliff_Rock_Surface_21"),
     "pillar": ("Planks_Wood_16", "Planks_Wood_16"),
 }
 
@@ -105,31 +109,90 @@ def materials():
             yield path, slots
 
 
-def texture_contrast():
-    """Mean luma of each material's cap and side albedo, with its tint applied.
+def ground_materials():
+    """Every material in the project on the arena-ground shader, read off disk.
+
+    The name, then the four things the contrast test needs: the guid in _TopMap, the guid
+    in _SideMap, and the two tints.
+    """
+    shader = None
+    meta = SHADER + ".meta"
+    if os.path.exists(meta):
+        with open(meta, encoding="utf-8", errors="ignore") as fh:
+            m = re.search(r"guid: ([0-9a-f]{32})", fh.read())
+            shader = m.group(1) if m else None
+
+    out = {}
+    if shader is None:
+        return out
+
+    for f in sorted(os.listdir(MATERIAL_FOLDER)):
+        if not f.endswith(".mat"):
+            continue
+        path = os.path.join(MATERIAL_FOLDER, f)
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            text = fh.read()
+        if not re.search(r"m_Shader: \{fileID: \d+, guid: " + shader, text):
+            continue
+
+        slots = {}
+        for m in re.finditer(r"- (_\w+):\n\s+m_Texture: \{fileID: -?\d+"
+                             r"(?:, guid: ([0-9a-f]{32}))?", text):
+            if m.group(2):
+                slots[m.group(1)] = m.group(2)
+
+        tints = {}
+        for m in re.finditer(r"- (_(?:Top|Side)Color): \{r: ([-\d.eE+]+), "
+                             r"g: ([-\d.eE+]+), b: ([-\d.eE+]+)", text):
+            tints[m.group(1)] = tuple(float(v) for v in m.groups()[1:])
+
+        out[f[:-4]] = (slots.get("_TopMap"), slots.get("_SideMap"),
+                       tints.get("_TopColor", (1.0, 1.0, 1.0)),
+                       tints.get("_SideColor", (1.0, 1.0, 1.0)))
+    return out
+
+
+def texture_contrast(guids):
+    """Mean luma of each ground material's cap and side albedo, with its tint applied.
+
+    THIS USED TO READ A TABLE IN THIS FILE, and the table was wrong in two ways at once.
+    It named three materials by the texture sets the setup tool was written with, so a
+    material retextured afterwards was measured as whatever it used to be -- and it built
+    the pack's path as Assets/Game Buffs/..., which is not where the pack is. Every
+    lookup missed, every luma came back 0, and the loop below skips a pair that measures
+    zero, so the one check in this file that an eye would actually notice had never run
+    once. It let a bright green lichened cliff into a snow fortress.
+
+    So it reads the materials. Five of the eight on this shader are now arena-specific
+    and none of them is in any table; what they have in common is the shader, which is
+    the thing worth keying on.
+
+    A material whose cap and side draw from the SAME texture is skipped rather than
+    measured: the pillars and the mill's wood are one material all the way round on
+    purpose, and there is no cap on them to tell apart.
 
     Raises ImportError when Pillow is not here; the caller says so and carries on.
     """
     from PIL import Image
-
     from PIL import ImageStat
 
-    pack = os.path.join(ASSETS, "Game Buffs", "Free Stylized Textures", "Textures")
-
-    def luma(name, tint):
-        path = os.path.join(pack, name, name + "_Albedo.png")
-        if not os.path.exists(path):
-            return 0.0
-        im = Image.open(path).convert("RGB").resize((96, 96), Image.BILINEAR)
+    def luma(guid, tint):
+        asset = guids.get(guid)
+        if asset is None or not os.path.exists(asset):
+            return None
+        im = Image.open(asset).convert("RGB").resize((96, 96), Image.BILINEAR)
         r, g, b = ImageStat.Stat(im).mean
         return (0.2126 * r * tint[0] + 0.7152 * g * tint[1]
                 + 0.0722 * b * tint[2]) / 255.0
 
     out = {}
-    for kind, (top, side) in TEXTURE_SETS.items():
-        settings = gm.MATERIALS[kind]
-        out[kind] = (luma(top, settings["top_tint"]),
-                     luma(side, settings["side_tint"]))
+    for name, (top, side, top_tint, side_tint) in ground_materials().items():
+        if top is None or side is None or top == side:
+            continue
+        a, b = luma(top, top_tint), luma(side, side_tint)
+        if a is None or b is None:
+            continue
+        out[name] = (a, b)
     return out
 
 
@@ -424,17 +487,22 @@ def main(argv=()):
     # Needs Pillow, which is a development dependency of this folder and not of the game,
     # so it says so and moves on rather than failing on a machine without it.
     try:
-        contrasts = texture_contrast()
+        contrasts = texture_contrast(guids)
     except ImportError:
         contrasts = None
         notes.append("Pillow is not installed, so the cap-against-side contrast was not "
                      "measured. pip install pillow to check it.")
 
-    for kind, (top_luma, side_luma) in (contrasts or {}).items():
+    if contrasts is not None and not contrasts:
+        problems.append("no material on the arena-ground shader could be measured -- "
+                        "either none of them has both a cap and a side texture, or the "
+                        "guids in them point outside the project")
+
+    for kind, (top_luma, side_luma) in sorted((contrasts or {}).items()):
         if max(top_luma, side_luma) <= 0:
             continue
         ratio = max(top_luma, side_luma) / max(min(top_luma, side_luma), 1e-4)
-        if kind != "pillar" and ratio < 1.25:
+        if ratio < 1.25:
             problems.append(
                 f"{kind}: the cap sits at {top_luma:.2f} luma and the side at "
                 f"{side_luma:.2f}, a {ratio:.2f}x difference -- too close to tell apart, "

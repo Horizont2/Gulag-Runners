@@ -31,9 +31,12 @@ namespace GulagRunners.GameEditor
     ///
     ///   GR_ArenaGround   forest floor on top, rocky earth down the sides. Everything
     ///                    wider than it is tall: floors, walkways, steps.
-    ///   GR_ArenaRock     the same pair, with the cap pulled back to the flat top only.
-    ///                    Walls and panels, where grass creeping down a vertical face
-    ///                    would read as moss on a cliff rather than turf on a slab.
+    ///   GR_ArenaRock     trodden earth on top, cut cliff stone down the sides, with
+    ///                    the cap pulled back to the flat top only. Walls and panels,
+    ///                    where turf creeping down a vertical face would read as moss on
+    ///                    a cliff rather than as grass on a slab. It used to carry the
+    ///                    ground material's own pair, which made a wall a taller floor;
+    ///                    cut stone is what a wall is.
     ///   GR_ArenaPillar   wood, all round, _MeshSize (1,2,1). The six cylinders.
     ///
     /// WHAT IT WILL NOT TOUCH. Only renderers still on Unity's built-in Default-Material.
@@ -60,6 +63,7 @@ namespace GulagRunners.GameEditor
         // maps, so nothing here has to correct an importer.
         const string ForestFloor = "Forest_Ground_38";
         const string RockyEarth = "Rocky_Dirt_2";
+        const string CliffRock = "Cliff_Rock_Surface_21";
         const string Planks = "Planks_Wood_16";
 
         // A floor seen from the side of the arena is seen at a grazing angle for most of
@@ -219,15 +223,25 @@ namespace GulagRunners.GameEditor
         {
             Material m = Load(RockMaterial, shader, "GR_ArenaRock");
             if (m == null) return null;
-            if (!Pair(m, "_TopMap", "_TopNormal", ForestFloor)) return null;
-            if (!Pair(m, "_SideMap", "_SideNormal", RockyEarth)) return null;
+            if (!Pair(m, "_TopMap", "_TopNormal", RockyEarth)) return null;
+            if (!Pair(m, "_SideMap", "_SideNormal", CliffRock)) return null;
 
-            // The same earth as the ground material, at the same size: these two meet
-            // everywhere, a floor edge in front of a bank.
+            // Earth on top, stone down the side, both at the ground material's own size:
+            // these two meet everywhere, a floor edge in front of a bank.
             m.SetFloat("_TopTile", 2.0f);
             m.SetFloat("_SideTile", 2.0f);
-            m.SetColor("_TopColor", new Color(1.15f, 1.15f, 1.1f, 1f));
-            m.SetColor("_SideColor", new Color(1.8f, 1.74f, 1.62f, 1f));
+
+            // THE TINTS CARRY THE WHOLE SEPARATION HERE, and they run the opposite way to
+            // the ground material's. Rocky_Dirt_2 measures 0.13 luma and
+            // Cliff_Rock_Surface_21 measures 0.31, so left alone the side is more than
+            // twice the cap and a wall reads as a pale slab with a dark stripe along the
+            // top. The earth comes up and the stone comes down, to 0.28 against 0.19.
+            //
+            // The stone also has the green taken out of it. It is a lichened cliff --
+            // (0.230, 0.340, 0.241), noticeably green -- which suits a forest and is
+            // wrong in the sawmill's ten slabs and a snow fortress's six borders.
+            m.SetColor("_TopColor", new Color(2.3f, 2.1f, 1.8f, 1f));
+            m.SetColor("_SideColor", new Color(0.72f, 0.6f, 0.68f, 1f));
             m.SetFloat("_TopNormalStrength", 1.0f);
             m.SetFloat("_SideNormalStrength", 1.25f);
             m.SetFloat("_TopSmoothness", 0.08f);

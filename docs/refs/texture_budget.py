@@ -63,13 +63,17 @@ RULES = (
     # The floor is the one surface the fight is always ON, so it fills more of the frame
     # than anything else and it is the one place 512 would read as mud.
     #
+    # Coal is in it for the same reason: GR_MineGround draws its sides from
+    # Coal_Surface_2, which is the face of every block in Arena_Mine. Nothing else
+    # in the name says floor, so without it the catch-all would cost it as a prop.
+    #
     # Planks and wood are in that list because they ARE the floor here: GR_ArenaRock and
     # GR_wood both draw from Planks_Wood_16, which is the surface every fight happens on.
     # Without them its normal map fell through to the catch-all and was costed as a prop
     # at 512, which on the one surface that fills most of the frame is the mud this rule
     # exists to prevent.
     (r"[Gg]round|[Ff]loor|[Tt]errain|[Dd]irt|[Gg]rass|[Pp]avement|[Rr]ock|[Ss]tone"
-     r"|[Ss]and|[Ww]all|[Pp]lanks|[Ww]ood", 1024,
+     r"|[Ss]and|[Ww]all|[Pp]lanks|[Ww]ood|[Cc]oal", 1024,
      "floor, wall or ground -- the biggest thing on screen"),
 
     # THE PARALLAX LAYERS ARE NOT PROPS, and the catch-all below was about to treat them

@@ -25,9 +25,20 @@ namespace GulagRunners.GameEditor
     /// Every effect this project builds for hits, dust and gas has playOnAwake off, because
     /// each is fired by an event, so the two kinds cannot be confused.
     ///
-    /// Only Arena_Egypt, the night temple, has empty air, and it gets fine sand drifting on the
-    /// wind. The emitter is sized from the arena's own borders rather than from a number
-    /// typed here, so it covers whatever the arena actually is.
+    /// ARENA_EGYPT HAS AIR NOW TOO, put in the scene rather than built here: three of the
+    /// same P_Dust_Gray_Wind emitters the mine uses, at x -10, 0 and 10 under an
+    /// Atmosphere root, on the project's own Particle Soft material. Each is a 10 x 3 x
+    /// 10 m box against borders at x +-15.1, so the three of them cover the arena.
+    ///
+    /// Grey dust and not yellow sand, which is the one thing worth saying about the
+    /// choice: lit sand at night is not the colour of sand, it is the moon picking out
+    /// grains, and the Moods entry below says the same thing in its own tint. Reusing the
+    /// emitter the mine already ships costs no texture, no material and no new prefab.
+    ///
+    /// So this tool now has nothing left to build in any of the five, and running it says
+    /// so, per scene, naming what it found. That is the useful answer rather than a
+    /// no-op: the question it answers is whether an arena's air is empty, and the Moods
+    /// table below stays as the shape of an answer for the next arena somebody adds.
     /// </summary>
     public static class ArenaAtmosphereSetup
     {

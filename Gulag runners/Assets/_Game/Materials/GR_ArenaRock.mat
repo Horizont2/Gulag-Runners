@@ -24,19 +24,19 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _SideMap:
-        m_Texture: {fileID: 2800000, guid: b6c9087391f197c409d0b79d433220c5, type: 3}
+        m_Texture: {fileID: 2800000, guid: 6fd39161d2c1b304083bc22f562fe5da, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SideNormal:
-        m_Texture: {fileID: 2800000, guid: 1373407ad1b166e44ae5237da4a06856, type: 3}
+        m_Texture: {fileID: 2800000, guid: eb5a3715ac775bd43ab7679f47936d47, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _TopMap:
-        m_Texture: {fileID: 2800000, guid: b6c9087391f197c409d0b79d433220c5, type: 3}
+        m_Texture: {fileID: 2800000, guid: 8b1d20f6985bdee43b8ac257fdfaf324, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _TopNormal:
-        m_Texture: {fileID: 2800000, guid: 1373407ad1b166e44ae5237da4a06856, type: 3}
+        m_Texture: {fileID: 2800000, guid: 15bfbda3d1778b8429155790dfbe98de, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -70,7 +70,7 @@ Material:
     - _Wear: 0.3
     m_Colors:
     - _MeshSize: {r: 1, g: 1, b: 1, a: 0}
-    - _SideColor: {r: 1.8, g: 1.74, b: 1.62, a: 1}
-    - _TopColor: {r: 1.15, g: 1.15, b: 1.1, a: 1}
+    - _SideColor: {r: 0.72, g: 0.6, b: 0.68, a: 1}
+    - _TopColor: {r: 2.3, g: 2.1, b: 1.8, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

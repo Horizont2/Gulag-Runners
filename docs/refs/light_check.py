@@ -30,6 +30,8 @@ from sim_motor_mirror import F                   # noqa: E402
 
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
 SETTINGS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Settings")
+POOL = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game", "Maps",
+                    "MapPool.asset")
 
 # How far behind the fighters the haze must begin. Less and it is on them; a fighter is
 # 0.6 m thick and leans, so a metre of clearance is the floor and three is comfortable.
@@ -368,9 +370,44 @@ def void_below(name, text, scene, problems, notes):
             f"uses a cloud layer, the mine uses more shaft.")
 
 
+def dealt():
+    """The arena scene files the map pool can actually deal, by name.
+
+    Arena_Sawmill is the reason this exists. It is a scene in the folder and a row in
+    EditorBuildSettings with enabled 0, it is in no map pool, and it has no fighters, no
+    backdrop, no hit effects and no SceneLighting -- somebody's workbench. Checked as a
+    shipped arena it reported one standing fault for every run, which is the thing that
+    hides the next real one: a count nobody reads is a count that always says 1.
+
+    The pool is the authority rather than the build settings, because the pool is what
+    the game hands the player. An empty or unreadable pool returns None, and the caller
+    then checks everything it finds, which is the right way round for a check.
+    """
+    try:
+        with open(POOL, encoding="utf-8", errors="ignore") as fh:
+            src = fh.read()
+    except OSError:
+        return None
+
+    out = {m.group(1).strip() + ".unity"
+           for m in re.finditer(r"- scene: (.+?)\n(?:.*?\n)*?\s*enabled: 1\b", src)}
+    return out or None
+
+
 def main(argv):
     wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
+
+    # An arena nobody can be sent to is a note, not a fault. Only when the caller did not
+    # name scenes itself: light_check.py Arena_Sawmill.unity still checks the workbench.
+    if not argv:
+        pool = dealt()
+        if pool is not None:
+            aside = [n for n in wanted if n not in pool]
+            wanted = [n for n in wanted if n in pool]
+            for n in sorted(aside):
+                notes.append(f"{n} is in the Scenes folder and in no map pool, so it is "
+                             f"not checked as a shipped arena")
 
     limits = budget()
     for who, (lim, mode) in sorted(limits.items()):

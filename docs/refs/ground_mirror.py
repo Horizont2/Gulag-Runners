@@ -383,7 +383,7 @@ ROCK = dict(top_tile=2.0, side_tile=2.0, top_facing=0.72, top_blend=0.12,
             sharpness=8.0, overhang=0.03, overhang_fade=2.4, lip_shade=0.3,
             lip_shade_depth=0.18, foot_shade=0.3, foot_shade_height=0.45,
             mesh_size=(1.0, 1.0, 1.0),
-            top_tint=(1.15, 1.15, 1.10), side_tint=(1.80, 1.74, 1.62),
+            top_tint=(2.30, 2.10, 1.80), side_tint=(0.72, 0.60, 0.68),
             edge_round=0.16, edge_round_strength=0.8, warp=0.35,
             lip_jitter=0.8, lip_jitter_scale=0.45, interlock=0.5, macro_scale=16.0,
             macro_strength=0.34, macro_warm=0.45, detune=0.2, wear=0.3)
