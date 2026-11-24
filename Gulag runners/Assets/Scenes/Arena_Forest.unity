@@ -18,7 +18,7 @@ RenderSettings:
   m_FogColor: {r: 0.18, g: 0.243, b: 0.246, a: 1}
   m_FogMode: 1
   m_FogDensity: 0.01
-  m_LinearFogStart: 7.49
+  m_LinearFogStart: 7.4900002
   m_LinearFogEnd: 19.49
   m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
@@ -711,7 +711,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.5575964, y: 0.088316105, z: 0.011912882}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 3.115869
-  sagDir: {x: 0.301857, y: -0.953353, z: 0}
+  sagDir: {x: 0.41872028, y: -0.90811527, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -744,7 +744,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.5575964, y: 0.088316105, z: -0.00019228458}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 3.115869
-  sagDir: {x: 0.301857, y: -0.953353, z: 0}
+  sagDir: {x: 0.41872028, y: -0.90811527, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -1334,10 +1334,10 @@ MonoBehaviour:
   spanOrigin: {x: -0.02112093, y: 0.5024443, z: -0.22851618}
   spanAxis: {x: 0.0882883, y: 0.28239152, z: 0.95522785}
   spanLength: 0.47845376
-  sagDir: {x: 0.088288, y: 0.282391, z: 0.955228}
+  sagDir: {x: 0.0882883, y: 0.28239152, z: 0.95522785}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -1348,8 +1348,8 @@ MonoBehaviour:
   landSwing: 6
   swingDamping: 0.08
   leanPerLoad: 2.5
-  swingPivot: {x: 0, y: 0, z: 0}
-  follow: {fileID: 1372700468}
+  swingPivot: {x: -0.02112093, y: 0.5024443, z: -0.22851618}
+  follow: {fileID: 1372700467}
 --- !u!4 &34846547 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -13585,7 +13585,7 @@ PrefabInstance:
     - target: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: d46b972c8006d8240ba130b57bdc3e58, type: 2}
+      objectReference: {fileID: 2100000, guid: 27683e91781235c4899f0fda927dada9, type: 2}
     - target: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 0
@@ -13605,7 +13605,7 @@ PrefabInstance:
     - target: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 64db12a0a62f37349a30fd63e06ddcba, type: 2}
+      objectReference: {fileID: 2100000, guid: 10f4f00603876fd43b595334f97ea7d8, type: 2}
     - target: {fileID: 6140288381748933299, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -13675,8 +13675,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
   skin:
   - {fileID: 210270017}
-  spanOrigin: {x: -1.28, y: 2, z: -1.5}
-  spanAxis: {x: -0, y: -1, z: -0}
+  spanOrigin: {x: -1.28, y: -2, z: -1.5}
+  spanAxis: {x: 0, y: 1, z: 0}
   spanLength: 4
   sagDir: {x: 0, y: -1, z: 0}
   watch:
@@ -13686,7 +13686,7 @@ MonoBehaviour:
   overhang: 0.08
   stiffness: 70
   damping: 7
-  swayPerLoad: 0.06
+  swayPerLoad: 0
   pendulumLength: 0
   idleSwing: 1.2
   landSwing: 6
@@ -13708,8 +13708,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
   skin:
   - {fileID: 210270019}
-  spanOrigin: {x: -1.28, y: 2, z: 1.5}
-  spanAxis: {x: -0, y: -1, z: -0}
+  spanOrigin: {x: -1.28, y: -2, z: 1.5}
+  spanAxis: {x: 0, y: 1, z: 0}
   spanLength: 4
   sagDir: {x: 0, y: -1, z: 0}
   watch:
@@ -13719,7 +13719,7 @@ MonoBehaviour:
   overhang: 0.08
   stiffness: 70
   damping: 7
-  swayPerLoad: 0.06
+  swayPerLoad: 0
   pendulumLength: 0
   idleSwing: 1.2
   landSwing: 6
@@ -14288,10 +14288,10 @@ MonoBehaviour:
   spanOrigin: {x: -0.031129852, y: 0.5932614, z: -0.1619582}
   spanAxis: {x: 0.18690419, y: -0.13966203, z: 0.97239983}
   spanLength: 0.3331103
-  sagDir: {x: 0.186904, y: -0.139662, z: 0.9724}
+  sagDir: {x: 0.18690419, y: -0.13966203, z: 0.97239983}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -14302,8 +14302,8 @@ MonoBehaviour:
   landSwing: 6
   swingDamping: 0.08
   leanPerLoad: 2.5
-  swingPivot: {x: 0, y: 0, z: 0}
-  follow: {fileID: 980100004}
+  swingPivot: {x: -0.031129852, y: 0.5932614, z: -0.1619582}
+  follow: {fileID: 980100003}
 --- !u!4 &270285042 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -26027,7 +26027,7 @@ Light:
     m_Type: 2
     m_Resolution: -1
     m_CustomResolution: -1
-    m_Strength: 1
+    m_Strength: 0.55
     m_Bias: 0.05
     m_NormalBias: 0.4
     m_NearPlane: 0.2
@@ -27136,7 +27136,7 @@ PrefabInstance:
     - target: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: d46b972c8006d8240ba130b57bdc3e58, type: 2}
+      objectReference: {fileID: 2100000, guid: 27683e91781235c4899f0fda927dada9, type: 2}
     - target: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 0
@@ -27156,7 +27156,7 @@ PrefabInstance:
     - target: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 64db12a0a62f37349a30fd63e06ddcba, type: 2}
+      objectReference: {fileID: 2100000, guid: 10f4f00603876fd43b595334f97ea7d8, type: 2}
     - target: {fileID: 6140288381748933299, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -27226,8 +27226,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
   skin:
   - {fileID: 494039444}
-  spanOrigin: {x: -1.28, y: 2, z: -1.5}
-  spanAxis: {x: -0, y: -1, z: -0}
+  spanOrigin: {x: -1.28, y: -2, z: -1.5}
+  spanAxis: {x: 0, y: 1, z: 0}
   spanLength: 4
   sagDir: {x: 0, y: -1, z: 0}
   watch:
@@ -27237,7 +27237,7 @@ MonoBehaviour:
   overhang: 0.08
   stiffness: 70
   damping: 7
-  swayPerLoad: 0.06
+  swayPerLoad: 0
   pendulumLength: 0
   idleSwing: 1.2
   landSwing: 6
@@ -27259,8 +27259,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
   skin:
   - {fileID: 494039446}
-  spanOrigin: {x: -1.28, y: 2, z: 1.5}
-  spanAxis: {x: -0, y: -1, z: -0}
+  spanOrigin: {x: -1.28, y: -2, z: 1.5}
+  spanAxis: {x: 0, y: 1, z: 0}
   spanLength: 4
   sagDir: {x: 0, y: -1, z: 0}
   watch:
@@ -27270,7 +27270,7 @@ MonoBehaviour:
   overhang: 0.08
   stiffness: 70
   damping: 7
-  swayPerLoad: 0.06
+  swayPerLoad: 0
   pendulumLength: 0
   idleSwing: 1.2
   landSwing: 6
@@ -44344,10 +44344,10 @@ MonoBehaviour:
   spanOrigin: {x: -0.044914577, y: 0.5438767, z: -0.16775115}
   spanAxis: {x: 0.25575775, y: 0.14875412, z: 0.95522785}
   spanLength: 0.35122752
-  sagDir: {x: 0.255758, y: 0.148754, z: 0.955228}
+  sagDir: {x: 0.25575775, y: 0.14875412, z: 0.95522785}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -44358,8 +44358,8 @@ MonoBehaviour:
   landSwing: 6
   swingDamping: 0.08
   leanPerLoad: 2.5
-  swingPivot: {x: 0, y: 0, z: 0}
-  follow: {fileID: 980100004}
+  swingPivot: {x: -0.044914577, y: 0.5438767, z: -0.16775115}
+  follow: {fileID: 980100003}
 --- !u!4 &625761578 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -45234,7 +45234,7 @@ PrefabInstance:
     - target: {fileID: -7882957766948770710, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: d46b972c8006d8240ba130b57bdc3e58, type: 2}
+      objectReference: {fileID: 2100000, guid: 27683e91781235c4899f0fda927dada9, type: 2}
     - target: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 0
@@ -45258,7 +45258,7 @@ PrefabInstance:
     - target: {fileID: 5825791775376799700, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 64db12a0a62f37349a30fd63e06ddcba, type: 2}
+      objectReference: {fileID: 2100000, guid: 10f4f00603876fd43b595334f97ea7d8, type: 2}
     - target: {fileID: 6140288381748933299, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -45328,8 +45328,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
   skin:
   - {fileID: 664725935}
-  spanOrigin: {x: -1.28, y: 2, z: -1.5}
-  spanAxis: {x: -0, y: -1, z: -0}
+  spanOrigin: {x: -1.28, y: -2, z: -1.5}
+  spanAxis: {x: 0, y: 1, z: 0}
   spanLength: 4
   sagDir: {x: 0, y: -1, z: 0}
   watch:
@@ -45339,7 +45339,7 @@ MonoBehaviour:
   overhang: 0.08
   stiffness: 70
   damping: 7
-  swayPerLoad: 0.06
+  swayPerLoad: 0
   pendulumLength: 0
   idleSwing: 1.2
   landSwing: 6
@@ -45361,8 +45361,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SaggingSpan
   skin:
   - {fileID: 664725937}
-  spanOrigin: {x: -1.28, y: 2, z: 1.5}
-  spanAxis: {x: -0, y: -1, z: -0}
+  spanOrigin: {x: -1.28, y: -2, z: 1.5}
+  spanAxis: {x: 0, y: 1, z: 0}
   spanLength: 4
   sagDir: {x: 0, y: -1, z: 0}
   watch:
@@ -45372,7 +45372,7 @@ MonoBehaviour:
   overhang: 0.08
   stiffness: 70
   damping: 7
-  swayPerLoad: 0.06
+  swayPerLoad: 0
   pendulumLength: 0
   idleSwing: 1.2
   landSwing: 6
@@ -56819,10 +56819,10 @@ MonoBehaviour:
   spanOrigin: {x: -0.02112093, y: 0.5024443, z: -0.22851618}
   spanAxis: {x: 0.0882883, y: 0.28239152, z: 0.95522785}
   spanLength: 0.47845376
-  sagDir: {x: 0.088288, y: 0.282391, z: 0.955228}
+  sagDir: {x: 0.0882883, y: 0.28239152, z: 0.95522785}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -56833,8 +56833,8 @@ MonoBehaviour:
   landSwing: 6
   swingDamping: 0.08
   leanPerLoad: 2.5
-  swingPivot: {x: 0, y: 0, z: 0}
-  follow: {fileID: 980100004}
+  swingPivot: {x: -0.02112093, y: 0.5024443, z: -0.22851618}
+  follow: {fileID: 980100003}
 --- !u!4 &743851741 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -65010,10 +65010,10 @@ MonoBehaviour:
   spanOrigin: {x: -0.044914577, y: 0.5438767, z: -0.16775115}
   spanAxis: {x: 0.25575775, y: 0.14875412, z: 0.95522785}
   spanLength: 0.35122752
-  sagDir: {x: 0.255758, y: 0.148754, z: 0.955228}
+  sagDir: {x: 0.25575775, y: 0.14875412, z: 0.95522785}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -65024,8 +65024,8 @@ MonoBehaviour:
   landSwing: 6
   swingDamping: 0.08
   leanPerLoad: 2.5
-  swingPivot: {x: 0, y: 0, z: 0}
-  follow: {fileID: 1372700468}
+  swingPivot: {x: -0.044914577, y: 0.5438767, z: -0.16775115}
+  follow: {fileID: 1372700467}
 --- !u!4 &921054233 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -65961,14 +65961,14 @@ MonoBehaviour:
   spanLength: 1.4603939
   sagDir: {x: 0, y: -1, z: 0}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
   damping: 5
   swayPerLoad: 0
-  pendulumLength: 0
+  pendulumLength: 0.6703572
   idleSwing: 3
   landSwing: 6
   swingDamping: 0.08
@@ -65994,8 +65994,8 @@ MonoBehaviour:
   spanLength: 1.5
   sagDir: {x: 0, y: -1, z: 0}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -85930,10 +85930,10 @@ MonoBehaviour:
   spanOrigin: {x: -0.014539974, y: 0.61555415, z: -0.19929011}
   spanAxis: {x: 0.07094517, y: -0.22227335, z: 0.97239983}
   spanLength: 0.40989336
-  sagDir: {x: 0.070945, y: -0.222273, z: 0.9724}
+  sagDir: {x: 0.07094517, y: -0.22227335, z: 0.97239983}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -85944,8 +85944,8 @@ MonoBehaviour:
   landSwing: 6
   swingDamping: 0.08
   leanPerLoad: 2.5
-  swingPivot: {x: 0, y: 0, z: 0}
-  follow: {fileID: 980100004}
+  swingPivot: {x: -0.014539974, y: 0.61555415, z: -0.19929011}
+  follow: {fileID: 980100003}
 --- !u!4 &1362744658 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -86327,14 +86327,14 @@ MonoBehaviour:
   spanLength: 1.4603939
   sagDir: {x: 0, y: -1, z: 0}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
   damping: 5
   swayPerLoad: 0
-  pendulumLength: 0
+  pendulumLength: 0.67135763
   idleSwing: 3
   landSwing: 6
   swingDamping: 0.08
@@ -86360,8 +86360,8 @@ MonoBehaviour:
   spanLength: 1.5
   sagDir: {x: 0, y: -1, z: 0}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -109081,10 +109081,10 @@ MonoBehaviour:
   spanOrigin: {x: -0.022953227, y: 0.60978854, z: -0.19143908}
   spanAxis: {x: 0.116589144, y: -0.20210287, z: 0.97239983}
   spanLength: 0.3937456
-  sagDir: {x: 0.116589, y: -0.202103, z: 0.9724}
+  sagDir: {x: 0.116589144, y: -0.20210287, z: 0.97239983}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -109095,8 +109095,8 @@ MonoBehaviour:
   landSwing: 6
   swingDamping: 0.08
   leanPerLoad: 2.5
-  swingPivot: {x: 0, y: 0, z: 0}
-  follow: {fileID: 1372700468}
+  swingPivot: {x: -0.022953227, y: 0.60978854, z: -0.19143908}
+  follow: {fileID: 1372700467}
 --- !u!4 &1583825140 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -109796,10 +109796,10 @@ MonoBehaviour:
   spanOrigin: {x: -0.031129852, y: 0.5932614, z: -0.1619582}
   spanAxis: {x: 0.18690419, y: -0.13966203, z: 0.97239983}
   spanLength: 0.3331103
-  sagDir: {x: 0.186904, y: -0.139662, z: 0.9724}
+  sagDir: {x: 0.18690419, y: -0.13966203, z: 0.97239983}
   watch:
-  - {fileID: 1900000119}
   - {fileID: 1900000127}
+  - {fileID: 1900000119}
   carryHeight: 0.75
   overhang: 0.08
   stiffness: 45
@@ -109810,8 +109810,8 @@ MonoBehaviour:
   landSwing: 6
   swingDamping: 0.08
   leanPerLoad: 2.5
-  swingPivot: {x: 0, y: 0, z: 0}
-  follow: {fileID: 1372700468}
+  swingPivot: {x: -0.031129852, y: 0.5932614, z: -0.1619582}
+  follow: {fileID: 1372700467}
 --- !u!4 &1644726342 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 979ee1a3ee65e094abf48420b6538d5a, type: 3}
@@ -111596,7 +111596,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.5575964, y: 0.088316105, z: 0.011912882}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 3.115869
-  sagDir: {x: -0.296814, y: -0.954935, z: 0}
+  sagDir: {x: -0.4123582, y: -0.9110218, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -111629,7 +111629,7 @@ MonoBehaviour:
   spanOrigin: {x: -1.5575964, y: 0.088316105, z: -0.00019228458}
   spanAxis: {x: 1, y: 0, z: 0}
   spanLength: 3.115869
-  sagDir: {x: -0.296814, y: -0.954935, z: 0}
+  sagDir: {x: -0.4123582, y: -0.9110218, z: 0}
   watch:
   - {fileID: 1900000127}
   - {fileID: 1900000119}
@@ -132158,6 +132158,65 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1900000001}
   m_LocalEulerAnglesHint: {x: 2, y: 8, z: 2}
+--- !u!1 &1900009400
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1900009401}
+  - component: {fileID: 1900009402}
+  m_Layer: 0
+  m_Name: Scene Lighting
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1900009401
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900009400}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1179193226}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1900009402
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900009400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6df01054ba947a78f1cac11f8f03408, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SceneLighting
+  fog: 1
+  fogColour: {r: 0.18, g: 0.243, b: 0.246, a: 1}
+  fogFromCamera: 1
+  measureFrom: {fileID: 1900000135}
+  fogBehindPlane: 1.4
+  fogStart: 7.4900002
+  fogEnd: 19.49
+  fogDepth: 12
+  ambientIntensity: 1
+  sun: {fileID: 410087040}
+  sunIntensity: 2
+  shadowStrength: 0.55
+  shadowBias: 0.05
+  shadowNormalBias: 0.4
+  logOnApply: 0
 --- !u!1 &1900878540
 GameObject:
   m_ObjectHideFlags: 0
@@ -148047,62 +148106,3 @@ SceneRoots:
   - {fileID: 629917137}
   - {fileID: 183832945}
   - {fileID: 367346955}
---- !u!1 &1900009400
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1900009401}
-  - component: {fileID: 1900009402}
-  m_Layer: 0
-  m_Name: Scene Lighting
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1900009401
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1900009400}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1179193226}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1900009402
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1900009400}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a6df01054ba947a78f1cac11f8f03408, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SceneLighting
-  fog: 1
-  fogColour: {r: 0.18, g: 0.243, b: 0.246, a: 1}
-  fogFromCamera: 1
-  measureFrom: {fileID: 1900000135}
-  fogBehindPlane: 1.4
-  fogStart: 7.49
-  fogEnd: 19.49
-  fogDepth: 12
-  ambientIntensity: 1
-  sun: {fileID: 410087040}
-  sunIntensity: 2
-  shadowStrength: 0.55
-  shadowBias: 0.05
-  shadowNormalBias: 0.4
-  logOnApply: 0

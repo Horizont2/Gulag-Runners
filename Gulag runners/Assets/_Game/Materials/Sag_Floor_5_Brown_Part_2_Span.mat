@@ -40,10 +40,14 @@ Material:
     - _Smoothness: 0.15
     - _SpanLength: 3.115869
     - _Sway: 0
+    - _SwingAngle: 0
     m_Colors:
     - _BaseColor: {r: 0.27999312, g: 0.2036179, b: 0.14136821, a: 1}
     - _SagDir: {r: 0.41872028, g: -0.90811527, b: 0, a: 0}
     - _SpanAxis: {r: 1, g: 0, b: 0, a: 0}
     - _SpanOrigin: {r: -1.5575964, g: 0.088316105, b: 0.011912882, a: 0}
+    - _SwingAxis: {r: 0, g: 0, b: 1, a: 0}
+    - _SwingOffset: {r: 0, g: 0, b: 0, a: 0}
+    - _SwingPivot: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
