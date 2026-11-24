@@ -128044,6 +128044,7 @@ GameObject:
   - component: {fileID: 1900000116}
   - component: {fileID: 1900000117}
   - component: {fileID: 1900000400}
+  - component: {fileID: 1748879270}
   m_Layer: 0
   m_Name: SimWorld
   m_TagString: Untagged
@@ -148346,3 +148347,82 @@ MonoBehaviour:
   down: 0.045
   up: 0.12
   target: {fileID: 0}
+--- !u!114 &1748879270
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000118}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 180c1359962a4f418ddc3d522f62f937, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  matchState: {fileID: 1900000400}
+  player: {fileID: 0}
+  pool: {fileID: 1960000002}
+  landed:
+    ms: 12
+    strength: 120
+    gap: 0
+    thenMs: 0
+    thenStrength: 0
+  hitRungs: {x: 0.08, y: 0.22}
+  graze:
+    ms: 28
+    strength: 150
+    gap: 0
+    thenMs: 0
+    thenStrength: 0
+  hit:
+    ms: 45
+    strength: 205
+    gap: 0
+    thenMs: 0
+    thenStrength: 0
+  crusher:
+    ms: 70
+    strength: 255
+    gap: 0
+    thenMs: 0
+    thenStrength: 0
+  parry:
+    ms: 14
+    strength: 255
+    gap: 26
+    thenMs: 26
+    thenStrength: 200
+  vent:
+    ms: 260
+    strength: 170
+    gap: 0
+    thenMs: 0
+    thenStrength: 0
+  throb:
+    ms: 16
+    strength: 90
+    gap: 0
+    thenMs: 0
+    thenStrength: 0
+  throbFrom: 3
+  throbRate: {x: 0.9, y: 3.2}
+  chest:
+    ms: 10
+    strength: 90
+    gap: 50
+    thenMs: 18
+    thenStrength: 150
+  refused:
+    ms: 55
+    strength: 130
+    gap: 0
+    thenMs: 0
+    thenStrength: 0
+  death:
+    ms: 420
+    strength: 255
+    gap: 0
+    thenMs: 0
+    thenStrength: 0
+  log: 0

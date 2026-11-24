@@ -25,6 +25,7 @@ putting it back is one revert.
 """
 import os
 import re
+import struct
 import sys
 import importlib.util
 
@@ -40,7 +41,16 @@ RULES = (
     # The game's own interface is measured in millimetres by ui_fit_check. Leave it.
     (r"(^|/)_Game/UI/(?!Loading)", None,
      "the game's own UI, measured in millimetres by ui_fit_check"),
-    (r"Loading screen", 1024, "full-bleed, on screen for a second"),
+    # 2048, not 1024, and this is the one row in the table that goes UP.
+    #
+    # "On screen for a second" is true and it is not the measurement that matters. These
+    # are full-bleed: MenuBackdrop grows the rect until the picture covers the screen and
+    # lets the overflow go off the edge, so one of them fills every pixel of the glass. The
+    # files are 1024 x 420 and a phone is 2400 across, which the note on MenuBackdrop
+    # already works out as a 2.3x blow-up -- so capping them at 1024 saves nothing today
+    # (they are already smaller than that) and throws away the only fix there is, which is
+    # bigger art.
+    (r"Loading screen", 2048, "full-bleed and blown up 2.3x already -- do not cap further"),
 
     # The nearest thing to the lens, and the only thing a player looks AT.
     (r"character|Character|GanzSe|Mercenary|mercenary|hero|Hero|soldier|Soldier"
@@ -52,8 +62,27 @@ RULES = (
 
     # The floor is the one surface the fight is always ON, so it fills more of the frame
     # than anything else and it is the one place 512 would read as mud.
+    #
+    # Planks and wood are in that list because they ARE the floor here: GR_ArenaRock and
+    # GR_wood both draw from Planks_Wood_16, which is the surface every fight happens on.
+    # Without them its normal map fell through to the catch-all and was costed as a prop
+    # at 512, which on the one surface that fills most of the frame is the mud this rule
+    # exists to prevent.
     (r"[Gg]round|[Ff]loor|[Tt]errain|[Dd]irt|[Gg]rass|[Pp]avement|[Rr]ock|[Ss]tone"
-     r"|[Ss]and|[Ww]all", 1024, "floor, wall or ground -- the biggest thing on screen"),
+     r"|[Ss]and|[Ww]all|[Pp]lanks|[Ww]ood", 1024,
+     "floor, wall or ground -- the biggest thing on screen"),
+
+    # THE PARALLAX LAYERS ARE NOT PROPS, and the catch-all below was about to treat them
+    # as ones. A prop five metres back occupies a few hundred pixels of the screen; these
+    # are full-bleed quads 3.21 SCREENS wide, so their 2048 already only works out to 637
+    # texels across a phone's whole screen width -- about a 1.7x magnification on a 1080
+    # handset. Capped to 512 that becomes 160 texels across the screen, a 6.8x blow-up,
+    # which is the exact look make_backdrops.py was rewritten to get rid of.
+    #
+    # Left where they are. Cheap anyway: fifteen layers at 2048 x 544 or less, all of them
+    # single-channel-ish flat colour that compresses to tens of kilobytes on disk.
+    (r"Effects/Backdrops/|fx_intro_smoke", None,
+     "a parallax layer, 3.2 screens wide -- already magnified at 2048"),
 
     # Everything else in the world. A 2.5D camera at a fixed distance never gets closer
     # to a wall than it does to the fighter.
@@ -70,8 +99,40 @@ def decide(rel):
     return None, "no rule"
 
 
+def jpeg_size(path):
+    """Width and height out of a JPEG's frame header, without pillow.
+
+    perf.png_size only reads PNGs, and cost() fell back to the .meta's maxTextureSize when
+    it got nothing -- so every JPEG in the project was costed at its CEILING rather than at
+    its size. The four loading screens are 1024 x 420 files with the ceiling left at 2048,
+    so they were being reported at 4.0 MB each and recommended for a cap to 1024 that would
+    not have saved a single byte, because they are already smaller than that. Twelve
+    megabytes of the overspend this file exists to measure was imaginary.
+    """
+    try:
+        with open(path, "rb") as f:
+            if f.read(2) != b"\xff\xd8":
+                return None
+            while True:
+                head = f.read(2)
+                if len(head) < 2 or head[0] != 0xFF:
+                    return None
+                marker = head[1]
+                if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+                    continue
+                length = struct.unpack(">H", f.read(2))[0]
+                if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+                              0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                    f.read(1)
+                    h, w = struct.unpack(">HH", f.read(4))
+                    return w, h
+                f.seek(length - 2, 1)
+    except (OSError, struct.error):
+        return None
+
+
 def cost(path, cap):
-    wh = perf.png_size(path)
+    wh = perf.png_size(path) or jpeg_size(path)
     w = h = cap or perf.cap_of(path) or 1024
     if wh:
         w, h = wh
