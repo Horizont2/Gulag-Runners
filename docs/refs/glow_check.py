@@ -140,6 +140,75 @@ def override(src, name):
     return d
 
 
+
+def ui_halos():
+    """(scene, [(square, gap, halo)]) for every HUD equipment column in the project.
+
+    Off the scene files, because a HUD built yesterday keeps yesterday's rects however the
+    builder reads today.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    scenes = os.path.join(here, "..", "..", "Gulag runners", "Assets", "Scenes")
+    out = []
+    for name in sorted(os.listdir(scenes)):
+        if not name.endswith(".unity"):
+            continue
+        src = read(os.path.join(scenes, name))
+        if src is None or "m_Name: Glow" not in src:
+            continue
+
+        by, cur, key = {}, None, None
+        for line in src.split("\n"):
+            m = re.match(r"^--- !u!(\d+) &(-?\d+)( stripped)?", line)
+            if m:
+                if key is not None:
+                    by[key] = cur
+                key = m.group(2)
+                cur = [m.group(1), []]
+            elif cur is not None:
+                cur[1].append(line)
+        if key is not None:
+            by[key] = cur
+        by = {k: (v[0], "\n".join(v[1])) for k, v in by.items()}
+
+        def rect(go_body):
+            for c in re.findall(r"- component: \{fileID: (-?\d+)\}", go_body):
+                kind, body = by.get(c, (None, None))
+                if kind != "224":
+                    continue
+                w = re.search(r"m_SizeDelta: \{x: ([-\d.e+]+)", body)
+                x = re.search(r"m_AnchoredPosition: \{x: ([-\d.e+]+)", body)
+                return (float(w.group(1)) if w else 0.0,
+                        float(x.group(1)) if x else 0.0)
+            return None
+
+        halos, squares = [], []
+        for anchor, (kind, body) in by.items():
+            if kind != "1":
+                continue
+            named = re.search(r"^  m_Name: (.*)$", body, re.M)
+            if named is None:
+                continue
+            if named.group(1) == "Glow":
+                got = rect(body)
+                if got:
+                    halos.append(got[0])
+            elif named.group(1).startswith("Slot / "):
+                got = rect(body)
+                if got:
+                    squares.append(got)
+
+        if not halos or len(squares) < 2:
+            continue
+
+        squares.sort(key=lambda s: s[1])
+        width = max(s[0] for s in squares)
+        gaps = [squares[i + 1][1] - squares[i][1] - width
+                for i in range(len(squares) - 1)]
+        out.append((name, [(width, min(gaps), max(halos))]))
+    return out
+
+
 def main():
     found = profiles()
     problems, notes = [], []
@@ -284,6 +353,36 @@ def main():
                         problems.append(f"{f}: a tierColours array that is not the one in "
                                         f"ItemModels.DefaultPalette() -- {got} against "
                                         f"{want}")
+
+    # ---------------------------------------------------------------- and the UI's halo
+    #
+    # The OTHER rarity glow, which is a sprite rather than a surface, and which had the
+    # opposite fault: not too dim, too big.
+    #
+    # Each equipment square carries a soft halo behind it whose alpha is the item's rarity.
+    # The square is 64 with a 24 gap, so a halo centred on one may overhang it by less than
+    # half the gap before it meets the next one's. It was built at 160 -- an overhang of
+    # 48 against a gap of 24 -- so it covered the whole gap and then painted 24 units over
+    # the NEIGHBOURING square, both sides, every slot. One rare find lit the entire row,
+    # which is the exact opposite of what a per-slot halo is for, and it shipped that way in
+    # three of the four arenas in the pool while the fourth was right.
+    #
+    # Measured off the scenes rather than off HudBuilder, because the scenes are the version
+    # that runs and a HUD built before the builder was fixed keeps the rect it was built
+    # with.
+    for name, path in ui_halos():
+        for square, gap, halo in path:
+            over = (halo - square) * 0.5
+            if gap > 0.0 and over > gap * 0.5 + 0.01:
+                problems.append(
+                    f"{name}: an equipment halo is {halo:0.1f} across a {square:0.1f} "
+                    f"square, so it overhangs by {over:0.1f} into a gap of {gap:0.1f} -- "
+                    f"more than the {gap * 0.5:0.1f} that would meet the next halo in the "
+                    "middle. It is painting over the squares either side of it, so one "
+                    "rare find lights the whole row")
+            else:
+                notes.append(f"{name}: halo {halo:0.1f} on a {square:0.1f} square, "
+                             f"overhang {over:0.1f} of a {gap:0.1f} gap")
 
     # Nothing left to look at is the one case a skipped scene becomes a fault: this check
     # would otherwise go on printing a pass while reading no scene at all.

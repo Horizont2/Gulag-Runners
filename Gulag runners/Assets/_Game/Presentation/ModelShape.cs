@@ -63,10 +63,43 @@ namespace GulagRunners.Game
 
         /// <summary>
         /// And how much wider than thick it must be to count as having a flat. Below this
-        /// it is a round thing and the roll genuinely does not matter -- the mace is 1.05,
-        /// the sword 3.3, the axe 7.5.
+        /// it is a round thing and the roll genuinely does not matter.
+        ///
+        /// Measured over the eleven weapons this game ships, on the BLADE rather than on
+        /// the whole model (see <see cref="BladeFrom"/>), the two groups land a long way
+        /// either side of it: the three round ones are 1.00, 1.05 and 1.14, and the eight
+        /// flat ones are 2.00, 2.48, 3.25, 5.20, 7.97, 11.15, 14.09 and 20.12. There is
+        /// nothing between 1.14 and 2.00, so this number is not a tuned threshold -- it is
+        /// a line drawn through the middle of an empty gap.
         /// </summary>
         public const float ClearlyFlat = 1.40f;
+
+        /// <summary>
+        /// Where the blade starts, as a share of the reach out of the grip. The cross
+        /// section is measured past this and nowhere else.
+        ///
+        /// THIS IS THE WHOLE FIX FOR A SWORD DRAWN EDGE-ON, and the model that proves it is
+        /// the pack's gladius. Its blade is 5.2 times wider than it is thick -- as flat as
+        /// anything in the game -- and its pommel and guard are round, 13.0 cm either way
+        /// against the blade's 10.3. The guard is therefore the widest thing on the model in
+        /// BOTH directions, so the whole-model cross section came out 13.0 by 13.0, a ratio
+        /// of exactly 1.00, and the measurement called a short sword round and handed its
+        /// roll to the animation clip. A weapon whose roll is left to the clip is a weapon
+        /// that is flat-on in one pose and edge-on in the next, which in a side-on game is
+        /// a sword that is sometimes a line.
+        ///
+        /// The grip end of a weapon is round BY DESIGN -- a pommel, a ring guard, a wrapped
+        /// handle -- and that is exactly the part of the model that says nothing about which
+        /// way the steel faces. So it is not measured. What the player is looking at is the
+        /// blade, and the blade is the part that is not in the fist.
+        ///
+        /// A half, and the answer does not depend on it: at any share between a quarter and
+        /// three fifths every one of the eleven weapons gives the same verdict, and the
+        /// three round ones never move off 1.00 to 1.14 at all. A half is simply the most
+        /// defensible sentence -- the outer half of the weapon is the half further from the
+        /// hand.
+        /// </summary>
+        public const float BladeFrom = 0.5f;
 
         /// <summary>How a model is held, in the model root's own space.</summary>
         public struct Grip
@@ -182,8 +215,9 @@ namespace GulagRunners.Game
             grip.Behind = Mathf.Max(0f, reach[far ^ 1]);
 
             // The cross section about that line, from the vertices when the importer kept
-            // them and from the box when it did not.
-            if (Spread(root, grip.Blade, ref grip)) return true;
+            // them and from the box when it did not. Past the grip, which is where the
+            // steel is -- see BladeFrom.
+            if (Spread(root, grip.Blade, grip.Reach, ref grip)) return true;
 
             Vector3 size = box.size;
             int a = (axis + 1) % 3, b = (axis + 2) % 3;
@@ -212,7 +246,7 @@ namespace GulagRunners.Game
         /// which way a weapon points, because the furthest point of an axe is a corner of
         /// its head.
         /// </summary>
-        static bool Spread(GameObject root, Vector3 blade, ref Grip grip)
+        static bool Spread(GameObject root, Vector3 blade, float reach, ref Grip grip)
         {
             if (root == null) return false;
 
@@ -222,28 +256,60 @@ namespace GulagRunners.Game
                 : Vector3.Normalize(Vector3.Cross(blade, Vector3.up));
             Vector3 v = Vector3.Cross(blade, u);
 
+            // Where the steel starts. Everything nearer the hand than this is grip, and a
+            // grip is round on purpose -- see BladeFrom for the model that made this
+            // necessary.
+            float from = reach > 0f ? reach * Mathf.Clamp01(BladeFrom) : float.NegativeInfinity;
+
             float uMin = 0f, uMax = 0f, vMin = 0f, vMax = 0f;
             float uu = 0f, vv = 0f, uv = 0f;
             int n = 0;
+            int all = 0;
 
-            foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
+            // Twice over when it has to be: once past the grip, and -- only if that left
+            // too little to measure -- over the whole model, which is what this did before.
+            // A weapon so short or so oddly authored that half of it holds no vertices is a
+            // weapon the old answer was no worse about.
+            for (int pass = 0; pass < 2; pass++)
             {
-                Mesh mesh = mf.sharedMesh;
-                if (mesh == null || !mesh.isReadable) continue;
-
-                Matrix4x4 m = toRoot * mf.transform.localToWorldMatrix;
-                Vector3[] points = mesh.vertices;
-                for (int i = 0; i < points.Length; i++)
+                foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
                 {
-                    Vector3 p = m.MultiplyPoint3x4(points[i]);
-                    float a = Vector3.Dot(p, u), b = Vector3.Dot(p, v);
-                    if (a < uMin) uMin = a;
-                    if (a > uMax) uMax = a;
-                    if (b < vMin) vMin = b;
-                    if (b > vMax) vMax = b;
-                    uu += a * a; vv += b * b; uv += a * b;
-                    n++;
+                    Mesh mesh = mf.sharedMesh;
+                    if (mesh == null || !mesh.isReadable) continue;
+
+                    Matrix4x4 m = toRoot * mf.transform.localToWorldMatrix;
+                    Vector3[] points = mesh.vertices;
+                    for (int i = 0; i < points.Length; i++)
+                    {
+                        Vector3 p = m.MultiplyPoint3x4(points[i]);
+                        if (pass == 0) all++;
+                        if (pass == 0 && Vector3.Dot(p, blade) < from) continue;
+
+                        float a = Vector3.Dot(p, u), b = Vector3.Dot(p, v);
+                        if (n == 0) { uMin = uMax = a; vMin = vMax = b; }
+                        else
+                        {
+                            if (a < uMin) uMin = a;
+                            if (a > uMax) uMax = a;
+                            if (b < vMin) vMin = b;
+                            if (b > vMax) vMax = b;
+                        }
+                        uu += a * a; vv += b * b; uv += a * b;
+                        n++;
+                    }
                 }
+
+                // Enough of the blade to mean something. Eight is a box; fewer than that and
+                // one stray vertex decides which way a sword faces.
+                //
+                // The reset below only ever happens between the two passes. Letting it run
+                // at the end of the second would throw away the answer it had just found and
+                // report no vertices at all.
+                if (n >= 8 || pass == 1 || all == 0) break;
+
+                uMin = uMax = vMin = vMax = 0f;
+                uu = vv = uv = 0f;
+                n = 0;
             }
 
             if (n == 0) return false;

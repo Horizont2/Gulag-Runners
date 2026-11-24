@@ -64,6 +64,9 @@ LOADOUT = "f45251f6651c01823ab78d6e297da412"       # PlayerLoadoutView
 CLEARLY_LONGEST = 1.10
 CLEARLY_FLAT = 1.40
 
+# ModelShape.BladeFrom: the cross section is measured past this share of the reach.
+BLADE_FROM = 0.5
+
 # ------------------------------------------------------------------ what counts as wrong
 
 # How far the grip-to-tip line may sit from the mesh's own principal axis before the model
@@ -260,49 +263,68 @@ def mesh_boxes(prefab_path):
 # ------------------------------------------------------------------ ModelShape, mirrored
 
 def measure(points):
-    """ModelShape.Measure: the tip is the VERTEX furthest from the grip.
+    """ModelShape.Measure, mirrored -- which it had STOPPED BEING.
 
-    Not a face of the box, which is what this mirrored before and what left two weapons
-    crooked in the hand. A box can only answer with one of six directions, so a model
-    authored a few degrees off its own axis is gripped along the axis and hangs at that
-    angle -- and the reach is then measured along the axis rather than along the weapon,
-    short by the cosine, so the fit scales the model up and the steel overshoots the
-    hitbox it is supposed to BE.
+    This measured the line from the grip to the furthest VERTEX, and the docstring that
+    used to sit here argued for it. The C# tried that rule and threw it away: the furthest
+    vertex of an axe is the far corner of its head, not its tip, so the rule answered 36.7
+    degrees off the haft on the axe and 37.3 on the scythe, and those were exactly the two
+    weapons reported as not pointing where the arm points. ModelShape now answers with the
+    model AXIS it reaches furthest along, which is +Y for all eleven weapons in the pack by
+    a factor of between 1.21 and 13.45.
 
-    The line from the grip to the furthest vertex is what the simulation swings, so
-    pointing THAT along the arm puts the drawn steel where the blade is. The haft hangs
-    at whatever angle the model was authored with, which is what a real weapon does.
+    So the mirror was measuring a rule the game does not run, and every angle it printed
+    was an angle about that dead rule. The one the C# actually uses is below, and the
+    "degrees off its own principal axis" column it feeds is now what it says it is: how far
+    the mesh's own long axis sits from the model axis the weapon is gripped along.
+
+    The cross section is measured past half the reach, for the reason ModelShape.BladeFrom
+    gives at length: a grip is round by design, and on the pack's gladius the round guard is
+    the widest thing on the model in both directions -- so the whole-model cross section
+    came out exactly 1.00 and a flat short sword was called round.
     """
-    tip = max(points, key=lambda p: p[0] * p[0] + p[1] * p[1] + p[2] * p[2])
-    far = math.sqrt(sum(x * x for x in tip))
-    if far <= 1e-6:
+    lo = [min(p[i] for p in points) for i in range(3)]
+    hi = [max(p[i] for p in points) for i in range(3)]
+
+    # The six ways out of the grip, ordered so i ^ 1 is the other end of the same axis.
+    reach = [hi[0], -lo[0], hi[1], -lo[1], hi[2], -lo[2]]
+    far = max(range(6), key=lambda i: reach[i])
+    axis = far >> 1
+
+    across_box = max(reach[i] for i in range(6) if (i >> 1) != axis)
+    if reach[far] <= 0.0 or reach[far] < across_box * CLEARLY_LONGEST:
         return None
 
-    blade = tuple(x / far for x in tip)
+    blade = [0.0, 0.0, 0.0]
+    blade[axis] = -1.0 if (far & 1) else 1.0
+    blade = tuple(blade)
 
-    # A basis across the blade, the same way the C# builds it, so the flat comes out the
-    # same side up.
-    u = cross(blade, (1.0, 0.0, 0.0) if abs(blade[0]) < 0.9 else (0.0, 1.0, 0.0))
-    u = unit(u)
+    u = unit(cross(blade, (1.0, 0.0, 0.0) if abs(blade[0]) < 0.9 else (0.0, 1.0, 0.0)))
     v = cross(blade, u)
 
-    behind = 0.0
-    us, vs = [], []
-    for p in points:
-        along = dot(p, blade)
-        behind = max(behind, -along)
-        us.append(dot(p, u))
-        vs.append(dot(p, v))
+    behind = max(0.0, reach[far ^ 1])
+
+    # Past the grip first; the whole model only if that left too little to measure.
+    from_ = reach[far] * BLADE_FROM
+    for keep in (from_, float("-inf")):
+        us, vs = [], []
+        for p in points:
+            if dot(p, blade) < keep:
+                continue
+            us.append(dot(p, u))
+            vs.append(dot(p, v))
+        if len(us) >= 8:
+            break
+
+    if not us:
+        return None
 
     wide, thin = max(us) - min(us), max(vs) - min(vs)
     across, thick = max(wide, thin), min(wide, thin)
 
-    # And which way it is flat, from the spread rather than from the box: a blade authored
-    # at twenty degrees to the axes has a nearly square box, which the old rule called
-    # round and left the roll to chance.
     flat = (0.0, 0.0, 0.0)
-    if across >= thick * CLEARLY_FLAT:
-        n = len(points)
+    if thick > 0.0 and across >= thick * CLEARLY_FLAT:
+        n = len(us)
         uu = sum(a * a for a in us) / n
         vv = sum(b * b for b in vs) / n
         uv = sum(a * b for a, b in zip(us, vs)) / n
@@ -315,10 +337,15 @@ def measure(points):
         else:
             flat = u if uu <= vv else v
 
-    return dict(blade=blade, flat=flat, reach=far, behind=behind,
-                across=across, thick=thick, crosswise=across,
-                box=[max(p[i] for p in points) - min(p[i] for p in points)
-                     for i in range(3)])
+    # The furthest vertex is still worth knowing: it is where the STEEL ends, which is what
+    # the tip rules below compare against the hitbox, and for a head-heavy weapon it is not
+    # on the blade line at all.
+    tip = max(points, key=lambda q: q[0] * q[0] + q[1] * q[1] + q[2] * q[2])
+    corner = math.sqrt(sum(x * x for x in tip))
+
+    return dict(blade=blade, flat=flat, reach=reach[far], behind=behind,
+                across=across, thick=thick, crosswise=across, corner=corner,
+                box=[hi[i] - lo[i] for i in range(3)])
 
 
 def dot(a, b):

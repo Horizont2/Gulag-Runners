@@ -155,11 +155,46 @@ namespace GulagRunners.Game
                 Paint(waist, belt);
             }
 
+            // AND SAY SO WHEN THERE IS NOTHING TO WEAR. An item with no set is not an
+            // error this code can recover from -- there is no mesh to switch on -- but it
+            // is the one armour fault that is completely invisible from the inside: the
+            // slot fills, the stat applies, the HUD draws the icon, and the fighter looks
+            // exactly as he did. "The helmet does not appear" is then a bug report about
+            // the pickup, the loot table or the inventory, and the fault is a list in a
+            // scene that was wired before helmets existed.
+            //
+            // Which is not hypothetical. Of the four arenas in the pool, one had sets for
+            // the base body and four CHEST armours -- one of them item 23, the shield,
+            // removed from the game -- and no helmet or belt sets at all. Every helmet and
+            // every belt found in that arena was invisible, and nothing anywhere said so.
+            //
+            // Once per item per view, because this is reached from LateUpdate and a line a
+            // frame teaches people to filter the console rather than read it.
+            Missing(helmet, "helmet");
+            Missing(chest, "chest armour");
+            Missing(belt, "belt");
+
             if (logChanges)
                 Debug.Log($"{name}: wearing {helmet} / {chest} / {belt}" +
                           (body == null ? " — and no base body set, so the legs are bare" : ""),
                           this);
         }
+
+        /// <summary>Said once per item: this view has nothing to put on for it.</summary>
+        void Missing(ItemId item, string slot)
+        {
+            if (item == ItemId.None || Find(item) != null) return;
+            if (_said == null) _said = new System.Collections.Generic.HashSet<ItemId>();
+            if (!_said.Add(item)) return;
+
+            Debug.LogWarning(
+                $"{name}: picked up {item} and there is no armour set for it, so the "
+                + $"{slot} slot is filled and the fighter does not change. Run Tools > "
+                + "Gulag Runners > Setup > Wire armour in this scene -- it builds one set "
+                + "per worn item from the character's own part categories.", this);
+        }
+
+        System.Collections.Generic.HashSet<ItemId> _said;
 
         /// <summary>
         /// Puts one item's rarity colour on the pieces worn for it.

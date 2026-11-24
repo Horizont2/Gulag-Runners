@@ -119,6 +119,17 @@ namespace GulagRunners.GameEditor
         /// <summary>
         /// Pulls the model towards the rarity colour it already wears in the HUD, so one
         /// torso mesh can be three grades of armour without three meshes.
+        ///
+        /// THROUGH A MATERIAL ASSET, and it used to be through a MaterialPropertyBlock,
+        /// which from an editor tool is the same as doing nothing at all. A property block
+        /// is a runtime override: it is handed to a renderer for the frames it is drawing
+        /// and it is NOT serialized, so every colour this tool set was gone the moment the
+        /// scene was saved and reopened. Three grades of body armour that differ only by
+        /// tint were therefore three identical torsos, and the tool reported success.
+        ///
+        /// So the tint is baked into a material beside the pack it came from, one per
+        /// shade, shared by every arena. Made once and reused: running this in the fourth
+        /// scene finds the three the first scene made.
         /// </summary>
         static void Tint(GameObject root, float towardsLeather)
         {
@@ -129,14 +140,47 @@ namespace GulagRunners.GameEditor
             Color steel = UiPalette.Common;
             Color want = Color.Lerp(steel, leather, Mathf.Clamp01(towardsLeather));
 
+            Material tinted = Shade(root, want, towardsLeather);
+            if (tinted == null) return;
+
             foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
             {
-                MaterialPropertyBlock block = new MaterialPropertyBlock();
-                r.GetPropertyBlock(block);
-                block.SetColor("_BaseColor", want);
-                block.SetColor("_Color", want);
-                r.SetPropertyBlock(block);
+                Undo.RecordObject(r, "Give the armour a model");
+                Material[] mats = r.sharedMaterials;
+                for (int i = 0; i < mats.Length; i++) mats[i] = tinted;
+                r.sharedMaterials = mats;
+                EditorUtility.SetDirty(r);
             }
+        }
+
+        /// <summary>
+        /// The material for one shade, made from whatever the pack's own armour uses so the
+        /// shader, the maps and the smoothness all come along -- only the colour changes.
+        /// Found rather than remade on a second run.
+        /// </summary>
+        static Material Shade(GameObject root, Color want, float towardsLeather)
+        {
+            string folder = $"{Pack}/Tinted";
+            string path = $"{folder}/Armour_{Mathf.RoundToInt(towardsLeather * 100f):000}.mat";
+
+            Material had = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (had != null) return had;
+
+            Material from = null;
+            foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+                if (r.sharedMaterial != null) { from = r.sharedMaterial; break; }
+            if (from == null) return null;
+
+            if (!AssetDatabase.IsValidFolder(folder))
+                AssetDatabase.CreateFolder(Pack, "Tinted");
+
+            Material made = new Material(from);
+            made.name = System.IO.Path.GetFileNameWithoutExtension(path);
+            if (made.HasProperty("_BaseColor")) made.SetColor("_BaseColor", want);
+            if (made.HasProperty("_Color")) made.SetColor("_Color", want);
+
+            AssetDatabase.CreateAsset(made, path);
+            return made;
         }
     }
 }

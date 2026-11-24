@@ -134,10 +134,22 @@ namespace GulagRunners.GameEditor
                       + "belt\". Same size and same borders as the solid one; draw it as a "
                       + "dashed or broken outline. Leave it empty and empty slots keep the "
                       + "solid frame, which reads as a slot that is filled."),
-            // 160, not the 88 this row carried while BuildColumn asked for 160: the window
-            // showed one number and an empty row built the other, and the generated glow
-            // is drawn at whatever this says. A halo 88 across a 64 square is a rim.
-            new Asset("hud/slot/glow", 160, 160,
+            // 88, and back to it. The row said 88, BuildColumn asked for 160, and the fix
+            // for that disagreement was to make both of them 160 -- which is the wrong one
+            // of the two numbers to have kept.
+            //
+            // THE HALO HAS TO FIT IN ITS OWN CELL. The squares are 64 with a 24 gap, so a
+            // halo centred on one may overhang it by less than 24 before it reaches the
+            // next square. At 160 it overhangs by 48: it covered the whole gap and then
+            // painted 24 px over the NEIGHBOUR, both sides, every slot. One rare find lit
+            // the entire row, which is the exact opposite of what a per-slot halo is for --
+            // and in three of the four arenas in the pool that is what shipped.
+            //
+            // 88 overhangs by 12, which is half the gap, so two neighbouring haloes meet
+            // in the middle of it and neither crosses. It is a rim rather than a wash, and
+            // a rim that means one slot beats a wash that means five. SlotHalo below is
+            // the arithmetic, so the next person to change the gap changes this with it.
+            new Asset("hud/slot/glow", 88, 88,
                       "A soft halo BEHIND an equipment square, bigger than the square. Its "
                       + "alpha is driven by the item's rarity, so draw it white and let the "
                       + "tint do the colour: a plain blurred blob, no edge, nothing readable "
@@ -590,13 +602,23 @@ namespace GulagRunners.GameEditor
             Color[] px = new Color[W * H];
 
             // The square it sits behind is 64; the halo is whatever Needed says, and the
-            // falloff is what is left over. Written as fractions so the halo can be made
-            // smaller in one place -- at 160 it was two and a half times the square it
-            // was meant to be haloing, which on a 0.65-scaled column is most of the gap
-            // between one slot and the next.
+            // falloff is derived from what is left over -- so that the alpha has REACHED
+            // ZERO by the time it runs out of rect.
+            //
+            // It used to be 1.25 times the overhang, which is the other way round: at a
+            // 160 halo the overhang is 48 and the falloff was 60, so the Gaussian was
+            // still at 24% alpha where the sprite ended. A soft blob cut off at a quarter
+            // of its brightness is a soft blob with a hard SQUARE EDGE, and that edge is
+            // half of why this read badly even where it fitted.
+            //
+            // 1.335 is the other direction and it is not a taste: exp(-2.2 * 1.335^2) is
+            // 0.02, so the alpha is two percent at the overhang and nothing at all past
+            // it. The halo fades out inside its own rect, which is the only way it can
+            // look like light rather than like a sprite.
             float half = 32f * scale;              // the 64 px square at the middle
             float radius = 12f * scale;
-            float falloff = Mathf.Max(6f, (w * 0.5f - 32f) * 1.25f) * scale;
+            float overhang = Mathf.Max(4f, w * 0.5f - 32f);
+            float falloff = overhang / 1.335f * scale;
             Vector2 centre = new Vector2(W * 0.5f, H * 0.5f);
 
             for (int y = 0; y < H; y++)
@@ -1066,7 +1088,7 @@ namespace GulagRunners.GameEditor
             };
 
             Vector2 square = Size("hud/slot/frame", 64, 64);
-            Vector2 halo = Size("hud/slot/glow", 160, 160);
+            Vector2 halo = Size("hud/slot/glow", 88, 88);
             Vector2 iconSize = Size("hud/icon/coif", 44, 44);
             Vector2 swapSize = Size("hud/slot/swap-arrow", 44, 44);
 
@@ -1078,6 +1100,14 @@ namespace GulagRunners.GameEditor
             // the four buttons the bottom right, and between them is a thumb's width of
             // nothing, directly under where the eyes already are.
             const float gap = 24f;
+
+            // AND THE HALO CLAMPED TO IT, whatever the asset row or a dropped-in sprite
+            // says. The two numbers were independent and disagreed by a factor of two,
+            // which is how a halo came to be wider than the cell it lives in; related here
+            // they cannot. Half the gap each way, so two neighbouring haloes meet in the
+            // middle of the gap and neither reaches the other's square.
+            halo = Vector2.Min(halo, square + Vector2.one * gap);
+
             float row0 = -(rows.Length * square.x + (rows.Length - 1) * gap) * 0.5f;
             const float fromBottom = 60f;
             float top = DesignH - fromBottom - square.y;
