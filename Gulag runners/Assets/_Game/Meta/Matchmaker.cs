@@ -40,6 +40,20 @@ namespace GulagRunners.Meta
         [Tooltip("Seconds before a bot is offered rather than keep somebody waiting.")]
         public int BotAfterSeconds;
 
+        [Tooltip("The same, for somebody inside their first five matches -- shorter, " +
+                 "because a first-time player staring at a search screen is the one who " +
+                 "has least reason to believe it will end.\n\n" +
+                 "It used to be ZERO, in effect: the training pool was handed a bot on " +
+                 "the frame PLAY was pressed and the service was never asked. That is " +
+                 "what docs/29 means by a bot immediately in training, and it cost the " +
+                 "game its matchmaking: on a fresh install both devices are inside their " +
+                 "first five matches, so two people searching at the same moment were " +
+                 "each given their own bot instead of each other.\n\n" +
+                 "So it is a short wait rather than none. Ten seconds is long enough for " +
+                 "a ticket to find somebody who is already in the queue and short enough " +
+                 "that a player alone in it still gets a match before they wonder.")]
+        public int TrainingBotAfterSeconds;
+
         public static SearchRules Default => new SearchRules
         {
             // A band of 60 is about a third of a league: close enough that the first few
@@ -52,6 +66,7 @@ namespace GulagRunners.Meta
             // seconds of nothing is a player deciding the game is dead, and a bot they
             // were told about is better than a queue they were not.
             BotAfterSeconds = 25,
+            TrainingBotAfterSeconds = 10,
         };
     }
 
@@ -121,7 +136,16 @@ namespace GulagRunners.Meta
         /// </summary>
         public static bool OfferBot(in SearchRules rules, int matchesPlayed, float seconds)
         {
-            if (Ladder.PoolFor(matchesPlayed) == Pool.Training) return true;
+            // The training pool waits too, just less. See TrainingBotAfterSeconds for
+            // what returning true here unconditionally used to cost.
+            //
+            // No band test on this one. Cast() asks whether the net has been let out as
+            // far as it goes, which is the right question for somebody with a rating to
+            // protect; a player on four matches has no rating worth the name and nothing
+            // to widen towards, so the clock is the whole of it.
+            if (Ladder.PoolFor(matchesPlayed) == Pool.Training)
+                return seconds >= Mathf.Max(1, rules.TrainingBotAfterSeconds);
+
             return seconds >= Mathf.Max(1, rules.BotAfterSeconds) &&
                    Cast(rules, seconds) >= 1f;
         }

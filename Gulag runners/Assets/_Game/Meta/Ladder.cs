@@ -113,11 +113,27 @@ namespace GulagRunners.Meta
         {
             Pool a = PoolFor(matchesA), b = PoolFor(matchesB);
 
-            // Training is bots only -- there is no human on the other side to allow.
-            if (a == Pool.Training || b == Pool.Training) return false;
-
-            if (a == Pool.Newcomers && LeagueOf(ratingB) >= League.Platinum) return false;
-            if (b == Pool.Newcomers && LeagueOf(ratingA) >= League.Platinum) return false;
+            // TRAINING USED TO MEAN BOTS ONLY, and that was the single line that stopped
+            // this game having online matchmaking at all.
+            //
+            // It refused every pairing in which either side had played fewer than five
+            // matches -- which on a fresh install is both sides. Two people pressing PLAY
+            // on two phones at the same moment could not be put together, and could not
+            // get out of the pool that forbade it either, because the only way to raise
+            // the match count was to play the bots it handed out instead. Ten matches
+            // against a practice opponent, on two devices, before the feature was even
+            // ATTEMPTED once. It read as "matchmaking is broken", and it was.
+            //
+            // What docs/09 actually asks for is one sentence: professionals wont fight
+            // with starting players all the game. That is a rule about the TOP of the
+            // ladder, and it is kept below in full -- nobody inside their first twenty
+            // matches is shown a Platinum or above, however thin the queue is.
+            //
+            // Two beginners are not something to protect each other from. They are the
+            // best pairing the pool can make, and the one the protection exists to leave
+            // room for.
+            if (a != Pool.Open && LeagueOf(ratingB) >= League.Platinum) return false;
+            if (b != Pool.Open && LeagueOf(ratingA) >= League.Platinum) return false;
 
             return true;
         }

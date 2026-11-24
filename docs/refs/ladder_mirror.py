@@ -132,12 +132,19 @@ def pool_for(matches):
 
 
 def may_meet(matches_a, rating_a, matches_b, rating_b):
+    """Mirrors Ladder.MayMeet.
+
+    TRAINING USED TO MEAN BOTS ONLY here too, and that line is what stopped the game
+    having online matchmaking: it refused every pairing in which either side had played
+    fewer than five matches, which on a fresh install is both sides. docs/09 asks for one
+    thing -- professionals wont fight with starting players all the game -- and that is
+    the Platinum guard below. Two beginners are the pairing it leaves room for, not a
+    thing to protect each other from.
+    """
     a, b = pool_for(matches_a), pool_for(matches_b)
-    if a == "Training" or b == "Training":
+    if a != "Open" and league_index(rating_b) >= 3:
         return False
-    if a == "Newcomers" and league_index(rating_b) >= 3:
-        return False
-    if b == "Newcomers" and league_index(rating_a) >= 3:
+    if b != "Open" and league_index(rating_a) >= 3:
         return False
     return True
 
@@ -213,6 +220,11 @@ def play_days(days, day_of=day_number, streak=advance_streak):
 # Mirrors Assets/_Game/Meta/Matchmaker.cs.
 START_BAND, WIDEN_PER_SECOND, MAX_BAND, BOT_AFTER = 60, 25, 400, 25
 
+# The same, for somebody inside their first five matches. It was effectively zero --
+# offer_bot returned True on the first frame for the training pool -- which is what
+# docs/29 asks for and is also why two fresh installs could never be put together.
+TRAINING_BOT_AFTER = 10
+
 
 def band(seconds, start=START_BAND, widen=WIDEN_PER_SECOND, top=MAX_BAND):
     return min(max(start, top), start + round(max(0.0, seconds) * widen))
@@ -232,9 +244,13 @@ def accepts(seconds, matches_a, rating_a, matches_b, rating_b, **kw):
     return abs(rating_a - rating_b) <= band(seconds, **kw)
 
 
-def offer_bot(matches_played, seconds, bot_after=BOT_AFTER, **kw):
+def offer_bot(matches_played, seconds, bot_after=BOT_AFTER,
+              training_bot_after=TRAINING_BOT_AFTER, **kw):
+    # No band test for the training pool: cast() asks whether the net is all the way out,
+    # which is the right question for somebody with a rating to protect, and a player on
+    # four matches has nothing to widen towards.
     if pool_for(matches_played) == "Training":
-        return True
+        return seconds >= max(1, training_bot_after)
     return seconds >= max(1, bot_after) and cast(seconds, **kw) >= 1.0
 
 

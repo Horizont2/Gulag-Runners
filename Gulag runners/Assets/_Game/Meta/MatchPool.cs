@@ -117,13 +117,20 @@ namespace GulagRunners.Meta
 
             _bots.Begin(rating, matchesPlayed);
 
-            // THE PLACEMENT MATCHES NEVER TOUCH THE SERVICE. docs/09 makes the first five
-            // bots and says so to the player's face, and Ladder.MayMeet refuses every human
-            // in the live pool for anybody inside them -- so a ticket submitted here is a
-            // ticket that cannot legally be matched and can only time out. Asking for a
-            // match that is not allowed to exist is slower than not asking, and no more
-            // honest.
-            if (_live == null || Ladder.PoolFor(matchesPlayed) == Pool.Training)
+            // THE PLACEMENT MATCHES USED TO SKIP THE SERVICE ENTIRELY, and between this
+            // and the two lines it was reasoning from -- Ladder.MayMeet refusing every
+            // human to anybody inside the training pool, and Matchmaker.OfferBot handing
+            // that pool a bot on the frame PLAY was pressed -- the game had no online
+            // matchmaking at all. Not a thin queue: NO TICKET WAS EVER SUBMITTED. On a
+            // fresh install both devices are inside their first five matches, so two
+            // people pressing PLAY together were each given their own practice match, and
+            // the only way out of the pool that forbade pairing was to play the bots it
+            // was handing out.
+            //
+            // The reasoning was sound and its premise was wrong. A training player's
+            // ticket IS allowed to be matched now -- see Ladder.MayMeet -- so it is
+            // submitted, and the floor under it waits ten seconds instead of none.
+            if (_live == null)
             {
                 _liveGaveUp = true;
                 return;
@@ -196,8 +203,11 @@ namespace GulagRunners.Meta
             // match offered without a reason, in a build whose networking is simply not
             // configured, is how "the game only ever gives me bots" becomes a mystery
             // instead of a one-line fix.
-            if (!string.IsNullOrEmpty(_liveSaid) &&
-                Ladder.PoolFor(_played) != Pool.Training)
+            // And for the training pool too, which used to be the one place this was
+            // suppressed. A first install is exactly where a build with no project linked
+            // and no queue on the dashboard needs to say so out loud: it is the difference
+            // between a one-line fix and "the game only ever gives me bots".
+            if (!string.IsNullOrEmpty(_liveSaid))
                 found.OpponentName = $"{_liveSaid} · A BOT INSTEAD";
 
             Say();
@@ -227,8 +237,8 @@ namespace GulagRunners.Meta
         /// May this pairing be played? The ladder's own rules, on the numbers the service
         /// actually sent.
         ///
-        /// A bot is always allowed: there is no human on the other side for the protection
-        /// to protect anybody from, and Ladder.MayMeet says so by refusing Training outright.
+        /// A bot is always allowed: there is no human on the other side for the
+        /// protection to protect anybody from.
         ///
         /// Their match COUNT is not in MatchFound and cannot be -- the service does not send
         /// it -- so the test runs from this side only. That is the half that matters: the
@@ -272,7 +282,6 @@ namespace GulagRunners.Meta
             }
 
             if (!_liveGaveUp) { Status = _live.Status; return; }
-            if (Ladder.PoolFor(_played) == Pool.Training) { Status = ""; return; }
 
             Status = string.IsNullOrEmpty(_liveSaid)
                 ? "" : $"{_liveSaid} · PRACTICE MATCH INSTEAD";

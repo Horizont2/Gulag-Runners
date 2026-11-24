@@ -215,6 +215,18 @@ namespace GulagRunners.Game
         bool _wiredLocal;
 
         /// <summary>
+        /// Has a wire said which side this device is?
+        ///
+        /// Read by <see cref="LocalCamera"/>, and the question it answers there is not
+        /// "which fighter" but "is the other fighter somebody else's". A match whose local
+        /// side was WIRED has a second device at the far end of it, so there is exactly one
+        /// person looking at this screen and the screen is theirs. Nobody can tell that
+        /// from LocalFighter alone: on the host that is 0, which is also what a lone player
+        /// on a phone gets.
+        /// </summary>
+        public bool LocalWasWired => _wiredLocal;
+
+        /// <summary>
         /// The fighter this device's own thumbs are on: the first one a brain is not
         /// driving. The same question NetMatch asks to find the local controls, so the
         /// answer cannot differ from the one the input takes.

@@ -5987,6 +5987,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 343685001}
+  - component: {fileID: 1900009500}
   m_Layer: 0
   m_Name: Cameras
   m_TagString: Untagged
@@ -145850,3 +145851,21 @@ SceneRoots:
   - {fileID: 254672494}
   - {fileID: 926056437}
   - {fileID: 1341062497}
+--- !u!114 &1900009500
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 343685000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b7f41d6c2e84a9f8d05e1b47ac93f52, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.LocalCamera
+  matchState: {fileID: 2012403445}
+  cameras:
+  - {fileID: 1064138585}
+  - {fileID: 2110629161}
+  splitForTwoLocalHumans: 1
+  showing: 

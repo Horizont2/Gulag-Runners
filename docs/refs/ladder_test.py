@@ -130,7 +130,13 @@ check("matches 6-20 are the newcomer pool",
       m.pool_for(5) == "Newcomers" and m.pool_for(19) == "Newcomers")
 check("match 21 opens it up", m.pool_for(20) == "Open")
 
-check("a player in training meets nobody", not m.may_meet(2, 1500, 300, 1500))
+# The line that cost this game its matchmaking. Two fresh installs are both inside
+# their first five matches, and this used to refuse them to each other.
+check("two players in training may meet each other", m.may_meet(2, 1500, 3, 1500))
+check("a player in training still never meets a platinum",
+      not m.may_meet(2, 1500, 300, 1750))
+check("a player in training may meet a settled gold",
+      m.may_meet(2, 1500, 300, 1600))
 check("a newcomer never meets a platinum", not m.may_meet(10, 1500, 400, 1750))
 check("a newcomer never meets a diamond", not m.may_meet(10, 1500, 400, 1950))
 check("a newcomer never meets a runner", not m.may_meet(10, 1500, 900, 2300))
@@ -195,12 +201,23 @@ for seconds in range(0, 121, 1):
 check("a newcomer never meets Platinum or above, at ANY wait (121s x 28 ratings)",
       not worst, str(worst[:3]))
 
-trainee = [s for s in range(0, 121) if m.accepts(s, 2, 1500, 400, 1500)]
-check("somebody in their first five matches is never given a human", not trainee,
-      str(trainee[:3]))
+# This used to assert the opposite -- that somebody inside their first five matches is
+# never given a human at any wait -- and that is the assertion that kept the game's
+# matchmaking switched off. Two fresh installs are both in that pool, so the rule it was
+# guarding made the feature impossible rather than safe. What is actually protected is
+# the top of the ladder, and that is the next two checks.
+peer = [s for s in range(0, 121) if m.accepts(s, 2, 1500, 400, 1500)]
+check("a trainee is given a human of their own rating", peer, "accepted at no wait")
+
+pro = [s for s in range(0, 121) if m.accepts(s, 2, 1500, 400, 1750)]
+check("a trainee is never given a Platinum, at ANY wait (121 s)", not pro, str(pro[:3]))
 
 print("\nand when it gives up, it gives up to a bot rather than to a spinner")
-check("the first five matches are bots from the first second", m.offer_bot(2, 0))
+# Not from the first second any more: ten, which is long enough for a ticket to find
+# somebody already in the queue and short enough that a first-time player alone in it
+# still gets a match before they wonder whether the button worked.
+check("a trainee is not fobbed off at nine seconds", not m.offer_bot(2, 9))
+check("but is at ten", m.offer_bot(2, 10))
 check("a veteran is not fobbed off at twenty seconds", not m.offer_bot(40, 20))
 check("but is at thirty", m.offer_bot(40, 30))
 early = [s for s in range(0, 25) if m.offer_bot(40, s)]
@@ -259,8 +276,8 @@ print("\nthe pool, as the search screen actually drives it")
 # moving it broke the one thing docs/09 is most specific about.
 
 at, got = m.search(m.BotQueue(), played=2)
-check("somebody placing is given a practice opponent at once", at is not None and at < 0.05,
-      "%.2f s" % (at if at is not None else -1))
+check("somebody placing is given a practice opponent at ten seconds",
+      at is not None and 9.9 <= at <= 10.2, "%.2f s" % (at if at is not None else -1))
 check("and told that is what it is", got and got["name"] == "TRAINING OPPONENT", str(got))
 
 at, got = m.search(m.BotQueue(), played=40)
