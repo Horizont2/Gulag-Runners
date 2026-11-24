@@ -605,11 +605,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -14.335
+      value: -14.296
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.544
+      value: 0.458
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
       propertyPath: m_LocalPosition.z
@@ -13594,6 +13594,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 859072e2b914c124bb0721018207153c, type: 2}
+    - target: {fileID: -2919749213416614620, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Name
       value: Bridge_5_Brown (2)
@@ -13607,6 +13611,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2100000, guid: 10f4f00603876fd43b595334f97ea7d8, type: 2}
     - target: {fileID: 6140288381748933299, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7088764129640645071, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
@@ -13624,6 +13632,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       insertIndex: -1
       addedObject: {fileID: 210270024}
+    - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 210270025}
     - targetCorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       insertIndex: -1
       addedObject: {fileID: 210270023}
@@ -13668,7 +13679,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 210270016}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -13701,7 +13712,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 210270018}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -13734,7 +13745,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 210270020}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -13760,6 +13771,19 @@ MonoBehaviour:
   leanPerLoad: 2.5
   swingPivot: {x: 0, y: 0, z: 0}
   follow: {fileID: 0}
+--- !u!114 &210270025
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210270020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
 --- !u!1 &214263243
 GameObject:
   m_ObjectHideFlags: 0
@@ -27145,6 +27169,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 859072e2b914c124bb0721018207153c, type: 2}
+    - target: {fileID: -2919749213416614620, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Name
       value: Bridge_5_Brown
@@ -27158,6 +27186,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2100000, guid: 10f4f00603876fd43b595334f97ea7d8, type: 2}
     - target: {fileID: 6140288381748933299, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7088764129640645071, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
@@ -27175,6 +27207,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       insertIndex: -1
       addedObject: {fileID: 494039451}
+    - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 494039452}
     - targetCorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       insertIndex: -1
       addedObject: {fileID: 494039450}
@@ -27219,7 +27254,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 494039443}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -27252,7 +27287,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 494039445}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -27285,7 +27320,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 494039447}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -27311,6 +27346,19 @@ MonoBehaviour:
   leanPerLoad: 2.5
   swingPivot: {x: 0, y: 0, z: 0}
   follow: {fileID: 0}
+--- !u!114 &494039452
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 494039447}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
 --- !u!1 &496474078
 GameObject:
   m_ObjectHideFlags: 0
@@ -45247,7 +45295,7 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: 859072e2b914c124bb0721018207153c, type: 2}
     - target: {fileID: -2919749213416614620, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Enabled
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_Name
@@ -45265,6 +45313,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7088764129640645071, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 0
@@ -45279,6 +45331,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       insertIndex: -1
       addedObject: {fileID: 664725942}
+    - targetCorrespondingSourceObject: {fileID: -7237359805147884544, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 664725943}
     - targetCorrespondingSourceObject: {fileID: 7446037427506617630, guid: f6a1328bc3f58784482d3afc70911844, type: 3}
       insertIndex: -1
       addedObject: {fileID: 664725941}
@@ -45323,7 +45378,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 664725934}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -45356,7 +45411,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 664725936}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -45389,7 +45444,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 664725938}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a9d7e13c6b84f05927ad3e81b5c046f, type: 3}
   m_Name: 
@@ -45415,6 +45470,19 @@ MonoBehaviour:
   leanPerLoad: 2.5
   swingPivot: {x: 0, y: 0, z: 0}
   follow: {fileID: 0}
+--- !u!114 &664725943
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 664725938}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92ea500d0103a36b3143c8a534b18b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
+  kind: 0
 --- !u!1 &667158314
 GameObject:
   m_ObjectHideFlags: 0
@@ -111674,11 +111742,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 10.115
+      value: 10.106
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.438
+      value: 0.453
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 6419b26c8ea619c4596349feaa4cc042, type: 3}
       propertyPath: m_LocalPosition.z
