@@ -365,6 +365,61 @@ class Rng:
     def between(self, a, b):
         return a + (b - a) * self.next()
 
+# How many times over the drawing is done before it is shrunk to size.
+#
+# EVERY EDGE IN THESE IMAGES WAS A STAIRCASE, and at the size they are actually seen that
+# is the whole of "it looks like Minecraft". The near layer's quad is 3.21 screens wide and
+# its texture 2048 across, so 637 texture pixels cover a phone's whole screen width: every
+# texel is magnified about twice, and a hard diagonal drawn one texel at a time becomes a
+# two-pixel staircase on the glass.
+#
+# Three, and it is drawn rather than filtered afterwards, because a blur applied to a
+# finished image softens the FILLS as well as the edges and this art is meant to be flat.
+# Drawing big and boxing down is the only way to get coverage: a pixel that is two thirds
+# inside a tree comes out two thirds of the way to the tree's colour, which is what the eye
+# reads as a straight edge.
+#
+# Nine times the pixels and about nine times the work: the whole set goes from 7 seconds to
+# a bit over a minute, once, offline, for fifteen files that are then in git.
+SUPERSAMPLE = 3
+
+
+def shrink(px, w, h, n):
+    """A supersampled buffer boxed down to w x h, alpha-weighted.
+
+    Weighted by alpha, which is the part that matters and the part a plain average gets
+    wrong. Half the samples under an edge pixel are transparent, and transparent pixels in
+    this buffer are BLACK -- averaging their colour in drags every silhouette towards a dark
+    fringe. Averaging only the colour that is actually there, and letting the alpha carry
+    how much of it there is, is what premultiplied compositing does and it is correct here
+    for the same reason.
+    """
+    out = bytearray(w * h * 4)
+    area = n * n
+    for y in range(h):
+        base = y * n
+        for x in range(w):
+            left = x * n
+            r = g = b = a = 0
+            for sy in range(n):
+                row = (base + sy) * w * n
+                for sx in range(n):
+                    i = (row + left + sx) * 4
+                    sa = px[i + 3]
+                    if sa:
+                        r += px[i] * sa
+                        g += px[i + 1] * sa
+                        b += px[i + 2] * sa
+                        a += sa
+            o = (y * w + x) * 4
+            if a:
+                out[o] = min(255, r // a)
+                out[o + 1] = min(255, g // a)
+                out[o + 2] = min(255, b // a)
+                out[o + 3] = a // area
+    return out
+
+
 def png(path, w, h, px):
     raw = b"".join(b"\x00" + bytes(px[y * w * 4:(y + 1) * w * 4]) for y in range(h))
 
@@ -513,14 +568,70 @@ def logs(px, w, h, x0, span, top, rows, colour, gap=0):
                 px[i:i + 4] = bytes((r, g, b, 255))
 
 
-def tree(px, w, h, x0, wide, top, colour):
-    """A conifer: a triangle on a trunk. Three strokes, no leaves."""
+def tree(px, w, h, x0, wide, top, colour, base=None, rng=None):
+    """A conifer: tiered branches on a trunk, and no two the same.
+
+    IT WAS ONE TRIANGLE, and a stand of them was the single most artificial thing in these
+    images: sixteen identical isoceles spikes at near-even spacing, which reads as a comb
+    rather than as a treeline.
+
+    THE TAPER IS OVER THE TREE'S OWN HEIGHT, which is the fault that made them needles.
+    Every shape here is drawn from its top to the BOTTOM OF THE IMAGE -- the ground fill and
+    the near bands cover the rest -- and the width was tapered over that whole span, so a
+    tree whose crown stands a tenth of the image above the ridge spent only the first tenth
+    of its taper where anybody could see it. The visible part was the first few per cent of
+    a cone: a spike about one to ten, drawn for a shape meant to be one to three. Measured
+    against the ridge it stands on instead, the cone is the cone that was intended.
+
+    Four things vary per tree and all four come off the same seed, so a re-run draws the
+    same forest: how many tiers it has, how far each overhangs, how much the whole thing
+    leans, and where the tiers fall. The lean is the cheapest of the four and does the most
+    -- a row of perfectly upright trees is a fence whatever shape the tops are.
+
+    Still flat colour and still hard-edged, per docs/00. What changed is that the edge is
+    now worth looking at.
+    """
     r, g, b = colour
-    half = wide // 2
-    for y in range(max(0, top), h):
-        t = (y - top) / max(1, h - top)
-        half_now = int(half * min(1.0, t * 2.4))
-        for x in across(x0 - half_now, x0 + half_now + 1, w):
+    half = max(1, wide // 2)
+
+    # Where the crown ends and the trunk begins. The foot of the tree, not the foot of the
+    # image -- see above.
+    foot = h if base is None else max(top + 2, min(h, base))
+    crown = max(2, foot - top)
+
+    if rng is None:
+        tiers, lean, ragged = 5, 0.0, 0.22
+    else:
+        tiers = 4 + int(rng.between(0, 3.99))
+        lean = rng.between(-0.10, 0.10)
+        ragged = rng.between(0.22, 0.46)
+
+    # A short trunk under the crown and then nothing. Drawing on to the bottom of the image
+    # is what every other shape here does, because the ground fill covers them -- but the
+    # ground is filled BEFORE the trees, so a tree that carried on down drew a bar of its
+    # own colour over the hillside, all the way to the frame's edge. Four bars of it per
+    # stand, pale against the ground on one layer and dark on the next.
+    stop = min(h, foot + max(2, crown // 9))
+
+    for y in range(max(0, top), stop):
+        t = (y - top) / crown
+
+        if t >= 1.0:
+            # The trunk, which is what stops a conifer reading as a cone balanced on its
+            # point. Most of it is behind the ground; the centimetre that shows is the job.
+            span = max(1, int(wide * 0.06))
+        else:
+            # The outline of a conifer is a stack of tiers, each one proud of the one above
+            # it and each one sagging towards its own bottom edge. Sawtooth, not a smooth
+            # cone: the steps ARE the branches.
+            step = min(tiers - 1, int(t * tiers))
+            within = t * tiers - step
+            reach = (step + 1) / tiers                 # how far down the stack this tier is
+            swell = reach ** 0.78 * (1.0 - ragged * (1.0 - within))
+            span = max(1, int(half * swell))
+
+        mid = x0 + int(lean * half * max(0.0, 1.0 - t) * 3.0)
+        for x in across(mid - span, mid + span + 1, w):
             i = (y * w + x) * 4
             px[i:i + 4] = bytes((r, g, b, 255))
 
@@ -553,6 +664,57 @@ def pyramid(px, w, h, x0, wide, top, colour):
 
 def lerp3(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def rim(px, w, h, line, colour, thick):
+    """A band of a lighter tone just under a ridge, where the light would catch it.
+
+    One fill and it is most of the difference between a silhouette and a piece of cardboard.
+    The sawmill already did it for snow and the note there has the reason: a bright edge
+    along the top of the land with darker ground under it is what a covered slope looks like
+    from across a valley. It is also what an UNcovered one looks like at dusk, which is when
+    every one of these arenas is set.
+
+    Drawn as the rim first and the body over it, rather than as a stripe, so it can never
+    land below the silhouette: the body fill starts one band lower and the only thing left
+    showing is the band itself.
+    """
+    if thick <= 0:
+        return
+    fill_below(px, w, h, line, colour)
+    return lambda u: line(u) + thick
+
+
+def aerial(px, w, h, layer, toward, strength):
+    """Lifts the layer towards the haze as it goes UP the frame.
+
+    Every layer was one flat colour, which is a cue the eye reads as paint rather than as
+    air: a hillside a hundred metres off is not the same tone at its ridge as at its foot,
+    because there is more atmosphere in the way of the part that is further. One lerp per
+    pixel, no extra asset, and it is the cheapest thing in this file that makes a layer look
+    like a place.
+
+    Measured in FRAME fractions and not image rows, because the three layers cover different
+    amounts of the frame -- the far one is a sixth of the near one's height in metres, so the
+    same gradient in image space would be six different gradients on screen.
+    """
+    if strength <= 0.0:
+        return
+    cover, top = layer["screens_high"], layer["screens_top"]
+    r0, g0, b0 = toward
+    for y in range(h):
+        d = y / h * cover + top                 # where this row lands in the frame
+        lift = strength * max(0.0, min(1.0, 1.0 - d)) ** 1.6
+        if lift <= 0.002:
+            continue
+        base = y * w * 4
+        for x in range(w):
+            i = base + x * 4
+            if not px[i + 3]:
+                continue
+            px[i] = int(px[i] + (r0 - px[i]) * lift)
+            px[i + 1] = int(px[i + 1] + (g0 - px[i + 1]) * lift)
+            px[i + 2] = int(px[i + 2] + (b0 - px[i + 2]) * lift)
 
 
 def near_bands(px, w, h, rng, row, high, colour, toward, lumps, index, on_band=None):
@@ -659,7 +821,11 @@ def draw(theme, index, w, h):
     # Further is more washed out: the near band keeps its ink, the far one is most of
     # the way to the sky. This is the whole depth cue and it costs nothing. With no sky to
     # do the washing out, the same range runs the other way and distance goes dark.
-    steps = (0.20, 0.48, 0.78) if sky else (0.78, 0.46, 0.14)
+    # Underground the range used to run 0.78 -> 0.14, which puts the far layer almost
+    # entirely in the ink: three layers of near-black, and the parallax the depths were
+    # chosen for is invisible because there is nothing in it to see move. The far end is
+    # lifted so the deepest rock still has a tone of its own.
+    steps = (0.20, 0.48, 0.78) if sky else (0.72, 0.46, 0.26)
     colour = lerp3(ink, haze, steps[index])
 
     rng = Rng(hash((theme, name)) & 0x7fffffff)
@@ -678,10 +844,20 @@ def draw(theme, index, w, h):
     amp = high((0.125, 0.088, 0.056)[index])
     line = ridge(rng, amp, base, lumps * (1.0, 0.7, 0.45)[index])
 
+    # The light along the ridge line, before anything stands on it. Toward the ink
+    # underground, where the only light is what the layer carries itself, and toward the
+    # haze above ground, where the sky is doing the lighting.
+    # Softer than it was: at 0.30 towards the haze this came out as a pale stroke ALONG
+    # the ridge, which the eye reads as an outline somebody drew rather than as light
+    # landing on a slope. Light is a small difference over a wider band.
+    catch = lerp3(colour, ink if not sky else haze, 0.17)
+    lit = max(1, high(0.022 - 0.006 * index))
+
     if theme == "mine":
         # No sky down here. The far layer is a shaft of lit air, which is the only light in
         # it, so it reads as depth rather than as a wall painted a lighter grey.
-        fill_below(px, w, h, line, colour)
+        body = rim(px, w, h, line, catch, lit)
+        fill_below(px, w, h, body, colour)
         if index == 2:
             # Two shafts, the second dimmer, so the deepest layer has somewhere to be.
             lit = lerp3(colour, (178, 148, 92), 0.42)
@@ -693,7 +869,7 @@ def draw(theme, index, w, h):
         else:
             def props(on, tone, count, mix):
                 for i in range(count):
-                    x = int(w * (i + 0.5) / count + rng.between(-90, 90))
+                    x = int(w * (i + 0.5) / count + w * rng.between(-0.044, 0.044))
                     top = int(on(x / w) - high(rng.between(0.23, 0.33)))
                     prop(px, w, h, x, wide(0.115), top, high(0.016),
                          lerp3(tone, ink, mix))
@@ -704,20 +880,38 @@ def draw(theme, index, w, h):
             plant = lambda k, on, tone: props(on, tone, (3, 2)[index] - k, 0.5 - 0.1 * k)
 
     elif theme == "forest":
-        fill_below(px, w, h, line, colour)
+        fill_below(px, w, h, rim(px, w, h, line, catch, lit), colour)
 
         def conifers(on, tone, count, scale, mix):
-            """A stand of trees along one horizon."""
+            """A stand of trees along one horizon.
+
+            CLUSTERED, not queued. One tree per even slot with a little jitter inside it is
+            still a row at a fixed pitch, and the eye finds a fixed pitch instantly -- it is
+            most of what was left of the comb after the shapes were fixed. Trees grow where
+            other trees already are, so the slot is wide enough for its neighbours' and
+            about a third of them stand in pairs.
+            """
             for i in range(count):
-                x = int(w * (i + rng.between(0.15, 0.85)) / count)
+                x = int(w * (i + rng.between(-0.35, 1.35)) / count)
                 # Conifers are not a picket fence: the spread has to be wide enough that
                 # the tops make a line of their own, or the layer reads as one serrated
                 # block. Cubed rather than raised to 1.3, so most of a stand is short and
                 # a few run away above it -- that difference is the whole silhouette.
                 up = rng.between(0.10, 1.0) ** 3 * 0.72 + 0.16
                 top = int(on(x / w) - high(up * scale))
-                tree(px, w, h, x, wide((0.145, 0.120, 0.098)[index]), top,
-                     lerp3(tone, ink, mix))
+                fat = wide((0.210, 0.172, 0.138)[index])
+                tree(px, w, h, x, fat, top, lerp3(tone, ink, mix),
+                     base=int(on(x / w)), rng=rng)
+
+                # Its neighbour, sometimes: shorter, a little to one side, and drawn after
+                # so it stands in front. A pair reads as a wood and a single reads as a
+                # specimen planted on a lawn.
+                if rng.between(0.0, 1.0) < 0.34:
+                    nx = x + int(fat * rng.between(0.45, 0.95)) * (1 if rng.between(-1, 1) > 0 else -1)
+                    nup = up * rng.between(0.55, 0.85)
+                    tree(px, w, h, nx % w, int(fat * rng.between(0.7, 0.95)),
+                         int(on((nx % w) / w) - high(nup * scale)),
+                         lerp3(tone, ink, mix + 0.08), base=int(on((nx % w) / w)), rng=rng)
 
         conifers(line, colour, (16, 12, 8)[index], (1, 0.75, 0.5)[index], 0.55)
         plant = lambda k, on, tone: conifers(
@@ -725,7 +919,7 @@ def draw(theme, index, w, h):
             (1.15, 0.85, 0.58)[index] * (1.0 + 0.2 * k), 0.5 - 0.1 * k)
 
     elif theme == "nordic":
-        fill_below(px, w, h, line, colour)
+        fill_below(px, w, h, rim(px, w, h, line, catch, lit), colour)
         if index == 1:
             # A fortress on the middle ridge: five towers and a wall between them.
             keep = lerp3(colour, ink, 0.45)
@@ -742,7 +936,7 @@ def draw(theme, index, w, h):
                        cap=wide(0.012))
 
     elif theme == "temple":
-        fill_below(px, w, h, line, colour)
+        fill_below(px, w, h, rim(px, w, h, line, catch, lit), colour)
         if index == 2:
             pyramid(px, w, h, int(w * 0.34), wide(1.70), int(row(0.09)),
                     lerp3(colour, ink, 0.60))
@@ -753,7 +947,7 @@ def draw(theme, index, w, h):
             # for. An obelisk is a narrow thing, but it is a narrow BUILDING.
             def stones(on, tone, count, mix):
                 for i in range(count):
-                    x = int(w * (i + 0.5) / count + rng.between(-90, 90))
+                    x = int(w * (i + 0.5) / count + w * rng.between(-0.044, 0.044))
                     top = int(on(x / w) - high(rng.between(0.20, 0.32)))
                     obelisk(px, w, h, x, wide(0.055), top, lerp3(tone, ink, mix))
 
@@ -765,8 +959,8 @@ def draw(theme, index, w, h):
         # whole layer lighter and lose the ridge entirely under an overcast sky; a bright
         # edge along the top of the land with the darker ground under it is what a covered
         # slope actually looks like from across a valley, and it costs one extra fill.
-        snow = lerp3(colour, (236, 241, 247), (0.70, 0.55, 0.38)[index])
-        cap = max(2, int(high((0.020, 0.014, 0.009)[index])))
+        snow = lerp3(colour, (236, 241, 247), (0.56, 0.44, 0.30)[index])
+        cap = max(2, int(high((0.016, 0.011, 0.007)[index])))
         fill_below(px, w, h, line, snow)
         fill_below(px, w, h, lambda u: line(u) + cap, colour)
 
@@ -786,20 +980,25 @@ def draw(theme, index, w, h):
         def stand(on, tone, count, scale, mix):
             """Conifers under snow: dark trunks, and a pale one here and there."""
             for i in range(count):
-                x = int(w * (i + rng.between(0.15, 0.85)) / count)
+                x = int(w * (i + rng.between(-0.35, 1.35)) / count)
                 up = rng.between(0.10, 1.0) ** 3 * 0.66 + 0.18
                 top = int(on(x / w) - high(up * scale))
                 # One tree in four wears its snow: a whole stand of pale trees is a
                 # Christmas card, and none at all is the forest arena in grey.
-                laden = rng.between(0.0, 1.0) < 0.28
-                shade = lerp3(tone, (228, 236, 244) if laden else ink,
-                              0.42 if laden else mix)
-                tree(px, w, h, x, wide((0.130, 0.108, 0.086)[index]), top, shade)
+                # A quarter of them, and not nearly as white as they were. At 0.42 towards
+                # paper white these read as lamps rather than as trees with snow on them --
+                # against an overcast sky the brightest thing in the picture should still be
+                # the sky.
+                laden = rng.between(0.0, 1.0) < 0.24
+                shade = lerp3(tone, (210, 220, 232) if laden else ink,
+                              0.26 if laden else mix)
+                tree(px, w, h, x, wide((0.190, 0.156, 0.125)[index]), top, shade,
+                     base=int(on(x / w)), rng=rng)
 
         def piles(on, tone, count, mix):
             """Cut timber, stacked and waiting. The near bands get the big ones."""
             for i in range(count):
-                x = int(w * (i + 0.5) / count + rng.between(-70, 70))
+                x = int(w * (i + 0.5) / count + w * rng.between(-0.034, 0.034))
                 base = int(on(x / w))
                 rows = (4, 3, 2)[index]
                 logs(px, w, h, x, wide((0.145, 0.110, 0.080)[index]),
@@ -818,6 +1017,12 @@ def draw(theme, index, w, h):
     # Last, so the near bands occlude the feet of everything standing behind them.
     near_bands(px, w, h, rng, row, high, colour, ink if sky else haze, lumps, index, plant)
 
+    # And the air over all of it. After the bands and the shapes on purpose: aerial
+    # perspective is a property of the DISTANCE a thing is at, not of what it is, so a tree
+    # and the hill behind it both take it and keep the difference between them.
+    aerial(px, w, h, LAYERS[index], haze if sky else ink,
+           (0.14, 0.19, 0.26)[index])
+
     return px
 
 
@@ -829,7 +1034,12 @@ def main(argv):
         for i, layer in enumerate(LAYERS):
             w, h = layer["pixels"]
             name = "bg_%s_%s" % (theme, layer["name"])
-            px = draw(theme, i, w, h)
+
+            # Drawn large and boxed down, which is where the anti-aliasing comes from.
+            n = max(1, SUPERSAMPLE)
+            px = draw(theme, i, w * n, h * n)
+            if n > 1:
+                px = shrink(px, w, h, n)
 
             lit = sum(1 for k in range(3, len(px), 4) if px[k] > 8) / float(w * h)
             if not 0.05 < lit < 0.95:
@@ -837,18 +1047,32 @@ def main(argv):
                       "a solid rectangle rather than a horizon" % (name, lit * 100))
                 return 1
 
-            # Every pixel must be either fully there or not there at all. A backdrop with
-            # partial alpha in it has to be alpha-BLENDED, and blended geometry is drawn
-            # after the opaque pass -- so the layer would come out in FRONT of the arena,
-            # over the fighters, instead of behind them. Cutout keeps it ordinary opaque
-            # geometry that the level occludes for free, which is also what docs/00 asks
-            # the art to look like: flat colour, hard edges, no feathering.
+            # PARTIAL ALPHA IS NOW WANTED, and the rule that used to stand here forbidding
+            # it was reasoning about the wrong shader.
+            #
+            # It said: anything feathered forces alpha BLENDING, and blended geometry draws
+            # after the opaque pass, so the backdrop would come out in front of the fight.
+            # That is true of a Transparent material and these are not one. Backdrop.shader
+            # does `clip(alpha - _Cutoff)` at a cutoff of 0.5 and sits in the AlphaTest
+            # queue: the fragment is kept or thrown away, never blended, and the layer stays
+            # ordinary opaque geometry that the arena occludes by depth.
+            #
+            # And a clip is exactly what WANTS a ramp. With a hard texel edge, magnified
+            # twice over as these are, the clip lands on a texel boundary and the silhouette
+            # is a staircase. With a coverage ramp and bilinear filtering the clip lands
+            # where the edge really is, to a fraction of a texel, which is the whole reason
+            # anti-aliased alpha testing works and why this file now supersamples.
+            #
+            # What is still worth refusing is a ramp so wide it is a fade: more than a few
+            # per cent of the image in between means something is blurring the fills rather
+            # than the edges.
             soft = sum(1 for k in range(3, len(px), 4) if 8 < px[k] < 247)
-            if soft > 0:
-                print("make_backdrops: %s has %d pixel(s) at partial alpha. The layers are "
-                      "drawn as cutout so the arena can occlude them; anything feathered "
-                      "forces alpha blending, and the backdrop then draws over the fight."
-                      % (name, soft))
+            share = soft / float(w * h)
+            if share > 0.06:
+                print("make_backdrops: %s has %.1f%% of its pixels at partial alpha. A "
+                      "coverage ramp along the silhouette is a few per cent; this much is "
+                      "a fade, and a faded cutout pops as the cutoff crosses it."
+                      % (name, share * 100))
                 return 1
 
             path = os.path.join(OUT, name + ".png")
