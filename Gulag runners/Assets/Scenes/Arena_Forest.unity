@@ -86284,6 +86284,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3978640675780065682, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1372700473}
+    - targetCorrespondingSourceObject: {fileID: 3978640675780065682, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1372700476}
     - targetCorrespondingSourceObject: {fileID: -2117188530202603140, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1372700467}
@@ -86387,6 +86390,28 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GulagRunners.Game.SimCollider
   kind: 0
+--- !u!64 &1372700476
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1372700465}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 0
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 7569951872256014818, guid: bdff89a3a290aa445805919f49d5fbd8, type: 3}
 --- !u!1001 &1384928216
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -133790,7 +133815,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9185907458619771011, guid: 185678918f664700a876fef1a9c1b498, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -1.66
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
