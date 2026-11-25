@@ -52,6 +52,13 @@ FIGHT_WIDTH = 2.0
 # of the fight plane is a bar at the fighters' feet; six metres is the floor of a room.
 LINE_DEPTH = 1.5
 
+# And how far off the fighters' own depth that line may sit. This test used to be written
+# against z 0, which is not where anybody stands in any of these arenas -- the fighters are
+# at the BACK of the solid volume, two to five metres behind it -- so it passed every
+# shipped arena while the line sat between the camera and the fight. A metre is the slack
+# a bar 1.5 m deep already gives on each side.
+FIGHT_PLANE_SLACK = 1.0
+
 # And how LOUD it may be. The report after the line was thinned was "make it less
 # eye-catching, so it looks like part of the game" -- and the numbers behind that feeling
 # are the two below.
@@ -374,6 +381,14 @@ def main(argv):
             continue
 
         plane = sc.baker_field("planeZ", float, 0.0)
+
+        # Where the FIGHTERS are, which is not the baker's planeZ: that one says which
+        # colliders get flattened onto the simulation's plane, and sits near zero in every
+        # arena, while the men themselves stand at the back of the solid volume. The
+        # cameras follow their depth (SideViewCamera.depthFromPlayer), so the fighters' own
+        # z is the depth the picture is built around.
+        spawns = geometry.spawns(sc)
+        fight_z = spawns[0][3] if spawns else plane
         found = pools(text, docs, pool_guid)
 
         if not found:
@@ -493,11 +508,14 @@ def main(argv):
                     f"horizontal plane that reaches toward it reads as a floor -- a green "
                     f"platform that rises, which is the one thing the smoke is there to be "
                     f"instead of. Keep it under {LINE_DEPTH:.1f} m, across the fight plane.")
-            elif abs(spos[2]) > deep / 2 + FIGHT_WIDTH / 2:
+            elif abs(spos[2] - fight_z) > deep / 2 + FIGHT_PLANE_SLACK:
                 problems.append(
-                    f"{scene}: the waterline sits at z {spos[2]:+.1f} and is {deep:.1f} m "
-                    f"deep, so it misses the fight plane at z 0 entirely -- a bright line "
-                    f"somewhere behind or in front of the only depth anybody is standing at.")
+                    f"{scene}: the waterline sits at z {spos[2]:+.2f} and is {deep:.1f} m "
+                    f"deep, but the fighters stand at z {fight_z:+.2f} -- so the line is "
+                    f"{abs(spos[2] - fight_z):.1f} m off the only depth anybody is standing "
+                    f"at. In front of them it is a lit green plane between the camera and "
+                    f"the fight, which is the platform the smoke exists to be instead of; "
+                    f"behind them it is a line nobody can see rise.")
 
         # --- and how loud the line is
         surface_mat = material_of(docs, p["surface"]) if p["surface"] else None

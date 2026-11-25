@@ -52,6 +52,10 @@ namespace GulagRunners.GameEditor
             // on scene names is only as good as the day somebody renames one, which is why
             // backdrop_check reads this table rather than keeping its own copy.
             { "Arena_Egypt", "temple" },
+            // The winter sawmill. Its art was drawn in the same pass as the other four and
+            // sat on disk unused, because this table is what says a scene HAS a backdrop --
+            // so the arena opened straight onto the skybox.
+            { "Arena_Sawmill", "sawmill" },
         };
 
         [Serializable]

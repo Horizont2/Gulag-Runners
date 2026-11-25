@@ -4,7 +4,7 @@ import re
 import os
 import io
 import sim_motor_mirror as T
-from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD
+from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP
 from arena_geometry import (rooms, floors, room_w, floor_h, slab, wall, door_h,
                            hatch_w, ladder_w, gap_w, total_w, total_h, left, right,
                            lintel, clear, ladder_x, world)

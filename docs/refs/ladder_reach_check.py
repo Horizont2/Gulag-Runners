@@ -86,7 +86,7 @@ def served(world, top):
     return False
 
 
-def reachable(world, below, above):
+def reachable(world, below, above, home=0.0):
     """Is there a ladder that carries a body from storey `below` up past storey `above`?
 
     This CLIMBS it rather than reasoning about it. The first version of this check asked
@@ -98,6 +98,13 @@ def reachable(world, below, above):
 
     So the body is stood at the foot of each ladder holding up, and the only question asked
     is the one the player asks: did it end up on the floor above.
+
+    `home` is the depth the fighters play at, and it has to be this arena's own. It was
+    nought, which is near enough in the four arenas whose floors are a couple of metres
+    deep, and nowhere near it in Arena_Sawmill: its floors are eight metres deep and step
+    FORWARD as they rise, so the men walk at z -5.63, -4.61 and -3.57. Standing the test
+    body at z 0 put it four metres in front of the ladders on a lane nobody uses, which is
+    both a pass this check cannot claim and a failure it cannot explain.
     """
     for L in world.get("ladder", []):
         if not spans(L, below):
@@ -116,7 +123,7 @@ def reachable(world, below, above):
             if f[3] != below or f[2] - f[0] < STOREY:
                 continue
             if f[2] > L[0] and f[0] < L[2]:
-                lane = lane_on(span(world, "solid", i), 0)
+                lane = lane_on(span(world, "solid", i), home)
                 break
         if lane is None:
             continue
@@ -158,6 +165,13 @@ def arena(path):
     if not world.get("ladder"):
         return
 
+    # Where this arena's fighters stand, from its own spawn points. The motor clamps that
+    # depth into each floor's slice as the body moves between storeys, which is what
+    # lane_on does below.
+    spawns = G.spawns(G.Scene(path))
+    home = spawns[0][3] if spawns else 0.0
+    C["HOME"] = int(home * ONE)
+
     kept = floors_of(world)
     if len(kept) < 2:
         return
@@ -166,7 +180,7 @@ def arena(path):
         below, above = kept[i], kept[i + 1]
         if not served(world, above):
             continue
-        got = reachable(world, below, above)
+        got = reachable(world, below, above, home)
         check("%s: the storey at y %.2f can be reached from y %.2f"
               % (name, above / ONE, below / ONE),
               got,

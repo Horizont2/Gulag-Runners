@@ -38,6 +38,17 @@ CAM = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game",
 GAME = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game")
 SCENES = os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "Scenes")
 
+sys.path.insert(0, HERE)
+import arena_demo_geometry as geometry                    # noqa: E402
+
+# SideViewCamera.cs, read from its own .meta rather than pasted here: a guid written out
+# by hand is a guid that stops matching the day the file is moved.
+CAM_GUID = re.search(
+    r"guid: ([0-9a-f]{32})",
+    open(os.path.join(HERE, "..", "..", "Gulag runners", "Assets", "_Game",
+                      "Presentation", "SideViewCamera.cs.meta"),
+         encoding="utf-8").read()).group(1)
+
 FPS = 60.0
 
 # The camera as the arenas have it (Camera Player 1/2 in every scene agree).
@@ -277,6 +288,57 @@ def one_writer():
     return found
 
 
+def box_holds_the_arena():
+    """Can each camera actually reach the fighters it is following?
+
+    bordersMin/bordersMax clamp the camera to the arena, which is the right idea and
+    the wrong thing to copy between scenes. Arena_Sawmill's rig came over from
+    Arena_Forest and kept Forest's box -- x -16.54..+12.20 on an arena that lives at
+    x -6.57..+16.74 -- so player 2, who spawns at x 14.86, stood two and a half metres
+    beyond the edge the camera could reach. His own view held at 12.20 and framed empty
+    arena with both health bars full, which is the "one player's camera is always lost"
+    report, and nothing in the camera code is wrong: it is doing exactly what the box
+    says.
+
+    So the box has to contain the SPAWNS, and reach most of the solid ground. A spawn
+    outside it is a player who cannot be followed from the first frame of the round.
+    """
+    out = []
+    for name in geometry.arena_scenes():
+        path = os.path.join(SCENES, name)
+        if not os.path.exists(path):
+            continue
+        scene = geometry.Scene(path)
+        spawns = geometry.spawns(scene)
+        if not spawns:
+            continue
+        text = open(path, encoding="utf-8", errors="ignore").read()
+        for block in re.findall(r"--- !u!114 &\d+\n(?:(?!--- !u!).)*", text, re.S):
+            if CAM_GUID not in block:
+                continue
+            lo = re.search(r"^  bordersMin: \{x: ([-\d.e+]+), y: ([-\d.e+]+)\}", block, re.M)
+            hi = re.search(r"^  bordersMax: \{x: ([-\d.e+]+), y: ([-\d.e+]+)\}", block, re.M)
+            if not (lo and hi):
+                continue
+            x0, y0 = float(lo.group(1)), float(lo.group(2))
+            x1, y1 = float(hi.group(1)), float(hi.group(2))
+            if x1 <= x0:
+                out.append((name, f"its camera box is empty or inside out: "
+                                  f"x {x0:+.2f}..{x1:+.2f}"))
+                continue
+            for i, sp in enumerate(spawns, 1):
+                if not (x0 <= sp[0] <= x1):
+                    out.append((name, f"spawn {i} is at x {sp[0]:+.2f}, outside the camera "
+                                      f"box x {x0:+.2f}..{x1:+.2f}. That player's camera "
+                                      f"cannot reach him: it holds at the edge and frames "
+                                      f"empty arena while he fights off screen"))
+                if not (y0 - 1.0 <= sp[1] <= y1):
+                    out.append((name, f"spawn {i} is at y {sp[1]:+.2f}, outside the camera "
+                                      f"box y {y0:+.2f}..{y1:+.2f}"))
+            break                       # the rigs in a scene share a box; one is enough
+    return out
+
+
 def main():
     # The camera's own numbers have to be the ones measured, or this measures a fiction.
     text = open(CAM, encoding="utf-8").read()
@@ -323,6 +385,13 @@ def main():
             f"{where[3]:.1f} m/s). That is the sharp movement at the top of a jump: a window "
             f"that overtakes what it frames. The anchor must be MOVED at the body's own "
             f"speed, never assigned, and the follow time eased rather than switched.")
+
+    reach = box_holds_the_arena()
+    if reach:
+        for scene, why in reach[:6]:
+            problems.append(f"{scene}: {why}.")
+    else:
+        print("  every spawn is inside its own scene's camera box")
 
     others = one_writer()
     if others:

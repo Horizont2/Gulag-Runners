@@ -32,6 +32,13 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, "..", "..", "Gulag runners", "Assets")
 SCENES = os.path.join(ASSETS, "Scenes")
+
+# PlayerController.cs, read from its .meta: a fighter authored straight into a scene carries
+# its own bodyHeight, and that is the number the camera frames against there.
+PLAYER_GUID = re.search(
+    r"guid: ([0-9a-f]{32})",
+    open(os.path.join(ASSETS, "_Game", "Presentation", "PlayerController.cs.meta"),
+         encoding="utf-8").read()).group(1)
 BACKDROPS = os.path.join(ASSETS, "_Game", "Effects", "Backdrops")
 BUILDER = os.path.join(ASSETS, "_Game", "Editor", "BackdropBuilder.cs")
 
@@ -136,8 +143,22 @@ def body_height(scene_text):
     only references it. Reading the SCRIPT's default instead gives 1.8 where the arenas
     actually use 0.91, which is a camera at twice the distance and every layer at twice the
     depth it should be.
+
+    A fighter does not have to BE a prefab instance, though, and in Arena_Sawmill neither of
+    them is: both were built as plain objects carrying the same components, so the value is
+    written in the scene itself. Reading only the prefabs there found nothing and reported a
+    scene whose camera distance is perfectly well described by its own file.
     """
     found = []
+    for block in re.findall(r"--- !u!114 &\d+\n(?:(?!--- !u!).)*", scene_text, re.S):
+        if PLAYER_GUID not in block:
+            continue
+        high = re.search(r"\n *bodyHeight: ([-\d.]+)", block)
+        if high:
+            found.append(("in the scene", float(high.group(1))))
+    if found:
+        return found
+
     prefabs = os.path.join(ASSETS, "Prefabs")
     if not os.path.isdir(prefabs):
         return None

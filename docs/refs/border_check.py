@@ -40,7 +40,12 @@ MIN_WIDTH = 2.0
 # generous about touching, which is not the same as there being something there.
 THIN = 0.02
 
-# How far below a storey counts as having left it for good.
+# How far below the LOWEST floor counts as having left the arena for good.
+#
+# Measured from the bottom of the level, not from the storey the fighter walked off.
+# Walking off a ledge and landing on the floor below is the game working: in this
+# project a storey can be nearly four metres above the next one, so "three metres
+# below where he started" reported a man standing safely on the ground as lost.
 GONE = 3.0
 
 # Long enough to cross any arena in this project twice at a run.
@@ -89,8 +94,13 @@ def walls(baked):
     return out
 
 
-def escapes(w, storey, toward, extra, label):
-    """Run a fighter at one end and say where he ended up."""
+def escapes(w, storey, toward, extra, label, floor=None, span=None):
+    """Run a fighter at one end and say where he ended up.
+
+    `floor` is the top of the lowest storey and `span` the arena's x extent, because
+    leaving the arena is what this asks about. Falling to the floor below is not
+    leaving: it is a route, and in this project a route the level design relies on.
+    """
     s = S((storey["x0"] + storey["x1"]) / 2, storey["top"] + 0.35)
     s.depth = X(storey["z"])
     for _ in range(90):
@@ -100,7 +110,11 @@ def escapes(w, storey, toward, extra, label):
 
     for t in range(RUN_TICKS):
         step(s, toward | (extra if extra and t % 24 == 0 else 0), w)
-    return F(s.x), F(s.y), F(s.y) < storey["top"] - GONE
+    bottom = storey["top"] if floor is None else floor
+    out = F(s.y) < bottom - GONE
+    if span is not None:
+        out = out or not (span[0] - 1.0 <= F(s.x) <= span[1] + 1.0)
+    return F(s.x), F(s.y), out
 
 
 def main(argv):
@@ -139,7 +153,15 @@ def main(argv):
                 # gone with the stamina that paid for it, so a wall only has to hold a
                 # body that is running or jumping at it.
                 for label, extra in (("running", 0), ("jumping", JMP)):
-                    got = escapes(w, storey, toward, extra, label)
+                    # The arena's x extent is the union of its storeys, not the
+                    # lowest one's: a fighter standing on an upper floor that
+                    # overhangs the ground is inside the level, and reading the
+                    # bottom storey's edges as the walls reported Forest's own
+                    # ledges as holes in it.
+                    got = escapes(w, storey, toward, extra, label,
+                                  floor=floors[-1]["top"],
+                                  span=(min(f["x0"] for f in floors),
+                                        max(f["x1"] for f in floors)))
                     if got is None:
                         continue
                     x, y, out = got
@@ -147,7 +169,7 @@ def main(argv):
                         problems.append(
                             f"{name}: a fighter {label} {side} off the storey at "
                             f"y {storey['top']:+.2f} leaves the arena -- ends at "
-                            f"x {x:.2f}, y {y:.1f} and still falling. That end has no "
+                            f"x {x:.2f}, y {y:.1f}, which is outside it. That end has no "
                             f"wall the simulation can see.")
                     else:
                         notes.append(f"  y {storey['top']:+.2f} {side:5s} {label:8s} "

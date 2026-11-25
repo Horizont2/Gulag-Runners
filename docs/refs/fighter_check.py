@@ -210,6 +210,19 @@ def fighters(text, guids):
     return out
 
 
+def scene_built(scene):
+    """How many PlayerControllers are authored straight into the scene, not instanced."""
+    path = os.path.join(SCENES, scene)
+    if not os.path.exists(path):
+        return 0
+    text = open(path, encoding="utf-8", errors="ignore").read()
+    found = 0
+    for block in re.findall(r"--- !u!114 &\d+\n(?:(?!--- !u!).)*", text, re.S):
+        if PLAYER_SCRIPT in block and " stripped" not in block.split("\n")[0]:
+            found += 1
+    return found
+
+
 def brains(text):
     """{fighter's prefab instance: takeOver} for every FighterBrain in the scene.
 
@@ -271,7 +284,22 @@ def main(argv):
     for name, rows in seen.items():
         notes.append(f"{name}: {len(rows)} fighter(s)")
         if not rows:
-            problems.append(f"{name}: no fighters in it at all")
+            # A fighter does not have to be a prefab instance, and in Arena_Sawmill neither
+            # of them is: both were built as plain objects with the same components, so this
+            # found nothing and said the arena had no fighters -- which is alarming and
+            # wrong. What IS wrong is quieter: nothing those two carry comes from the
+            # prefab, so every fix made to Player 1.prefab has to be made again here, by
+            # hand, and the stamina pass had to be applied to this scene twice.
+            loose = scene_built(name)
+            if loose:
+                problems.append(
+                    f"{name}: {loose} fighter(s), and not one of them is an instance of a "
+                    f"player prefab -- they were built in the scene. They work, and they "
+                    f"will keep working while nobody touches Player 1.prefab: a change "
+                    f"made there reaches every other arena and not this one. Replace them "
+                    f"with prefab instances, or expect to fix this arena twice every time")
+            else:
+                problems.append(f"{name}: no fighters in it at all")
             continue
 
         thinking = brains(text_of[name])

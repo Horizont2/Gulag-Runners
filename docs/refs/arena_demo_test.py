@@ -12,7 +12,7 @@ Numbers printed next to each check are measured, not asserted — they are what 
 """
 import arena_demo_geometry as G
 import sim_motor_mirror as T
-from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP, DOD
+from sim_motor_mirror import S, step, X, F, L, R, UP, DN, JMP
 
 W = G.world(report=True)
 CHESTS = G.bake()["chest"]
