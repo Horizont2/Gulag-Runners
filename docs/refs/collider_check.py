@@ -501,6 +501,57 @@ def scene_colliders(path):
     return out
 
 
+# A SimCollider reads its shape from the Collider first and from MeshFilter.sharedMesh when
+# there is none. In the editor that mesh is the asset. In a PLAYER, Unity's static batching
+# has combined every Batching Static mesh into one and sharedMesh returns the COMBINED mesh,
+# whose bounds span the whole batch -- so the same marker is a one-metre cube in the editor
+# and a box the size of the batch in the build.
+#
+# That is one machine running a build against its own editor and the two disagreeing: the
+# world fingerprint differs at the handshake and the simulations part a second later, and
+# from inside the build it is invisible collision where no art is. Twenty-eight pieces of
+# arena were in that state -- three floors in the sawmill, fourteen cages in the mine.
+#
+# A Collider fixes it because nothing in the build pipeline touches one. This says so.
+BATCHING_STATIC = 4
+SIM_COLLIDER_GUID = "a92ea500d0103a36b3143c8a534b18b2"
+
+
+def batched_without_a_collider(path):
+    """Marked objects that read their shape from a mesh the build will have replaced."""
+    text = open(path, encoding="utf-8", errors="ignore").read()
+    docs = documents(text)
+    owners, kinds = {}, {}
+    for fid, doc in docs.items():
+        cls, body = doc["cls"], doc["body"]
+        if cls == 114 and SIM_COLLIDER_GUID in body and not re.search(
+                r"^  m_Enabled: 0", body, re.M):
+            m = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+            if m:
+                owners.setdefault(int(m.group(1)), []).append(fid)
+        if cls in (65, 136, 135, 64, 33):
+            m = re.search(r"m_GameObject: \{fileID: (-?\d+)\}", body)
+            if m:
+                kinds.setdefault(int(m.group(1)), set()).add(cls)
+
+    out = []
+    for go in sorted(owners):
+        if go not in docs or docs[go]["stripped"]:
+            continue                       # stripped: the prefab carries its own parts
+        have = kinds.get(go, set())
+        if have & {65, 136, 135, 64}:
+            continue                       # a Collider, which batching cannot touch
+        if 33 not in have:
+            continue                       # no mesh either: LocalBox falls back to a unit cube
+        body = docs[go]["body"]
+        flags = re.search(r"^  m_StaticEditorFlags: (\d+)", body, re.M)
+        if not flags or not (int(flags.group(1)) & BATCHING_STATIC):
+            continue
+        name = re.search(r"^  m_Name: (.*)$", body, re.M)
+        out.append(name.group(1).strip() if name else str(go))
+    return out
+
+
 def main(argv):
     wanted = argv or geometry.arena_scenes()
     problems, notes = [], []
@@ -565,6 +616,22 @@ def main(argv):
                     f"becomes its BOUNDS in the simulation, so a shape with a hole in it, "
                     f"or an arch, or a rock the arena sits inside, becomes solid all "
                     f"through. Mark it Ignore unless it is really meant to be a wall.")
+
+    for name in wanted:
+        path = os.path.join(SCENES, name)
+        if not os.path.exists(path):
+            continue
+        batched = batched_without_a_collider(path)
+        if batched:
+            problems.append(
+                f"{name}: {len(batched)} marked object(s) are Batching Static with no "
+                f"Collider, so the simulation reads their shape off MeshFilter.sharedMesh "
+                f"-- and in a build that is the COMBINED batch mesh, not theirs. The same "
+                f"arena then bakes one way in the editor and another in the player: the "
+                f"world fingerprint disagrees at the handshake and the two simulations "
+                f"part within a second. Give each a BoxCollider; a Collider is read first "
+                f"and the build pipeline does not touch it. ("
+                + ", ".join(batched[:6]) + (", ..." if len(batched) > 6 else "") + ")")
 
     for n in notes:
         print("  note: " + n if not n.startswith("  ") else "  " + n)
