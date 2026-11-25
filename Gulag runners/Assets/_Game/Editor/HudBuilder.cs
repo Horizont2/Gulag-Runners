@@ -936,10 +936,12 @@ namespace GulagRunners.GameEditor
             view.wins2 = Marks(bar, sprites, "Wins / P2", 1120 + 24, 90, 0.5f);
 
             // The one line the NETWORK speaks on, under the round label and centred.
-            // NetMatch has said two things since it was written -- the other player has
-            // stopped answering, and a bot has their fighter now -- and until this label
-            // existed nothing drew either. A freeze that explains itself is a wait; the
-            // same freeze with nothing on it is a hang.
+            //
+            // It had a third colour, `waiting`, for the two things NetMatch used to say:
+            // a countdown while the other player stopped answering, and the news that a
+            // bot had taken their fighter. Both are gone -- neither is this player's
+            // business -- and the field went with them. What is left is a refusal, which
+            // is news that there is no match, and a rematch, which is news to live with.
             //
             // Empty at rest, so the HUD is no busier than it was for the whole of a
             // match where nothing goes wrong.
@@ -947,7 +949,7 @@ namespace GulagRunners.GameEditor
                                            0.5f, TextAnchor.UpperCenter, 30);
             NetNotice speaks = Undo.AddComponent<NetNotice>(notice.gameObject);
             speaks.target = notice;
-            speaks.waiting = UiPalette.Amber;
+            speaks.refused = UiPalette.Danger;
             speaks.settled = UiPalette.Ink;
         }
 

@@ -102,6 +102,33 @@ MULTI = re.compile(
     r'(?:[A-Za-z_][\w<>,\[\]\.\?]*)\s+'
     r'([A-Za-z_]\w*)\s*(?:=[^,;]*)?\s*,\s*([^;]+);')
 
+# A property whose BRACE IS ON THE NEXT LINE. MEMBER_DECL wants a `(`, `=>`, `=`, `;` or
+# `{` straight after the name, and this style ends the line there instead:
+#
+#     public float EffectiveViewHeight
+#     {
+#         get => ...
+#
+# Six of them went uncollected -- EffectiveViewHeight, Flooded, SuggestedDelay,
+# ExternallyClocked and two more -- and every file that read one looked like it was
+# reaching for something removed.
+OPEN_NEXT_LINE = re.compile(
+    r'^\s*(?:\[[^\]]*\]\s*)*'
+    r'(?:public|private|protected|internal)\s+'
+    r'(?:static\s+|readonly\s+|sealed\s+|override\s+|virtual\s+|abstract\s+|new\s+|'
+    r'extern\s+|partial\s+|unsafe\s+)*'
+    r'(?:[A-Za-z_][\w\[\]\.\?]*(?:<[^<>]*(?:<[^<>]*>)?[^<>]*>)?)\s+'
+    r'([A-Za-z_]\w*)\s*$')
+
+# And a field with no access modifier at all, which C# makes private and this project
+# writes a lot of: `Image _black;`, `float _hold;`. Only ever ADDS a name to a type's
+# surface, so a loose match here makes this check quieter, never noisier.
+IMPLICIT_FIELD = re.compile(
+    r'^\s*(?:\[[^\]]*\]\s*)*'
+    r'(?:static\s+|readonly\s+|const\s+|volatile\s+)*'
+    r'(?:[A-Za-z_][\w\[\]\.\?]*(?:<[^<>]*(?:<[^<>]*>)?[^<>]*>)?)\s+'
+    r'([A-Za-z_]\w*)\s*(?:=[^;]*)?;\s*$')
+
 TYPE_DECL = re.compile(
     r'^\s*(?:public|internal|private|protected|static|sealed|abstract|partial|\s)*'
     r'(class|struct|interface|enum)\s+([A-Za-z_]\w*)\s*(?::\s*([^{\n]+))?')
@@ -163,6 +190,10 @@ def types_of(files):
                 m = MEMBER_DECL.match(line)
                 if m:
                     members[owner].add(m.group(1))
+                for other in (OPEN_NEXT_LINE, IMPLICIT_FIELD):
+                    hit = other.match(line)
+                    if hit:
+                        members[owner].add(hit.group(1))
 
                 # `public Fix MinX, MinY, MaxX, MaxY;` is four fields, and this is its own
                 # test rather than a continuation of the one above -- MEMBER_DECL wants a
@@ -206,18 +237,38 @@ def surface(name, members, bases, seen=None):
     return out
 
 
-def unity_backed(name, bases, members, seen=None):
-    """True when the type descends from something this project does not declare."""
+# The one foreign base this check will reason about. A MonoBehaviour's own surface is
+# small, fixed and already written out in UNITY above, and nearly every view and component
+# in this project is one -- so skipping them cost the check the commonest case there is.
+# It cost it twice in a week: `view.sparksOnBlock` when the block went, and
+# `speaks.waiting` when the disconnect notice went. Both were a field removed from a
+# MonoBehaviour while a writer stayed behind, and both were found by Unity in front of
+# somebody waiting to build.
+#
+# Nothing else is let through. EditorWindow, Editor, ScriptableObject, Graphic and the UI
+# behaviours each carry a surface no list here can stay level with -- the first version of
+# this check kept one and was still wrong about EditorWindow.minSize.
+KNOWN_BASES = {"MonoBehaviour"}
+
+
+def foreign_bases(name, bases, members, seen=None):
+    """The base types this project does not declare, anywhere up the chain."""
     seen = seen or set()
     if name in seen:
-        return False
+        return set()
     seen.add(name)
+    out = set()
     for b in bases.get(name, []):
         if b not in members:
-            return True
-        if unity_backed(b, bases, members, seen):
-            return True
-    return False
+            out.add(b)
+        else:
+            out |= foreign_bases(b, bases, members, seen)
+    return out
+
+
+def unity_backed(name, bases, members, seen=None):
+    """True when the type descends from a foreign type this check cannot account for."""
+    return bool(foreign_bases(name, bases, members) - KNOWN_BASES)
 
 
 def main():
